@@ -174,7 +174,9 @@ class _AudioListTile extends StatelessWidget {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Audio file not found. The file may have been deleted.'),
+                content: Text(
+                  'Audio file not found. The file may have been deleted.',
+                ),
                 duration: Duration(seconds: 3),
               ),
             );
@@ -182,7 +184,7 @@ class _AudioListTile extends StatelessWidget {
             context.read<AudioLibraryProvider>().removeAudioItem(audioItem.id);
             return;
           }
-          
+
           context.read<PlayerProvider>().loadAudio(audioItem);
           Navigator.pushNamed(context, '/player');
         },
@@ -448,30 +450,21 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
     );
 
     if (existingItem.id.isNotEmpty) {
-      // 已存在同名文件，提示是否覆盖
-      final shouldOverwrite = await showDialog<bool>(
+      // 已存在同名文件，提示用户先删除原音频
+      await showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('文件已存在'),
-          content: Text('已存在名为 "$_audioName" 的音频文件，是否覆盖？'),
+          content: Text('已存在名为 "$_audioName" 的音频文件，请先删除原音频后再导入。'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('覆盖'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('确定'),
             ),
           ],
         ),
       );
-
-      if (shouldOverwrite != true) return;
-
-      // 覆盖：删除旧条目，添加新条目
-      await library.removeAudioItem(existingItem.id);
+      return;
     }
 
     setState(() {
