@@ -267,6 +267,7 @@ This is the second sentence.
 # 生成图标
 flutter pub run flutter_launcher_icons
 # 安装 ios 版本
+flutter devices
 flutter run --release -d <device_id>
 # 构建 macos 版本
 flutter build macos --release
