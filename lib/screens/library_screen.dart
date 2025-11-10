@@ -328,7 +328,8 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
             ? await _getDownloadsDirectory()
             : null;
         result = await FilePicker.platform.pickFiles(
-          type: FileType.audio,
+          type: FileType.custom,
+          allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'flac'],
           initialDirectory: initialDir,
         );
       }
@@ -346,9 +347,9 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${l10n.pickAudioFileFailed}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.pickAudioFileFailed}: $e')),
+        );
       }
     }
   }
@@ -370,7 +371,8 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
             ? await _getDownloadsDirectory()
             : null;
         result = await FilePicker.platform.pickFiles(
-          type: FileType.any,
+          type: FileType.custom,
+          allowedExtensions: ['srt', 'lrc', 'txt', 'vtt', 'ass', 'ssa'],
           initialDirectory: initialDir,
           allowMultiple: false,
         );
@@ -388,9 +390,9 @@ class _AddAudioDialogState extends State<_AddAudioDialog> {
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${l10n.pickTranscriptFileFailed}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.pickTranscriptFileFailed}: $e')),
+        );
       }
     }
   }
