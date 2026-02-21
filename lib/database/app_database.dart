@@ -100,10 +100,10 @@ class AppDatabase extends _$AppDatabase {
       WHERE deleted_at IS NULL
     ''');
 
-    // 合集排序（排除已删除）
+    // 合集按创建时间排序（排除已删除）
     await customStatement('''
-      CREATE INDEX IF NOT EXISTS idx_collections_sort
-      ON collections(sort_order)
+      CREATE INDEX IF NOT EXISTS idx_collections_created
+      ON collections(created_date DESC)
       WHERE deleted_at IS NULL
     ''');
 

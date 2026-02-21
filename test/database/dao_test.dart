@@ -169,7 +169,6 @@ void main() {
           id: Value('col-1'),
           name: Value('Test Collection'),
           createdDate: Value(now),
-          sortOrder: Value(0),
           updatedAt: Value(now),
         ),
       );

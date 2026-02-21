@@ -7,7 +7,7 @@ import 'audio_library_provider.dart';
 
 part 'collection_provider.g.dart';
 
-enum CollectionSortType { nameAsc, nameDesc, dateAsc, dateDesc, custom }
+enum CollectionSortType { nameAsc, nameDesc, dateAsc, dateDesc }
 
 enum CollectionViewMode { grid, list }
 
@@ -51,8 +51,6 @@ class CollectionState {
         sorted.sort((a, b) => a.createdDate.compareTo(b.createdDate));
       case CollectionSortType.dateDesc:
         sorted.sort((a, b) => b.createdDate.compareTo(a.createdDate));
-      case CollectionSortType.custom:
-        sorted.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     }
     return sorted;
   }
@@ -94,7 +92,6 @@ class CollectionList extends _$CollectionList {
             name: row.name,
             createdDate: row.createdDate,
             isStarred: row.isStarred,
-            sortOrder: row.sortOrder,
           ),
         )
         .toList();
@@ -138,7 +135,6 @@ class CollectionList extends _$CollectionList {
       id: now.millisecondsSinceEpoch.toString(),
       name: name,
       createdDate: now,
-      sortOrder: state.rawCollections.length,
     );
     state = state.copyWith(
       rawCollections: [...state.rawCollections, collection],
@@ -247,43 +243,6 @@ class CollectionList extends _$CollectionList {
     state = state.copyWith(sortType: type);
   }
 
-  Future<void> reorderCollections(int oldIndex, int newIndex) async {
-    final sorted = state.collections;
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
-    final item = sorted.removeAt(oldIndex);
-    sorted.insert(newIndex, item);
-
-    final collections = [...state.rawCollections];
-    for (int i = 0; i < sorted.length; i++) {
-      final idx = collections.indexWhere((c) => c.id == sorted[i].id);
-      if (idx != -1) {
-        collections[idx] = collections[idx].copyWith(sortOrder: i);
-      }
-    }
-
-    state = state.copyWith(rawCollections: collections);
-    // 批量更新排序
-    for (final c in collections) {
-      await _upsertCollection(c);
-    }
-  }
-
-  Future<void> applyCustomOrder(List<String> orderedIds) async {
-    final collections = [...state.rawCollections];
-    for (int i = 0; i < orderedIds.length; i++) {
-      final idx = collections.indexWhere((c) => c.id == orderedIds[i]);
-      if (idx != -1) {
-        collections[idx] = collections[idx].copyWith(sortOrder: i);
-      }
-    }
-    state = state.copyWith(rawCollections: collections);
-    for (final c in collections) {
-      await _upsertCollection(c);
-    }
-  }
-
   /// 将 Collection 模型写入 Drift 数据库
   Future<void> _upsertCollection(Collection collection) async {
     final dao = ref.read(collectionDaoProvider);
@@ -293,7 +252,6 @@ class CollectionList extends _$CollectionList {
         name: Value(collection.name),
         createdDate: Value(collection.createdDate),
         isStarred: Value(collection.isStarred),
-        sortOrder: Value(collection.sortOrder),
         updatedAt: Value(DateTime.now()),
       ),
     );

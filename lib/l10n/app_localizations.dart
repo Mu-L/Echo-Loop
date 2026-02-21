@@ -740,12 +740,6 @@ abstract class AppLocalizations {
   /// **'Newest First'**
   String get sortByDateDesc;
 
-  /// No description provided for @sortByCustom.
-  ///
-  /// In en, this message translates to:
-  /// **'Custom Order'**
-  String get sortByCustom;
-
   /// No description provided for @sortCollections.
   ///
   /// In en, this message translates to:

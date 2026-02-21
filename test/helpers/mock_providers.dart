@@ -57,7 +57,6 @@ Collection createTestCollection({
   String id = 'test-collection-1',
   String name = 'Test Collection',
   bool isStarred = false,
-  int sortOrder = 0,
   DateTime? createdDate,
 }) {
   return Collection(
@@ -65,7 +64,6 @@ Collection createTestCollection({
     name: name,
     createdDate: createdDate ?? DateTime(2026, 1, 1),
     isStarred: isStarred,
-    sortOrder: sortOrder,
   );
 }
 
@@ -148,7 +146,6 @@ class TestCollectionList extends CollectionList {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       createdDate: DateTime.now(),
-      sortOrder: state.rawCollections.length,
     );
     state = state.copyWith(
       rawCollections: [...state.rawCollections, collection],

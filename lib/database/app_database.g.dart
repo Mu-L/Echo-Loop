@@ -640,18 +640,6 @@ class $CollectionsTable extends Collections
     ),
     defaultValue: const Constant(false),
   );
-  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
-    'sortOrder',
-  );
-  @override
-  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
-    'sort_order',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -692,7 +680,6 @@ class $CollectionsTable extends Collections
     name,
     createdDate,
     isStarred,
-    sortOrder,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -737,12 +724,6 @@ class $CollectionsTable extends Collections
       context.handle(
         _isStarredMeta,
         isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta),
-      );
-    }
-    if (data.containsKey('sort_order')) {
-      context.handle(
-        _sortOrderMeta,
-        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
     if (data.containsKey('updated_at')) {
@@ -790,10 +771,6 @@ class $CollectionsTable extends Collections
         DriftSqlType.bool,
         data['${effectivePrefix}is_starred'],
       )!,
-      sortOrder: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}sort_order'],
-      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -828,9 +805,6 @@ class Collection extends DataClass implements Insertable<Collection> {
   /// 星标
   final bool isStarred;
 
-  /// 排序序号
-  final int sortOrder;
-
   /// 最后修改时间
   final DateTime updatedAt;
 
@@ -844,7 +818,6 @@ class Collection extends DataClass implements Insertable<Collection> {
     required this.name,
     required this.createdDate,
     required this.isStarred,
-    required this.sortOrder,
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
@@ -856,7 +829,6 @@ class Collection extends DataClass implements Insertable<Collection> {
     map['name'] = Variable<String>(name);
     map['created_date'] = Variable<DateTime>(createdDate);
     map['is_starred'] = Variable<bool>(isStarred);
-    map['sort_order'] = Variable<int>(sortOrder);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -871,7 +843,6 @@ class Collection extends DataClass implements Insertable<Collection> {
       name: Value(name),
       createdDate: Value(createdDate),
       isStarred: Value(isStarred),
-      sortOrder: Value(sortOrder),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -890,7 +861,6 @@ class Collection extends DataClass implements Insertable<Collection> {
       name: serializer.fromJson<String>(json['name']),
       createdDate: serializer.fromJson<DateTime>(json['createdDate']),
       isStarred: serializer.fromJson<bool>(json['isStarred']),
-      sortOrder: serializer.fromJson<int>(json['sortOrder']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
@@ -904,7 +874,6 @@ class Collection extends DataClass implements Insertable<Collection> {
       'name': serializer.toJson<String>(name),
       'createdDate': serializer.toJson<DateTime>(createdDate),
       'isStarred': serializer.toJson<bool>(isStarred),
-      'sortOrder': serializer.toJson<int>(sortOrder),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
@@ -916,7 +885,6 @@ class Collection extends DataClass implements Insertable<Collection> {
     String? name,
     DateTime? createdDate,
     bool? isStarred,
-    int? sortOrder,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
@@ -925,7 +893,6 @@ class Collection extends DataClass implements Insertable<Collection> {
     name: name ?? this.name,
     createdDate: createdDate ?? this.createdDate,
     isStarred: isStarred ?? this.isStarred,
-    sortOrder: sortOrder ?? this.sortOrder,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -938,7 +905,6 @@ class Collection extends DataClass implements Insertable<Collection> {
           ? data.createdDate.value
           : this.createdDate,
       isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
-      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncStatus: data.syncStatus.present
@@ -954,7 +920,6 @@ class Collection extends DataClass implements Insertable<Collection> {
           ..write('name: $name, ')
           ..write('createdDate: $createdDate, ')
           ..write('isStarred: $isStarred, ')
-          ..write('sortOrder: $sortOrder, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -968,7 +933,6 @@ class Collection extends DataClass implements Insertable<Collection> {
     name,
     createdDate,
     isStarred,
-    sortOrder,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -981,7 +945,6 @@ class Collection extends DataClass implements Insertable<Collection> {
           other.name == this.name &&
           other.createdDate == this.createdDate &&
           other.isStarred == this.isStarred &&
-          other.sortOrder == this.sortOrder &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.syncStatus == this.syncStatus);
@@ -992,7 +955,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
   final Value<String> name;
   final Value<DateTime> createdDate;
   final Value<bool> isStarred;
-  final Value<int> sortOrder;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
@@ -1002,7 +964,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     this.name = const Value.absent(),
     this.createdDate = const Value.absent(),
     this.isStarred = const Value.absent(),
-    this.sortOrder = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1013,7 +974,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     required String name,
     required DateTime createdDate,
     this.isStarred = const Value.absent(),
-    this.sortOrder = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1027,7 +987,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Expression<String>? name,
     Expression<DateTime>? createdDate,
     Expression<bool>? isStarred,
-    Expression<int>? sortOrder,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
@@ -1038,7 +997,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       if (name != null) 'name': name,
       if (createdDate != null) 'created_date': createdDate,
       if (isStarred != null) 'is_starred': isStarred,
-      if (sortOrder != null) 'sort_order': sortOrder,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1051,7 +1009,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Value<String>? name,
     Value<DateTime>? createdDate,
     Value<bool>? isStarred,
-    Value<int>? sortOrder,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
@@ -1062,7 +1019,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       name: name ?? this.name,
       createdDate: createdDate ?? this.createdDate,
       isStarred: isStarred ?? this.isStarred,
-      sortOrder: sortOrder ?? this.sortOrder,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1084,9 +1040,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     }
     if (isStarred.present) {
       map['is_starred'] = Variable<bool>(isStarred.value);
-    }
-    if (sortOrder.present) {
-      map['sort_order'] = Variable<int>(sortOrder.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -1110,7 +1063,6 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
           ..write('name: $name, ')
           ..write('createdDate: $createdDate, ')
           ..write('isStarred: $isStarred, ')
-          ..write('sortOrder: $sortOrder, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -4410,7 +4362,6 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       required String name,
       required DateTime createdDate,
       Value<bool> isStarred,
-      Value<int> sortOrder,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -4422,7 +4373,6 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<DateTime> createdDate,
       Value<bool> isStarred,
-      Value<int> sortOrder,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -4488,11 +4438,6 @@ class $$CollectionsTableFilterComposer
 
   ColumnFilters<bool> get isStarred => $composableBuilder(
     column: $table.isStarred,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get sortOrder => $composableBuilder(
-    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4566,11 +4511,6 @@ class $$CollectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get sortOrder => $composableBuilder(
-    column: $table.sortOrder,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4609,9 +4549,6 @@ class $$CollectionsTableAnnotationComposer
 
   GeneratedColumn<bool> get isStarred =>
       $composableBuilder(column: $table.isStarred, builder: (column) => column);
-
-  GeneratedColumn<int> get sortOrder =>
-      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -4683,7 +4620,6 @@ class $$CollectionsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdDate = const Value.absent(),
                 Value<bool> isStarred = const Value.absent(),
-                Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4693,7 +4629,6 @@ class $$CollectionsTableTableManager
                 name: name,
                 createdDate: createdDate,
                 isStarred: isStarred,
-                sortOrder: sortOrder,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
@@ -4705,7 +4640,6 @@ class $$CollectionsTableTableManager
                 required String name,
                 required DateTime createdDate,
                 Value<bool> isStarred = const Value.absent(),
-                Value<int> sortOrder = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4715,7 +4649,6 @@ class $$CollectionsTableTableManager
                 name: name,
                 createdDate: createdDate,
                 isStarred: isStarred,
-                sortOrder: sortOrder,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,

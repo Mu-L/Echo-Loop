@@ -339,9 +339,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sortByDateDesc => 'Newest First';
 
   @override
-  String get sortByCustom => 'Custom Order';
-
-  @override
   String get sortCollections => 'Sort';
 
   @override

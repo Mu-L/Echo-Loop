@@ -14,9 +14,6 @@ class Collections extends Table {
   /// 星标
   BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
 
-  /// 排序序号
-  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
-
   /// 最后修改时间
   DateTimeColumn get updatedAt => dateTime()();
 

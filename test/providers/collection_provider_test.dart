@@ -11,14 +11,12 @@ void main() {
       required String name,
       DateTime? createdDate,
       bool isStarred = false,
-      int sortOrder = 0,
     }) {
       return Collection(
         id: id,
         name: name,
         createdDate: createdDate ?? now,
         isStarred: isStarred,
-        sortOrder: sortOrder,
       );
     }
 
@@ -52,19 +50,16 @@ void main() {
             id: '1',
             name: 'B集',
             createdDate: DateTime(2026, 1, 10),
-            sortOrder: 2,
           ),
           createCollection(
             id: '2',
             name: 'A集',
             createdDate: DateTime(2026, 1, 15),
-            sortOrder: 0,
           ),
           createCollection(
             id: '3',
             name: 'C集',
             createdDate: DateTime(2026, 1, 12),
-            sortOrder: 1,
           ),
         ];
       });
@@ -113,16 +108,6 @@ void main() {
         expect(sorted[2].id, '1'); // 1月10日
       });
 
-      test('custom 按 sortOrder 排序', () {
-        final state = CollectionState(
-          rawCollections: rawCollections,
-          sortType: CollectionSortType.custom,
-        );
-        final sorted = state.collections;
-        expect(sorted[0].id, '2'); // sortOrder=0
-        expect(sorted[1].id, '3'); // sortOrder=1
-        expect(sorted[2].id, '1'); // sortOrder=2
-      });
     });
 
     group('copyWith', () {

@@ -135,7 +135,6 @@
   "sortByNameDesc": "Name (Z-A)",
   "sortByDateAsc": "Oldest First",
   "sortByDateDesc": "Newest First",
-  "sortByCustom": "Custom Order",
   "sortCollections": "Sort",
   "gridView": "Grid View",
   "listView": "List View",

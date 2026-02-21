@@ -107,7 +107,6 @@
   "sortByNameDesc": "名称 (Z-A)",
   "sortByDateAsc": "最早创建",
   "sortByDateDesc": "最近创建",
-  "sortByCustom": "自定义排序",
   "sortCollections": "排序",
   "gridView": "文件夹视图",
   "listView": "列表视图",

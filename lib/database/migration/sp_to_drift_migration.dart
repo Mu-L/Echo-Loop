@@ -133,7 +133,6 @@ class SpToDriftMigration {
           name: Value(c.name),
           createdDate: Value(c.createdDate),
           isStarred: Value(c.isStarred),
-          sortOrder: Value(c.sortOrder),
           updatedAt: Value(now),
           syncStatus: Value(0),
         ),

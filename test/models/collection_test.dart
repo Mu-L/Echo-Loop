@@ -11,7 +11,6 @@ void main() {
         name: '我的合集',
         createdDate: now,
         isStarred: true,
-        sortOrder: 2,
       );
     }
 
@@ -22,7 +21,6 @@ void main() {
           'name': '我的合集',
           'createdDate': now.toIso8601String(),
           'isStarred': true,
-          'sortOrder': 2,
           'audioItemIds': ['a1', 'a2'], // 旧格式兼容
         };
         final col = Collection.fromJson(json);
@@ -31,7 +29,6 @@ void main() {
         expect(col.name, '我的合集');
         expect(col.createdDate, now);
         expect(col.isStarred, true);
-        expect(col.sortOrder, 2);
       });
 
       test('处理缺失可选字段', () {
@@ -43,7 +40,6 @@ void main() {
         final col = Collection.fromJson(json);
 
         expect(col.isStarred, isFalse);
-        expect(col.sortOrder, 0);
       });
     });
 

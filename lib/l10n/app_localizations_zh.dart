@@ -338,9 +338,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sortByDateDesc => '最近创建';
 
   @override
-  String get sortByCustom => '自定义排序';
-
-  @override
   String get sortCollections => '排序';
 
   @override

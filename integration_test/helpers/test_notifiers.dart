@@ -56,7 +56,6 @@ class TestCollectionList extends CollectionList {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       createdDate: DateTime.now(),
-      sortOrder: state.rawCollections.length,
     );
     state = state.copyWith(
       rawCollections: [...state.rawCollections, collection],

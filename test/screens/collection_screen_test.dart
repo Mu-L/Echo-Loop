@@ -214,7 +214,6 @@ void main() {
         expect(find.text('Name (Z-A)'), findsOneWidget);
         expect(find.text('Oldest First'), findsOneWidget);
         expect(find.text('Newest First'), findsOneWidget);
-        expect(find.text('Custom Order'), findsOneWidget);
       });
 
       testWidgets('点击星标切换', (tester) async {

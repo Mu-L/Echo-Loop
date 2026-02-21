@@ -82,16 +82,9 @@ class CollectionScreen extends ConsumerWidget {
         }
 
         final collections = collectionState.collections;
-        final isCustomSort =
-            collectionState.sortType == CollectionSortType.custom;
 
         if (collectionState.viewMode == CollectionViewMode.grid) {
-          if (isCustomSort) {
-            return _buildReorderableGridView(context, collections);
-          }
           return _buildGridView(context, collections);
-        } else if (isCustomSort) {
-          return _buildReorderableListView(context, ref, collections);
         } else {
           return _buildListView(context, collections);
         }
@@ -125,40 +118,6 @@ class CollectionScreen extends ConsumerWidget {
         return _CollectionListTile(collection: collections[index]);
       },
     );
-  }
-
-  /// 可拖拽排序列表视图（Custom Order 模式）
-  Widget _buildReorderableListView(
-    BuildContext context,
-    WidgetRef ref,
-    List<Collection> collections,
-  ) {
-    return ReorderableListView.builder(
-      padding: const EdgeInsets.all(8),
-      buildDefaultDragHandles: false,
-      itemCount: collections.length,
-      onReorder: (oldIndex, newIndex) {
-        ref
-            .read(collectionListProvider.notifier)
-            .reorderCollections(oldIndex, newIndex);
-      },
-      itemBuilder: (context, index) {
-        return _CollectionListTile(
-          key: ValueKey(collections[index].id),
-          collection: collections[index],
-          showDragHandle: true,
-          reorderIndex: index,
-        );
-      },
-    );
-  }
-
-  /// 可拖拽排序网格视图（Custom Order + Grid 模式）
-  Widget _buildReorderableGridView(
-    BuildContext context,
-    List<Collection> collections,
-  ) {
-    return _ReorderableCollectionGrid(collections: collections);
   }
 
   void _showCreateDialog(BuildContext context) {
@@ -203,7 +162,6 @@ class _SortButton extends ConsumerWidget {
             CollectionSortType.dateDesc,
             current,
           ),
-          _sortMenuItem(l10n.sortByCustom, CollectionSortType.custom, current),
         ];
       },
     );
@@ -359,14 +317,9 @@ class _CollectionGridTile extends ConsumerWidget {
 /// 列表项
 class _CollectionListTile extends ConsumerWidget {
   final Collection collection;
-  final bool showDragHandle;
-  final int reorderIndex;
 
   const _CollectionListTile({
-    super.key,
     required this.collection,
-    this.showDragHandle = false,
-    this.reorderIndex = 0,
   });
 
   @override
@@ -465,19 +418,6 @@ class _CollectionListTile extends ConsumerWidget {
                 },
               ),
             ),
-            // 拖拽排序手柄
-            if (showDragHandle)
-              ReorderableDragStartListener(
-                index: reorderIndex,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Icon(
-                    Icons.drag_handle,
-                    color: Theme.of(context).colorScheme.outline,
-                    size: 22,
-                  ),
-                ),
-              ),
           ],
         ),
         onTap: () => _openCollection(context),
@@ -491,107 +431,6 @@ class _CollectionListTile extends ConsumerWidget {
 
   void _openCollection(BuildContext context) {
     context.push(AppRoutes.collectionDetail(collection.id));
-  }
-}
-
-/// 可拖拽排序的网格视图（Custom Order + Grid 模式）
-class _ReorderableCollectionGrid extends ConsumerStatefulWidget {
-  final List<Collection> collections;
-
-  const _ReorderableCollectionGrid({required this.collections});
-
-  @override
-  ConsumerState<_ReorderableCollectionGrid> createState() =>
-      _ReorderableCollectionGridState();
-}
-
-class _ReorderableCollectionGridState
-    extends ConsumerState<_ReorderableCollectionGrid> {
-  late List<Collection> _items;
-  int? _dragIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _items = List.from(widget.collections);
-  }
-
-  @override
-  void didUpdateWidget(covariant _ReorderableCollectionGrid oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 仅在非拖拽状态下同步 provider 数据
-    if (_dragIndex == null) {
-      _items = List.from(widget.collections);
-    }
-  }
-
-  /// 拖拽进入目标位置时，移动元素让出空间
-  void _onHover(String draggedId, int targetIndex) {
-    final fromIndex = _items.indexWhere((c) => c.id == draggedId);
-    if (fromIndex == -1 || fromIndex == targetIndex) return;
-    setState(() {
-      final item = _items.removeAt(fromIndex);
-      _items.insert(targetIndex, item);
-      _dragIndex = targetIndex;
-    });
-  }
-
-  /// 提交最终排序
-  void _commitOrder() {
-    final orderedIds = _items.map((c) => c.id).toList();
-    ref.read(collectionListProvider.notifier).applyCustomOrder(orderedIds);
-    setState(() => _dragIndex = null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _items.length,
-      itemBuilder: (context, index) {
-        final collection = _items[index];
-
-        return DragTarget<String>(
-          onWillAcceptWithDetails: (details) {
-            _onHover(details.data, index);
-            // 返回 false，不触发 onAccept；排序在拖拽结束时统一提交
-            return false;
-          },
-          builder: (context, candidateData, rejectedData) {
-            return LongPressDraggable<String>(
-              data: collection.id,
-              onDragStarted: () {
-                setState(() => _dragIndex = index);
-              },
-              onDragEnd: (_) => _commitOrder(),
-              feedback: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 160,
-                  height: 160 / 0.85,
-                  child: Opacity(
-                    opacity: 0.9,
-                    child: _CollectionGridTile(collection: collection),
-                  ),
-                ),
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.3,
-                child: _CollectionGridTile(collection: collection),
-              ),
-              child: _CollectionGridTile(collection: collection),
-            );
-          },
-        );
-      },
-    );
   }
 }
 

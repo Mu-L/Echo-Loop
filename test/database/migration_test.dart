@@ -102,7 +102,6 @@ void main() {
           'name': 'Collection 1',
           'createdDate': DateTime(2026, 1, 1).toIso8601String(),
           'isStarred': true,
-          'sortOrder': 0,
           'audioItemIds': ['a1', 'a2'],
         },
       ];
