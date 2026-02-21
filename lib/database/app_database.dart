@@ -10,15 +10,20 @@ import 'tables/collections.dart';
 import 'tables/collection_audio_items.dart';
 import 'tables/bookmarks.dart';
 import 'tables/playback_states.dart';
+import 'tables/learning_progresses.dart';
+import 'tables/stage_completions.dart';
 import 'daos/audio_item_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/bookmark_dao.dart';
 import 'daos/playback_state_dao.dart';
+import 'daos/learning_progress_dao.dart';
+import 'daos/stage_completion_dao.dart';
 
 part 'app_database.g.dart';
 
 /// Fluency 应用数据库
-/// 包含 5 张表：audio_items, collections, collection_audio_items, bookmarks, playback_states
+/// 包含 7 张表：audio_items, collections, collection_audio_items, bookmarks,
+/// playback_states, learning_progresses, stage_completions
 @DriftDatabase(
   tables: [
     AudioItems,
@@ -26,14 +31,23 @@ part 'app_database.g.dart';
     CollectionAudioItems,
     Bookmarks,
     PlaybackStates,
+    LearningProgresses,
+    StageCompletions,
   ],
-  daos: [AudioItemDao, CollectionDao, BookmarkDao, PlaybackStateDao],
+  daos: [
+    AudioItemDao,
+    CollectionDao,
+    BookmarkDao,
+    PlaybackStateDao,
+    LearningProgressDao,
+    StageCompletionDao,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -42,6 +56,24 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
         // 创建自定义索引
         await _createCustomIndexes(m);
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        if (from < 2) {
+          await m.createTable(learningProgresses);
+        }
+        // v2→v3：learning_progresses 的 currentStage/currentSubStage 从 INT 改为 TEXT
+        // App 尚未发布，直接重建表
+        if (from < 3) {
+          await m.deleteTable('learning_progresses');
+          await m.createTable(learningProgresses);
+        }
+        // v3→v4：learning_progresses 新增 3 列 + 新建 stage_completions 表
+        // App 尚未发布，直接重建
+        if (from < 4) {
+          await m.deleteTable('learning_progresses');
+          await m.createTable(learningProgresses);
+          await m.createTable(stageCompletions);
+        }
       },
     );
   }

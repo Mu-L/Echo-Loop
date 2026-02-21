@@ -15,6 +15,7 @@ import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/package_info_provider.dart';
 
 // ========== 测试 Notifier ==========
@@ -107,6 +108,14 @@ class TestListeningPractice extends ListeningPractice {
   Future<void> updateSettings(dynamic newSettings) async {}
 }
 
+class TestLearningProgressNotifier extends LearningProgressNotifier {
+  @override
+  LearningProgressState build() => const LearningProgressState();
+
+  @override
+  Future<void> loadAll() async {}
+}
+
 class TestAudioEngine extends AudioEngine {
   @override
   AudioEngineState build() => const AudioEngineState();
@@ -139,6 +148,9 @@ Widget createTestApp() {
       collectionListProvider.overrideWith(() => TestCollectionList()),
       listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
+      learningProgressNotifierProvider.overrideWith(
+        () => TestLearningProgressNotifier(),
+      ),
       packageInfoProvider.overrideWithValue(_testPackageInfo),
     ],
     child: const FluencyApp(),

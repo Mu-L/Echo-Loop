@@ -6,6 +6,7 @@ import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
 import 'collection_provider.dart';
+import 'learning_progress_provider.dart';
 
 part 'audio_library_provider.g.dart';
 
@@ -184,9 +185,12 @@ class AudioLibrary extends _$AudioLibrary {
       audioItems: state.audioItems.where((item) => item.id != id).toList(),
     );
 
-    // 硬删除（CASCADE 会自动清理 junction、bookmarks、playback_states）
+    // 硬删除（CASCADE 会自动清理 junction、bookmarks、playback_states、learning_progresses）
     final dao = ref.read(audioItemDaoProvider);
     await dao.hardDelete(id);
+
+    // 清理学习进度内存状态（硬删除 CASCADE 已清理数据库）
+    ref.read(learningProgressNotifierProvider.notifier).deleteProgress(id);
 
     // 从所有合集中清理对该音频的引用（更新 Provider 内存状态）
     ref.read(collectionListProvider.notifier).removeAudioFromAllCollections(id);

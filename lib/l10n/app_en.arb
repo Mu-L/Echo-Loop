@@ -192,27 +192,39 @@
   "stepBlindListeningDesc": "Listen 1-2 times without subtitles",
   "stepIntensiveListening": "Intensive Listening",
   "stepIntensiveListeningDesc": "Listen sentence by sentence, mark difficult ones",
-  "stepShadowing": "Shadowing",
+  "stepShadowing": "Listen & Repeat",
   "stepShadowingDesc": "Repeat difficult sentences with subtitles",
   "stepRetelling": "Retelling",
   "stepRetellingDesc": "Retell paragraphs in your own words",
-  "review1": "Review 1",
-  "review2": "Review 2",
-  "review3": "Review 3",
-  "review4": "Review 4",
-  "review5": "Review 5",
-  "review6": "Review 6",
-  "review7": "Review 7",
-  "reviewEarTraining": "Ear Training",
-  "reviewGraduation": "Graduation Test",
-  "reviewInterval6h": "After 6h",
+  "reviewRound0": "Review 1",
+  "reviewRound1": "Review 2",
+  "reviewRound2": "Review 3",
+  "reviewRound4": "Review 4",
+  "reviewRound7": "Review 5",
+  "reviewRound14": "Review 6",
+  "reviewRound28": "Review 7",
+  "reviewIntervalNow": "Now",
   "reviewInterval1d": "After 1 day",
-  "reviewInterval3d": "After 3 days",
-  "reviewInterval5d": "After 5 days",
-  "reviewInterval8d": "After 8 days",
-  "reviewInterval11d": "After 11 days",
+  "reviewInterval2d": "After 2 days",
+  "reviewInterval4d": "After 4 days",
+  "reviewInterval7d": "After 7 days",
   "reviewInterval14d": "After 14 days",
-  "reviewInterval21d": "After 21 days",
   "reviewInterval28d": "After 28 days",
-  "startLearning": "Start Learning"
+  "startLearning": "Start Learning",
+  "continueLearning": "Continue Learning",
+  "learningInProgress": "In Progress",
+  "learningCompleted": "Completed",
+  "reviewReady": "Ready to review",
+  "reviewCountdown": "Available in {days} days",
+  "@reviewCountdown": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "reviewCountdownHours": "Available in {hours} hours",
+  "@reviewCountdownHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  }
 }

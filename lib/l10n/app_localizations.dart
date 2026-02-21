@@ -923,7 +923,7 @@ abstract class AppLocalizations {
   /// No description provided for @stepShadowing.
   ///
   /// In en, this message translates to:
-  /// **'Shadowing'**
+  /// **'Listen & Repeat'**
   String get stepShadowing;
 
   /// No description provided for @stepShadowingDesc.
@@ -944,65 +944,53 @@ abstract class AppLocalizations {
   /// **'Retell paragraphs in your own words'**
   String get stepRetellingDesc;
 
-  /// No description provided for @review1.
+  /// No description provided for @reviewRound0.
   ///
   /// In en, this message translates to:
   /// **'Review 1'**
-  String get review1;
+  String get reviewRound0;
 
-  /// No description provided for @review2.
+  /// No description provided for @reviewRound1.
   ///
   /// In en, this message translates to:
   /// **'Review 2'**
-  String get review2;
+  String get reviewRound1;
 
-  /// No description provided for @review3.
+  /// No description provided for @reviewRound2.
   ///
   /// In en, this message translates to:
   /// **'Review 3'**
-  String get review3;
+  String get reviewRound2;
 
-  /// No description provided for @review4.
+  /// No description provided for @reviewRound4.
   ///
   /// In en, this message translates to:
   /// **'Review 4'**
-  String get review4;
+  String get reviewRound4;
 
-  /// No description provided for @review5.
+  /// No description provided for @reviewRound7.
   ///
   /// In en, this message translates to:
   /// **'Review 5'**
-  String get review5;
+  String get reviewRound7;
 
-  /// No description provided for @review6.
+  /// No description provided for @reviewRound14.
   ///
   /// In en, this message translates to:
   /// **'Review 6'**
-  String get review6;
+  String get reviewRound14;
 
-  /// No description provided for @review7.
+  /// No description provided for @reviewRound28.
   ///
   /// In en, this message translates to:
   /// **'Review 7'**
-  String get review7;
+  String get reviewRound28;
 
-  /// No description provided for @reviewEarTraining.
+  /// No description provided for @reviewIntervalNow.
   ///
   /// In en, this message translates to:
-  /// **'Ear Training'**
-  String get reviewEarTraining;
-
-  /// No description provided for @reviewGraduation.
-  ///
-  /// In en, this message translates to:
-  /// **'Graduation Test'**
-  String get reviewGraduation;
-
-  /// No description provided for @reviewInterval6h.
-  ///
-  /// In en, this message translates to:
-  /// **'After 6h'**
-  String get reviewInterval6h;
+  /// **'Now'**
+  String get reviewIntervalNow;
 
   /// No description provided for @reviewInterval1d.
   ///
@@ -1010,41 +998,29 @@ abstract class AppLocalizations {
   /// **'After 1 day'**
   String get reviewInterval1d;
 
-  /// No description provided for @reviewInterval3d.
+  /// No description provided for @reviewInterval2d.
   ///
   /// In en, this message translates to:
-  /// **'After 3 days'**
-  String get reviewInterval3d;
+  /// **'After 2 days'**
+  String get reviewInterval2d;
 
-  /// No description provided for @reviewInterval5d.
+  /// No description provided for @reviewInterval4d.
   ///
   /// In en, this message translates to:
-  /// **'After 5 days'**
-  String get reviewInterval5d;
+  /// **'After 4 days'**
+  String get reviewInterval4d;
 
-  /// No description provided for @reviewInterval8d.
+  /// No description provided for @reviewInterval7d.
   ///
   /// In en, this message translates to:
-  /// **'After 8 days'**
-  String get reviewInterval8d;
-
-  /// No description provided for @reviewInterval11d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 11 days'**
-  String get reviewInterval11d;
+  /// **'After 7 days'**
+  String get reviewInterval7d;
 
   /// No description provided for @reviewInterval14d.
   ///
   /// In en, this message translates to:
   /// **'After 14 days'**
   String get reviewInterval14d;
-
-  /// No description provided for @reviewInterval21d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 21 days'**
-  String get reviewInterval21d;
 
   /// No description provided for @reviewInterval28d.
   ///
@@ -1057,6 +1033,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start Learning'**
   String get startLearning;
+
+  /// No description provided for @continueLearning.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue Learning'**
+  String get continueLearning;
+
+  /// No description provided for @learningInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In Progress'**
+  String get learningInProgress;
+
+  /// No description provided for @learningCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get learningCompleted;
+
+  /// No description provided for @reviewReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to review'**
+  String get reviewReady;
+
+  /// No description provided for @reviewCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {days} days'**
+  String reviewCountdown(int days);
+
+  /// No description provided for @reviewCountdownHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {hours} hours'**
+  String reviewCountdownHours(int hours);
 }
 
 class _AppLocalizationsDelegate

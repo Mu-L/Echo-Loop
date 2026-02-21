@@ -436,10 +436,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stepIntensiveListeningDesc => '逐句盲听，标记难句';
 
   @override
-  String get stepShadowing => '难句跟读';
+  String get stepShadowing => '跟读';
 
   @override
-  String get stepShadowingDesc => '有字幕跟读难句';
+  String get stepShadowingDesc => '跟读难句';
 
   @override
   String get stepRetelling => '段级复述';
@@ -448,59 +448,69 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stepRetellingDesc => '用自己的话复述';
 
   @override
-  String get review1 => '首轮复习';
+  String get reviewRound0 => '首轮复习';
 
   @override
-  String get review2 => '第二轮复习';
+  String get reviewRound1 => '第二轮复习';
 
   @override
-  String get review3 => '第三轮复习';
+  String get reviewRound2 => '第三轮复习';
 
   @override
-  String get review4 => '第四轮复习';
+  String get reviewRound4 => '第四轮复习';
 
   @override
-  String get review5 => '第五轮复习';
+  String get reviewRound7 => '第五轮复习';
 
   @override
-  String get review6 => '第六轮复习';
+  String get reviewRound14 => '第六轮复习';
 
   @override
-  String get review7 => '第七轮复习';
+  String get reviewRound28 => '第七轮复习';
 
   @override
-  String get reviewEarTraining => '磨耳朵';
-
-  @override
-  String get reviewGraduation => '毕业检验';
-
-  @override
-  String get reviewInterval6h => '6小时后';
+  String get reviewIntervalNow => '当前';
 
   @override
   String get reviewInterval1d => '1天后';
 
   @override
-  String get reviewInterval3d => '3天后';
+  String get reviewInterval2d => '2天后';
 
   @override
-  String get reviewInterval5d => '5天后';
+  String get reviewInterval4d => '4天后';
 
   @override
-  String get reviewInterval8d => '8天后';
-
-  @override
-  String get reviewInterval11d => '11天后';
+  String get reviewInterval7d => '7天后';
 
   @override
   String get reviewInterval14d => '14天后';
-
-  @override
-  String get reviewInterval21d => '21天后';
 
   @override
   String get reviewInterval28d => '28天后';
 
   @override
   String get startLearning => '开始学习';
+
+  @override
+  String get continueLearning => '继续学习';
+
+  @override
+  String get learningInProgress => '学习中';
+
+  @override
+  String get learningCompleted => '已完成';
+
+  @override
+  String get reviewReady => '可以复习了';
+
+  @override
+  String reviewCountdown(int days) {
+    return '$days 天后可复习';
+  }
+
+  @override
+  String reviewCountdownHours(int hours) {
+    return '$hours 小时后可复习';
+  }
 }

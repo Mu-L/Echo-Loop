@@ -2445,6 +2445,1084 @@ class PlaybackStatesCompanion extends UpdateCompanion<PlaybackState> {
   }
 }
 
+class $LearningProgressesTable extends LearningProgresses
+    with TableInfo<$LearningProgressesTable, LearningProgressesData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LearningProgressesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _audioItemIdMeta = const VerificationMeta(
+    'audioItemId',
+  );
+  @override
+  late final GeneratedColumn<String> audioItemId = GeneratedColumn<String>(
+    'audio_item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES audio_items (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _currentStageMeta = const VerificationMeta(
+    'currentStage',
+  );
+  @override
+  late final GeneratedColumn<String> currentStage = GeneratedColumn<String>(
+    'current_stage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('firstLearn'),
+  );
+  static const VerificationMeta _currentSubStageMeta = const VerificationMeta(
+    'currentSubStage',
+  );
+  @override
+  late final GeneratedColumn<String> currentSubStage = GeneratedColumn<String>(
+    'current_sub_stage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('blindListen'),
+  );
+  static const VerificationMeta _difficultyMeta = const VerificationMeta(
+    'difficulty',
+  );
+  @override
+  late final GeneratedColumn<int> difficulty = GeneratedColumn<int>(
+    'difficulty',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _firstLearnCompletedAtMeta =
+      const VerificationMeta('firstLearnCompletedAt');
+  @override
+  late final GeneratedColumn<DateTime> firstLearnCompletedAt =
+      GeneratedColumn<DateTime>(
+        'first_learn_completed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastStageCompletedAtMeta =
+      const VerificationMeta('lastStageCompletedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastStageCompletedAt =
+      GeneratedColumn<DateTime>(
+        'last_stage_completed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _currentStageStartedAtMeta =
+      const VerificationMeta('currentStageStartedAt');
+  @override
+  late final GeneratedColumn<DateTime> currentStageStartedAt =
+      GeneratedColumn<DateTime>(
+        'current_stage_started_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _totalStudyDurationMsMeta =
+      const VerificationMeta('totalStudyDurationMs');
+  @override
+  late final GeneratedColumn<int> totalStudyDurationMs = GeneratedColumn<int>(
+    'total_study_duration_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    audioItemId,
+    currentStage,
+    currentSubStage,
+    difficulty,
+    firstLearnCompletedAt,
+    lastStageCompletedAt,
+    currentStageStartedAt,
+    totalStudyDurationMs,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'learning_progresses';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LearningProgressesData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('audio_item_id')) {
+      context.handle(
+        _audioItemIdMeta,
+        audioItemId.isAcceptableOrUnknown(
+          data['audio_item_id']!,
+          _audioItemIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_audioItemIdMeta);
+    }
+    if (data.containsKey('current_stage')) {
+      context.handle(
+        _currentStageMeta,
+        currentStage.isAcceptableOrUnknown(
+          data['current_stage']!,
+          _currentStageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_sub_stage')) {
+      context.handle(
+        _currentSubStageMeta,
+        currentSubStage.isAcceptableOrUnknown(
+          data['current_sub_stage']!,
+          _currentSubStageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('difficulty')) {
+      context.handle(
+        _difficultyMeta,
+        difficulty.isAcceptableOrUnknown(data['difficulty']!, _difficultyMeta),
+      );
+    }
+    if (data.containsKey('first_learn_completed_at')) {
+      context.handle(
+        _firstLearnCompletedAtMeta,
+        firstLearnCompletedAt.isAcceptableOrUnknown(
+          data['first_learn_completed_at']!,
+          _firstLearnCompletedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_stage_completed_at')) {
+      context.handle(
+        _lastStageCompletedAtMeta,
+        lastStageCompletedAt.isAcceptableOrUnknown(
+          data['last_stage_completed_at']!,
+          _lastStageCompletedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_stage_started_at')) {
+      context.handle(
+        _currentStageStartedAtMeta,
+        currentStageStartedAt.isAcceptableOrUnknown(
+          data['current_stage_started_at']!,
+          _currentStageStartedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_study_duration_ms')) {
+      context.handle(
+        _totalStudyDurationMsMeta,
+        totalStudyDurationMs.isAcceptableOrUnknown(
+          data['total_study_duration_ms']!,
+          _totalStudyDurationMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {audioItemId};
+  @override
+  LearningProgressesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LearningProgressesData(
+      audioItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_item_id'],
+      )!,
+      currentStage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}current_stage'],
+      )!,
+      currentSubStage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}current_sub_stage'],
+      )!,
+      difficulty: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}difficulty'],
+      )!,
+      firstLearnCompletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}first_learn_completed_at'],
+      ),
+      lastStageCompletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_stage_completed_at'],
+      ),
+      currentStageStartedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}current_stage_started_at'],
+      ),
+      totalStudyDurationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_study_duration_ms'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LearningProgressesTable createAlias(String alias) {
+    return $LearningProgressesTable(attachedDatabase, alias);
+  }
+}
+
+class LearningProgressesData extends DataClass
+    implements Insertable<LearningProgressesData> {
+  /// 音频 ID，主键 + 外键关联 audio_items（级联删除）
+  final String audioItemId;
+
+  /// 当前大阶段键（对应 LearningStage.key）
+  final String currentStage;
+
+  /// 当前子步骤键（对应 SubStageType.key）
+  final String currentSubStage;
+
+  /// 难度等级（0=easy, 1=medium, 2=hard）
+  final int difficulty;
+
+  /// 首学完成时间（复习间隔计算基准，首学完成前为 null）
+  final DateTime? firstLearnCompletedAt;
+
+  /// 上一阶段完成时间（复习调度核心字段，用于计算下次复习时间）
+  final DateTime? lastStageCompletedAt;
+
+  /// 当前阶段开始时间（进入该阶段的时间，用于断点续学和耗时计算）
+  final DateTime? currentStageStartedAt;
+
+  /// 累计学习时长（毫秒）
+  final int totalStudyDurationMs;
+
+  /// 最后更新时间
+  final DateTime updatedAt;
+  const LearningProgressesData({
+    required this.audioItemId,
+    required this.currentStage,
+    required this.currentSubStage,
+    required this.difficulty,
+    this.firstLearnCompletedAt,
+    this.lastStageCompletedAt,
+    this.currentStageStartedAt,
+    required this.totalStudyDurationMs,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['audio_item_id'] = Variable<String>(audioItemId);
+    map['current_stage'] = Variable<String>(currentStage);
+    map['current_sub_stage'] = Variable<String>(currentSubStage);
+    map['difficulty'] = Variable<int>(difficulty);
+    if (!nullToAbsent || firstLearnCompletedAt != null) {
+      map['first_learn_completed_at'] = Variable<DateTime>(
+        firstLearnCompletedAt,
+      );
+    }
+    if (!nullToAbsent || lastStageCompletedAt != null) {
+      map['last_stage_completed_at'] = Variable<DateTime>(lastStageCompletedAt);
+    }
+    if (!nullToAbsent || currentStageStartedAt != null) {
+      map['current_stage_started_at'] = Variable<DateTime>(
+        currentStageStartedAt,
+      );
+    }
+    map['total_study_duration_ms'] = Variable<int>(totalStudyDurationMs);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LearningProgressesCompanion toCompanion(bool nullToAbsent) {
+    return LearningProgressesCompanion(
+      audioItemId: Value(audioItemId),
+      currentStage: Value(currentStage),
+      currentSubStage: Value(currentSubStage),
+      difficulty: Value(difficulty),
+      firstLearnCompletedAt: firstLearnCompletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firstLearnCompletedAt),
+      lastStageCompletedAt: lastStageCompletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastStageCompletedAt),
+      currentStageStartedAt: currentStageStartedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentStageStartedAt),
+      totalStudyDurationMs: Value(totalStudyDurationMs),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LearningProgressesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LearningProgressesData(
+      audioItemId: serializer.fromJson<String>(json['audioItemId']),
+      currentStage: serializer.fromJson<String>(json['currentStage']),
+      currentSubStage: serializer.fromJson<String>(json['currentSubStage']),
+      difficulty: serializer.fromJson<int>(json['difficulty']),
+      firstLearnCompletedAt: serializer.fromJson<DateTime?>(
+        json['firstLearnCompletedAt'],
+      ),
+      lastStageCompletedAt: serializer.fromJson<DateTime?>(
+        json['lastStageCompletedAt'],
+      ),
+      currentStageStartedAt: serializer.fromJson<DateTime?>(
+        json['currentStageStartedAt'],
+      ),
+      totalStudyDurationMs: serializer.fromJson<int>(
+        json['totalStudyDurationMs'],
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'audioItemId': serializer.toJson<String>(audioItemId),
+      'currentStage': serializer.toJson<String>(currentStage),
+      'currentSubStage': serializer.toJson<String>(currentSubStage),
+      'difficulty': serializer.toJson<int>(difficulty),
+      'firstLearnCompletedAt': serializer.toJson<DateTime?>(
+        firstLearnCompletedAt,
+      ),
+      'lastStageCompletedAt': serializer.toJson<DateTime?>(
+        lastStageCompletedAt,
+      ),
+      'currentStageStartedAt': serializer.toJson<DateTime?>(
+        currentStageStartedAt,
+      ),
+      'totalStudyDurationMs': serializer.toJson<int>(totalStudyDurationMs),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LearningProgressesData copyWith({
+    String? audioItemId,
+    String? currentStage,
+    String? currentSubStage,
+    int? difficulty,
+    Value<DateTime?> firstLearnCompletedAt = const Value.absent(),
+    Value<DateTime?> lastStageCompletedAt = const Value.absent(),
+    Value<DateTime?> currentStageStartedAt = const Value.absent(),
+    int? totalStudyDurationMs,
+    DateTime? updatedAt,
+  }) => LearningProgressesData(
+    audioItemId: audioItemId ?? this.audioItemId,
+    currentStage: currentStage ?? this.currentStage,
+    currentSubStage: currentSubStage ?? this.currentSubStage,
+    difficulty: difficulty ?? this.difficulty,
+    firstLearnCompletedAt: firstLearnCompletedAt.present
+        ? firstLearnCompletedAt.value
+        : this.firstLearnCompletedAt,
+    lastStageCompletedAt: lastStageCompletedAt.present
+        ? lastStageCompletedAt.value
+        : this.lastStageCompletedAt,
+    currentStageStartedAt: currentStageStartedAt.present
+        ? currentStageStartedAt.value
+        : this.currentStageStartedAt,
+    totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
+    return LearningProgressesData(
+      audioItemId: data.audioItemId.present
+          ? data.audioItemId.value
+          : this.audioItemId,
+      currentStage: data.currentStage.present
+          ? data.currentStage.value
+          : this.currentStage,
+      currentSubStage: data.currentSubStage.present
+          ? data.currentSubStage.value
+          : this.currentSubStage,
+      difficulty: data.difficulty.present
+          ? data.difficulty.value
+          : this.difficulty,
+      firstLearnCompletedAt: data.firstLearnCompletedAt.present
+          ? data.firstLearnCompletedAt.value
+          : this.firstLearnCompletedAt,
+      lastStageCompletedAt: data.lastStageCompletedAt.present
+          ? data.lastStageCompletedAt.value
+          : this.lastStageCompletedAt,
+      currentStageStartedAt: data.currentStageStartedAt.present
+          ? data.currentStageStartedAt.value
+          : this.currentStageStartedAt,
+      totalStudyDurationMs: data.totalStudyDurationMs.present
+          ? data.totalStudyDurationMs.value
+          : this.totalStudyDurationMs,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LearningProgressesData(')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('currentStage: $currentStage, ')
+          ..write('currentSubStage: $currentSubStage, ')
+          ..write('difficulty: $difficulty, ')
+          ..write('firstLearnCompletedAt: $firstLearnCompletedAt, ')
+          ..write('lastStageCompletedAt: $lastStageCompletedAt, ')
+          ..write('currentStageStartedAt: $currentStageStartedAt, ')
+          ..write('totalStudyDurationMs: $totalStudyDurationMs, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    audioItemId,
+    currentStage,
+    currentSubStage,
+    difficulty,
+    firstLearnCompletedAt,
+    lastStageCompletedAt,
+    currentStageStartedAt,
+    totalStudyDurationMs,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LearningProgressesData &&
+          other.audioItemId == this.audioItemId &&
+          other.currentStage == this.currentStage &&
+          other.currentSubStage == this.currentSubStage &&
+          other.difficulty == this.difficulty &&
+          other.firstLearnCompletedAt == this.firstLearnCompletedAt &&
+          other.lastStageCompletedAt == this.lastStageCompletedAt &&
+          other.currentStageStartedAt == this.currentStageStartedAt &&
+          other.totalStudyDurationMs == this.totalStudyDurationMs &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LearningProgressesCompanion
+    extends UpdateCompanion<LearningProgressesData> {
+  final Value<String> audioItemId;
+  final Value<String> currentStage;
+  final Value<String> currentSubStage;
+  final Value<int> difficulty;
+  final Value<DateTime?> firstLearnCompletedAt;
+  final Value<DateTime?> lastStageCompletedAt;
+  final Value<DateTime?> currentStageStartedAt;
+  final Value<int> totalStudyDurationMs;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LearningProgressesCompanion({
+    this.audioItemId = const Value.absent(),
+    this.currentStage = const Value.absent(),
+    this.currentSubStage = const Value.absent(),
+    this.difficulty = const Value.absent(),
+    this.firstLearnCompletedAt = const Value.absent(),
+    this.lastStageCompletedAt = const Value.absent(),
+    this.currentStageStartedAt = const Value.absent(),
+    this.totalStudyDurationMs = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LearningProgressesCompanion.insert({
+    required String audioItemId,
+    this.currentStage = const Value.absent(),
+    this.currentSubStage = const Value.absent(),
+    this.difficulty = const Value.absent(),
+    this.firstLearnCompletedAt = const Value.absent(),
+    this.lastStageCompletedAt = const Value.absent(),
+    this.currentStageStartedAt = const Value.absent(),
+    this.totalStudyDurationMs = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : audioItemId = Value(audioItemId),
+       updatedAt = Value(updatedAt);
+  static Insertable<LearningProgressesData> custom({
+    Expression<String>? audioItemId,
+    Expression<String>? currentStage,
+    Expression<String>? currentSubStage,
+    Expression<int>? difficulty,
+    Expression<DateTime>? firstLearnCompletedAt,
+    Expression<DateTime>? lastStageCompletedAt,
+    Expression<DateTime>? currentStageStartedAt,
+    Expression<int>? totalStudyDurationMs,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (audioItemId != null) 'audio_item_id': audioItemId,
+      if (currentStage != null) 'current_stage': currentStage,
+      if (currentSubStage != null) 'current_sub_stage': currentSubStage,
+      if (difficulty != null) 'difficulty': difficulty,
+      if (firstLearnCompletedAt != null)
+        'first_learn_completed_at': firstLearnCompletedAt,
+      if (lastStageCompletedAt != null)
+        'last_stage_completed_at': lastStageCompletedAt,
+      if (currentStageStartedAt != null)
+        'current_stage_started_at': currentStageStartedAt,
+      if (totalStudyDurationMs != null)
+        'total_study_duration_ms': totalStudyDurationMs,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LearningProgressesCompanion copyWith({
+    Value<String>? audioItemId,
+    Value<String>? currentStage,
+    Value<String>? currentSubStage,
+    Value<int>? difficulty,
+    Value<DateTime?>? firstLearnCompletedAt,
+    Value<DateTime?>? lastStageCompletedAt,
+    Value<DateTime?>? currentStageStartedAt,
+    Value<int>? totalStudyDurationMs,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LearningProgressesCompanion(
+      audioItemId: audioItemId ?? this.audioItemId,
+      currentStage: currentStage ?? this.currentStage,
+      currentSubStage: currentSubStage ?? this.currentSubStage,
+      difficulty: difficulty ?? this.difficulty,
+      firstLearnCompletedAt:
+          firstLearnCompletedAt ?? this.firstLearnCompletedAt,
+      lastStageCompletedAt: lastStageCompletedAt ?? this.lastStageCompletedAt,
+      currentStageStartedAt:
+          currentStageStartedAt ?? this.currentStageStartedAt,
+      totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (audioItemId.present) {
+      map['audio_item_id'] = Variable<String>(audioItemId.value);
+    }
+    if (currentStage.present) {
+      map['current_stage'] = Variable<String>(currentStage.value);
+    }
+    if (currentSubStage.present) {
+      map['current_sub_stage'] = Variable<String>(currentSubStage.value);
+    }
+    if (difficulty.present) {
+      map['difficulty'] = Variable<int>(difficulty.value);
+    }
+    if (firstLearnCompletedAt.present) {
+      map['first_learn_completed_at'] = Variable<DateTime>(
+        firstLearnCompletedAt.value,
+      );
+    }
+    if (lastStageCompletedAt.present) {
+      map['last_stage_completed_at'] = Variable<DateTime>(
+        lastStageCompletedAt.value,
+      );
+    }
+    if (currentStageStartedAt.present) {
+      map['current_stage_started_at'] = Variable<DateTime>(
+        currentStageStartedAt.value,
+      );
+    }
+    if (totalStudyDurationMs.present) {
+      map['total_study_duration_ms'] = Variable<int>(
+        totalStudyDurationMs.value,
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LearningProgressesCompanion(')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('currentStage: $currentStage, ')
+          ..write('currentSubStage: $currentSubStage, ')
+          ..write('difficulty: $difficulty, ')
+          ..write('firstLearnCompletedAt: $firstLearnCompletedAt, ')
+          ..write('lastStageCompletedAt: $lastStageCompletedAt, ')
+          ..write('currentStageStartedAt: $currentStageStartedAt, ')
+          ..write('totalStudyDurationMs: $totalStudyDurationMs, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StageCompletionsTable extends StageCompletions
+    with TableInfo<$StageCompletionsTable, StageCompletion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StageCompletionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _audioItemIdMeta = const VerificationMeta(
+    'audioItemId',
+  );
+  @override
+  late final GeneratedColumn<String> audioItemId = GeneratedColumn<String>(
+    'audio_item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES audio_items (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _stageMeta = const VerificationMeta('stage');
+  @override
+  late final GeneratedColumn<String> stage = GeneratedColumn<String>(
+    'stage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _subStageMeta = const VerificationMeta(
+    'subStage',
+  );
+  @override
+  late final GeneratedColumn<String> subStage = GeneratedColumn<String>(
+    'sub_stage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    audioItemId,
+    stage,
+    subStage,
+    completedAt,
+    durationMs,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stage_completions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StageCompletion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('audio_item_id')) {
+      context.handle(
+        _audioItemIdMeta,
+        audioItemId.isAcceptableOrUnknown(
+          data['audio_item_id']!,
+          _audioItemIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_audioItemIdMeta);
+    }
+    if (data.containsKey('stage')) {
+      context.handle(
+        _stageMeta,
+        stage.isAcceptableOrUnknown(data['stage']!, _stageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stageMeta);
+    }
+    if (data.containsKey('sub_stage')) {
+      context.handle(
+        _subStageMeta,
+        subStage.isAcceptableOrUnknown(data['sub_stage']!, _subStageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subStageMeta);
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_completedAtMeta);
+    }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StageCompletion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StageCompletion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      audioItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_item_id'],
+      )!,
+      stage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stage'],
+      )!,
+      subStage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sub_stage'],
+      )!,
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      )!,
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $StageCompletionsTable createAlias(String alias) {
+    return $StageCompletionsTable(attachedDatabase, alias);
+  }
+}
+
+class StageCompletion extends DataClass implements Insertable<StageCompletion> {
+  /// 自增主键
+  final int id;
+
+  /// 音频 ID，外键关联 audio_items（级联删除）
+  final String audioItemId;
+
+  /// 完成的大阶段键（对应 LearningStage.key）
+  final String stage;
+
+  /// 完成的子步骤键（对应 SubStageType.key）
+  final String subStage;
+
+  /// 完成时间
+  final DateTime completedAt;
+
+  /// 该步骤耗时（毫秒），默认 0
+  final int durationMs;
+  const StageCompletion({
+    required this.id,
+    required this.audioItemId,
+    required this.stage,
+    required this.subStage,
+    required this.completedAt,
+    required this.durationMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['audio_item_id'] = Variable<String>(audioItemId);
+    map['stage'] = Variable<String>(stage);
+    map['sub_stage'] = Variable<String>(subStage);
+    map['completed_at'] = Variable<DateTime>(completedAt);
+    map['duration_ms'] = Variable<int>(durationMs);
+    return map;
+  }
+
+  StageCompletionsCompanion toCompanion(bool nullToAbsent) {
+    return StageCompletionsCompanion(
+      id: Value(id),
+      audioItemId: Value(audioItemId),
+      stage: Value(stage),
+      subStage: Value(subStage),
+      completedAt: Value(completedAt),
+      durationMs: Value(durationMs),
+    );
+  }
+
+  factory StageCompletion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StageCompletion(
+      id: serializer.fromJson<int>(json['id']),
+      audioItemId: serializer.fromJson<String>(json['audioItemId']),
+      stage: serializer.fromJson<String>(json['stage']),
+      subStage: serializer.fromJson<String>(json['subStage']),
+      completedAt: serializer.fromJson<DateTime>(json['completedAt']),
+      durationMs: serializer.fromJson<int>(json['durationMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'audioItemId': serializer.toJson<String>(audioItemId),
+      'stage': serializer.toJson<String>(stage),
+      'subStage': serializer.toJson<String>(subStage),
+      'completedAt': serializer.toJson<DateTime>(completedAt),
+      'durationMs': serializer.toJson<int>(durationMs),
+    };
+  }
+
+  StageCompletion copyWith({
+    int? id,
+    String? audioItemId,
+    String? stage,
+    String? subStage,
+    DateTime? completedAt,
+    int? durationMs,
+  }) => StageCompletion(
+    id: id ?? this.id,
+    audioItemId: audioItemId ?? this.audioItemId,
+    stage: stage ?? this.stage,
+    subStage: subStage ?? this.subStage,
+    completedAt: completedAt ?? this.completedAt,
+    durationMs: durationMs ?? this.durationMs,
+  );
+  StageCompletion copyWithCompanion(StageCompletionsCompanion data) {
+    return StageCompletion(
+      id: data.id.present ? data.id.value : this.id,
+      audioItemId: data.audioItemId.present
+          ? data.audioItemId.value
+          : this.audioItemId,
+      stage: data.stage.present ? data.stage.value : this.stage,
+      subStage: data.subStage.present ? data.subStage.value : this.subStage,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StageCompletion(')
+          ..write('id: $id, ')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('stage: $stage, ')
+          ..write('subStage: $subStage, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('durationMs: $durationMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, audioItemId, stage, subStage, completedAt, durationMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StageCompletion &&
+          other.id == this.id &&
+          other.audioItemId == this.audioItemId &&
+          other.stage == this.stage &&
+          other.subStage == this.subStage &&
+          other.completedAt == this.completedAt &&
+          other.durationMs == this.durationMs);
+}
+
+class StageCompletionsCompanion extends UpdateCompanion<StageCompletion> {
+  final Value<int> id;
+  final Value<String> audioItemId;
+  final Value<String> stage;
+  final Value<String> subStage;
+  final Value<DateTime> completedAt;
+  final Value<int> durationMs;
+  const StageCompletionsCompanion({
+    this.id = const Value.absent(),
+    this.audioItemId = const Value.absent(),
+    this.stage = const Value.absent(),
+    this.subStage = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.durationMs = const Value.absent(),
+  });
+  StageCompletionsCompanion.insert({
+    this.id = const Value.absent(),
+    required String audioItemId,
+    required String stage,
+    required String subStage,
+    required DateTime completedAt,
+    this.durationMs = const Value.absent(),
+  }) : audioItemId = Value(audioItemId),
+       stage = Value(stage),
+       subStage = Value(subStage),
+       completedAt = Value(completedAt);
+  static Insertable<StageCompletion> custom({
+    Expression<int>? id,
+    Expression<String>? audioItemId,
+    Expression<String>? stage,
+    Expression<String>? subStage,
+    Expression<DateTime>? completedAt,
+    Expression<int>? durationMs,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (audioItemId != null) 'audio_item_id': audioItemId,
+      if (stage != null) 'stage': stage,
+      if (subStage != null) 'sub_stage': subStage,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (durationMs != null) 'duration_ms': durationMs,
+    });
+  }
+
+  StageCompletionsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? audioItemId,
+    Value<String>? stage,
+    Value<String>? subStage,
+    Value<DateTime>? completedAt,
+    Value<int>? durationMs,
+  }) {
+    return StageCompletionsCompanion(
+      id: id ?? this.id,
+      audioItemId: audioItemId ?? this.audioItemId,
+      stage: stage ?? this.stage,
+      subStage: subStage ?? this.subStage,
+      completedAt: completedAt ?? this.completedAt,
+      durationMs: durationMs ?? this.durationMs,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (audioItemId.present) {
+      map['audio_item_id'] = Variable<String>(audioItemId.value);
+    }
+    if (stage.present) {
+      map['stage'] = Variable<String>(stage.value);
+    }
+    if (subStage.present) {
+      map['sub_stage'] = Variable<String>(subStage.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StageCompletionsCompanion(')
+          ..write('id: $id, ')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('stage: $stage, ')
+          ..write('subStage: $subStage, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('durationMs: $durationMs')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2454,10 +3532,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CollectionAudioItemsTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
   late final $PlaybackStatesTable playbackStates = $PlaybackStatesTable(this);
+  late final $LearningProgressesTable learningProgresses =
+      $LearningProgressesTable(this);
+  late final $StageCompletionsTable stageCompletions = $StageCompletionsTable(
+    this,
+  );
   late final AudioItemDao audioItemDao = AudioItemDao(this as AppDatabase);
   late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
   late final PlaybackStateDao playbackStateDao = PlaybackStateDao(
+    this as AppDatabase,
+  );
+  late final LearningProgressDao learningProgressDao = LearningProgressDao(
+    this as AppDatabase,
+  );
+  late final StageCompletionDao stageCompletionDao = StageCompletionDao(
     this as AppDatabase,
   );
   @override
@@ -2470,6 +3559,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     collectionAudioItems,
     bookmarks,
     playbackStates,
+    learningProgresses,
+    stageCompletions,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2500,6 +3591,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('playback_states', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'audio_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('learning_progresses', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'audio_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('stage_completions', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2597,6 +3702,56 @@ final class $$AudioItemsTableReferences
     ).filter((f) => f.audioItemId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_playbackStatesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $LearningProgressesTable,
+    List<LearningProgressesData>
+  >
+  _learningProgressesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.learningProgresses,
+        aliasName: $_aliasNameGenerator(
+          db.audioItems.id,
+          db.learningProgresses.audioItemId,
+        ),
+      );
+
+  $$LearningProgressesTableProcessedTableManager get learningProgressesRefs {
+    final manager = $$LearningProgressesTableTableManager(
+      $_db,
+      $_db.learningProgresses,
+    ).filter((f) => f.audioItemId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _learningProgressesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$StageCompletionsTable, List<StageCompletion>>
+  _stageCompletionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.stageCompletions,
+    aliasName: $_aliasNameGenerator(
+      db.audioItems.id,
+      db.stageCompletions.audioItemId,
+    ),
+  );
+
+  $$StageCompletionsTableProcessedTableManager get stageCompletionsRefs {
+    final manager = $$StageCompletionsTableTableManager(
+      $_db,
+      $_db.stageCompletions,
+    ).filter((f) => f.audioItemId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _stageCompletionsRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -2723,6 +3878,56 @@ class $$AudioItemsTableFilterComposer
           }) => $$PlaybackStatesTableFilterComposer(
             $db: $db,
             $table: $db.playbackStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> learningProgressesRefs(
+    Expression<bool> Function($$LearningProgressesTableFilterComposer f) f,
+  ) {
+    final $$LearningProgressesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.learningProgresses,
+      getReferencedColumn: (t) => t.audioItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LearningProgressesTableFilterComposer(
+            $db: $db,
+            $table: $db.learningProgresses,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> stageCompletionsRefs(
+    Expression<bool> Function($$StageCompletionsTableFilterComposer f) f,
+  ) {
+    final $$StageCompletionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.stageCompletions,
+      getReferencedColumn: (t) => t.audioItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StageCompletionsTableFilterComposer(
+            $db: $db,
+            $table: $db.stageCompletions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2905,6 +4110,57 @@ class $$AudioItemsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> learningProgressesRefs<T extends Object>(
+    Expression<T> Function($$LearningProgressesTableAnnotationComposer a) f,
+  ) {
+    final $$LearningProgressesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.learningProgresses,
+          getReferencedColumn: (t) => t.audioItemId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$LearningProgressesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.learningProgresses,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> stageCompletionsRefs<T extends Object>(
+    Expression<T> Function($$StageCompletionsTableAnnotationComposer a) f,
+  ) {
+    final $$StageCompletionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.stageCompletions,
+      getReferencedColumn: (t) => t.audioItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StageCompletionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.stageCompletions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$AudioItemsTableTableManager
@@ -2924,6 +4180,8 @@ class $$AudioItemsTableTableManager
             bool collectionAudioItemsRefs,
             bool bookmarksRefs,
             bool playbackStatesRefs,
+            bool learningProgressesRefs,
+            bool stageCompletionsRefs,
           })
         > {
   $$AudioItemsTableTableManager(_$AppDatabase db, $AudioItemsTable table)
@@ -2998,6 +4256,8 @@ class $$AudioItemsTableTableManager
                 collectionAudioItemsRefs = false,
                 bookmarksRefs = false,
                 playbackStatesRefs = false,
+                learningProgressesRefs = false,
+                stageCompletionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -3005,6 +4265,8 @@ class $$AudioItemsTableTableManager
                     if (collectionAudioItemsRefs) db.collectionAudioItems,
                     if (bookmarksRefs) db.bookmarks,
                     if (playbackStatesRefs) db.playbackStates,
+                    if (learningProgressesRefs) db.learningProgresses,
+                    if (stageCompletionsRefs) db.stageCompletions,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -3072,6 +4334,48 @@ class $$AudioItemsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (learningProgressesRefs)
+                        await $_getPrefetchedData<
+                          AudioItem,
+                          $AudioItemsTable,
+                          LearningProgressesData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$AudioItemsTableReferences
+                              ._learningProgressesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$AudioItemsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).learningProgressesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.audioItemId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (stageCompletionsRefs)
+                        await $_getPrefetchedData<
+                          AudioItem,
+                          $AudioItemsTable,
+                          StageCompletion
+                        >(
+                          currentTable: table,
+                          referencedTable: $$AudioItemsTableReferences
+                              ._stageCompletionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$AudioItemsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).stageCompletionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.audioItemId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3096,6 +4400,8 @@ typedef $$AudioItemsTableProcessedTableManager =
         bool collectionAudioItemsRefs,
         bool bookmarksRefs,
         bool playbackStatesRefs,
+        bool learningProgressesRefs,
+        bool stageCompletionsRefs,
       })
     >;
 typedef $$CollectionsTableCreateCompanionBuilder =
@@ -4615,6 +5921,779 @@ typedef $$PlaybackStatesTableProcessedTableManager =
       PlaybackState,
       PrefetchHooks Function({bool audioItemId})
     >;
+typedef $$LearningProgressesTableCreateCompanionBuilder =
+    LearningProgressesCompanion Function({
+      required String audioItemId,
+      Value<String> currentStage,
+      Value<String> currentSubStage,
+      Value<int> difficulty,
+      Value<DateTime?> firstLearnCompletedAt,
+      Value<DateTime?> lastStageCompletedAt,
+      Value<DateTime?> currentStageStartedAt,
+      Value<int> totalStudyDurationMs,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LearningProgressesTableUpdateCompanionBuilder =
+    LearningProgressesCompanion Function({
+      Value<String> audioItemId,
+      Value<String> currentStage,
+      Value<String> currentSubStage,
+      Value<int> difficulty,
+      Value<DateTime?> firstLearnCompletedAt,
+      Value<DateTime?> lastStageCompletedAt,
+      Value<DateTime?> currentStageStartedAt,
+      Value<int> totalStudyDurationMs,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$LearningProgressesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $LearningProgressesTable,
+          LearningProgressesData
+        > {
+  $$LearningProgressesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $AudioItemsTable _audioItemIdTable(_$AppDatabase db) =>
+      db.audioItems.createAlias(
+        $_aliasNameGenerator(
+          db.learningProgresses.audioItemId,
+          db.audioItems.id,
+        ),
+      );
+
+  $$AudioItemsTableProcessedTableManager get audioItemId {
+    final $_column = $_itemColumn<String>('audio_item_id')!;
+
+    final manager = $$AudioItemsTableTableManager(
+      $_db,
+      $_db.audioItems,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_audioItemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$LearningProgressesTableFilterComposer
+    extends Composer<_$AppDatabase, $LearningProgressesTable> {
+  $$LearningProgressesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get currentStage => $composableBuilder(
+    column: $table.currentStage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currentSubStage => $composableBuilder(
+    column: $table.currentSubStage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get difficulty => $composableBuilder(
+    column: $table.difficulty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get firstLearnCompletedAt => $composableBuilder(
+    column: $table.firstLearnCompletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastStageCompletedAt => $composableBuilder(
+    column: $table.lastStageCompletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get currentStageStartedAt => $composableBuilder(
+    column: $table.currentStageStartedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalStudyDurationMs => $composableBuilder(
+    column: $table.totalStudyDurationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$AudioItemsTableFilterComposer get audioItemId {
+    final $$AudioItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LearningProgressesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LearningProgressesTable> {
+  $$LearningProgressesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get currentStage => $composableBuilder(
+    column: $table.currentStage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currentSubStage => $composableBuilder(
+    column: $table.currentSubStage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get difficulty => $composableBuilder(
+    column: $table.difficulty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get firstLearnCompletedAt => $composableBuilder(
+    column: $table.firstLearnCompletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastStageCompletedAt => $composableBuilder(
+    column: $table.lastStageCompletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get currentStageStartedAt => $composableBuilder(
+    column: $table.currentStageStartedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalStudyDurationMs => $composableBuilder(
+    column: $table.totalStudyDurationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$AudioItemsTableOrderingComposer get audioItemId {
+    final $$AudioItemsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableOrderingComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LearningProgressesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LearningProgressesTable> {
+  $$LearningProgressesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get currentStage => $composableBuilder(
+    column: $table.currentStage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get currentSubStage => $composableBuilder(
+    column: $table.currentSubStage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get difficulty => $composableBuilder(
+    column: $table.difficulty,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get firstLearnCompletedAt => $composableBuilder(
+    column: $table.firstLearnCompletedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastStageCompletedAt => $composableBuilder(
+    column: $table.lastStageCompletedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get currentStageStartedAt => $composableBuilder(
+    column: $table.currentStageStartedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalStudyDurationMs => $composableBuilder(
+    column: $table.totalStudyDurationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$AudioItemsTableAnnotationComposer get audioItemId {
+    final $$AudioItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LearningProgressesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LearningProgressesTable,
+          LearningProgressesData,
+          $$LearningProgressesTableFilterComposer,
+          $$LearningProgressesTableOrderingComposer,
+          $$LearningProgressesTableAnnotationComposer,
+          $$LearningProgressesTableCreateCompanionBuilder,
+          $$LearningProgressesTableUpdateCompanionBuilder,
+          (LearningProgressesData, $$LearningProgressesTableReferences),
+          LearningProgressesData,
+          PrefetchHooks Function({bool audioItemId})
+        > {
+  $$LearningProgressesTableTableManager(
+    _$AppDatabase db,
+    $LearningProgressesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LearningProgressesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LearningProgressesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LearningProgressesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> audioItemId = const Value.absent(),
+                Value<String> currentStage = const Value.absent(),
+                Value<String> currentSubStage = const Value.absent(),
+                Value<int> difficulty = const Value.absent(),
+                Value<DateTime?> firstLearnCompletedAt = const Value.absent(),
+                Value<DateTime?> lastStageCompletedAt = const Value.absent(),
+                Value<DateTime?> currentStageStartedAt = const Value.absent(),
+                Value<int> totalStudyDurationMs = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LearningProgressesCompanion(
+                audioItemId: audioItemId,
+                currentStage: currentStage,
+                currentSubStage: currentSubStage,
+                difficulty: difficulty,
+                firstLearnCompletedAt: firstLearnCompletedAt,
+                lastStageCompletedAt: lastStageCompletedAt,
+                currentStageStartedAt: currentStageStartedAt,
+                totalStudyDurationMs: totalStudyDurationMs,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String audioItemId,
+                Value<String> currentStage = const Value.absent(),
+                Value<String> currentSubStage = const Value.absent(),
+                Value<int> difficulty = const Value.absent(),
+                Value<DateTime?> firstLearnCompletedAt = const Value.absent(),
+                Value<DateTime?> lastStageCompletedAt = const Value.absent(),
+                Value<DateTime?> currentStageStartedAt = const Value.absent(),
+                Value<int> totalStudyDurationMs = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LearningProgressesCompanion.insert(
+                audioItemId: audioItemId,
+                currentStage: currentStage,
+                currentSubStage: currentSubStage,
+                difficulty: difficulty,
+                firstLearnCompletedAt: firstLearnCompletedAt,
+                lastStageCompletedAt: lastStageCompletedAt,
+                currentStageStartedAt: currentStageStartedAt,
+                totalStudyDurationMs: totalStudyDurationMs,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$LearningProgressesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({audioItemId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (audioItemId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.audioItemId,
+                                referencedTable:
+                                    $$LearningProgressesTableReferences
+                                        ._audioItemIdTable(db),
+                                referencedColumn:
+                                    $$LearningProgressesTableReferences
+                                        ._audioItemIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$LearningProgressesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LearningProgressesTable,
+      LearningProgressesData,
+      $$LearningProgressesTableFilterComposer,
+      $$LearningProgressesTableOrderingComposer,
+      $$LearningProgressesTableAnnotationComposer,
+      $$LearningProgressesTableCreateCompanionBuilder,
+      $$LearningProgressesTableUpdateCompanionBuilder,
+      (LearningProgressesData, $$LearningProgressesTableReferences),
+      LearningProgressesData,
+      PrefetchHooks Function({bool audioItemId})
+    >;
+typedef $$StageCompletionsTableCreateCompanionBuilder =
+    StageCompletionsCompanion Function({
+      Value<int> id,
+      required String audioItemId,
+      required String stage,
+      required String subStage,
+      required DateTime completedAt,
+      Value<int> durationMs,
+    });
+typedef $$StageCompletionsTableUpdateCompanionBuilder =
+    StageCompletionsCompanion Function({
+      Value<int> id,
+      Value<String> audioItemId,
+      Value<String> stage,
+      Value<String> subStage,
+      Value<DateTime> completedAt,
+      Value<int> durationMs,
+    });
+
+final class $$StageCompletionsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $StageCompletionsTable, StageCompletion> {
+  $$StageCompletionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $AudioItemsTable _audioItemIdTable(_$AppDatabase db) =>
+      db.audioItems.createAlias(
+        $_aliasNameGenerator(db.stageCompletions.audioItemId, db.audioItems.id),
+      );
+
+  $$AudioItemsTableProcessedTableManager get audioItemId {
+    final $_column = $_itemColumn<String>('audio_item_id')!;
+
+    final manager = $$AudioItemsTableTableManager(
+      $_db,
+      $_db.audioItems,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_audioItemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$StageCompletionsTableFilterComposer
+    extends Composer<_$AppDatabase, $StageCompletionsTable> {
+  $$StageCompletionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stage => $composableBuilder(
+    column: $table.stage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subStage => $composableBuilder(
+    column: $table.subStage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$AudioItemsTableFilterComposer get audioItemId {
+    final $$AudioItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StageCompletionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StageCompletionsTable> {
+  $$StageCompletionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stage => $composableBuilder(
+    column: $table.stage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subStage => $composableBuilder(
+    column: $table.subStage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$AudioItemsTableOrderingComposer get audioItemId {
+    final $$AudioItemsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableOrderingComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StageCompletionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StageCompletionsTable> {
+  $$StageCompletionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get stage =>
+      $composableBuilder(column: $table.stage, builder: (column) => column);
+
+  GeneratedColumn<String> get subStage =>
+      $composableBuilder(column: $table.subStage, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
+  $$AudioItemsTableAnnotationComposer get audioItemId {
+    final $$AudioItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StageCompletionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StageCompletionsTable,
+          StageCompletion,
+          $$StageCompletionsTableFilterComposer,
+          $$StageCompletionsTableOrderingComposer,
+          $$StageCompletionsTableAnnotationComposer,
+          $$StageCompletionsTableCreateCompanionBuilder,
+          $$StageCompletionsTableUpdateCompanionBuilder,
+          (StageCompletion, $$StageCompletionsTableReferences),
+          StageCompletion,
+          PrefetchHooks Function({bool audioItemId})
+        > {
+  $$StageCompletionsTableTableManager(
+    _$AppDatabase db,
+    $StageCompletionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StageCompletionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StageCompletionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StageCompletionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> audioItemId = const Value.absent(),
+                Value<String> stage = const Value.absent(),
+                Value<String> subStage = const Value.absent(),
+                Value<DateTime> completedAt = const Value.absent(),
+                Value<int> durationMs = const Value.absent(),
+              }) => StageCompletionsCompanion(
+                id: id,
+                audioItemId: audioItemId,
+                stage: stage,
+                subStage: subStage,
+                completedAt: completedAt,
+                durationMs: durationMs,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String audioItemId,
+                required String stage,
+                required String subStage,
+                required DateTime completedAt,
+                Value<int> durationMs = const Value.absent(),
+              }) => StageCompletionsCompanion.insert(
+                id: id,
+                audioItemId: audioItemId,
+                stage: stage,
+                subStage: subStage,
+                completedAt: completedAt,
+                durationMs: durationMs,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$StageCompletionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({audioItemId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (audioItemId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.audioItemId,
+                                referencedTable:
+                                    $$StageCompletionsTableReferences
+                                        ._audioItemIdTable(db),
+                                referencedColumn:
+                                    $$StageCompletionsTableReferences
+                                        ._audioItemIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$StageCompletionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StageCompletionsTable,
+      StageCompletion,
+      $$StageCompletionsTableFilterComposer,
+      $$StageCompletionsTableOrderingComposer,
+      $$StageCompletionsTableAnnotationComposer,
+      $$StageCompletionsTableCreateCompanionBuilder,
+      $$StageCompletionsTableUpdateCompanionBuilder,
+      (StageCompletion, $$StageCompletionsTableReferences),
+      StageCompletion,
+      PrefetchHooks Function({bool audioItemId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4629,4 +6708,8 @@ class $AppDatabaseManager {
       $$BookmarksTableTableManager(_db, _db.bookmarks);
   $$PlaybackStatesTableTableManager get playbackStates =>
       $$PlaybackStatesTableTableManager(_db, _db.playbackStates);
+  $$LearningProgressesTableTableManager get learningProgresses =>
+      $$LearningProgressesTableTableManager(_db, _db.learningProgresses);
+  $$StageCompletionsTableTableManager get stageCompletions =>
+      $$StageCompletionsTableTableManager(_db, _db.stageCompletions);
 }

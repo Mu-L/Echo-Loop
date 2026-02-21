@@ -10,6 +10,7 @@ import '../models/audio_item.dart';
 import '../models/collection.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
+import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
@@ -128,6 +129,13 @@ class _CollectionAudioTile extends ConsumerWidget {
     );
     final isCurrentlyPlaying = currentAudioItem?.id == audioItem.id;
 
+    // 监听学习进度
+    final progress = ref.watch(
+      learningProgressNotifierProvider.select(
+        (s) => s.progressMap[audioItem.id],
+      ),
+    );
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       color: isCurrentlyPlaying
@@ -169,6 +177,29 @@ class _CollectionAudioTile extends ConsumerWidget {
               l10n.addedOn(_formatDate(audioItem.addedDate)),
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (progress != null && progress.isStarted) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: progress.isCompleted
+                      ? Theme.of(context).colorScheme.tertiaryContainer
+                      : Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  progress.isCompleted
+                      ? l10n.learningCompleted
+                      : progress.currentStage.label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: progress.isCompleted
+                        ? Theme.of(context).colorScheme.onTertiaryContainer
+                        : Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         trailing: Row(
@@ -243,9 +274,7 @@ class _CollectionAudioTile extends ConsumerWidget {
             return;
           }
           if (!context.mounted) return;
-          context.push(
-            AppRoutes.learningPlan(collectionId, audioItem.id),
-          );
+          context.push(AppRoutes.learningPlan(collectionId, audioItem.id));
         },
       ),
     );

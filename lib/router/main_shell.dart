@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
+import '../providers/learning_progress_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 主导航壳组件 — 包含 NavigationRail / NavigationBar + 内容区域
@@ -32,6 +33,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
       });
+      ref.read(learningProgressNotifierProvider.notifier).loadAll();
     });
   }
 
@@ -52,8 +54,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                   onDestinationSelected: (index) {
                     widget.navigationShell.goBranch(
                       index,
-                      initialLocation: index ==
-                          widget.navigationShell.currentIndex,
+                      initialLocation:
+                          index == widget.navigationShell.currentIndex,
                     );
                   },
                   destinations: [
@@ -101,12 +103,11 @@ class _MainShellState extends ConsumerState<MainShell> {
                   onDestinationSelected: (index) {
                     widget.navigationShell.goBranch(
                       index,
-                      initialLocation: index ==
-                          widget.navigationShell.currentIndex,
+                      initialLocation:
+                          index == widget.navigationShell.currentIndex,
                     );
                   },
-                  labelBehavior:
-                      NavigationDestinationLabelBehavior.alwaysShow,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                   destinations: [
                     NavigationDestination(
                       icon: const Icon(Icons.collections_bookmark_outlined),

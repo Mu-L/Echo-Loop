@@ -17,7 +17,6 @@
 - [x] 更新测试基础设施（test_app.dart、test_notifiers.dart）
 - [x] 更新受影响的测试（settings_screen、learning_plan_screen、widget_test）
 - [x] 编写路由测试（app_router_test.dart，9 个测试）
-- [x] 全部验证通过（flutter analyze + flutter test 196 通过 + flutter build macos）
 
 **完成时间**: 2026-02-21
 
@@ -28,7 +27,18 @@
 
 **完成时间**: 2026-02-21
 
-- [ ] 设计学习进度数据模型（阶段、小阶段、完成状态、难度）
+- [x] 设计学习进度数据模型（阶段、小阶段、完成状态、难度）
+
+**完成时间**: 2026-02-21
+
+- [x] 学习流程灵活性改进 — stage + subStage 均存字符串键，解耦存储与枚举顺序
+
+**完成时间**: 2026-02-21
+
+- [x] 扩展学习进度数据模型 — +3 列（lastStageCompletedAt, currentStageStartedAt, totalStudyDurationMs）+ 新建 stage_completions 历史表 + StageCompletionDao + nextReviewAt/isReviewReady 计算属性 + completeCurrentSubStage 写入历史记录 + 复习卡片显示倒计时
+
+**完成时间**: 2026-02-21
+
 - [ ] 实现首学流程 — 全文盲听模式
 - [ ] 实现首学流程 — 逐句精听+标注模式
 - [ ] 实现首学流程 — 难句跟读模式

@@ -13,6 +13,7 @@ import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/package_info_provider.dart';
 
 import 'helpers/mock_providers.dart';
@@ -32,10 +33,11 @@ void main() {
           appSettingsProvider.overrideWith(() => TestAppSettings()),
           audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
           collectionListProvider.overrideWith(() => TestCollectionList()),
-          listeningPracticeProvider.overrideWith(
-            () => TestListeningPractice(),
-          ),
+          listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
           audioEngineProvider.overrideWith(() => TestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(),
+          ),
           packageInfoProvider.overrideWithValue(packageInfo),
         ],
         child: const FluencyApp(),

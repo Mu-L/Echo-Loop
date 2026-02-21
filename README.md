@@ -100,6 +100,7 @@ flutter run -d android         # Android
 # 质量检查
 flutter analyze                # 静态分析
 flutter test                   # 运行所有测试
+flutter test integration_test -d macos # 运行集成测试
 dart format .                  # 代码格式化
 
 # 依赖管理

@@ -26,22 +26,27 @@ lib/
 │   ├── sentence.dart                #   字幕句子（时间轴 + 书签状态）
 │   ├── playback_settings.dart       #   播放设置（循环、速度、间隔等）
 │   ├── audio_engine_state.dart      #   音频引擎状态快照
-│   └── listening_practice_state.dart#   学习会话完整状态
+│   ├── listening_practice_state.dart#   学习会话完整状态
+│   └── learning_progress.dart       #   学习进度（阶段、进度计算）
 ├── database/                        # Drift (SQLite) 数据库层
 │   ├── app_database.dart            #   数据库定义 + 连接 + 索引
-│   ├── enums.dart                   #   SyncStatus 枚举
+│   ├── enums.dart                   #   SyncStatus / LearningStage / SubStageType / DifficultyLevel 枚举
 │   ├── providers.dart               #   数据库 + DAO 的 Riverpod Provider
-│   ├── tables/                      #   5 张表定义
+│   ├── tables/                      #   6 张表定义
 │   │   ├── audio_items.dart
 │   │   ├── collections.dart
 │   │   ├── collection_audio_items.dart
 │   │   ├── bookmarks.dart
-│   │   └── playback_states.dart
-│   ├── daos/                        #   4 个 DAO
+│   │   ├── playback_states.dart
+│   │   ├── learning_progresses.dart
+│   │   └── stage_completions.dart
+│   ├── daos/                        #   6 个 DAO
 │   │   ├── audio_item_dao.dart
 │   │   ├── collection_dao.dart
 │   │   ├── bookmark_dao.dart
-│   │   └── playback_state_dao.dart
+│   │   ├── playback_state_dao.dart
+│   │   ├── learning_progress_dao.dart
+│   │   └── stage_completion_dao.dart
 │   └── migration/
 │       └── sp_to_drift_migration.dart  # SP → Drift 一次性迁移
 ├── services/                        # 基础服务（无状态/单例）
@@ -53,6 +58,7 @@ lib/
 │   ├── settings_provider.dart       #   全局设置（主题/语言）
 │   ├── audio_engine/
 │   │   └── audio_engine_provider.dart  # 底层音频控制（封装 just_audio）
+│   ├── learning_progress_provider.dart  # 学习进度管理（加载/推进/难度设置）
 │   └── listening_practice/
 │       ├── listening_practice_provider.dart  # 核心业务：播放模式/句子导航/书签
 │       ├── sentence_tracker.dart     #   二分查找定位当前句子
@@ -97,7 +103,7 @@ integration_test/                    # 端到端集成测试
 | `audio_engine_provider.dart` | ~160 | 底层音频引擎，封装 just_audio |
 | `player_screen.dart` | — | 播放器 UI，用户交互最集中的页面 |
 | `app_theme.dart` | ~236 | 全局主题定义，修改视觉从这里开始 |
-| `app_database.dart` | — | Drift 数据库定义（5 表 + 4 DAO + 索引） |
+| `app_database.dart` | — | Drift 数据库定义（7 表 + 6 DAO + 索引） |
 | `storage_service.dart` | — | SharedPreferences（仅 PlaybackSettings） |
 | `METHOD.md` | — | 学习方法论完整设计，Milestone 2 的需求文档 |
 
@@ -145,7 +151,7 @@ FluencyApp (main.dart)
 
 业务数据使用 Drift (SQLite)，纯设置使用 SharedPreferences：
 
-**Drift (SQLite) — 5 张表**：
+**Drift (SQLite) — 7 张表**：
 
 | 表 | 说明 |
 |----|------|
@@ -154,6 +160,8 @@ FluencyApp (main.dart)
 | `collection_audio_items` | Junction 表（多对多关联） |
 | `bookmarks` | 增强版书签（存 text/startTime/endTime） |
 | `playback_states` | 播放断点（仅 position_ms + playlistMode） |
+| `learning_progresses` | 学习进度（阶段、小阶段、难度、首学完成时间、复习调度、学习时长） |
+| `stage_completions` | 步骤完成历史（按步骤记录完成时间和耗时） |
 
 **SharedPreferences — 纯设置项**：
 
@@ -241,11 +249,11 @@ FluencyApp (main.dart)
 
 ### 核心理念
 
-每篇音频经历 **9 个大阶段**的间隔复习周期：
+每篇音频经历 **8 个大阶段**的间隔复习周期：
 
 ```
-首学(Day 0) → 首轮复习(5-8h后) → R1(1天) → R3(3天) → R5(5天)
-→ R8(8天) → R11(11天) → R14(14天) → R21(21天·磨耳朵) → R28(28天·毕业检验)
+首学(Day 0) → 首轮复习(当前) → R1(1天) → R2(2天) → R4(4天)
+→ R7(7天) → R14(14天) → R28(28天) → 已完成
 ```
 
 ### 首学流程
@@ -255,13 +263,9 @@ FluencyApp (main.dart)
 3. **难句跟读** — 有字幕跟读难句，遍数根据难度调整（2-5 遍）
 4. **段级复述** — 提供关键意群提示，用自己的话复述段落
 
-### 复习流程（R1-R14）
+### 复习流程（review0-review28）
 
-1. 全文盲听 → 2. 难句补练（盲听+跟读） → 3. 段级复述
-
-### 毕业检验（R28）
-
-1. 全文盲听 → 2. 全文跟读（不看字幕） → 3. 总结复述
+1. 全文盲听 → 2. 跟读 → 3. 段级复述
 
 ### 收藏体系
 

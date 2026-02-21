@@ -15,6 +15,7 @@ import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import 'mock_providers.dart';
@@ -41,6 +42,9 @@ Widget createTestApp(
     collectionListProvider.overrideWith(() => TestCollectionList()),
     listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
     audioEngineProvider.overrideWith(() => TestAudioEngine()),
+    learningProgressNotifierProvider.overrideWith(
+      () => TestLearningProgressNotifier(),
+    ),
   ];
 
   return ProviderScope(
@@ -105,20 +109,15 @@ GoRouter createTestRouter(Widget screen) {
   return GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => screen,
-      ),
+      GoRoute(path: '/', builder: (context, state) => screen),
       // stub 路由，用于验证导航跳转
       GoRoute(
         path: '/player',
-        builder: (context, state) =>
-            const Scaffold(body: Text('Player')),
+        builder: (context, state) => const Scaffold(body: Text('Player')),
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) =>
-            const Scaffold(body: Text('Settings')),
+        builder: (context, state) => const Scaffold(body: Text('Settings')),
       ),
       GoRoute(
         path: '/collections/:collectionId',
@@ -132,8 +131,7 @@ GoRouter createTestRouter(Widget screen) {
           ),
           GoRoute(
             path: ':audioId/player',
-            builder: (context, state) =>
-                const Scaffold(body: Text('Player')),
+            builder: (context, state) => const Scaffold(body: Text('Player')),
           ),
         ],
       ),

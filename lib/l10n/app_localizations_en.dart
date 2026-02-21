@@ -439,7 +439,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Listen sentence by sentence, mark difficult ones';
 
   @override
-  String get stepShadowing => 'Shadowing';
+  String get stepShadowing => 'Listen & Repeat';
 
   @override
   String get stepShadowingDesc => 'Repeat difficult sentences with subtitles';
@@ -451,59 +451,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepRetellingDesc => 'Retell paragraphs in your own words';
 
   @override
-  String get review1 => 'Review 1';
+  String get reviewRound0 => 'Review 1';
 
   @override
-  String get review2 => 'Review 2';
+  String get reviewRound1 => 'Review 2';
 
   @override
-  String get review3 => 'Review 3';
+  String get reviewRound2 => 'Review 3';
 
   @override
-  String get review4 => 'Review 4';
+  String get reviewRound4 => 'Review 4';
 
   @override
-  String get review5 => 'Review 5';
+  String get reviewRound7 => 'Review 5';
 
   @override
-  String get review6 => 'Review 6';
+  String get reviewRound14 => 'Review 6';
 
   @override
-  String get review7 => 'Review 7';
+  String get reviewRound28 => 'Review 7';
 
   @override
-  String get reviewEarTraining => 'Ear Training';
-
-  @override
-  String get reviewGraduation => 'Graduation Test';
-
-  @override
-  String get reviewInterval6h => 'After 6h';
+  String get reviewIntervalNow => 'Now';
 
   @override
   String get reviewInterval1d => 'After 1 day';
 
   @override
-  String get reviewInterval3d => 'After 3 days';
+  String get reviewInterval2d => 'After 2 days';
 
   @override
-  String get reviewInterval5d => 'After 5 days';
+  String get reviewInterval4d => 'After 4 days';
 
   @override
-  String get reviewInterval8d => 'After 8 days';
-
-  @override
-  String get reviewInterval11d => 'After 11 days';
+  String get reviewInterval7d => 'After 7 days';
 
   @override
   String get reviewInterval14d => 'After 14 days';
-
-  @override
-  String get reviewInterval21d => 'After 21 days';
 
   @override
   String get reviewInterval28d => 'After 28 days';
 
   @override
   String get startLearning => 'Start Learning';
+
+  @override
+  String get continueLearning => 'Continue Learning';
+
+  @override
+  String get learningInProgress => 'In Progress';
+
+  @override
+  String get learningCompleted => 'Completed';
+
+  @override
+  String get reviewReady => 'Ready to review';
+
+  @override
+  String reviewCountdown(int days) {
+    return 'Available in $days days';
+  }
+
+  @override
+  String reviewCountdownHours(int hours) {
+    return 'Available in $hours hours';
+  }
 }

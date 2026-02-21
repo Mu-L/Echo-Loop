@@ -14,6 +14,9 @@ import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/collection_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
+import 'package:fluency/database/enums.dart';
+import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/models/sentence.dart';
 
 // ========== 测试数据工厂 ==========
@@ -275,6 +278,83 @@ class TestListeningPractice extends ListeningPractice {
 
   @override
   Future<void> saveCurrentPlaybackState() async {}
+}
+
+/// 创建测试用 LearningProgress
+LearningProgress createTestLearningProgress({
+  String audioItemId = 'test-audio-1',
+  LearningStage currentStage = LearningStage.firstLearn,
+  SubStageType currentSubStage = SubStageType.blindListen,
+  DifficultyLevel difficulty = DifficultyLevel.medium,
+  DateTime? firstLearnCompletedAt,
+  DateTime? lastStageCompletedAt,
+  DateTime? currentStageStartedAt,
+  int totalStudyDurationMs = 0,
+  DateTime? updatedAt,
+}) {
+  return LearningProgress(
+    audioItemId: audioItemId,
+    currentStage: currentStage,
+    currentSubStage: currentSubStage,
+    difficulty: difficulty,
+    firstLearnCompletedAt: firstLearnCompletedAt,
+    lastStageCompletedAt: lastStageCompletedAt,
+    currentStageStartedAt: currentStageStartedAt,
+    totalStudyDurationMs: totalStudyDurationMs,
+    updatedAt: updatedAt ?? DateTime(2026, 1, 1),
+  );
+}
+
+/// 测试用 LearningProgressNotifier — 不访问数据库
+class TestLearningProgressNotifier extends LearningProgressNotifier {
+  final LearningProgressState _initialState;
+
+  TestLearningProgressNotifier([
+    this._initialState = const LearningProgressState(),
+  ]);
+
+  @override
+  LearningProgressState build() => _initialState;
+
+  @override
+  Future<void> loadAll() async {
+    // 测试中不做任何 I/O
+  }
+
+  @override
+  Future<LearningProgress> ensureProgress(String audioItemId) async {
+    final existing = state.progressMap[audioItemId];
+    if (existing != null) return existing;
+
+    final progress = LearningProgress(
+      audioItemId: audioItemId,
+      updatedAt: DateTime.now(),
+    );
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = progress;
+    state = state.copyWith(progressMap: newMap);
+    return progress;
+  }
+
+  @override
+  Future<void> completeCurrentSubStage(String audioItemId) async {
+    // 测试中的简化实现
+  }
+
+  @override
+  Future<void> setDifficulty(
+    String audioItemId,
+    DifficultyLevel difficulty,
+  ) async {
+    // 测试中的简化实现
+  }
+
+  @override
+  Future<void> deleteProgress(String audioItemId) async {
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap.remove(audioItemId);
+    state = state.copyWith(progressMap: newMap);
+  }
 }
 
 /// 测试用 AudioEngine — 不依赖 just_audio

@@ -7,9 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/screens/learning_plan_screen.dart';
 import 'package:fluency/models/audio_item.dart';
+import 'package:fluency/models/learning_progress.dart';
+import 'package:fluency/database/enums.dart';
 import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import '../helpers/mock_providers.dart';
@@ -22,7 +25,10 @@ void main() {
     addedDate: DateTime(2026, 1, 1),
   );
 
-  Widget createTestWidget({Locale locale = const Locale('en')}) {
+  Widget createTestWidget({
+    Locale locale = const Locale('en'),
+    LearningProgressState? progressState,
+  }) {
     final router = GoRouter(
       initialLocation: '/collections/col-1/test-1/plan',
       routes: [
@@ -39,8 +45,7 @@ void main() {
         ),
         GoRoute(
           path: '/collections/:collectionId/:audioId/player',
-          builder: (context, state) =>
-              const Scaffold(body: Text('Player')),
+          builder: (context, state) => const Scaffold(body: Text('Player')),
         ),
       ],
     );
@@ -48,14 +53,16 @@ void main() {
     return ProviderScope(
       overrides: [
         audioLibraryProvider.overrideWith(
-          () => TestAudioLibrary(
-            AudioLibraryState(audioItems: [testAudioItem]),
+          () =>
+              TestAudioLibrary(AudioLibraryState(audioItems: [testAudioItem])),
+        ),
+        listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
+        audioEngineProvider.overrideWith(() => TestAudioEngine()),
+        learningProgressNotifierProvider.overrideWith(
+          () => TestLearningProgressNotifier(
+            progressState ?? const LearningProgressState(),
           ),
         ),
-        listeningPracticeProvider.overrideWith(
-          () => TestListeningPractice(),
-        ),
-        audioEngineProvider.overrideWith(() => TestAudioEngine()),
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -98,7 +105,7 @@ void main() {
 
       expect(find.text('Blind Listening'), findsOneWidget);
       expect(find.text('Intensive Listening'), findsOneWidget);
-      expect(find.text('Shadowing'), findsOneWidget);
+      expect(find.text('Listen & Repeat'), findsOneWidget);
       expect(find.text('Retelling'), findsOneWidget);
     });
 
@@ -116,7 +123,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Review'), findsOneWidget);
-      expect(find.text('0/9 completed'), findsOneWidget);
+      expect(find.text('0/7 completed'), findsOneWidget);
       final expandIcon = tester.widget<AnimatedRotation>(
         find.byType(AnimatedRotation),
       );
@@ -141,7 +148,7 @@ void main() {
       // 复习步骤可见（可能需要继续滚动）
       await tester.scrollUntilVisible(find.text('Review 1'), 200);
       expect(find.text('Review 1'), findsOneWidget);
-      expect(find.text('After 6h'), findsOneWidget);
+      expect(find.text('Now'), findsOneWidget);
     });
 
     testWidgets('显示底部"开始学习"按钮', (tester) async {
@@ -149,6 +156,42 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Start Learning'), findsOneWidget);
+    });
+
+    testWidgets('进行中时底部显示"继续学习"', (tester) async {
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: SubStageType.listenAndRepeat,
+            updatedAt: DateTime(2026, 1, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue Learning'), findsOneWidget);
+    });
+
+    testWidgets('有进度时显示正确的完成步骤数', (tester) async {
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: SubStageType.listenAndRepeat,
+            updatedAt: DateTime(2026, 1, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2/4 completed'), findsOneWidget);
     });
 
     testWidgets('点击"开始学习"导航到播放器', (tester) async {
@@ -210,6 +253,9 @@ void main() {
               () => TestListeningPractice(),
             ),
             audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            learningProgressNotifierProvider.overrideWith(
+              () => TestLearningProgressNotifier(),
+            ),
           ],
           child: MaterialApp.router(
             supportedLocales: const [Locale('en'), Locale('zh')],
@@ -230,6 +276,27 @@ void main() {
         find.text('Audio file not found. The file may have been deleted.'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('已完成状态显示正确', (tester) async {
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.completed,
+            currentSubStage: SubStageType.blindListen,
+            firstLearnCompletedAt: DateTime(2026, 1, 1),
+            updatedAt: DateTime(2026, 2, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      expect(find.text('100%'), findsOneWidget);
+      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('4/4 completed'), findsOneWidget);
     });
   });
 }

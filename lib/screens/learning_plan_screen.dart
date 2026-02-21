@@ -1,13 +1,17 @@
 // 学习计划表页面
 //
-// 展示音频的完整学习流程：首学（4步）和复习（9步）。
-// 纯 UI 页面，使用静态 mock 数据展示效果。
+// 展示音频的完整学习流程：首学（4步）和复习（7步）。
+// 从 LearningProgressNotifier 读取真实进度数据，
+// 步骤卡片支持三态：已完成、当前、未开始。
 // 导航路径：合集详情 → 学习计划表 → 播放器
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
+import '../database/enums.dart';
+import '../models/learning_progress.dart';
 import '../providers/audio_library_provider.dart';
+import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
@@ -28,8 +32,7 @@ class LearningPlanScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<LearningPlanScreen> createState() =>
-      _LearningPlanScreenState();
+  ConsumerState<LearningPlanScreen> createState() => _LearningPlanScreenState();
 }
 
 class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
@@ -39,8 +42,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   @override
   void initState() {
     super.initState();
-    // 检查并加载音频数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 确保学习进度记录存在
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .ensureProgress(widget.audioItemId);
+
+      // 检查并加载音频数据
       final audioItem = ref
           .read(audioLibraryProvider.notifier)
           .getItemById(widget.audioItemId);
@@ -60,12 +68,33 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         .watch(audioLibraryProvider.notifier)
         .getItemById(widget.audioItemId);
 
+    // 监听学习进度
+    final progress = ref.watch(
+      learningProgressNotifierProvider.select(
+        (s) => s.progressMap[widget.audioItemId],
+      ),
+    );
+
     // audioItem 找不到时显示错误页面
     if (audioItem == null) {
       return Scaffold(
         appBar: AppBar(),
         body: Center(child: Text(l10n.audioFileNotFound)),
       );
+    }
+
+    // 当活跃阶段在复习区域时自动展开
+    if (progress != null &&
+        progress.currentStage.index >= LearningStage.review0.index &&
+        !progress.isCompleted &&
+        !_isReviewExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _isReviewExpanded = true;
+          });
+        }
+      });
     }
 
     return Scaffold(
@@ -76,12 +105,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.m),
               children: [
-                _ProgressCard(l10n: l10n),
+                _ProgressCard(l10n: l10n, progress: progress),
                 const SizedBox(height: AppSpacing.l),
-                _FirstStudySection(l10n: l10n),
+                _FirstStudySection(l10n: l10n, progress: progress),
                 const SizedBox(height: AppSpacing.l),
                 _ReviewSection(
                   l10n: l10n,
+                  progress: progress,
                   isExpanded: _isReviewExpanded,
                   onToggle: () {
                     setState(() {
@@ -94,6 +124,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           ),
           _BottomButton(
             l10n: l10n,
+            progress: progress,
             onPressed: () {
               context.push(
                 AppRoutes.player(widget.collectionId, widget.audioItemId),
@@ -109,12 +140,18 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 /// 顶部进度卡片 — 圆环进度 + 状态文字
 class _ProgressCard extends StatelessWidget {
   final AppLocalizations l10n;
+  final LearningProgress? progress;
 
-  const _ProgressCard({required this.l10n});
+  const _ProgressCard({required this.l10n, this.progress});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final percent = progress?.progressPercent ?? 0.0;
+    final percentText = '${(percent * 100).round()}%';
+
+    // 状态文字
+    final statusText = _getStatusText();
 
     return Card(
       child: Padding(
@@ -126,13 +163,13 @@ class _ProgressCard extends StatelessWidget {
               height: 64,
               child: CustomPaint(
                 painter: _ProgressRingPainter(
-                  progress: 0.0,
+                  progress: percent,
                   backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   progressColor: theme.colorScheme.primary,
                 ),
                 child: Center(
                   child: Text(
-                    '0%',
+                    percentText,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -154,7 +191,7 @@ class _ProgressCard extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    l10n.learningPlanNotStarted,
+                    statusText,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -166,6 +203,17 @@ class _ProgressCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 获取状态文字
+  String _getStatusText() {
+    if (progress == null || !progress!.isStarted) {
+      return l10n.learningPlanNotStarted;
+    }
+    if (progress!.isCompleted) {
+      return l10n.learningCompleted;
+    }
+    return '${progress!.currentStage.label} ${l10n.learningInProgress}';
   }
 }
 
@@ -220,35 +268,41 @@ class _ProgressRingPainter extends CustomPainter {
 /// 首学区域 — 默认展开，显示 4 个步骤
 class _FirstStudySection extends StatelessWidget {
   final AppLocalizations l10n;
+  final LearningProgress? progress;
 
-  const _FirstStudySection({required this.l10n});
+  const _FirstStudySection({required this.l10n, this.progress});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final completedCount = progress?.completedFirstStudySteps ?? 0;
+    final firstLearnStage = LearningStage.firstLearn;
 
-    final steps = [
-      _StepData(
+    /// 子步骤的 UI 数据映射
+    final stepDataMap = {
+      SubStageType.blindListen: _StepData(
         icon: Icons.headphones,
         name: l10n.stepBlindListening,
         description: l10n.stepBlindListeningDesc,
       ),
-      _StepData(
+      SubStageType.intensiveListen: _StepData(
         icon: Icons.hearing,
         name: l10n.stepIntensiveListening,
         description: l10n.stepIntensiveListeningDesc,
       ),
-      _StepData(
+      SubStageType.listenAndRepeat: _StepData(
         icon: Icons.record_voice_over,
         name: l10n.stepShadowing,
         description: l10n.stepShadowingDesc,
       ),
-      _StepData(
+      SubStageType.retell: _StepData(
         icon: Icons.chat,
         name: l10n.stepRetelling,
         description: l10n.stepRetellingDesc,
       ),
-    ];
+    };
+
+    final subStages = firstLearnStage.subStages;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,11 +311,7 @@ class _FirstStudySection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           child: Row(
             children: [
-              Icon(
-                Icons.school,
-                color: theme.colorScheme.primary,
-                size: 20,
-              ),
+              Icon(Icons.school, color: theme.colorScheme.primary, size: 20),
               const SizedBox(width: AppSpacing.s),
               Text(
                 l10n.firstStudy,
@@ -271,7 +321,7 @@ class _FirstStudySection extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                l10n.stepProgress(0, 4),
+                l10n.stepProgress(completedCount, subStages.length),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -280,15 +330,21 @@ class _FirstStudySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s),
-        ...List.generate(steps.length, (index) {
-          final step = steps[index];
+        ...List.generate(subStages.length, (index) {
+          final subStage = subStages[index];
+          final stepData = stepDataMap[subStage]!;
+          final isCompleted =
+              progress?.isSubStageCompleted(firstLearnStage, subStage) ?? false;
+          final isCurrent =
+              progress?.isCurrentSubStage(firstLearnStage, subStage) ?? false;
           return _StepCard(
             stepNumber: index + 1,
-            icon: step.icon,
-            name: step.name,
-            description: step.description,
-            isCompleted: false,
-            isLast: index == steps.length - 1,
+            icon: stepData.icon,
+            name: stepData.name,
+            description: stepData.description,
+            isCompleted: isCompleted,
+            isCurrent: isCurrent,
+            isLast: index == subStages.length - 1,
           );
         }),
       ],
@@ -309,13 +365,14 @@ class _StepData {
   });
 }
 
-/// 单个步骤卡片
+/// 单个步骤卡片 — 支持三态：已完成、当前、未开始
 class _StepCard extends StatelessWidget {
   final int stepNumber;
   final IconData icon;
   final String name;
   final String description;
   final bool isCompleted;
+  final bool isCurrent;
   final bool isLast;
 
   const _StepCard({
@@ -324,6 +381,7 @@ class _StepCard extends StatelessWidget {
     required this.name,
     required this.description,
     required this.isCompleted,
+    required this.isCurrent,
     required this.isLast,
   });
 
@@ -345,8 +403,13 @@ class _StepCard extends StatelessWidget {
                   height: 28,
                   decoration: BoxDecoration(
                     color: isCompleted
-                        ? theme.colorScheme.primary
+                        ? theme.colorScheme.outlineVariant
+                        : isCurrent
+                        ? null
                         : theme.colorScheme.surfaceContainerHighest,
+                    border: isCurrent
+                        ? Border.all(color: theme.colorScheme.primary, width: 2)
+                        : null,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -354,13 +417,15 @@ class _StepCard extends StatelessWidget {
                         ? Icon(
                             Icons.check,
                             size: 16,
-                            color: theme.colorScheme.onPrimary,
+                            color: theme.colorScheme.outline,
                           )
                         : Text(
                             '$stepNumber',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: isCurrent
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                   ),
@@ -378,15 +443,19 @@ class _StepCard extends StatelessWidget {
           // 右侧卡片内容
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(
-                bottom: isLast ? 0 : AppSpacing.s,
-              ),
+              padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.s),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.m),
                   child: Row(
                     children: [
-                      Icon(icon, color: theme.colorScheme.primary, size: 24),
+                      Icon(
+                        icon,
+                        color: isCompleted
+                            ? theme.colorScheme.outline
+                            : theme.colorScheme.primary,
+                        size: 24,
+                      ),
                       const SizedBox(width: AppSpacing.m),
                       Expanded(
                         child: Column(
@@ -396,13 +465,18 @@ class _StepCard extends StatelessWidget {
                               name,
                               style: theme.textTheme.bodyLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
+                                color: isCompleted
+                                    ? theme.colorScheme.outline
+                                    : null,
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               description,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: isCompleted
+                                    ? theme.colorScheme.outline
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -420,34 +494,81 @@ class _StepCard extends StatelessWidget {
   }
 }
 
-/// 复习区域 — 默认折叠，展开后显示 9 个复习阶段
+/// 复习区域 — 默认折叠，展开后显示 7 个复习阶段
 class _ReviewSection extends StatelessWidget {
   final AppLocalizations l10n;
+  final LearningProgress? progress;
   final bool isExpanded;
   final VoidCallback onToggle;
 
   const _ReviewSection({
     required this.l10n,
+    this.progress,
     required this.isExpanded,
     required this.onToggle,
   });
 
+  /// 获取当前复习阶段的倒计时文案
+  String? _getReviewTimingText(LearningStage stage) {
+    if (progress == null) return null;
+    if (!progress!.isCurrentStage(stage)) return null;
+
+    final nextReview = progress!.nextReviewAt;
+    if (nextReview == null) return null;
+
+    final now = DateTime.now();
+    if (now.isAfter(nextReview) || now.isAtSameMomentAs(nextReview)) {
+      return l10n.reviewReady;
+    }
+
+    final diff = nextReview.difference(now);
+    if (diff.inDays > 0) {
+      return l10n.reviewCountdown(diff.inDays);
+    }
+    return l10n.reviewCountdownHours(diff.inHours.clamp(1, 999));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final completedCount = progress?.completedReviewStages ?? 0;
 
+    /// 复习阶段列表（review0 ~ review28，共 7 个）
     final reviews = [
-      _ReviewData(name: l10n.review1, interval: l10n.reviewInterval6h),
-      _ReviewData(name: l10n.review2, interval: l10n.reviewInterval1d),
-      _ReviewData(name: l10n.review3, interval: l10n.reviewInterval3d),
-      _ReviewData(name: l10n.review4, interval: l10n.reviewInterval5d),
-      _ReviewData(name: l10n.review5, interval: l10n.reviewInterval8d),
-      _ReviewData(name: l10n.review6, interval: l10n.reviewInterval11d),
-      _ReviewData(name: l10n.review7, interval: l10n.reviewInterval14d),
-      _ReviewData(name: l10n.reviewEarTraining, interval: l10n.reviewInterval21d),
       _ReviewData(
-        name: l10n.reviewGraduation,
+        name: l10n.reviewRound0,
+        interval: l10n.reviewIntervalNow,
+        stage: LearningStage.review0,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound1,
+        interval: l10n.reviewInterval1d,
+        stage: LearningStage.review1,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound2,
+        interval: l10n.reviewInterval2d,
+        stage: LearningStage.review2,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound4,
+        interval: l10n.reviewInterval4d,
+        stage: LearningStage.review4,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound7,
+        interval: l10n.reviewInterval7d,
+        stage: LearningStage.review7,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound14,
+        interval: l10n.reviewInterval14d,
+        stage: LearningStage.review14,
+      ),
+      _ReviewData(
+        name: l10n.reviewRound28,
         interval: l10n.reviewInterval28d,
+        stage: LearningStage.review28,
       ),
     ];
 
@@ -479,7 +600,7 @@ class _ReviewSection extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  l10n.stepProgress(0, 9),
+                  l10n.stepProgress(completedCount, 7),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -505,12 +626,19 @@ class _ReviewSection extends StatelessWidget {
             child: Column(
               children: List.generate(reviews.length, (index) {
                 final review = reviews[index];
+                final isCompleted =
+                    progress?.isStageCompleted(review.stage) ?? false;
+                final isCurrent =
+                    progress?.isCurrentStage(review.stage) ?? false;
+                final timingText = _getReviewTimingText(review.stage);
                 return _ReviewStepCard(
                   stepNumber: index + 1,
                   name: review.name,
                   interval: review.interval,
-                  isCompleted: false,
+                  isCompleted: isCompleted,
+                  isCurrent: isCurrent,
                   isLast: index == reviews.length - 1,
+                  timingText: timingText,
                 );
               }),
             ),
@@ -529,24 +657,35 @@ class _ReviewSection extends StatelessWidget {
 class _ReviewData {
   final String name;
   final String interval;
+  final LearningStage stage;
 
-  const _ReviewData({required this.name, required this.interval});
+  const _ReviewData({
+    required this.name,
+    required this.interval,
+    required this.stage,
+  });
 }
 
-/// 复习步骤卡片 — 带竖向时间线
+/// 复习步骤卡片 — 带竖向时间线，支持三态
 class _ReviewStepCard extends StatelessWidget {
   final int stepNumber;
   final String name;
   final String interval;
   final bool isCompleted;
+  final bool isCurrent;
   final bool isLast;
+
+  /// 当前阶段的复习倒计时文案（仅 isCurrent 时显示）
+  final String? timingText;
 
   const _ReviewStepCard({
     required this.stepNumber,
     required this.name,
     required this.interval,
     required this.isCompleted,
+    required this.isCurrent,
     required this.isLast,
+    this.timingText,
   });
 
   @override
@@ -567,8 +706,16 @@ class _ReviewStepCard extends StatelessWidget {
                   height: 28,
                   decoration: BoxDecoration(
                     color: isCompleted
-                        ? theme.colorScheme.tertiary
+                        ? theme.colorScheme.outlineVariant
+                        : isCurrent
+                        ? null
                         : theme.colorScheme.surfaceContainerHighest,
+                    border: isCurrent
+                        ? Border.all(
+                            color: theme.colorScheme.tertiary,
+                            width: 2,
+                          )
+                        : null,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -576,13 +723,15 @@ class _ReviewStepCard extends StatelessWidget {
                         ? Icon(
                             Icons.check,
                             size: 16,
-                            color: theme.colorScheme.onTertiary,
+                            color: theme.colorScheme.outline,
                           )
                         : Text(
                             '$stepNumber',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: isCurrent
+                                  ? theme.colorScheme.tertiary
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                   ),
@@ -600,42 +749,59 @@ class _ReviewStepCard extends StatelessWidget {
           // 右侧卡片
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(
-                bottom: isLast ? 0 : AppSpacing.s,
-              ),
+              padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.s),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.m,
                     vertical: 12,
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: theme.textTheme.bodyLarge?.copyWith(
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                color: isCompleted
+                                    ? theme.colorScheme.outline
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              interval,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onTertiaryContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // 复习倒计时提示
+                      if (timingText != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          timingText!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.tertiary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.tertiaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          interval,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onTertiaryContainer,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -648,15 +814,24 @@ class _ReviewStepCard extends StatelessWidget {
   }
 }
 
-/// 底部固定按钮
+/// 底部固定按钮 — 根据进度显示不同文案
 class _BottomButton extends StatelessWidget {
   final AppLocalizations l10n;
+  final LearningProgress? progress;
   final VoidCallback onPressed;
 
-  const _BottomButton({required this.l10n, required this.onPressed});
+  const _BottomButton({
+    required this.l10n,
+    this.progress,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final buttonText = (progress != null && progress!.isStarted)
+        ? l10n.continueLearning
+        : l10n.startLearning;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.m),
       decoration: BoxDecoration(
@@ -673,10 +848,7 @@ class _BottomButton extends StatelessWidget {
         top: false,
         child: SizedBox(
           width: double.infinity,
-          child: FilledButton(
-            onPressed: onPressed,
-            child: Text(l10n.startLearning),
-          ),
+          child: FilledButton(onPressed: onPressed, child: Text(buttonText)),
         ),
       ),
     );
