@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
+import '../utils/audio_duration.dart';
 import 'collection_provider.dart';
 import 'learning_progress_provider.dart';
 
@@ -211,6 +212,18 @@ class AudioLibrary extends _$AudioLibrary {
       return state.audioItems.firstWhere((item) => item.id == id);
     } catch (e) {
       return null;
+    }
+  }
+
+  /// 补填缺失时长 — 对 totalDuration == 0 的音频逐个提取并持久化
+  Future<void> backfillDurations() async {
+    final missing =
+        state.audioItems.where((item) => item.totalDuration == 0).toList();
+    for (final item in missing) {
+      final seconds = await getAudioDurationSeconds(item.audioPath);
+      if (seconds > 0) {
+        updateAudioItem(item.copyWith(totalDuration: seconds));
+      }
     }
   }
 

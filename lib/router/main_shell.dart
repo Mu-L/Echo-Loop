@@ -32,6 +32,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
+        ref.read(audioLibraryProvider.notifier).backfillDurations();
       });
       ref.read(learningProgressNotifierProvider.notifier).loadAll();
     });

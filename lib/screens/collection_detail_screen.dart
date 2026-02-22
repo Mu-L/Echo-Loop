@@ -154,6 +154,20 @@ class _CollectionAudioTile extends ConsumerWidget {
         ),
         subtitle: Row(
           children: [
+            // 音频时长
+            if (audioItem.totalDuration > 0) ...[
+              Icon(
+                Icons.schedule,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                _formatDuration(audioItem.totalDuration),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(width: 12),
+            ],
             if (audioItem.hasTranscript) ...[
               Icon(
                 Icons.subtitles,
@@ -167,20 +181,6 @@ class _CollectionAudioTile extends ConsumerWidget {
                   color: Theme.of(context).colorScheme.primary,
                   fontSize: 12,
                 ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            // 音频时长
-            if (audioItem.totalDuration > 0) ...[
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                _formatDuration(audioItem.totalDuration),
-                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(width: 12),
             ],

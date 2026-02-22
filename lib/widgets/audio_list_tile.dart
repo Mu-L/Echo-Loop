@@ -76,19 +76,6 @@ class AudioListTile extends ConsumerWidget {
         // 与合集详情页音频列表项保持一致的 Row 布局
         subtitle: Row(
           children: [
-            // 字幕图标 + 文字
-            if (audioItem.hasTranscript) ...[
-              Icon(Icons.subtitles, size: 16, color: theme.colorScheme.primary),
-              const SizedBox(width: 4),
-              Text(
-                l10n.transcript,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
             // 音频时长
             if (audioItem.totalDuration > 0) ...[
               Icon(
@@ -100,6 +87,19 @@ class AudioListTile extends ConsumerWidget {
               Text(
                 _formatDuration(audioItem.totalDuration),
                 style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(width: 12),
+            ],
+            // 字幕图标 + 文字
+            if (audioItem.hasTranscript) ...[
+              Icon(Icons.subtitles, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 4),
+              Text(
+                l10n.transcript,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(width: 12),
             ],
