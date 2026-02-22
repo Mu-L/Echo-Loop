@@ -23,13 +23,25 @@ void main() {
     id: 'test-1',
     name: 'Test Audio',
     audioPath: 'audios/test.mp3',
+    transcriptPath: 'transcripts/test.srt',
+    addedDate: DateTime(2026, 1, 1),
+    sentenceCount: 10,
+    wordCount: 50,
+  );
+
+  final testAudioItemNoTranscript = AudioItem(
+    id: 'test-1',
+    name: 'Test Audio',
+    audioPath: 'audios/test.mp3',
     addedDate: DateTime(2026, 1, 1),
   );
 
   Widget createTestWidget({
     Locale locale = const Locale('en'),
     LearningProgressState? progressState,
+    AudioItem? audioItem,
   }) {
+    final item = audioItem ?? testAudioItem;
     final router = GoRouter(
       initialLocation: '/collections/col-1/test-1/plan',
       routes: [
@@ -59,8 +71,7 @@ void main() {
     return ProviderScope(
       overrides: [
         audioLibraryProvider.overrideWith(
-          () =>
-              TestAudioLibrary(AudioLibraryState(audioItems: [testAudioItem])),
+          () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
         ),
         listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
         audioEngineProvider.overrideWith(() => TestAudioEngine()),
@@ -357,6 +368,45 @@ void main() {
 
       // 不应弹出简报弹窗（因为没有 onTap）
       expect(find.text('Full Listening'), findsNothing);
+    });
+
+    testWidgets('无字幕时显示警告横幅且禁用开始按钮', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(audioItem: testAudioItemNoTranscript),
+      );
+      await tester.pumpAndSettle();
+
+      // 显示无字幕警告
+      expect(
+        find.text(
+          'No transcript uploaded. A transcript is required to start the learning flow.',
+        ),
+        findsOneWidget,
+      );
+
+      // 开始学习按钮应被禁用
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('有字幕时显示句子数和单词数', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.text('10 sentences'), findsOneWidget);
+      expect(find.text('50 words'), findsOneWidget);
+    });
+
+    testWidgets('有字幕时不显示警告横幅', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'No transcript uploaded. A transcript is required to start the learning flow.',
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('已完成状态显示正确', (tester) async {

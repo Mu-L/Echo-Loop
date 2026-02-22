@@ -8,6 +8,8 @@ void main() {
     AudioItem createSample({
       String? transcriptPath = 'transcripts/test.srt',
       int totalDuration = 120,
+      int sentenceCount = 10,
+      int wordCount = 50,
     }) {
       return AudioItem(
         id: 'audio-1',
@@ -16,6 +18,8 @@ void main() {
         transcriptPath: transcriptPath,
         addedDate: now,
         totalDuration: totalDuration,
+        sentenceCount: sentenceCount,
+        wordCount: wordCount,
       );
     }
 
@@ -31,6 +35,8 @@ void main() {
         expect(restored.transcriptPath, item.transcriptPath);
         expect(restored.addedDate, item.addedDate);
         expect(restored.totalDuration, item.totalDuration);
+        expect(restored.sentenceCount, item.sentenceCount);
+        expect(restored.wordCount, item.wordCount);
       });
 
       test('transcriptPath 为 null 时往返一致', () {
@@ -54,6 +60,16 @@ void main() {
         expect(copied.audioPath, item.audioPath);
         expect(copied.transcriptPath, item.transcriptPath);
         expect(copied.addedDate, item.addedDate);
+        expect(copied.sentenceCount, item.sentenceCount);
+        expect(copied.wordCount, item.wordCount);
+      });
+
+      test('sentenceCount 和 wordCount 覆盖', () {
+        final item = createSample();
+        final copied = item.copyWith(sentenceCount: 20, wordCount: 100);
+
+        expect(copied.sentenceCount, 20);
+        expect(copied.wordCount, 100);
       });
 
       test('不传参数时保持原值', () {
@@ -93,6 +109,32 @@ void main() {
       };
       final item = AudioItem.fromJson(json);
       expect(item.totalDuration, 0);
+    });
+
+    test('fromJson 处理缺失 sentenceCount/wordCount 字段（默认 0）', () {
+      final json = {
+        'id': 'audio-1',
+        'name': '测试',
+        'audioPath': 'audios/test.mp3',
+        'transcriptPath': null,
+        'addedDate': now.toIso8601String(),
+        'totalDuration': 60,
+        // 无 sentenceCount / wordCount
+      };
+      final item = AudioItem.fromJson(json);
+      expect(item.sentenceCount, 0);
+      expect(item.wordCount, 0);
+    });
+
+    test('默认 sentenceCount 和 wordCount 为 0', () {
+      final item = AudioItem(
+        id: 'audio-1',
+        name: '测试',
+        audioPath: 'audios/test.mp3',
+        addedDate: now,
+      );
+      expect(item.sentenceCount, 0);
+      expect(item.wordCount, 0);
     });
   });
 }

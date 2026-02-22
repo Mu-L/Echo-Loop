@@ -654,4 +654,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get replace => 'Replace';
+
+  @override
+  String sentenceCountLabel(int count) {
+    return '$count sentences';
+  }
+
+  @override
+  String wordCountLabel(int count) {
+    return '$count words';
+  }
+
+  @override
+  String get noTranscriptWarning =>
+      'No transcript uploaded. A transcript is required to start the learning flow.';
 }

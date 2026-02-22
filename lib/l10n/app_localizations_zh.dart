@@ -647,4 +647,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get replace => '替换';
+
+  @override
+  String sentenceCountLabel(int count) {
+    return '$count 句';
+  }
+
+  @override
+  String wordCountLabel(int count) {
+    return '$count 词';
+  }
+
+  @override
+  String get noTranscriptWarning => '尚未上传字幕，需要字幕才能开始学习流程。';
 }

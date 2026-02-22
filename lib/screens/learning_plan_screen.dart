@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import '../database/enums.dart';
+import '../models/audio_item.dart';
 import '../models/learning_progress.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/audio_library_provider.dart';
@@ -17,6 +18,7 @@ import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
+import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_briefing_sheet.dart';
 
@@ -146,6 +148,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       });
     }
 
+    final hasTranscript = audioItem.hasTranscript;
+
     return Scaffold(
       appBar: AppBar(title: Text(audioItem.name)),
       body: Column(
@@ -155,6 +159,12 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
               padding: const EdgeInsets.all(AppSpacing.m),
               children: [
                 _ProgressCard(l10n: l10n, progress: progress),
+                const SizedBox(height: AppSpacing.s),
+                _AudioInfoRow(l10n: l10n, audioItem: audioItem),
+                if (!hasTranscript) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  _NoTranscriptBanner(l10n: l10n),
+                ],
                 const SizedBox(height: AppSpacing.l),
                 _FirstStudySection(
                   l10n: l10n,
@@ -179,9 +189,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           _BottomButton(
             l10n: l10n,
             progress: progress,
-            onPressed: () {
-              _handleStartLearning(context, progress);
-            },
+            onPressed: hasTranscript
+                ? () => _handleStartLearning(context, progress)
+                : null,
           ),
         ],
       ),
@@ -924,11 +934,129 @@ class _ReviewStepCard extends StatelessWidget {
   }
 }
 
+/// 音频信息行 — 显示时长、句子数、单词数
+class _AudioInfoRow extends StatelessWidget {
+  final AppLocalizations l10n;
+  final AudioItem audioItem;
+
+  const _AudioInfoRow({required this.l10n, required this.audioItem});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chips = <Widget>[];
+
+    // 时长
+    if (audioItem.totalDuration > 0) {
+      chips.add(_InfoChip(
+        icon: Icons.timer_outlined,
+        label: SubtitleParser.formatDuration(
+          Duration(seconds: audioItem.totalDuration),
+        ),
+        theme: theme,
+      ));
+    }
+
+    // 句子数
+    if (audioItem.sentenceCount > 0) {
+      chips.add(_InfoChip(
+        icon: Icons.format_list_numbered,
+        label: l10n.sentenceCountLabel(audioItem.sentenceCount),
+        theme: theme,
+      ));
+    }
+
+    // 单词数
+    if (audioItem.wordCount > 0) {
+      chips.add(_InfoChip(
+        icon: Icons.text_fields,
+        label: l10n.wordCountLabel(audioItem.wordCount),
+        theme: theme,
+      ));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: Wrap(spacing: AppSpacing.s, runSpacing: AppSpacing.xs, children: chips),
+    );
+  }
+}
+
+/// 单个信息标签
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final ThemeData theme;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 无字幕提醒横幅 — 提示用户需要上传字幕
+class _NoTranscriptBanner extends StatelessWidget {
+  final AppLocalizations l10n;
+
+  const _NoTranscriptBanner({required this.l10n});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.m),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: theme.colorScheme.onErrorContainer,
+              size: 24,
+            ),
+            const SizedBox(width: AppSpacing.s),
+            Expanded(
+              child: Text(
+                l10n.noTranscriptWarning,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 底部固定按钮 — 根据进度显示不同文案
+///
+/// [onPressed] 为 null 时按钮禁用（例如无字幕时）。
 class _BottomButton extends StatelessWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _BottomButton({
     required this.l10n,

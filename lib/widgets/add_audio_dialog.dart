@@ -15,6 +15,7 @@ import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/audio_duration.dart';
+import '../utils/transcript_stats.dart';
 
 /// 添加音频对话框 — collectionId 可选
 class AddAudioDialog extends ConsumerStatefulWidget {
@@ -315,6 +316,15 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       // 导入时提取音频时长
       final duration = await getAudioDurationSeconds(_audioPath!);
 
+      // 导入时统计字幕句子数和单词数
+      int sentenceCount = 0;
+      int wordCount = 0;
+      if (_transcriptPath != null) {
+        final stats = await getTranscriptStats(_transcriptPath!);
+        sentenceCount = stats.$1;
+        wordCount = stats.$2;
+      }
+
       final audioItem = AudioItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _audioName,
@@ -322,6 +332,8 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         transcriptPath: _transcriptPath,
         addedDate: DateTime.now(),
         totalDuration: duration,
+        sentenceCount: sentenceCount,
+        wordCount: wordCount,
       );
 
       await library.addAudioItem(audioItem);

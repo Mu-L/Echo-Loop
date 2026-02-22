@@ -11,6 +11,8 @@ class AudioItem {
   final String? transcriptPath; // 相对路径，如 "transcripts/file.srt"
   final DateTime addedDate;
   final int totalDuration; // in seconds
+  final int sentenceCount;
+  final int wordCount;
 
   AudioItem({
     required this.id,
@@ -19,6 +21,8 @@ class AudioItem {
     this.transcriptPath,
     required this.addedDate,
     this.totalDuration = 0,
+    this.sentenceCount = 0,
+    this.wordCount = 0,
   });
 
   bool get hasTranscript =>
@@ -44,6 +48,8 @@ class AudioItem {
     'transcriptPath': transcriptPath,
     'addedDate': addedDate.toIso8601String(),
     'totalDuration': totalDuration,
+    'sentenceCount': sentenceCount,
+    'wordCount': wordCount,
   };
 
   factory AudioItem.fromJson(Map<String, dynamic> json) => AudioItem(
@@ -53,6 +59,8 @@ class AudioItem {
     transcriptPath: json['transcriptPath'],
     addedDate: DateTime.parse(json['addedDate']),
     totalDuration: json['totalDuration'] ?? 0,
+    sentenceCount: json['sentenceCount'] ?? 0,
+    wordCount: json['wordCount'] ?? 0,
   );
 
   AudioItem copyWith({
@@ -62,6 +70,8 @@ class AudioItem {
     Object? transcriptPath = _sentinel,
     DateTime? addedDate,
     int? totalDuration,
+    int? sentenceCount,
+    int? wordCount,
   }) {
     return AudioItem(
       id: id ?? this.id,
@@ -72,6 +82,8 @@ class AudioItem {
           : transcriptPath as String?,
       addedDate: addedDate ?? this.addedDate,
       totalDuration: totalDuration ?? this.totalDuration,
+      sentenceCount: sentenceCount ?? this.sentenceCount,
+      wordCount: wordCount ?? this.wordCount,
     );
   }
 }

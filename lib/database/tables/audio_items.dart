@@ -20,6 +20,12 @@ class AudioItems extends Table {
   /// 时长（秒）
   IntColumn get totalDuration => integer().withDefault(const Constant(0))();
 
+  /// 字幕句子数
+  IntColumn get sentenceCount => integer().withDefault(const Constant(0))();
+
+  /// 字幕单词数
+  IntColumn get wordCount => integer().withDefault(const Constant(0))();
+
   /// 最后修改时间
   DateTimeColumn get updatedAt => dateTime()();
 

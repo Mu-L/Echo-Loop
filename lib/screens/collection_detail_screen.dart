@@ -152,44 +152,52 @@ class _CollectionAudioTile extends ConsumerWidget {
           audioItem.name,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        subtitle: Row(
+        subtitle: Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             // 音频时长
-            if (audioItem.totalDuration > 0) ...[
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            if (audioItem.totalDuration > 0)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    _formatDuration(audioItem.totalDuration),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              const SizedBox(width: 3),
-              Text(
-                _formatDuration(audioItem.totalDuration),
-                style: Theme.of(context).textTheme.bodySmall,
+            if (audioItem.hasTranscript)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.subtitles,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    l10n.transcript,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-            ],
-            if (audioItem.hasTranscript) ...[
-              Icon(
-                Icons.subtitles,
-                size: 16,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                l10n.transcript,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
             Text(
               l10n.addedOn(_formatDate(audioItem.addedDate)),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (progress != null && progress.isStarted) ...[
-              const SizedBox(width: 8),
+            if (progress != null && progress.isStarted)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -210,7 +218,6 @@ class _CollectionAudioTile extends ConsumerWidget {
                   ),
                 ),
               ),
-            ],
           ],
         ),
         trailing: Row(

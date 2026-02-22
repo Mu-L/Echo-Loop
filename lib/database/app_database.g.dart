@@ -72,6 +72,30 @@ class $AudioItemsTable extends AudioItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _sentenceCountMeta = const VerificationMeta(
+    'sentenceCount',
+  );
+  @override
+  late final GeneratedColumn<int> sentenceCount = GeneratedColumn<int>(
+    'sentence_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _wordCountMeta = const VerificationMeta(
+    'wordCount',
+  );
+  @override
+  late final GeneratedColumn<int> wordCount = GeneratedColumn<int>(
+    'word_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -114,6 +138,8 @@ class $AudioItemsTable extends AudioItems
     transcriptPath,
     addedDate,
     totalDuration,
+    sentenceCount,
+    wordCount,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -177,6 +203,21 @@ class $AudioItemsTable extends AudioItems
         ),
       );
     }
+    if (data.containsKey('sentence_count')) {
+      context.handle(
+        _sentenceCountMeta,
+        sentenceCount.isAcceptableOrUnknown(
+          data['sentence_count']!,
+          _sentenceCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('word_count')) {
+      context.handle(
+        _wordCountMeta,
+        wordCount.isAcceptableOrUnknown(data['word_count']!, _wordCountMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -230,6 +271,14 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.int,
         data['${effectivePrefix}total_duration'],
       )!,
+      sentenceCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sentence_count'],
+      )!,
+      wordCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}word_count'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -270,6 +319,12 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 时长（秒）
   final int totalDuration;
 
+  /// 字幕句子数
+  final int sentenceCount;
+
+  /// 字幕单词数
+  final int wordCount;
+
   /// 最后修改时间
   final DateTime updatedAt;
 
@@ -285,6 +340,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     this.transcriptPath,
     required this.addedDate,
     required this.totalDuration,
+    required this.sentenceCount,
+    required this.wordCount,
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
@@ -300,6 +357,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     }
     map['added_date'] = Variable<DateTime>(addedDate);
     map['total_duration'] = Variable<int>(totalDuration);
+    map['sentence_count'] = Variable<int>(sentenceCount);
+    map['word_count'] = Variable<int>(wordCount);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -318,6 +377,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           : Value(transcriptPath),
       addedDate: Value(addedDate),
       totalDuration: Value(totalDuration),
+      sentenceCount: Value(sentenceCount),
+      wordCount: Value(wordCount),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -338,6 +399,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       transcriptPath: serializer.fromJson<String?>(json['transcriptPath']),
       addedDate: serializer.fromJson<DateTime>(json['addedDate']),
       totalDuration: serializer.fromJson<int>(json['totalDuration']),
+      sentenceCount: serializer.fromJson<int>(json['sentenceCount']),
+      wordCount: serializer.fromJson<int>(json['wordCount']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
@@ -353,6 +416,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'transcriptPath': serializer.toJson<String?>(transcriptPath),
       'addedDate': serializer.toJson<DateTime>(addedDate),
       'totalDuration': serializer.toJson<int>(totalDuration),
+      'sentenceCount': serializer.toJson<int>(sentenceCount),
+      'wordCount': serializer.toJson<int>(wordCount),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
@@ -366,6 +431,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     Value<String?> transcriptPath = const Value.absent(),
     DateTime? addedDate,
     int? totalDuration,
+    int? sentenceCount,
+    int? wordCount,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
@@ -378,6 +445,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
         : this.transcriptPath,
     addedDate: addedDate ?? this.addedDate,
     totalDuration: totalDuration ?? this.totalDuration,
+    sentenceCount: sentenceCount ?? this.sentenceCount,
+    wordCount: wordCount ?? this.wordCount,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -394,6 +463,10 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       totalDuration: data.totalDuration.present
           ? data.totalDuration.value
           : this.totalDuration,
+      sentenceCount: data.sentenceCount.present
+          ? data.sentenceCount.value
+          : this.sentenceCount,
+      wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncStatus: data.syncStatus.present
@@ -411,6 +484,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('transcriptPath: $transcriptPath, ')
           ..write('addedDate: $addedDate, ')
           ..write('totalDuration: $totalDuration, ')
+          ..write('sentenceCount: $sentenceCount, ')
+          ..write('wordCount: $wordCount, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -426,6 +501,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     transcriptPath,
     addedDate,
     totalDuration,
+    sentenceCount,
+    wordCount,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -440,6 +517,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.transcriptPath == this.transcriptPath &&
           other.addedDate == this.addedDate &&
           other.totalDuration == this.totalDuration &&
+          other.sentenceCount == this.sentenceCount &&
+          other.wordCount == this.wordCount &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.syncStatus == this.syncStatus);
@@ -452,6 +531,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<String?> transcriptPath;
   final Value<DateTime> addedDate;
   final Value<int> totalDuration;
+  final Value<int> sentenceCount;
+  final Value<int> wordCount;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
@@ -463,6 +544,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.transcriptPath = const Value.absent(),
     this.addedDate = const Value.absent(),
     this.totalDuration = const Value.absent(),
+    this.sentenceCount = const Value.absent(),
+    this.wordCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -475,6 +558,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.transcriptPath = const Value.absent(),
     required DateTime addedDate,
     this.totalDuration = const Value.absent(),
+    this.sentenceCount = const Value.absent(),
+    this.wordCount = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -491,6 +576,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<String>? transcriptPath,
     Expression<DateTime>? addedDate,
     Expression<int>? totalDuration,
+    Expression<int>? sentenceCount,
+    Expression<int>? wordCount,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
@@ -503,6 +590,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (transcriptPath != null) 'transcript_path': transcriptPath,
       if (addedDate != null) 'added_date': addedDate,
       if (totalDuration != null) 'total_duration': totalDuration,
+      if (sentenceCount != null) 'sentence_count': sentenceCount,
+      if (wordCount != null) 'word_count': wordCount,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -517,6 +606,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<String?>? transcriptPath,
     Value<DateTime>? addedDate,
     Value<int>? totalDuration,
+    Value<int>? sentenceCount,
+    Value<int>? wordCount,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
@@ -529,6 +620,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       transcriptPath: transcriptPath ?? this.transcriptPath,
       addedDate: addedDate ?? this.addedDate,
       totalDuration: totalDuration ?? this.totalDuration,
+      sentenceCount: sentenceCount ?? this.sentenceCount,
+      wordCount: wordCount ?? this.wordCount,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -557,6 +650,12 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (totalDuration.present) {
       map['total_duration'] = Variable<int>(totalDuration.value);
     }
+    if (sentenceCount.present) {
+      map['sentence_count'] = Variable<int>(sentenceCount.value);
+    }
+    if (wordCount.present) {
+      map['word_count'] = Variable<int>(wordCount.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -581,6 +680,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('transcriptPath: $transcriptPath, ')
           ..write('addedDate: $addedDate, ')
           ..write('totalDuration: $totalDuration, ')
+          ..write('sentenceCount: $sentenceCount, ')
+          ..write('wordCount: $wordCount, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -3626,6 +3727,8 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<String?> transcriptPath,
       required DateTime addedDate,
       Value<int> totalDuration,
+      Value<int> sentenceCount,
+      Value<int> wordCount,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -3639,6 +3742,8 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<String?> transcriptPath,
       Value<DateTime> addedDate,
       Value<int> totalDuration,
+      Value<int> sentenceCount,
+      Value<int> wordCount,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -3803,6 +3908,16 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<int> get totalDuration => $composableBuilder(
     column: $table.totalDuration,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sentenceCount => $composableBuilder(
+    column: $table.sentenceCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get wordCount => $composableBuilder(
+    column: $table.wordCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3986,6 +4101,16 @@ class $$AudioItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sentenceCount => $composableBuilder(
+    column: $table.sentenceCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get wordCount => $composableBuilder(
+    column: $table.wordCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4032,6 +4157,14 @@ class $$AudioItemsTableAnnotationComposer
     column: $table.totalDuration,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get sentenceCount => $composableBuilder(
+    column: $table.sentenceCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get wordCount =>
+      $composableBuilder(column: $table.wordCount, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -4212,6 +4345,8 @@ class $$AudioItemsTableTableManager
                 Value<String?> transcriptPath = const Value.absent(),
                 Value<DateTime> addedDate = const Value.absent(),
                 Value<int> totalDuration = const Value.absent(),
+                Value<int> sentenceCount = const Value.absent(),
+                Value<int> wordCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4223,6 +4358,8 @@ class $$AudioItemsTableTableManager
                 transcriptPath: transcriptPath,
                 addedDate: addedDate,
                 totalDuration: totalDuration,
+                sentenceCount: sentenceCount,
+                wordCount: wordCount,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
@@ -4236,6 +4373,8 @@ class $$AudioItemsTableTableManager
                 Value<String?> transcriptPath = const Value.absent(),
                 required DateTime addedDate,
                 Value<int> totalDuration = const Value.absent(),
+                Value<int> sentenceCount = const Value.absent(),
+                Value<int> wordCount = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4247,6 +4386,8 @@ class $$AudioItemsTableTableManager
                 transcriptPath: transcriptPath,
                 addedDate: addedDate,
                 totalDuration: totalDuration,
+                sentenceCount: sentenceCount,
+                wordCount: wordCount,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,

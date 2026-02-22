@@ -201,5 +201,8 @@
   "uploadTranscript": "上传字幕",
   "replaceTranscriptTitle": "替换字幕",
   "replaceTranscriptMessage": "字幕已存在，是否替换？",
-  "replace": "替换"
+  "replace": "替换",
+  "sentenceCountLabel": "{count} 句",
+  "wordCountLabel": "{count} 词",
+  "noTranscriptWarning": "尚未上传字幕，需要字幕才能开始学习流程。"
 }

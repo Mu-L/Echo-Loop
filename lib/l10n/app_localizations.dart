@@ -1309,6 +1309,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Replace'**
   String get replace;
+
+  /// No description provided for @sentenceCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sentences'**
+  String sentenceCountLabel(int count);
+
+  /// No description provided for @wordCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} words'**
+  String wordCountLabel(int count);
+
+  /// No description provided for @noTranscriptWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'No transcript uploaded. A transcript is required to start the learning flow.'**
+  String get noTranscriptWarning;
 }
 
 class _AppLocalizationsDelegate

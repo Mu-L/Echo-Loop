@@ -6,6 +6,7 @@ import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/audio_item.dart';
 import '../utils/audio_duration.dart';
+import '../utils/transcript_stats.dart';
 import 'collection_provider.dart';
 import 'learning_progress_provider.dart';
 
@@ -50,6 +51,8 @@ class AudioLibrary extends _$AudioLibrary {
             transcriptPath: row.transcriptPath,
             addedDate: row.addedDate,
             totalDuration: row.totalDuration,
+            sentenceCount: row.sentenceCount,
+            wordCount: row.wordCount,
           ),
         )
         .toList();
@@ -82,7 +85,11 @@ class AudioLibrary extends _$AudioLibrary {
         if (fullTranscriptPath != null) {
           final transcriptFile = File(fullTranscriptPath);
           if (!await transcriptFile.exists()) {
-            processedItem = processedItem.copyWith(transcriptPath: null);
+            processedItem = processedItem.copyWith(
+              transcriptPath: null,
+              sentenceCount: 0,
+              wordCount: 0,
+            );
             hasMigratedItems = true;
           }
         }
@@ -227,6 +234,21 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
+  /// 补填字幕统计 — 对有字幕但 sentenceCount == 0 的音频逐个统计并持久化
+  Future<void> backfillTranscriptStats() async {
+    final missing = state.audioItems
+        .where((item) => item.hasTranscript && item.sentenceCount == 0)
+        .toList();
+    for (final item in missing) {
+      final stats = await getTranscriptStats(item.transcriptPath!);
+      if (stats.$1 > 0) {
+        updateAudioItem(
+          item.copyWith(sentenceCount: stats.$1, wordCount: stats.$2),
+        );
+      }
+    }
+  }
+
   /// 将 AudioItem 模型写入 Drift 数据库
   Future<void> _upsertItem(AudioItem item) async {
     final dao = ref.read(audioItemDaoProvider);
@@ -238,6 +260,8 @@ class AudioLibrary extends _$AudioLibrary {
         transcriptPath: Value(item.transcriptPath),
         addedDate: Value(item.addedDate),
         totalDuration: Value(item.totalDuration),
+        sentenceCount: Value(item.sentenceCount),
+        wordCount: Value(item.wordCount),
         updatedAt: Value(DateTime.now()),
       ),
     );

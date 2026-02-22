@@ -73,44 +73,56 @@ class AudioListTile extends ConsumerWidget {
           audioItem.name,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        // 与合集详情页音频列表项保持一致的 Row 布局
-        subtitle: Row(
+        // 使用 Wrap 避免内容溢出
+        subtitle: Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             // 音频时长
-            if (audioItem.totalDuration > 0) ...[
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
+            if (audioItem.totalDuration > 0)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    _formatDuration(audioItem.totalDuration),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
-              const SizedBox(width: 3),
-              Text(
-                _formatDuration(audioItem.totalDuration),
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(width: 12),
-            ],
             // 字幕图标 + 文字
-            if (audioItem.hasTranscript) ...[
-              Icon(Icons.subtitles, size: 16, color: theme.colorScheme.primary),
-              const SizedBox(width: 4),
-              Text(
-                l10n.transcript,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 12,
-                ),
+            if (audioItem.hasTranscript)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.subtitles,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    l10n.transcript,
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-            ],
             // 添加时间
             Text(
               l10n.addedOn(_formatDate(audioItem.addedDate)),
               style: theme.textTheme.bodySmall,
             ),
             // 学习进度 badge
-            if (progress != null && progress.isStarted) ...[
-              const SizedBox(width: 8),
+            if (progress != null && progress.isStarted)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -131,31 +143,26 @@ class AudioListTile extends ConsumerWidget {
                   ),
                 ),
               ),
-            ],
             // 合集标签 chips
-            if (collectionNames.isNotEmpty)
-              ...collectionNames.map(
-                (name) => Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      name,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
-                    ),
+            ...collectionNames.map(
+              (name) => Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  name,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
                   ),
                 ),
               ),
+            ),
           ],
         ),
         trailing: PopupMenuButton<String>(

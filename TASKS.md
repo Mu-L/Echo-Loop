@@ -23,6 +23,23 @@
 
 ---
 
+## 上传字幕时记录句子数和单词数
+
+- [x] 数据库表增加 sentenceCount / wordCount 两列 + schema v5→v6 迁移
+- [x] AudioItem 模型增加两个字段（构造函数、toJson/fromJson、copyWith）
+- [x] 新建 `lib/utils/transcript_stats.dart` 统计工具函数
+- [x] AddAudioDialog 创建音频时统计字幕
+- [x] transcript_picker 上传/替换字幕时统计
+- [x] AudioLibraryProvider 映射 + upsert + 字幕清除时清零 + backfillTranscriptStats
+- [x] 启动时补填旧音频缺失统计
+- [x] 新增 `test/utils/transcript_stats_test.dart` + 更新 AudioItem 测试
+- [x] 学习计划页面显示句子数/单词数/时长 + 无字幕警告横幅 + 禁用开始按钮
+- [x] 更新 LearningPlanScreen 测试（3 个新测试 + 修复已有测试）
+
+**完成时间**: 2026-02-22
+
+---
+
 ## 资源库（Library）Tab 改造
 
 - [x] 任务 1：修复 deleteCollection 的 audioIdsMap Bug

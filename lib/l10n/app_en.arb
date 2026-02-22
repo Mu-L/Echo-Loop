@@ -303,5 +303,18 @@
   "uploadTranscript": "Upload Transcript",
   "replaceTranscriptTitle": "Replace Transcript",
   "replaceTranscriptMessage": "A transcript already exists. Do you want to replace it?",
-  "replace": "Replace"
+  "replace": "Replace",
+  "sentenceCountLabel": "{count} sentences",
+  "@sentenceCountLabel": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "wordCountLabel": "{count} words",
+  "@wordCountLabel": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noTranscriptWarning": "No transcript uploaded. A transcript is required to start the learning flow."
 }

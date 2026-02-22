@@ -12,6 +12,7 @@ import 'package:path/path.dart' as path;
 import '../models/audio_item.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
+import 'transcript_stats.dart';
 
 /// 选择并保存字幕文件到沙盒，返回相对路径。用户取消返回 null。
 Future<String?> pickAndSaveTranscript() async {
@@ -77,11 +78,18 @@ Future<void> uploadTranscriptForAudio(
     final newPath = await pickAndSaveTranscript();
     if (newPath == null) return;
 
-    // 更新音频项的字幕路径
+    // 统计字幕句子数和单词数
+    final stats = await getTranscriptStats(newPath);
+
+    // 更新音频项的字幕路径和统计数据
     if (!context.mounted) return;
-    ref
-        .read(audioLibraryProvider.notifier)
-        .updateAudioItem(audioItem.copyWith(transcriptPath: newPath));
+    ref.read(audioLibraryProvider.notifier).updateAudioItem(
+      audioItem.copyWith(
+        transcriptPath: newPath,
+        sentenceCount: stats.$1,
+        wordCount: stats.$2,
+      ),
+    );
   } catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

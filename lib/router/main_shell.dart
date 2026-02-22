@@ -33,6 +33,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
         ref.read(audioLibraryProvider.notifier).backfillDurations();
+        ref.read(audioLibraryProvider.notifier).backfillTranscriptStats();
       });
       ref.read(learningProgressNotifierProvider.notifier).loadAll();
     });
