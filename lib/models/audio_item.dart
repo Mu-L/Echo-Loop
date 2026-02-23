@@ -13,6 +13,7 @@ class AudioItem {
   final int totalDuration; // in seconds
   final int sentenceCount;
   final int wordCount;
+  final bool isStarred;
 
   AudioItem({
     required this.id,
@@ -23,6 +24,7 @@ class AudioItem {
     this.totalDuration = 0,
     this.sentenceCount = 0,
     this.wordCount = 0,
+    this.isStarred = false,
   });
 
   bool get hasTranscript =>
@@ -50,6 +52,7 @@ class AudioItem {
     'totalDuration': totalDuration,
     'sentenceCount': sentenceCount,
     'wordCount': wordCount,
+    'isStarred': isStarred,
   };
 
   factory AudioItem.fromJson(Map<String, dynamic> json) => AudioItem(
@@ -61,6 +64,7 @@ class AudioItem {
     totalDuration: json['totalDuration'] ?? 0,
     sentenceCount: json['sentenceCount'] ?? 0,
     wordCount: json['wordCount'] ?? 0,
+    isStarred: json['isStarred'] ?? false,
   );
 
   AudioItem copyWith({
@@ -72,6 +76,7 @@ class AudioItem {
     int? totalDuration,
     int? sentenceCount,
     int? wordCount,
+    bool? isStarred,
   }) {
     return AudioItem(
       id: id ?? this.id,
@@ -84,6 +89,7 @@ class AudioItem {
       totalDuration: totalDuration ?? this.totalDuration,
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
+      isStarred: isStarred ?? this.isStarred,
     );
   }
 }

@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -70,6 +70,12 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             await m.createTable(stageCompletions);
           }
+        }
+        // v7→v8：audio_items 新增 isStarred 列
+        if (from < 8) {
+          await customStatement(
+            'ALTER TABLE audio_items ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0',
+          );
         }
         // v5→v6：audio_items 新增 sentenceCount、wordCount 列
         if (from < 6) {

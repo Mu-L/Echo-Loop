@@ -5,6 +5,20 @@
 
 ---
 
+## 音频星标功能
+
+- [x] 数据库表 `audio_items` 添加 `isStarred` 列 + schema v7→v8 迁移
+- [x] AudioItem 模型添加 `isStarred` 字段（构造函数、toJson/fromJson、copyWith）
+- [x] AudioLibraryProvider 添加 `toggleStar` 方法 + loadLibrary/upsert 映射
+- [x] SP 迁移 Companion 补充 `isStarred`
+- [x] 国际化添加 `starAudio` / `unstarAudio` 字符串
+- [x] AudioListTile 添加星标 IconButton（AppTheme.bookmarkColor 颜色）
+- [x] 测试：AudioItem 模型测试（+4）、AudioLibraryProvider 测试（+3）、AudioListTile Widget 测试（+4）
+
+**完成时间**: 2026-02-23
+
+---
+
 ## 合集音频列表与全局音频列表复用
 
 - [x] 统一 AudioListTile — 添加 collectionId 参数，合并 _CollectionAudioTile 差异逻辑（正在播放标记、文件检查、路由切换、条件菜单）

@@ -13,6 +13,7 @@ import 'groups/learning_plan_tests.dart';
 import 'groups/blind_listen_tests.dart';
 import 'groups/intensive_listen_tests.dart';
 import 'groups/learning_flow_tests.dart';
+import 'groups/audio_star_tests.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ void main() {
   navigationTests();
   settingsTests();
   collectionTests();
+  audioStarTests();
   learningPlanTests();
   blindListenTests();
   intensiveListenTests();

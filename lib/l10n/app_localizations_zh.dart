@@ -326,6 +326,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unstarCollection => '取消星标';
 
   @override
+  String get starAudio => '星标';
+
+  @override
+  String get unstarAudio => '取消星标';
+
+  @override
   String get sortByNameAsc => '名称 (A-Z)';
 
   @override

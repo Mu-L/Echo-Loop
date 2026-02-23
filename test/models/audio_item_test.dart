@@ -10,6 +10,7 @@ void main() {
       int totalDuration = 120,
       int sentenceCount = 10,
       int wordCount = 50,
+      bool isStarred = false,
     }) {
       return AudioItem(
         id: 'audio-1',
@@ -20,6 +21,7 @@ void main() {
         totalDuration: totalDuration,
         sentenceCount: sentenceCount,
         wordCount: wordCount,
+        isStarred: isStarred,
       );
     }
 
@@ -37,6 +39,15 @@ void main() {
         expect(restored.totalDuration, item.totalDuration);
         expect(restored.sentenceCount, item.sentenceCount);
         expect(restored.wordCount, item.wordCount);
+        expect(restored.isStarred, item.isStarred);
+      });
+
+      test('isStarred=true 往返一致', () {
+        final item = createSample(isStarred: true);
+        final json = item.toJson();
+        final restored = AudioItem.fromJson(json);
+
+        expect(restored.isStarred, isTrue);
       });
 
       test('transcriptPath 为 null 时往返一致', () {
@@ -70,6 +81,16 @@ void main() {
 
         expect(copied.sentenceCount, 20);
         expect(copied.wordCount, 100);
+      });
+
+      test('isStarred 覆盖', () {
+        final item = createSample(isStarred: false);
+        final copied = item.copyWith(isStarred: true);
+
+        expect(copied.isStarred, isTrue);
+        // 未修改的字段保持不变
+        expect(copied.id, item.id);
+        expect(copied.name, item.name);
       });
 
       test('不传参数时保持原值', () {
@@ -126,7 +147,21 @@ void main() {
       expect(item.wordCount, 0);
     });
 
-    test('默认 sentenceCount 和 wordCount 为 0', () {
+    test('fromJson 处理缺失 isStarred 字段（默认 false）', () {
+      final json = {
+        'id': 'audio-1',
+        'name': '测试',
+        'audioPath': 'audios/test.mp3',
+        'transcriptPath': null,
+        'addedDate': now.toIso8601String(),
+        'totalDuration': 60,
+        // 无 isStarred
+      };
+      final item = AudioItem.fromJson(json);
+      expect(item.isStarred, isFalse);
+    });
+
+    test('默认 sentenceCount、wordCount 为 0，isStarred 为 false', () {
       final item = AudioItem(
         id: 'audio-1',
         name: '测试',
@@ -135,6 +170,7 @@ void main() {
       );
       expect(item.sentenceCount, 0);
       expect(item.wordCount, 0);
+      expect(item.isStarred, isFalse);
     });
   });
 }

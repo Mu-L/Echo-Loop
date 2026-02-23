@@ -716,6 +716,18 @@ abstract class AppLocalizations {
   /// **'Unstar'**
   String get unstarCollection;
 
+  /// No description provided for @starAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Star'**
+  String get starAudio;
+
+  /// No description provided for @unstarAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Unstar'**
+  String get unstarAudio;
+
   /// No description provided for @sortByNameAsc.
   ///
   /// In en, this message translates to:

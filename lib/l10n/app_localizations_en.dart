@@ -327,6 +327,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unstarCollection => 'Unstar';
 
   @override
+  String get starAudio => 'Star';
+
+  @override
+  String get unstarAudio => 'Unstar';
+
+  @override
   String get sortByNameAsc => 'Name (A-Z)';
 
   @override

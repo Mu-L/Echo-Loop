@@ -13,6 +13,7 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
+import '../theme/app_theme.dart';
 import '../utils/transcript_picker.dart';
 
 /// 音频列表项 — 资源库全局列表和合集详情页共用
@@ -83,7 +84,12 @@ class AudioListTile extends ConsumerWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Colors.transparent,
-          child: Icon(Icons.audiotrack, color: theme.colorScheme.primary),
+          child: Icon(
+            Icons.audiotrack,
+            color: audioItem.isStarred
+                ? AppTheme.bookmarkColor
+                : theme.colorScheme.primary,
+          ),
         ),
         title: Text(
           audioItem.name,
@@ -216,7 +222,23 @@ class AudioListTile extends ConsumerWidget {
     );
   }
 
-  /// 构建 trailing 区域（正在播放标记 + 弹出菜单）
+  /// 构建星标按钮
+  Widget _buildStarButton(WidgetRef ref, AppLocalizations l10n, ThemeData theme) {
+    return IconButton(
+      icon: Icon(
+        audioItem.isStarred ? Icons.star : Icons.star_border,
+        color: audioItem.isStarred
+            ? AppTheme.bookmarkColor
+            : theme.colorScheme.onSurfaceVariant,
+      ),
+      tooltip: audioItem.isStarred ? l10n.unstarAudio : l10n.starAudio,
+      onPressed: () {
+        ref.read(audioLibraryProvider.notifier).toggleStar(audioItem.id);
+      },
+    );
+  }
+
+  /// 构建 trailing 区域（星标 + 正在播放标记 + 弹出菜单）
   Widget _buildTrailing(
     BuildContext context,
     WidgetRef ref,
@@ -225,12 +247,19 @@ class AudioListTile extends ConsumerWidget {
     bool isCurrentlyPlaying,
   ) {
     if (!isCurrentlyPlaying) {
-      return _buildPopupMenu(context, ref, l10n, theme);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildStarButton(ref, l10n, theme),
+          _buildPopupMenu(context, ref, l10n, theme),
+        ],
+      );
     }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        _buildStarButton(ref, l10n, theme),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(

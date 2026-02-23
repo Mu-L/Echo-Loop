@@ -131,6 +131,8 @@
   "renameCollection": "Rename",
   "starCollection": "Star",
   "unstarCollection": "Unstar",
+  "starAudio": "Star",
+  "unstarAudio": "Unstar",
   "sortByNameAsc": "Name (A-Z)",
   "sortByNameDesc": "Name (Z-A)",
   "sortByDateAsc": "Oldest First",

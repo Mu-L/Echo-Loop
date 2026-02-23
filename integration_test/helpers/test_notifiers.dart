@@ -164,6 +164,18 @@ class TestAudioLibrary extends AudioLibrary {
       return null;
     }
   }
+
+  @override
+  Future<void> toggleStar(String id) async {
+    final items = [...state.audioItems];
+    final index = items.indexWhere((item) => item.id == id);
+    if (index != -1) {
+      items[index] = items[index].copyWith(
+        isStarred: !items[index].isStarred,
+      );
+      state = state.copyWith(audioItems: items);
+    }
+  }
 }
 
 /// 测试用 CollectionList — 不访问数据库

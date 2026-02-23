@@ -96,6 +96,21 @@ class $AudioItemsTable extends AudioItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isStarredMeta = const VerificationMeta(
+    'isStarred',
+  );
+  @override
+  late final GeneratedColumn<bool> isStarred = GeneratedColumn<bool>(
+    'is_starred',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_starred" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -140,6 +155,7 @@ class $AudioItemsTable extends AudioItems
     totalDuration,
     sentenceCount,
     wordCount,
+    isStarred,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -218,6 +234,12 @@ class $AudioItemsTable extends AudioItems
         wordCount.isAcceptableOrUnknown(data['word_count']!, _wordCountMeta),
       );
     }
+    if (data.containsKey('is_starred')) {
+      context.handle(
+        _isStarredMeta,
+        isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -279,6 +301,10 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.int,
         data['${effectivePrefix}word_count'],
       )!,
+      isStarred: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_starred'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -325,6 +351,9 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 字幕单词数
   final int wordCount;
 
+  /// 是否星标
+  final bool isStarred;
+
   /// 最后修改时间
   final DateTime updatedAt;
 
@@ -342,6 +371,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     required this.totalDuration,
     required this.sentenceCount,
     required this.wordCount,
+    required this.isStarred,
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
@@ -359,6 +389,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     map['total_duration'] = Variable<int>(totalDuration);
     map['sentence_count'] = Variable<int>(sentenceCount);
     map['word_count'] = Variable<int>(wordCount);
+    map['is_starred'] = Variable<bool>(isStarred);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -379,6 +410,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       totalDuration: Value(totalDuration),
       sentenceCount: Value(sentenceCount),
       wordCount: Value(wordCount),
+      isStarred: Value(isStarred),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -401,6 +433,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       totalDuration: serializer.fromJson<int>(json['totalDuration']),
       sentenceCount: serializer.fromJson<int>(json['sentenceCount']),
       wordCount: serializer.fromJson<int>(json['wordCount']),
+      isStarred: serializer.fromJson<bool>(json['isStarred']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
@@ -418,6 +451,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'totalDuration': serializer.toJson<int>(totalDuration),
       'sentenceCount': serializer.toJson<int>(sentenceCount),
       'wordCount': serializer.toJson<int>(wordCount),
+      'isStarred': serializer.toJson<bool>(isStarred),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
@@ -433,6 +467,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     int? totalDuration,
     int? sentenceCount,
     int? wordCount,
+    bool? isStarred,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
@@ -447,6 +482,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     totalDuration: totalDuration ?? this.totalDuration,
     sentenceCount: sentenceCount ?? this.sentenceCount,
     wordCount: wordCount ?? this.wordCount,
+    isStarred: isStarred ?? this.isStarred,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -467,6 +503,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ? data.sentenceCount.value
           : this.sentenceCount,
       wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
+      isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncStatus: data.syncStatus.present
@@ -486,6 +523,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('totalDuration: $totalDuration, ')
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
+          ..write('isStarred: $isStarred, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -503,6 +541,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     totalDuration,
     sentenceCount,
     wordCount,
+    isStarred,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -519,6 +558,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.totalDuration == this.totalDuration &&
           other.sentenceCount == this.sentenceCount &&
           other.wordCount == this.wordCount &&
+          other.isStarred == this.isStarred &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.syncStatus == this.syncStatus);
@@ -533,6 +573,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<int> totalDuration;
   final Value<int> sentenceCount;
   final Value<int> wordCount;
+  final Value<bool> isStarred;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
@@ -546,6 +587,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.totalDuration = const Value.absent(),
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
+    this.isStarred = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -560,6 +602,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.totalDuration = const Value.absent(),
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
+    this.isStarred = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -578,6 +621,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<int>? totalDuration,
     Expression<int>? sentenceCount,
     Expression<int>? wordCount,
+    Expression<bool>? isStarred,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
@@ -592,6 +636,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (totalDuration != null) 'total_duration': totalDuration,
       if (sentenceCount != null) 'sentence_count': sentenceCount,
       if (wordCount != null) 'word_count': wordCount,
+      if (isStarred != null) 'is_starred': isStarred,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -608,6 +653,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<int>? totalDuration,
     Value<int>? sentenceCount,
     Value<int>? wordCount,
+    Value<bool>? isStarred,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
@@ -622,6 +668,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       totalDuration: totalDuration ?? this.totalDuration,
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
+      isStarred: isStarred ?? this.isStarred,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -656,6 +703,9 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (wordCount.present) {
       map['word_count'] = Variable<int>(wordCount.value);
     }
+    if (isStarred.present) {
+      map['is_starred'] = Variable<bool>(isStarred.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -682,6 +732,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('totalDuration: $totalDuration, ')
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
+          ..write('isStarred: $isStarred, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -3803,6 +3854,7 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<int> totalDuration,
       Value<int> sentenceCount,
       Value<int> wordCount,
+      Value<bool> isStarred,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -3818,6 +3870,7 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<int> totalDuration,
       Value<int> sentenceCount,
       Value<int> wordCount,
+      Value<bool> isStarred,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -3992,6 +4045,11 @@ class $$AudioItemsTableFilterComposer
 
   ColumnFilters<int> get wordCount => $composableBuilder(
     column: $table.wordCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isStarred => $composableBuilder(
+    column: $table.isStarred,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4185,6 +4243,11 @@ class $$AudioItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isStarred => $composableBuilder(
+    column: $table.isStarred,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4239,6 +4302,9 @@ class $$AudioItemsTableAnnotationComposer
 
   GeneratedColumn<int> get wordCount =>
       $composableBuilder(column: $table.wordCount, builder: (column) => column);
+
+  GeneratedColumn<bool> get isStarred =>
+      $composableBuilder(column: $table.isStarred, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -4421,6 +4487,7 @@ class $$AudioItemsTableTableManager
                 Value<int> totalDuration = const Value.absent(),
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
+                Value<bool> isStarred = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4434,6 +4501,7 @@ class $$AudioItemsTableTableManager
                 totalDuration: totalDuration,
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
+                isStarred: isStarred,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
@@ -4449,6 +4517,7 @@ class $$AudioItemsTableTableManager
                 Value<int> totalDuration = const Value.absent(),
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
+                Value<bool> isStarred = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -4462,6 +4531,7 @@ class $$AudioItemsTableTableManager
                 totalDuration: totalDuration,
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
+                isStarred: isStarred,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,

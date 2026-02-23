@@ -53,6 +53,7 @@ class AudioLibrary extends _$AudioLibrary {
             totalDuration: row.totalDuration,
             sentenceCount: row.sentenceCount,
             wordCount: row.wordCount,
+            isStarred: row.isStarred,
           ),
         )
         .toList();
@@ -214,6 +215,19 @@ class AudioLibrary extends _$AudioLibrary {
     }
   }
 
+  /// 切换音频星标状态（乐观更新 + 持久化）
+  Future<void> toggleStar(String id) async {
+    final items = [...state.audioItems];
+    final index = items.indexWhere((item) => item.id == id);
+    if (index != -1) {
+      items[index] = items[index].copyWith(
+        isStarred: !items[index].isStarred,
+      );
+      state = state.copyWith(audioItems: items);
+      await _upsertItem(items[index]);
+    }
+  }
+
   AudioItem? getItemById(String id) {
     try {
       return state.audioItems.firstWhere((item) => item.id == id);
@@ -262,6 +276,7 @@ class AudioLibrary extends _$AudioLibrary {
         totalDuration: Value(item.totalDuration),
         sentenceCount: Value(item.sentenceCount),
         wordCount: Value(item.wordCount),
+        isStarred: Value(item.isStarred),
         updatedAt: Value(DateTime.now()),
       ),
     );

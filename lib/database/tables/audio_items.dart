@@ -26,6 +26,9 @@ class AudioItems extends Table {
   /// 字幕单词数
   IntColumn get wordCount => integer().withDefault(const Constant(0))();
 
+  /// 是否星标
+  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
+
   /// 最后修改时间
   DateTimeColumn get updatedAt => dateTime()();
 

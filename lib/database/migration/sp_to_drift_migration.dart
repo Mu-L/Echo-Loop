@@ -105,6 +105,7 @@ class SpToDriftMigration {
             transcriptPath: Value(item.transcriptPath),
             addedDate: Value(item.addedDate),
             totalDuration: Value(item.totalDuration),
+            isStarred: Value(item.isStarred),
             updatedAt: Value(now),
             syncStatus: Value(0),
           ),
