@@ -5,6 +5,18 @@
 
 ---
 
+## 合集音频列表与全局音频列表复用
+
+- [x] 统一 AudioListTile — 添加 collectionId 参数，合并 _CollectionAudioTile 差异逻辑（正在播放标记、文件检查、路由切换、条件菜单）
+- [x] 统一 AudioListView — 添加 items/collectionId/emptyState 参数，支持外部数据源 + 统一排序
+- [x] 提取 AudioSortButton — 从 library_screen.dart 的 _AudioSortButton 提取为公开组件
+- [x] CollectionDetailScreen 改用 AudioListView + AudioSortButton，删除 _CollectionAudioTile
+- [x] 验证通过（flutter analyze / flutter test / flutter build macos）
+
+**完成时间**: 2026-02-23
+
+---
+
 ## 音频导入时提取并存储时长
 
 - [x] 新建 `lib/utils/audio_duration.dart` 工具函数，使用 just_audio 临时实例提取时长

@@ -5,11 +5,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/collection_provider.dart';
-import '../providers/audio_list_settings_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/audio_list_view.dart';
 import '../widgets/add_audio_dialog.dart';
 import 'collection_screen.dart';
+
+// AudioSortButton 已提取到 audio_list_view.dart 中作为公开组件
 
 /// 资源库视图类型
 enum LibraryViewType { collections, audio }
@@ -94,7 +95,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     } else {
       return [
         // 音频排序
-        const _AudioSortButton(),
+        const AudioSortButton(),
         // 添加音频
         IconButton(
           icon: const Icon(Icons.add),
@@ -133,51 +134,5 @@ class _CollectionListBody extends ConsumerWidget {
     } else {
       return CollectionListView(collections: collections);
     }
-  }
-}
-
-/// 音频排序按钮
-class _AudioSortButton extends ConsumerWidget {
-  const _AudioSortButton();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
-    return PopupMenuButton<AudioSortType>(
-      icon: const Icon(Icons.sort),
-      tooltip: l10n.sortAudio,
-      onSelected: (type) {
-        ref.read(audioListSettingsProvider.notifier).setSortType(type);
-      },
-      itemBuilder: (context) {
-        final current = ref.read(audioListSettingsProvider).sortType;
-        return [
-          _sortMenuItem(l10n.sortByNameAsc, AudioSortType.nameAsc, current),
-          _sortMenuItem(l10n.sortByNameDesc, AudioSortType.nameDesc, current),
-          _sortMenuItem(l10n.sortByDateAsc, AudioSortType.dateAsc, current),
-          _sortMenuItem(l10n.sortByDateDesc, AudioSortType.dateDesc, current),
-        ];
-      },
-    );
-  }
-
-  PopupMenuItem<AudioSortType> _sortMenuItem(
-    String label,
-    AudioSortType type,
-    AudioSortType current,
-  ) {
-    return PopupMenuItem(
-      value: type,
-      child: Row(
-        children: [
-          if (type == current)
-            const Icon(Icons.check, size: 18)
-          else
-            const SizedBox(width: 18),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
-    );
   }
 }

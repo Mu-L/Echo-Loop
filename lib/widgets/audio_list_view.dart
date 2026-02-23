@@ -1,7 +1,9 @@
 // 音频列表视图
 //
-// 展示资源库中所有音频项，支持排序。
-// 使用 AudioListTile 渲染每一项。
+// 展示音频列表，支持排序。同时用于资源库全局列表和合集详情页。
+// - items 为 null 时从 audioLibraryProvider 读取（全局场景）
+// - items 非 null 时使用传入的列表（合集场景）
+// 排序逻辑统一使用 audioListSettingsProvider。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/audio_item.dart';
@@ -13,23 +15,44 @@ import '../widgets/add_audio_dialog.dart';
 import 'audio_list_tile.dart';
 import 'edit_collection_membership_sheet.dart';
 
-/// 音频列表视图 — 用于资源库的"音频"Tab
+/// 音频列表视图 — 资源库全局列表和合集详情页共用
+///
+/// [items] 为 null 时从 audioLibraryProvider 读取全局音频列表；
+/// 非 null 时使用传入的列表（合集场景）。
+/// [collectionId] 传递给 AudioListTile 以区分上下文。
+/// [emptyState] 自定义空状态组件。
 class AudioListView extends ConsumerWidget {
-  const AudioListView({super.key});
+  /// 外部传入的音频列表（合集场景），为 null 时从 provider 读取
+  final List<AudioItem>? items;
+
+  /// 合集 ID — 传递给 AudioListTile
+  final String? collectionId;
+
+  /// 自定义空状态组件
+  final Widget? emptyState;
+
+  const AudioListView({
+    super.key,
+    this.items,
+    this.collectionId,
+    this.emptyState,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final audioItems = ref.watch(
-      audioLibraryProvider.select((s) => s.audioItems),
-    );
+
+    // 数据来源：外部传入 or provider
+    final List<AudioItem> audioItems =
+        items ?? ref.watch(audioLibraryProvider.select((s) => s.audioItems));
+
     final settings = ref.watch(audioListSettingsProvider);
 
     // 排序
     final sortedItems = _sortItems(audioItems, settings.sortType);
 
     if (sortedItems.isEmpty) {
-      return _EmptyState(l10n: l10n);
+      return emptyState ?? _DefaultEmptyState(l10n: l10n);
     }
 
     return ListView.builder(
@@ -39,12 +62,10 @@ class AudioListView extends ConsumerWidget {
         final item = sortedItems[index];
         return AudioListTile(
           audioItem: item,
-          onManageCollections: () {
-            _showManageCollectionsSheet(context, item.id);
-          },
-          onDelete: () {
-            _confirmDeleteAudio(context, ref, item);
-          },
+          collectionId: collectionId,
+          onManageCollections: () =>
+              _showManageCollectionsSheet(context, item.id),
+          onDelete: () => _confirmDeleteAudio(context, ref, item),
         );
       },
     );
@@ -114,11 +135,11 @@ class AudioListView extends ConsumerWidget {
   }
 }
 
-/// 空状态视图
-class _EmptyState extends StatelessWidget {
+/// 默认空状态视图（全局音频列表用）
+class _DefaultEmptyState extends StatelessWidget {
   final AppLocalizations l10n;
 
-  const _EmptyState({required this.l10n});
+  const _DefaultEmptyState({required this.l10n});
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +173,52 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: Text(l10n.addAudio),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 音频排序按钮 — 公开组件，可在多处复用
+class AudioSortButton extends ConsumerWidget {
+  const AudioSortButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    return PopupMenuButton<AudioSortType>(
+      icon: const Icon(Icons.sort),
+      tooltip: l10n.sortAudio,
+      onSelected: (type) {
+        ref.read(audioListSettingsProvider.notifier).setSortType(type);
+      },
+      itemBuilder: (context) {
+        final current = ref.read(audioListSettingsProvider).sortType;
+        return [
+          _sortMenuItem(l10n.sortByNameAsc, AudioSortType.nameAsc, current),
+          _sortMenuItem(l10n.sortByNameDesc, AudioSortType.nameDesc, current),
+          _sortMenuItem(l10n.sortByDateAsc, AudioSortType.dateAsc, current),
+          _sortMenuItem(l10n.sortByDateDesc, AudioSortType.dateDesc, current),
+        ];
+      },
+    );
+  }
+
+  PopupMenuItem<AudioSortType> _sortMenuItem(
+    String label,
+    AudioSortType type,
+    AudioSortType current,
+  ) {
+    return PopupMenuItem(
+      value: type,
+      child: Row(
+        children: [
+          if (type == current)
+            const Icon(Icons.check, size: 18)
+          else
+            const SizedBox(width: 18),
+          const SizedBox(width: 8),
+          Text(label),
         ],
       ),
     );

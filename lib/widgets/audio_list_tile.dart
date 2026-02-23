@@ -1,24 +1,38 @@
 // 音频列表项组件
 //
-// 独立 ConsumerWidget，精确订阅各 provider，
-// 样式与合集详情页中的音频列表项保持一致。
+// 统一的音频列表项，同时用于资源库全局列表和合集详情页。
+// 通过 collectionId 参数区分两种上下文，自动调整菜单、路由和显示逻辑。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:universal_io/io.dart';
 import '../models/audio_item.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../utils/transcript_picker.dart';
 
-/// 音频列表项 — 用于资源库音频视图
+/// 音频列表项 — 资源库全局列表和合集详情页共用
+///
+/// [collectionId] 非 null 时为合集上下文：
+/// - 不显示合集标签 chips 和"管理合集"菜单
+/// - 显示"正在播放"标记
+/// - 导航到 learningPlan(collectionId, audioId)
+///
+/// [collectionId] 为 null 时为全局上下文：
+/// - 显示合集标签 chips 和"管理合集"菜单
+/// - 导航到 audioLearningPlan(audioId)
 class AudioListTile extends ConsumerWidget {
   /// 音频项数据
   final AudioItem audioItem;
 
-  /// 管理合集回调
+  /// 合集 ID — 非 null 表示在合集上下文中
+  final String? collectionId;
+
+  /// 管理合集回调（仅全局列表使用）
   final VoidCallback? onManageCollections;
 
   /// 删除音频回调
@@ -27,9 +41,13 @@ class AudioListTile extends ConsumerWidget {
   const AudioListTile({
     super.key,
     required this.audioItem,
+    this.collectionId,
     this.onManageCollections,
     this.onDelete,
   });
+
+  /// 是否在合集上下文中
+  bool get _isCollectionContext => collectionId != null;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,27 +61,25 @@ class AudioListTile extends ConsumerWidget {
       ),
     );
 
-    // 精确订阅所属合集
-    final collectionIds = ref.watch(
-      collectionListProvider.select(
-        (s) => s.audioToCollectionsMap[audioItem.id],
-      ),
-    );
+    // 合集上下文：监听当前播放状态以显示"正在播放"标记
+    final isCurrentlyPlaying = _isCollectionContext
+        ? ref.watch(
+            listeningPracticeProvider.select(
+              (s) => s.currentAudioItem?.id == audioItem.id,
+            ),
+          )
+        : false;
 
-    // 获取合集名称
-    final collectionState = ref.watch(collectionListProvider);
-    final collectionNames = <String>[];
-    if (collectionIds != null) {
-      for (final cId in collectionIds) {
-        final c = collectionState.rawCollections
-            .where((c) => c.id == cId)
-            .firstOrNull;
-        if (c != null) collectionNames.add(c.name);
-      }
-    }
+    // 全局上下文：精确订阅所属合集名称
+    final collectionNames = _isCollectionContext
+        ? const <String>[]
+        : _getCollectionNames(ref);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      color: isCurrentlyPlaying
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+          : null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Colors.transparent,
@@ -73,161 +89,259 @@ class AudioListTile extends ConsumerWidget {
           audioItem.name,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        // 使用 Wrap 避免内容溢出
-        subtitle: Wrap(
-          spacing: 12,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            // 音频时长
-            if (audioItem.totalDuration > 0)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.schedule,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    _formatDuration(audioItem.totalDuration),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            // 字幕图标 + 文字
-            if (audioItem.hasTranscript)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.subtitles,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    l10n.transcript,
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            // 添加时间
-            Text(
-              l10n.addedOn(_formatDate(audioItem.addedDate)),
-              style: theme.textTheme.bodySmall,
-            ),
-            // 学习进度 badge
-            if (progress != null && progress.isStarted)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: progress.isCompleted
-                      ? theme.colorScheme.tertiaryContainer
-                      : theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  progress.isCompleted
-                      ? l10n.learningCompleted
-                      : progress.currentStage.label,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: progress.isCompleted
-                        ? theme.colorScheme.onTertiaryContainer
-                        : theme.colorScheme.onPrimaryContainer,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            // 合集标签 chips
-            ...collectionNames.map(
-              (name) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  name,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        subtitle: _buildSubtitle(
+          context,
+          l10n,
+          theme,
+          progress,
+          collectionNames,
         ),
-        trailing: PopupMenuButton<String>(
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'rename',
-              child: Row(
-                children: [
-                  const Icon(Icons.edit, size: 20),
-                  const SizedBox(width: 8),
-                  Text(l10n.renameAudio),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'transcript',
-              child: Row(
-                children: [
-                  const Icon(Icons.subtitles_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Text(l10n.uploadTranscript),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'manage',
-              child: Row(
-                children: [
-                  const Icon(Icons.folder_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Text(l10n.manageCollections),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
-                  const SizedBox(width: 8),
-                  Text(l10n.delete),
-                ],
-              ),
-            ),
-          ],
-          onSelected: (value) {
-            if (value == 'rename') {
-              _showRenameDialog(context, ref);
-            } else if (value == 'transcript') {
-              uploadTranscriptForAudio(context, ref, audioItem);
-            } else if (value == 'manage') {
-              onManageCollections?.call();
-            } else if (value == 'delete') {
-              onDelete?.call();
-            }
-          },
-        ),
-        onTap: () {
-          context.push(AppRoutes.audioLearningPlan(audioItem.id));
-        },
+        trailing: _buildTrailing(context, ref, l10n, theme, isCurrentlyPlaying),
+        onTap: () => _handleTap(context, l10n),
       ),
     );
   }
 
-  /// 格式化添加日期为 M/d/yyyy（与合集详情页一致）
+  /// 获取音频所属合集名称列表（仅全局上下文使用）
+  List<String> _getCollectionNames(WidgetRef ref) {
+    final collectionIds = ref.watch(
+      collectionListProvider.select(
+        (s) => s.audioToCollectionsMap[audioItem.id],
+      ),
+    );
+    if (collectionIds == null) return const [];
+
+    final collectionState = ref.watch(collectionListProvider);
+    final names = <String>[];
+    for (final cId in collectionIds) {
+      final c = collectionState.rawCollections
+          .where((c) => c.id == cId)
+          .firstOrNull;
+      if (c != null) names.add(c.name);
+    }
+    return names;
+  }
+
+  /// 构建副标题 Wrap 区域
+  Widget _buildSubtitle(
+    BuildContext context,
+    AppLocalizations l10n,
+    ThemeData theme,
+    dynamic progress,
+    List<String> collectionNames,
+  ) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        // 音频时长
+        if (audioItem.totalDuration > 0)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.schedule,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                _formatDuration(audioItem.totalDuration),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        // 字幕图标 + 文字
+        if (audioItem.hasTranscript)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.subtitles, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 4),
+              Text(
+                l10n.transcript,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        // 添加时间
+        Text(
+          l10n.addedOn(_formatDate(audioItem.addedDate)),
+          style: theme.textTheme.bodySmall,
+        ),
+        // 学习进度 badge
+        if (progress != null && progress.isStarted)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: progress.isCompleted
+                  ? theme.colorScheme.tertiaryContainer
+                  : theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              progress.isCompleted
+                  ? l10n.learningCompleted
+                  : progress.currentStage.label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: progress.isCompleted
+                    ? theme.colorScheme.onTertiaryContainer
+                    : theme.colorScheme.onPrimaryContainer,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        // 合集标签 chips（仅全局上下文显示）
+        ...collectionNames.map(
+          (name) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              name,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 构建 trailing 区域（正在播放标记 + 弹出菜单）
+  Widget _buildTrailing(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    ThemeData theme,
+    bool isCurrentlyPlaying,
+  ) {
+    if (!isCurrentlyPlaying) {
+      return _buildPopupMenu(context, ref, l10n, theme);
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            l10n.playing,
+            style: TextStyle(
+              color: theme.colorScheme.onPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _buildPopupMenu(context, ref, l10n, theme),
+      ],
+    );
+  }
+
+  /// 构建弹出菜单
+  Widget _buildPopupMenu(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    ThemeData theme,
+  ) {
+    return PopupMenuButton<String>(
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              const Icon(Icons.edit, size: 20),
+              const SizedBox(width: 8),
+              Text(l10n.renameAudio),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'transcript',
+          child: Row(
+            children: [
+              const Icon(Icons.subtitles_outlined, size: 20),
+              const SizedBox(width: 8),
+              Text(l10n.uploadTranscript),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'manage',
+          child: Row(
+            children: [
+              const Icon(Icons.folder_outlined, size: 20),
+              const SizedBox(width: 8),
+              Text(l10n.manageCollections),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 20, color: theme.colorScheme.error),
+              const SizedBox(width: 8),
+              Text(l10n.delete),
+            ],
+          ),
+        ),
+      ],
+      onSelected: (value) {
+        if (value == 'rename') {
+          _showRenameDialog(context, ref);
+        } else if (value == 'transcript') {
+          uploadTranscriptForAudio(context, ref, audioItem);
+        } else if (value == 'manage') {
+          onManageCollections?.call();
+        } else if (value == 'delete') {
+          onDelete?.call();
+        }
+      },
+    );
+  }
+
+  /// 处理点击 — 验证文件后导航
+  Future<void> _handleTap(BuildContext context, AppLocalizations l10n) async {
+    // 验证音频文件是否存在
+    final fullAudioPath = await audioItem.getFullAudioPath();
+    final audioFile = File(fullAudioPath);
+    if (!await audioFile.exists()) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.audioFileNotFound),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+
+    // 根据上下文选择路由
+    if (_isCollectionContext) {
+      context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
+    } else {
+      context.push(AppRoutes.audioLearningPlan(audioItem.id));
+    }
+  }
+
+  /// 格式化添加日期为 M/d/yyyy
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
   }
