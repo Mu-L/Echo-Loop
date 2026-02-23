@@ -1573,6 +1573,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Difficulty: {difficulty}'**
   String difficultyLabel(String difficulty);
+
+  /// No description provided for @backToPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Plan'**
+  String get backToPlan;
+
+  /// No description provided for @continueToStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue: {step}'**
+  String continueToStep(String step);
+
+  /// No description provided for @completeFirstStudy.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete First Study'**
+  String get completeFirstStudy;
+
+  /// No description provided for @completeReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Review'**
+  String get completeReview;
+
+  /// No description provided for @stepProgressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current}/{total} ({stage})'**
+  String stepProgressLabel(int current, int total, String stage);
 }
 
 class _AppLocalizationsDelegate

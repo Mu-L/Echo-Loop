@@ -5,8 +5,13 @@
 ///
 /// 播放完成后根据目标遍数决定行为：
 /// - 未达目标遍数：显示 5 秒倒计时 → 自动播放下一遍
-/// - 已达/超过目标遍数：弹完成对话框（难度选择 + 再听一遍）
+/// - 已达/超过目标遍数：弹完成对话框（难度选择 + 双按钮）
 /// - 自由练习模式：无倒计时、无弹窗
+///
+/// 完成对话框支持三种操作：
+/// - 再听一遍：重播当前盲听
+/// - 返回计划：保存进度后返回学习计划页
+/// - 继续下一步：直接跳转到下一个子步骤的播放器
 ///
 /// 进度条使用 BlindListenPlayer 的 drag-safe 状态驱动，
 /// 拖动期间只更新显示位置不 seek，松手后再执行实际 seek。
@@ -16,10 +21,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
+import '../providers/listening_practice/listening_practice_provider.dart';
+import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_complete_dialog.dart';
 
@@ -132,15 +140,74 @@ class _BlindListenPlayerScreenState
     ref.read(learningSessionProvider.notifier).replayBlindListen();
   }
 
+  /// 获取当前步骤的上下文信息
+  ///
+  /// [nextStepName] 为 null 表示下一步没有播放器或不存在。
+  /// [isLastStep] 为 true 表示当前是阶段的最后一步。
+  ({
+    int stepIndex,
+    int totalSteps,
+    String stageName,
+    String? nextStepName,
+    bool isLastStep,
+  })
+      _getStepContext() {
+    final l10n = AppLocalizations.of(context)!;
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+
+    if (progress == null) {
+      return (
+        stepIndex: 0,
+        totalSteps: LearningStage.firstLearn.subStageCount,
+        stageName: LearningStage.firstLearn.label,
+        nextStepName: _hasPlayerScreen(SubStageType.intensiveListen)
+            ? _getSubStageName(SubStageType.intensiveListen, l10n)
+            : null,
+        isLastStep: false,
+      );
+    }
+
+    final stage = progress.currentStage;
+    final subStages = stage.subStages;
+    final currentIdx = subStages.indexOf(progress.currentSubStage);
+    final isLast = currentIdx >= subStages.length - 1;
+
+    // 判断下一步是否有播放器
+    String? nextStepName;
+    if (!isLast) {
+      final nextSubStage = subStages[currentIdx + 1];
+      if (_hasPlayerScreen(nextSubStage)) {
+        nextStepName = _getSubStageName(nextSubStage, l10n);
+      }
+    }
+
+    return (
+      stepIndex: currentIdx,
+      totalSteps: subStages.length,
+      stageName: stage.label,
+      nextStepName: nextStepName,
+      isLastStep: isLast,
+    );
+  }
+
   /// 显示完成对话框
   Future<void> _showCompleteDialog() async {
     if (_isShowingDialog || !mounted) return;
     _isShowingDialog = true;
 
     final session = ref.read(learningSessionProvider);
+    final stepCtx = _getStepContext();
+
     final result = await showBlindListenCompleteDialog(
       context: context,
       passCount: session.blindListenPassCount,
+      stepIndex: stepCtx.stepIndex,
+      totalSteps: stepCtx.totalSteps,
+      stageName: stepCtx.stageName,
+      nextStepName: stepCtx.nextStepName,
+      isLastStep: stepCtx.isLastStep,
     );
 
     _isShowingDialog = false;
@@ -150,17 +217,71 @@ class _BlindListenPlayerScreenState
       // 用户选择"再听一遍"
       await ref.read(learningSessionProvider.notifier).replayBlindListen();
     } else {
-      // 用户选择了难度 → 保存难度 → 推进子步骤 → 退出盲听模式 → 返回
+      // 用户选择了难度 → 保存难度 → 推进子步骤
       try {
         await ref
             .read(learningProgressNotifierProvider.notifier)
-            .setDifficulty(widget.audioItemId, result);
+            .setDifficulty(widget.audioItemId, result.difficulty);
         await ref
             .read(learningProgressNotifierProvider.notifier)
             .completeCurrentSubStage(widget.audioItemId);
       } catch (e) {
         debugPrint('盲听完成处理出错: $e');
       }
+
+      if (result.continueToNext) {
+        // 继续下一步：退出盲听模式 → 进入下一步模式 → 替换路由
+        await _navigateToNextStep();
+      } else {
+        // 返回计划页
+        await ref.read(learningSessionProvider.notifier).exitLearningMode();
+        if (mounted) context.pop();
+      }
+    }
+  }
+
+  /// 导航到下一个子步骤
+  ///
+  /// 完成盲听后，根据新的当前子步骤进入对应播放器。
+  /// 使用 pushReplacement 替换当前路由，避免返回栈堆积。
+  Future<void> _navigateToNextStep() async {
+    // 读取更新后的进度（completeCurrentSubStage 已推进到下一步）
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+    if (progress == null || !mounted) {
+      await ref.read(learningSessionProvider.notifier).exitLearningMode();
+      if (mounted) context.pop();
+      return;
+    }
+
+    final nextSubStage = progress.currentSubStage;
+
+    if (nextSubStage == SubStageType.intensiveListen) {
+      // 退出盲听模式 → LP 恢复 → 读取句子 → 进入精听模式
+      await ref.read(learningSessionProvider.notifier).exitLearningMode();
+      if (!mounted) return;
+
+      final lpState = ref.read(listeningPracticeProvider);
+      if (lpState.sentences.isEmpty) {
+        // 无字幕，回退到计划页
+        if (mounted) context.pop();
+        return;
+      }
+
+      await ref
+          .read(learningSessionProvider.notifier)
+          .enterIntensiveListenMode(widget.audioItemId, lpState.sentences);
+      if (mounted) {
+        context.pushReplacement(
+          AppRoutes.intensiveListenPlayer(
+            widget.collectionId,
+            widget.audioItemId,
+          ),
+        );
+      }
+    } else {
+      // 其他子步骤暂无专用播放器 → 返回计划页
       await ref.read(learningSessionProvider.notifier).exitLearningMode();
       if (mounted) context.pop();
     }
@@ -330,6 +451,23 @@ class _BlindListenPlayerScreenState
     );
   }
 }
+
+/// 判断子步骤是否有专用播放器页面
+bool _hasPlayerScreen(SubStageType type) => switch (type) {
+  SubStageType.blindListen => true,
+  SubStageType.intensiveListen => true,
+  SubStageType.listenAndRepeat => false,
+  SubStageType.retell => false,
+};
+
+/// 获取子步骤的本地化名称
+String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
+    switch (type) {
+      SubStageType.blindListen => l10n.stepBlindListening,
+      SubStageType.intensiveListen => l10n.stepIntensiveListening,
+      SubStageType.listenAndRepeat => l10n.stepShadowing,
+      SubStageType.retell => l10n.stepRetelling,
+    };
 
 /// 底部进度条区域 — 完全由 BlindListenPlayer 状态驱动
 class _ProgressSection extends ConsumerWidget {

@@ -415,5 +415,22 @@
     "placeholders": {
       "difficulty": { "type": "String" }
     }
+  },
+  "backToPlan": "Back to Plan",
+  "continueToStep": "Continue: {step}",
+  "@continueToStep": {
+    "placeholders": {
+      "step": { "type": "String" }
+    }
+  },
+  "completeFirstStudy": "Complete First Study",
+  "completeReview": "Complete Review",
+  "stepProgressLabel": "Step {current}/{total} ({stage})",
+  "@stepProgressLabel": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" },
+      "stage": { "type": "String" }
+    }
   }
 }

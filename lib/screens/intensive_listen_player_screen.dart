@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../database/enums.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
@@ -135,7 +136,66 @@ class _IntensiveListenPlayerScreenState
     }
   }
 
+  /// 获取当前步骤的上下文信息
+  ({
+    int stepIndex,
+    int totalSteps,
+    String stageName,
+    String? nextStepName,
+    bool isLastStep,
+  })
+      _getStepContext() {
+    final l10n = AppLocalizations.of(context)!;
+    final progress = ref
+        .read(learningProgressNotifierProvider)
+        .progressMap[widget.audioItemId];
+
+    if (progress == null) {
+      final subStages = LearningStage.firstLearn.subStages;
+      final idx = subStages.indexOf(SubStageType.intensiveListen);
+      final isLast = idx >= subStages.length - 1;
+      String? nextName;
+      if (!isLast) {
+        final next = subStages[idx + 1];
+        if (_hasPlayerScreen(next)) {
+          nextName = _getSubStageName(next, l10n);
+        }
+      }
+      return (
+        stepIndex: idx,
+        totalSteps: subStages.length,
+        stageName: LearningStage.firstLearn.label,
+        nextStepName: nextName,
+        isLastStep: isLast,
+      );
+    }
+
+    final stage = progress.currentStage;
+    final subStages = stage.subStages;
+    final currentIdx = subStages.indexOf(progress.currentSubStage);
+    final isLast = currentIdx >= subStages.length - 1;
+
+    // 判断下一步是否有播放器
+    String? nextStepName;
+    if (!isLast) {
+      final nextSubStage = subStages[currentIdx + 1];
+      if (_hasPlayerScreen(nextSubStage)) {
+        nextStepName = _getSubStageName(nextSubStage, l10n);
+      }
+    }
+
+    return (
+      stepIndex: currentIdx,
+      totalSteps: subStages.length,
+      stageName: stage.label,
+      nextStepName: nextStepName,
+      isLastStep: isLast,
+    );
+  }
+
   /// 处理播放完成
+  ///
+  /// 弹出完成对话框，支持双按钮："返回计划"和"继续下一步"。
   Future<void> _handleCompleted() async {
     if (_isShowingDialog || !mounted) return;
     _isShowingDialog = true;
@@ -151,8 +211,6 @@ class _IntensiveListenPlayerScreenState
       return;
     }
 
-    final l10n = AppLocalizations.of(context)!;
-
     // 自由练习模式直接退出
     if (session.isFreePlay) {
       await ref.read(learningSessionProvider.notifier).exitLearningMode();
@@ -161,30 +219,27 @@ class _IntensiveListenPlayerScreenState
       return;
     }
 
+    final stepCtx = _getStepContext();
+
+    // continueToNext: true = 继续, false = 返回计划, null = 对话框未响应
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.intensiveListenCompleteTitle),
-        content: Text(
-          l10n.intensiveListenCompleteMessage(
-            playerState.totalSentences,
-            playerState.difficultSentences.length,
-          ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.intensiveListenCompleteNext),
-          ),
-        ],
+      builder: (ctx) => _IntensiveListenCompleteDialog(
+        totalSentences: playerState.totalSentences,
+        difficultCount: playerState.difficultSentences.length,
+        stepIndex: stepCtx.stepIndex,
+        totalSteps: stepCtx.totalSteps,
+        stageName: stepCtx.stageName,
+        nextStepName: stepCtx.nextStepName,
+        isLastStep: stepCtx.isLastStep,
       ),
     );
 
     _isShowingDialog = false;
     if (!mounted) return;
 
-    if (result == true) {
+    if (result != null) {
       try {
         // 清除断点（已完成）
         await ref
@@ -199,8 +254,15 @@ class _IntensiveListenPlayerScreenState
         debugPrint('精听完成处理出错: $e');
       }
 
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-      if (mounted) context.pop();
+      if (result == true) {
+        // 继续下一步（目前精听后的步骤暂无播放器，回退到计划页）
+        await ref.read(learningSessionProvider.notifier).exitLearningMode();
+        if (mounted) context.pop();
+      } else {
+        // 返回计划页
+        await ref.read(learningSessionProvider.notifier).exitLearningMode();
+        if (mounted) context.pop();
+      }
     }
   }
 
@@ -704,3 +766,143 @@ class _PlaybackControls extends StatelessWidget {
     );
   }
 }
+
+/// 精听完成对话框 — 双按钮（返回计划 / 继续下一步）
+///
+/// 返回 true 表示"继续下一步"，false 表示"返回计划"。
+class _IntensiveListenCompleteDialog extends StatelessWidget {
+  final int totalSentences;
+  final int difficultCount;
+  final int stepIndex;
+  final int totalSteps;
+  final String stageName;
+  final String? nextStepName;
+  final bool isLastStep;
+
+  const _IntensiveListenCompleteDialog({
+    required this.totalSentences,
+    required this.difficultCount,
+    required this.stepIndex,
+    required this.totalSteps,
+    required this.stageName,
+    this.nextStepName,
+    this.isLastStep = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: theme.colorScheme.primary),
+            const SizedBox(width: AppSpacing.s),
+            Text(l10n.intensiveListenCompleteTitle),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 步骤进度
+            Text(
+              l10n.stepProgressLabel(stepIndex + 1, totalSteps, stageName),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s),
+            // 完成统计
+            Text(
+              l10n.intensiveListenCompleteMessage(totalSentences, difficultCount),
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        // 底部操作按钮（返回计划 + 继续 同一行）
+        actions: _buildActions(context, l10n),
+      ),
+    );
+  }
+
+  /// 构建底部操作按钮
+  ///
+  /// 三种情况：
+  /// 1. 有下一步可继续：[返回计划 Outlined] [继续：X Filled] 同一行
+  /// 2. 末步骤：[完成首学/复习 Filled]（全宽）
+  /// 3. 非末步骤但下一步不可用：[返回计划 Filled]（全宽）
+  List<Widget> _buildActions(BuildContext context, AppLocalizations l10n) {
+    if (nextStepName != null) {
+      // 情况 1：有下一步可继续 — 返回计划（左） + 继续（右）
+      return [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(l10n.backToPlan),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s),
+            Expanded(
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(l10n.continueToStep(nextStepName!)),
+              ),
+            ),
+          ],
+        ),
+      ];
+    } else if (isLastStep) {
+      // 情况 2：末步骤 — 完成按钮全宽
+      final l10nCtx = AppLocalizations.of(context)!;
+      final isFirstStudy = stageName == l10nCtx.firstStudy ||
+          stageName == LearningStage.firstLearn.label;
+      final completeText = isFirstStudy
+          ? l10n.completeFirstStudy
+          : l10n.completeReview;
+
+      return [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(completeText),
+          ),
+        ),
+      ];
+    } else {
+      // 情况 3：非末步骤但下一步不可用 — 返回计划全宽
+      return [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.backToPlan),
+          ),
+        ),
+      ];
+    }
+  }
+}
+
+/// 判断子步骤是否有专用播放器页面
+bool _hasPlayerScreen(SubStageType type) => switch (type) {
+  SubStageType.blindListen => true,
+  SubStageType.intensiveListen => true,
+  SubStageType.listenAndRepeat => false,
+  SubStageType.retell => false,
+};
+
+/// 获取子步骤的本地化名称
+String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
+    switch (type) {
+      SubStageType.blindListen => l10n.stepBlindListening,
+      SubStageType.intensiveListen => l10n.stepIntensiveListening,
+      SubStageType.listenAndRepeat => l10n.stepShadowing,
+      SubStageType.retell => l10n.stepRetelling,
+    };

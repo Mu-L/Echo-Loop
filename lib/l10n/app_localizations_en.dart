@@ -824,4 +824,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String difficultyLabel(String difficulty) {
     return 'Difficulty: $difficulty';
   }
+
+  @override
+  String get backToPlan => 'Back to Plan';
+
+  @override
+  String continueToStep(String step) {
+    return 'Continue: $step';
+  }
+
+  @override
+  String get completeFirstStudy => 'Complete First Study';
+
+  @override
+  String get completeReview => 'Complete Review';
+
+  @override
+  String stepProgressLabel(int current, int total, String stage) {
+    return 'Step $current/$total ($stage)';
+  }
 }

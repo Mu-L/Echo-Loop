@@ -805,4 +805,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String difficultyLabel(String difficulty) {
     return '难度: $difficulty';
   }
+
+  @override
+  String get backToPlan => '返回计划';
+
+  @override
+  String continueToStep(String step) {
+    return '继续：$step';
+  }
+
+  @override
+  String get completeFirstStudy => '完成首学';
+
+  @override
+  String get completeReview => '完成本轮复习';
+
+  @override
+  String stepProgressLabel(int current, int total, String stage) {
+    return '步骤进度：$current/$total（$stage）';
+  }
 }

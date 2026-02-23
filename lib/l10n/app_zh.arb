@@ -280,5 +280,22 @@
     "placeholders": {
       "difficulty": { "type": "String" }
     }
+  },
+  "backToPlan": "返回计划",
+  "continueToStep": "继续：{step}",
+  "@continueToStep": {
+    "placeholders": {
+      "step": { "type": "String" }
+    }
+  },
+  "completeFirstStudy": "完成首学",
+  "completeReview": "完成本轮复习",
+  "stepProgressLabel": "步骤进度：{current}/{total}（{stage}）",
+  "@stepProgressLabel": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" },
+      "stage": { "type": "String" }
+    }
   }
 }

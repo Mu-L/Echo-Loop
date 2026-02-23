@@ -7,13 +7,21 @@ import '../helpers/test_app.dart';
 
 void main() {
   group('BlindListenCompleteDialog', () {
-    testWidgets('显示完成信息和 5 档难度选择', (tester) async {
+    /// 非末步骤（有下一步可继续）
+    testWidgets('非末步骤 — 显示步骤进度、难度选择、双按钮', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           Builder(
             builder: (context) => ElevatedButton(
               onPressed: () {
-                showBlindListenCompleteDialog(context: context, passCount: 1);
+                showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 2,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
+                );
               },
               child: const Text('Open'),
             ),
@@ -24,9 +32,10 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      // 验证标题和遍数
+      // 验证标题和步骤进度
       expect(find.text('Listening Complete'), findsOneWidget);
-      expect(find.text('Listened 1 time(s)'), findsOneWidget);
+      expect(find.text('Step 1/4 (First Study)'), findsOneWidget);
+      expect(find.text('Listened 2 time(s)'), findsOneWidget);
       expect(find.text('How did it feel?'), findsOneWidget);
 
       // 验证 5 个难度选项
@@ -36,18 +45,26 @@ void main() {
       expect(find.text('Hard'), findsOneWidget);
       expect(find.text('Very Hard'), findsOneWidget);
 
-      // 验证按钮
+      // 验证三个按钮
       expect(find.text('Listen Again'), findsOneWidget);
-      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('Back to Plan'), findsOneWidget);
+      expect(find.text('Continue: Intensive Listening'), findsOneWidget);
     });
 
-    testWidgets('未选择难度时 — "下一步"按钮置灰', (tester) async {
+    testWidgets('非末步骤 — 未选择难度时按钮置灰', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           Builder(
             builder: (context) => ElevatedButton(
               onPressed: () {
-                showBlindListenCompleteDialog(context: context, passCount: 1);
+                showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 1,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
+                );
               },
               child: const Text('Open'),
             ),
@@ -58,15 +75,21 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      // "下一步"按钮应该是置灰的（disabled）
-      final nextButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Next'),
+      // "继续"和"返回计划"按钮都应置灰
+      final continueButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Continue: Intensive Listening'),
       );
-      expect(nextButton.onPressed, isNull);
+      expect(continueButton.onPressed, isNull);
+
+      final backButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Back to Plan'),
+      );
+      expect(backButton.onPressed, isNull);
     });
 
-    testWidgets('选择难度后 — "下一步"按钮可点击', (tester) async {
-      DifficultyLevel? result;
+    testWidgets('非末步骤 — 选择难度后点击"继续"返回 continueToNext=true',
+        (tester) async {
+      BlindListenResult? result;
 
       await tester.pumpWidget(
         createTestApp(
@@ -76,6 +99,10 @@ void main() {
                 result = await showBlindListenCompleteDialog(
                   context: context,
                   passCount: 2,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
                 );
               },
               child: const Text('Open'),
@@ -87,25 +114,62 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      // 选择"Hard"
+      // 选择难度
       await tester.tap(find.text('Hard'));
       await tester.pumpAndSettle();
 
-      // "下一步"按钮可点击
-      final nextButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Next'),
-      );
-      expect(nextButton.onPressed, isNotNull);
-
-      // 点击"下一步"
-      await tester.tap(find.text('Next'));
+      // 点击"继续"
+      await tester.tap(find.text('Continue: Intensive Listening'));
       await tester.pumpAndSettle();
 
-      expect(result, DifficultyLevel.hard);
+      expect(result, isNotNull);
+      expect(result!.difficulty, DifficultyLevel.hard);
+      expect(result!.continueToNext, isTrue);
+    });
+
+    testWidgets('非末步骤 — 选择难度后点击"返回计划"返回 continueToNext=false',
+        (tester) async {
+      BlindListenResult? result;
+
+      await tester.pumpWidget(
+        createTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                result = await showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 2,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // 选择难度
+      await tester.tap(find.text('Easy'));
+      await tester.pumpAndSettle();
+
+      // 点击"返回计划"
+      await tester.tap(find.text('Back to Plan'));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.difficulty, DifficultyLevel.easy);
+      expect(result!.continueToNext, isFalse);
     });
 
     testWidgets('"再听一遍"按钮返回 null', (tester) async {
-      DifficultyLevel? result = DifficultyLevel.medium; // 初始值非 null 用于验证
+      BlindListenResult? result =
+          (difficulty: DifficultyLevel.medium, continueToNext: false);
 
       await tester.pumpWidget(
         createTestApp(
@@ -115,6 +179,10 @@ void main() {
                 result = await showBlindListenCompleteDialog(
                   context: context,
                   passCount: 1,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
                 );
               },
               child: const Text('Open'),
@@ -126,20 +194,101 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      // 点击"再听一遍"
+      // 点击"再听一遍"（TextButton）
       await tester.tap(find.text('Listen Again'));
       await tester.pumpAndSettle();
 
       expect(result, isNull);
     });
 
-    testWidgets('已听多遍时显示正确遍数', (tester) async {
+    /// 末步骤（没有下一步）
+    testWidgets('末步骤 — 显示"完成首学"按钮', (tester) async {
       await tester.pumpWidget(
         createTestApp(
           Builder(
             builder: (context) => ElevatedButton(
               onPressed: () {
-                showBlindListenCompleteDialog(context: context, passCount: 3);
+                showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 2,
+                  stepIndex: 3,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  isLastStep: true,
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // 验证步骤进度
+      expect(find.text('Step 4/4 (First Study)'), findsOneWidget);
+
+      // 末步骤显示"完成首学"按钮（FilledButton）和"再听一遍"（OutlinedButton）
+      expect(find.text('Complete First Study'), findsOneWidget);
+      expect(find.text('Listen Again'), findsOneWidget);
+
+      // 不应显示"返回计划"和"继续"
+      expect(find.text('Back to Plan'), findsNothing);
+    });
+
+    testWidgets('末步骤 — 选择难度后点击"完成首学"返回 continueToNext=false',
+        (tester) async {
+      BlindListenResult? result;
+
+      await tester.pumpWidget(
+        createTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                result = await showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 2,
+                  stepIndex: 3,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  isLastStep: true,
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Okay'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Complete First Study'));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.difficulty, DifficultyLevel.medium);
+      expect(result!.continueToNext, isFalse);
+    });
+
+    testWidgets('显示正确遍数', (tester) async {
+      await tester.pumpWidget(
+        createTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                showBlindListenCompleteDialog(
+                  context: context,
+                  passCount: 3,
+                  stepIndex: 0,
+                  totalSteps: 4,
+                  stageName: 'First Study',
+                  nextStepName: 'Intensive Listening',
+                );
               },
               child: const Text('Open'),
             ),

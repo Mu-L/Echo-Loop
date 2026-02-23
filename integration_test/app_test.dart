@@ -9,6 +9,10 @@ import 'package:integration_test/integration_test.dart';
 import 'groups/navigation_tests.dart';
 import 'groups/settings_tests.dart';
 import 'groups/collection_tests.dart';
+import 'groups/learning_plan_tests.dart';
+import 'groups/blind_listen_tests.dart';
+import 'groups/intensive_listen_tests.dart';
+import 'groups/learning_flow_tests.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -16,4 +20,8 @@ void main() {
   navigationTests();
   settingsTests();
   collectionTests();
+  learningPlanTests();
+  blindListenTests();
+  intensiveListenTests();
+  learningFlowTests();
 }

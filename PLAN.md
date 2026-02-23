@@ -1,6 +1,6 @@
 # Fluency 项目规划
 
-> 最后更新：2026-02-22
+> 最后更新：2026-02-23
 > 当前阶段：Milestone 1 已完成 ✅，Drift 迁移已完成 ✅，资源库 Tab 改造已完成 ✅，Milestone 2 计划中
 
 ## 项目概述
@@ -97,10 +97,17 @@ test/                                # 单元测试 + Widget 测试
 ├── services/                        #   SubtitleParser 测试
 └── widgets/                         #   3 个组件测试
 
-integration_test/                    # 端到端集成测试
-├── app_test.dart                    #   入口
-├── groups/                          #   按功能分组（collection, navigation, settings）
-└── helpers/                         #   测试用 Notifier
+integration_test/                    # 端到端集成测试（25 个测试）
+├── app_test.dart                    #   入口（7 个 group）
+├── groups/                          #   按功能分组
+│   ├── navigation_tests.dart        #     导航（2 个测试）
+│   ├── settings_tests.dart          #     设置（2 个测试）
+│   ├── collection_tests.dart        #     合集（1 个测试）
+│   ├── learning_plan_tests.dart     #     学习计划页（5 个测试）
+│   ├── blind_listen_tests.dart      #     盲听播放器（6 个测试）
+│   ├── intensive_listen_tests.dart  #     精听播放器（7 个测试）
+│   └── learning_flow_tests.dart     #     跨页面学习闭环（2 个测试）
+└── helpers/                         #   测试用 Notifier + 数据工厂
 ```
 
 ### 关键文件速查
