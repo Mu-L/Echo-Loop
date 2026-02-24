@@ -947,4 +947,145 @@ class AppLocalizationsZh extends AppLocalizations {
   String shadowingPassInfo(int count) {
     return '跟读 $count 遍';
   }
+
+  @override
+  String get retellBriefingTitle => '段级复述';
+
+  @override
+  String get retellBriefingSubtitle => '听一段音频，然后尝试复述。关键词会帮助你回忆内容。';
+
+  @override
+  String get retellBriefingTargetDuration => '目标段落时长';
+
+  @override
+  String retellBriefingParagraphCount(int count) {
+    return '将分为 $count 个段落';
+  }
+
+  @override
+  String retellBriefingSeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String get retellBriefingSentenceLevel => '逐句';
+
+  @override
+  String retellBriefingSentenceCount(int count) {
+    return '共 $count 个句子';
+  }
+
+  @override
+  String get retellTitle => '段级复述';
+
+  @override
+  String retellParagraphProgress(int current, int total) {
+    return '段落 $current/$total';
+  }
+
+  @override
+  String retellParagraphDuration(String duration) {
+    return '段落时长 $duration';
+  }
+
+  @override
+  String get retellListeningPhase => '认真听...';
+
+  @override
+  String retellRetellingCountdown(int seconds) {
+    return '请复述 ${seconds}s';
+  }
+
+  @override
+  String retellRepeatInfo(int current, int total) {
+    return '第 $current/$total 遍';
+  }
+
+  @override
+  String get retellCompleteFirstStudy => '完成首学';
+
+  @override
+  String get retellCompleteReview => '完成复习';
+
+  @override
+  String get retellCompleteFreePlay => '练习完成';
+
+  @override
+  String get retellCompleteTitle => '复述完成';
+
+  @override
+  String get retellPracticeAgain => '再来一遍';
+
+  @override
+  String retellCompleteMessage(int count) {
+    return '共 $count 段复述完成';
+  }
+
+  @override
+  String get retellExitConfirmTitle => '退出复述？';
+
+  @override
+  String get retellExitConfirmMessage => '当前段落进度将被保存。';
+
+  @override
+  String get retellDisplayKeywordsOnly => '仅可见词';
+
+  @override
+  String get retellDisplayShowAll => '全部显示';
+
+  @override
+  String get retellDisplayHideAll => '全部隐藏';
+
+  @override
+  String get retellSettingsTitle => '复述设置';
+
+  @override
+  String get retellRepeatCount => '每段重复次数';
+
+  @override
+  String get retellPauseMode => '复述停顿';
+
+  @override
+  String retellPassInfo(int count) {
+    return '复述 $count 遍';
+  }
+
+  @override
+  String get retellNoDifficultSentences => '没有可复述的句子。请先完成逐句精听。';
+
+  @override
+  String get retellKeywordMethod => '可见词生成方式';
+
+  @override
+  String get retellKeywordMethodOff => '关闭';
+
+  @override
+  String get retellKeywordMethodRandom => '随机';
+
+  @override
+  String get retellKeywordMethodAi => 'AI';
+
+  @override
+  String get retellKeywordMethodAiComingSoon => '即将推出';
+
+  @override
+  String get retellKeywordRatio => '可见词比例';
+
+  @override
+  String get pauseModeSmart => '智能';
+
+  @override
+  String get pauseModeFixed => '固定';
+
+  @override
+  String get pauseModeMultiplier => '倍数';
+
+  @override
+  String get fixedPauseSeconds => '固定间隔';
+
+  @override
+  String get pauseMultiplier => '倍数';
+
+  @override
+  String get settingsSessionOnly => '设置仅对本次会话生效';
 }

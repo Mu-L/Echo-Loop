@@ -288,6 +288,44 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
+  /// 保存复述断点段落索引
+  Future<void> saveRetellParagraphIndex(
+    String audioItemId,
+    int? paragraphIndex,
+  ) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      retellParagraphIndex: paragraphIndex,
+      clearRetellParagraphIndex: paragraphIndex == null,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
+  /// 复述完成时递增总遍数（+1）
+  Future<void> incrementRetellPassCount(String audioItemId) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      retellPassCount: (progress.retellPassCount ?? 0) + 1,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
   /// 保存精听断点句子索引
   Future<void> saveIntensiveListenSentenceIndex(
     String audioItemId,
@@ -334,6 +372,8 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
           progress.intensiveListenSentenceIndex,
         ),
         shadowingSentenceIndex: Value(progress.shadowingSentenceIndex),
+        retellParagraphIndex: Value(progress.retellParagraphIndex),
+        retellPassCount: Value(progress.retellPassCount),
         updatedAt: Value(progress.updatedAt),
       ),
     );
@@ -356,6 +396,8 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       shadowingPassCount: row.shadowingPassCount,
       intensiveListenSentenceIndex: row.intensiveListenSentenceIndex,
       shadowingSentenceIndex: row.shadowingSentenceIndex,
+      retellParagraphIndex: row.retellParagraphIndex,
+      retellPassCount: row.retellPassCount,
       updatedAt: row.updatedAt,
     );
   }

@@ -1801,6 +1801,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shadowing {count}x'**
   String shadowingPassInfo(int count);
+
+  /// No description provided for @retellBriefingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paragraph Retelling'**
+  String get retellBriefingTitle;
+
+  /// No description provided for @retellBriefingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen to a paragraph, then retell in your own words. Keywords help you recall the content.'**
+  String get retellBriefingSubtitle;
+
+  /// No description provided for @retellBriefingTargetDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Target paragraph duration'**
+  String get retellBriefingTargetDuration;
+
+  /// No description provided for @retellBriefingParagraphCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Will be divided into {count} paragraphs'**
+  String retellBriefingParagraphCount(int count);
+
+  /// No description provided for @retellBriefingSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String retellBriefingSeconds(int seconds);
+
+  /// No description provided for @retellBriefingSentenceLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Per Sentence'**
+  String get retellBriefingSentenceLevel;
+
+  /// No description provided for @retellBriefingSentenceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sentences total'**
+  String retellBriefingSentenceCount(int count);
+
+  /// No description provided for @retellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paragraph Retelling'**
+  String get retellTitle;
+
+  /// No description provided for @retellParagraphProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Paragraph {current}/{total}'**
+  String retellParagraphProgress(int current, int total);
+
+  /// No description provided for @retellParagraphDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration {duration}'**
+  String retellParagraphDuration(String duration);
+
+  /// No description provided for @retellListeningPhase.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening...'**
+  String get retellListeningPhase;
+
+  /// No description provided for @retellRetellingCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell {seconds}s'**
+  String retellRetellingCountdown(int seconds);
+
+  /// No description provided for @retellRepeatInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Round {current}/{total}'**
+  String retellRepeatInfo(int current, int total);
+
+  /// No description provided for @retellCompleteFirstStudy.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete First Study'**
+  String get retellCompleteFirstStudy;
+
+  /// No description provided for @retellCompleteReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Review'**
+  String get retellCompleteReview;
+
+  /// No description provided for @retellCompleteFreePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice Complete'**
+  String get retellCompleteFreePlay;
+
+  /// No description provided for @retellCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retelling Complete'**
+  String get retellCompleteTitle;
+
+  /// No description provided for @retellPracticeAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice Again'**
+  String get retellPracticeAgain;
+
+  /// No description provided for @retellCompleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} paragraphs retold'**
+  String retellCompleteMessage(int count);
+
+  /// No description provided for @retellExitConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Retelling?'**
+  String get retellExitConfirmTitle;
+
+  /// No description provided for @retellExitConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Current paragraph progress will be saved.'**
+  String get retellExitConfirmMessage;
+
+  /// No description provided for @retellDisplayKeywordsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible Only'**
+  String get retellDisplayKeywordsOnly;
+
+  /// No description provided for @retellDisplayShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show All'**
+  String get retellDisplayShowAll;
+
+  /// No description provided for @retellDisplayHideAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide All'**
+  String get retellDisplayHideAll;
+
+  /// No description provided for @retellSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell Settings'**
+  String get retellSettingsTitle;
+
+  /// No description provided for @retellRepeatCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat per paragraph'**
+  String get retellRepeatCount;
+
+  /// No description provided for @retellPauseMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell pause'**
+  String get retellPauseMode;
+
+  /// No description provided for @retellPassInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell {count}x'**
+  String retellPassInfo(int count);
+
+  /// No description provided for @retellNoDifficultSentences.
+  ///
+  /// In en, this message translates to:
+  /// **'No sentences to retell. Complete intensive listening first.'**
+  String get retellNoDifficultSentences;
+
+  /// No description provided for @retellKeywordMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible words'**
+  String get retellKeywordMethod;
+
+  /// No description provided for @retellKeywordMethodOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get retellKeywordMethodOff;
+
+  /// No description provided for @retellKeywordMethodRandom.
+  ///
+  /// In en, this message translates to:
+  /// **'Random'**
+  String get retellKeywordMethodRandom;
+
+  /// No description provided for @retellKeywordMethodAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI'**
+  String get retellKeywordMethodAi;
+
+  /// No description provided for @retellKeywordMethodAiComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get retellKeywordMethodAiComingSoon;
+
+  /// No description provided for @retellKeywordRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible ratio'**
+  String get retellKeywordRatio;
+
+  /// No description provided for @pauseModeSmart.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart'**
+  String get pauseModeSmart;
+
+  /// No description provided for @pauseModeFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed'**
+  String get pauseModeFixed;
+
+  /// No description provided for @pauseModeMultiplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiplier'**
+  String get pauseModeMultiplier;
+
+  /// No description provided for @fixedPauseSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed pause'**
+  String get fixedPauseSeconds;
+
+  /// No description provided for @pauseMultiplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiplier'**
+  String get pauseMultiplier;
+
+  /// No description provided for @settingsSessionOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings apply to current session only'**
+  String get settingsSessionOnly;
 }
 
 class _AppLocalizationsDelegate

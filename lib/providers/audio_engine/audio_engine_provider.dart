@@ -91,6 +91,14 @@ class AudioEngine extends _$AudioEngine {
     await _audioPlayer.stop();
   }
 
+  /// 停止音频播放（不改变 sessionId）
+  ///
+  /// 用于 pause 场景：先通过 newSession() 使旧 session 失效，
+  /// 再调用此方法真正停止底层播放器，避免额外递增 sessionId。
+  Future<void> stopPlayback() async {
+    await _audioPlayer.stop();
+  }
+
   Future<void> seek(Duration pos) async => await _audioPlayer.seek(pos);
 
   Future<void> setSpeed(double speed) async =>
@@ -124,8 +132,7 @@ class AudioEngine extends _$AudioEngine {
     await _audioPlayer.playerStateStream.firstWhere(
       (s) =>
           !isActiveSession(sessionId) ||
-          s.processingState == ja.ProcessingState.completed ||
-          (!s.playing && s.processingState == ja.ProcessingState.ready),
+          s.processingState == ja.ProcessingState.completed,
     );
   }
 
@@ -147,6 +154,30 @@ class AudioEngine extends _$AudioEngine {
         await Future.delayed(interval);
       }
     }
+  }
+
+  // --- 区间播放（段落级） ---
+
+  /// 播放指定时间区间一次（段落播放用）
+  ///
+  /// [start] 区间起始时间，[end] 区间结束时间。
+  /// 设置 clip 后播放，等待完成。受 sessionId 保护。
+  Future<void> playRangeOnce(
+    Duration start,
+    Duration end,
+    int sessionId,
+  ) async {
+    if (!isActiveSession(sessionId)) return;
+
+    state = state.copyWith(clipStart: start);
+    await _audioPlayer.setClip(start: start, end: end);
+    await _audioPlayer.play();
+
+    await _audioPlayer.playerStateStream.firstWhere(
+      (s) =>
+          !isActiveSession(sessionId) ||
+          s.processingState == ja.ProcessingState.completed,
+    );
   }
 
   // --- Session 管理 ---

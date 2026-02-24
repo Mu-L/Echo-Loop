@@ -54,6 +54,12 @@ class LearningProgresses extends Table {
   /// 跟读断点续学句子索引（null 表示从头开始）
   IntColumn get shadowingSentenceIndex => integer().nullable()();
 
+  /// 复述断点续学段落索引（null 表示从头开始）
+  IntColumn get retellParagraphIndex => integer().nullable()();
+
+  /// 复述总完成遍数（每次完成复述 +1）
+  IntColumn get retellPassCount => integer().nullable()();
+
   /// 最后更新时间
   DateTimeColumn get updatedAt => dateTime()();
 

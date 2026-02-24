@@ -2713,6 +2713,27 @@ class $LearningProgressesTable extends LearningProgresses
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _retellParagraphIndexMeta =
+      const VerificationMeta('retellParagraphIndex');
+  @override
+  late final GeneratedColumn<int> retellParagraphIndex = GeneratedColumn<int>(
+    'retell_paragraph_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _retellPassCountMeta = const VerificationMeta(
+    'retellPassCount',
+  );
+  @override
+  late final GeneratedColumn<int> retellPassCount = GeneratedColumn<int>(
+    'retell_pass_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -2740,6 +2761,8 @@ class $LearningProgressesTable extends LearningProgresses
     intensiveListenPassCount,
     shadowingPassCount,
     shadowingSentenceIndex,
+    retellParagraphIndex,
+    retellPassCount,
     updatedAt,
   ];
   @override
@@ -2879,6 +2902,24 @@ class $LearningProgressesTable extends LearningProgresses
         ),
       );
     }
+    if (data.containsKey('retell_paragraph_index')) {
+      context.handle(
+        _retellParagraphIndexMeta,
+        retellParagraphIndex.isAcceptableOrUnknown(
+          data['retell_paragraph_index']!,
+          _retellParagraphIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('retell_pass_count')) {
+      context.handle(
+        _retellPassCountMeta,
+        retellPassCount.isAcceptableOrUnknown(
+          data['retell_pass_count']!,
+          _retellPassCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -2952,6 +2993,14 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.int,
         data['${effectivePrefix}shadowing_sentence_index'],
       ),
+      retellParagraphIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retell_paragraph_index'],
+      ),
+      retellPassCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retell_pass_count'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -3009,6 +3058,12 @@ class LearningProgressesData extends DataClass
   /// 跟读断点续学句子索引（null 表示从头开始）
   final int? shadowingSentenceIndex;
 
+  /// 复述断点续学段落索引（null 表示从头开始）
+  final int? retellParagraphIndex;
+
+  /// 复述总完成遍数（每次完成复述 +1）
+  final int? retellPassCount;
+
   /// 最后更新时间
   final DateTime updatedAt;
   const LearningProgressesData({
@@ -3026,6 +3081,8 @@ class LearningProgressesData extends DataClass
     this.intensiveListenPassCount,
     this.shadowingPassCount,
     this.shadowingSentenceIndex,
+    this.retellParagraphIndex,
+    this.retellPassCount,
     required this.updatedAt,
   });
   @override
@@ -3071,6 +3128,12 @@ class LearningProgressesData extends DataClass
     if (!nullToAbsent || shadowingSentenceIndex != null) {
       map['shadowing_sentence_index'] = Variable<int>(shadowingSentenceIndex);
     }
+    if (!nullToAbsent || retellParagraphIndex != null) {
+      map['retell_paragraph_index'] = Variable<int>(retellParagraphIndex);
+    }
+    if (!nullToAbsent || retellPassCount != null) {
+      map['retell_pass_count'] = Variable<int>(retellPassCount);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -3109,6 +3172,12 @@ class LearningProgressesData extends DataClass
       shadowingSentenceIndex: shadowingSentenceIndex == null && nullToAbsent
           ? const Value.absent()
           : Value(shadowingSentenceIndex),
+      retellParagraphIndex: retellParagraphIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(retellParagraphIndex),
+      retellPassCount: retellPassCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(retellPassCount),
       updatedAt: Value(updatedAt),
     );
   }
@@ -3151,6 +3220,10 @@ class LearningProgressesData extends DataClass
       shadowingSentenceIndex: serializer.fromJson<int?>(
         json['shadowingSentenceIndex'],
       ),
+      retellParagraphIndex: serializer.fromJson<int?>(
+        json['retellParagraphIndex'],
+      ),
+      retellPassCount: serializer.fromJson<int?>(json['retellPassCount']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3184,6 +3257,8 @@ class LearningProgressesData extends DataClass
       ),
       'shadowingPassCount': serializer.toJson<int?>(shadowingPassCount),
       'shadowingSentenceIndex': serializer.toJson<int?>(shadowingSentenceIndex),
+      'retellParagraphIndex': serializer.toJson<int?>(retellParagraphIndex),
+      'retellPassCount': serializer.toJson<int?>(retellPassCount),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3203,6 +3278,8 @@ class LearningProgressesData extends DataClass
     Value<int?> intensiveListenPassCount = const Value.absent(),
     Value<int?> shadowingPassCount = const Value.absent(),
     Value<int?> shadowingSentenceIndex = const Value.absent(),
+    Value<int?> retellParagraphIndex = const Value.absent(),
+    Value<int?> retellPassCount = const Value.absent(),
     DateTime? updatedAt,
   }) => LearningProgressesData(
     audioItemId: audioItemId ?? this.audioItemId,
@@ -3235,6 +3312,12 @@ class LearningProgressesData extends DataClass
     shadowingSentenceIndex: shadowingSentenceIndex.present
         ? shadowingSentenceIndex.value
         : this.shadowingSentenceIndex,
+    retellParagraphIndex: retellParagraphIndex.present
+        ? retellParagraphIndex.value
+        : this.retellParagraphIndex,
+    retellPassCount: retellPassCount.present
+        ? retellPassCount.value
+        : this.retellPassCount,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
@@ -3281,6 +3364,12 @@ class LearningProgressesData extends DataClass
       shadowingSentenceIndex: data.shadowingSentenceIndex.present
           ? data.shadowingSentenceIndex.value
           : this.shadowingSentenceIndex,
+      retellParagraphIndex: data.retellParagraphIndex.present
+          ? data.retellParagraphIndex.value
+          : this.retellParagraphIndex,
+      retellPassCount: data.retellPassCount.present
+          ? data.retellPassCount.value
+          : this.retellPassCount,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3306,6 +3395,8 @@ class LearningProgressesData extends DataClass
           ..write('intensiveListenPassCount: $intensiveListenPassCount, ')
           ..write('shadowingPassCount: $shadowingPassCount, ')
           ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
+          ..write('retellParagraphIndex: $retellParagraphIndex, ')
+          ..write('retellPassCount: $retellPassCount, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -3327,6 +3418,8 @@ class LearningProgressesData extends DataClass
     intensiveListenPassCount,
     shadowingPassCount,
     shadowingSentenceIndex,
+    retellParagraphIndex,
+    retellPassCount,
     updatedAt,
   );
   @override
@@ -3349,6 +3442,8 @@ class LearningProgressesData extends DataClass
           other.intensiveListenPassCount == this.intensiveListenPassCount &&
           other.shadowingPassCount == this.shadowingPassCount &&
           other.shadowingSentenceIndex == this.shadowingSentenceIndex &&
+          other.retellParagraphIndex == this.retellParagraphIndex &&
+          other.retellPassCount == this.retellPassCount &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3368,6 +3463,8 @@ class LearningProgressesCompanion
   final Value<int?> intensiveListenPassCount;
   final Value<int?> shadowingPassCount;
   final Value<int?> shadowingSentenceIndex;
+  final Value<int?> retellParagraphIndex;
+  final Value<int?> retellPassCount;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LearningProgressesCompanion({
@@ -3385,6 +3482,8 @@ class LearningProgressesCompanion
     this.intensiveListenPassCount = const Value.absent(),
     this.shadowingPassCount = const Value.absent(),
     this.shadowingSentenceIndex = const Value.absent(),
+    this.retellParagraphIndex = const Value.absent(),
+    this.retellPassCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3403,6 +3502,8 @@ class LearningProgressesCompanion
     this.intensiveListenPassCount = const Value.absent(),
     this.shadowingPassCount = const Value.absent(),
     this.shadowingSentenceIndex = const Value.absent(),
+    this.retellParagraphIndex = const Value.absent(),
+    this.retellPassCount = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : audioItemId = Value(audioItemId),
@@ -3422,6 +3523,8 @@ class LearningProgressesCompanion
     Expression<int>? intensiveListenPassCount,
     Expression<int>? shadowingPassCount,
     Expression<int>? shadowingSentenceIndex,
+    Expression<int>? retellParagraphIndex,
+    Expression<int>? retellPassCount,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3450,6 +3553,9 @@ class LearningProgressesCompanion
         'shadowing_pass_count': shadowingPassCount,
       if (shadowingSentenceIndex != null)
         'shadowing_sentence_index': shadowingSentenceIndex,
+      if (retellParagraphIndex != null)
+        'retell_paragraph_index': retellParagraphIndex,
+      if (retellPassCount != null) 'retell_pass_count': retellPassCount,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3470,6 +3576,8 @@ class LearningProgressesCompanion
     Value<int?>? intensiveListenPassCount,
     Value<int?>? shadowingPassCount,
     Value<int?>? shadowingSentenceIndex,
+    Value<int?>? retellParagraphIndex,
+    Value<int?>? retellPassCount,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -3494,6 +3602,8 @@ class LearningProgressesCompanion
       shadowingPassCount: shadowingPassCount ?? this.shadowingPassCount,
       shadowingSentenceIndex:
           shadowingSentenceIndex ?? this.shadowingSentenceIndex,
+      retellParagraphIndex: retellParagraphIndex ?? this.retellParagraphIndex,
+      retellPassCount: retellPassCount ?? this.retellPassCount,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3562,6 +3672,12 @@ class LearningProgressesCompanion
         shadowingSentenceIndex.value,
       );
     }
+    if (retellParagraphIndex.present) {
+      map['retell_paragraph_index'] = Variable<int>(retellParagraphIndex.value);
+    }
+    if (retellPassCount.present) {
+      map['retell_pass_count'] = Variable<int>(retellPassCount.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -3592,6 +3708,8 @@ class LearningProgressesCompanion
           ..write('intensiveListenPassCount: $intensiveListenPassCount, ')
           ..write('shadowingPassCount: $shadowingPassCount, ')
           ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
+          ..write('retellParagraphIndex: $retellParagraphIndex, ')
+          ..write('retellPassCount: $retellPassCount, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7351,6 +7469,8 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       Value<int?> intensiveListenPassCount,
       Value<int?> shadowingPassCount,
       Value<int?> shadowingSentenceIndex,
+      Value<int?> retellParagraphIndex,
+      Value<int?> retellPassCount,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -7370,6 +7490,8 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<int?> intensiveListenPassCount,
       Value<int?> shadowingPassCount,
       Value<int?> shadowingSentenceIndex,
+      Value<int?> retellParagraphIndex,
+      Value<int?> retellPassCount,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -7484,6 +7606,16 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get retellParagraphIndex => $composableBuilder(
+    column: $table.retellParagraphIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get retellPassCount => $composableBuilder(
+    column: $table.retellPassCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
@@ -7584,6 +7716,16 @@ class $$LearningProgressesTableOrderingComposer
 
   ColumnOrderings<int> get shadowingSentenceIndex => $composableBuilder(
     column: $table.shadowingSentenceIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get retellParagraphIndex => $composableBuilder(
+    column: $table.retellParagraphIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get retellPassCount => $composableBuilder(
+    column: $table.retellPassCount,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7690,6 +7832,16 @@ class $$LearningProgressesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get retellParagraphIndex => $composableBuilder(
+    column: $table.retellParagraphIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get retellPassCount => $composableBuilder(
+    column: $table.retellPassCount,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -7765,6 +7917,8 @@ class $$LearningProgressesTableTableManager
                 Value<int?> intensiveListenPassCount = const Value.absent(),
                 Value<int?> shadowingPassCount = const Value.absent(),
                 Value<int?> shadowingSentenceIndex = const Value.absent(),
+                Value<int?> retellParagraphIndex = const Value.absent(),
+                Value<int?> retellPassCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion(
@@ -7782,6 +7936,8 @@ class $$LearningProgressesTableTableManager
                 intensiveListenPassCount: intensiveListenPassCount,
                 shadowingPassCount: shadowingPassCount,
                 shadowingSentenceIndex: shadowingSentenceIndex,
+                retellParagraphIndex: retellParagraphIndex,
+                retellPassCount: retellPassCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -7802,6 +7958,8 @@ class $$LearningProgressesTableTableManager
                 Value<int?> intensiveListenPassCount = const Value.absent(),
                 Value<int?> shadowingPassCount = const Value.absent(),
                 Value<int?> shadowingSentenceIndex = const Value.absent(),
+                Value<int?> retellParagraphIndex = const Value.absent(),
+                Value<int?> retellPassCount = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion.insert(
@@ -7819,6 +7977,8 @@ class $$LearningProgressesTableTableManager
                 intensiveListenPassCount: intensiveListenPassCount,
                 shadowingPassCount: shadowingPassCount,
                 shadowingSentenceIndex: shadowingSentenceIndex,
+                retellParagraphIndex: retellParagraphIndex,
+                retellPassCount: retellPassCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

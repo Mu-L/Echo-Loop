@@ -529,5 +529,97 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "retellBriefingTitle": "Paragraph Retelling",
+  "retellBriefingSubtitle": "Listen to a paragraph, then retell in your own words. Keywords help you recall the content.",
+  "retellBriefingTargetDuration": "Target paragraph duration",
+  "retellBriefingParagraphCount": "Will be divided into {count} paragraphs",
+  "@retellBriefingParagraphCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellBriefingSeconds": "{seconds}s",
+  "@retellBriefingSeconds": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "retellBriefingSentenceLevel": "Per Sentence",
+  "retellBriefingSentenceCount": "{count} sentences total",
+  "@retellBriefingSentenceCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "retellTitle": "Paragraph Retelling",
+  "retellParagraphProgress": "Paragraph {current}/{total}",
+  "@retellParagraphProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "retellParagraphDuration": "Duration {duration}",
+  "@retellParagraphDuration": {
+    "placeholders": {
+      "duration": { "type": "String" }
+    }
+  },
+  "retellListeningPhase": "Listening...",
+  "retellRetellingCountdown": "Retell {seconds}s",
+  "@retellRetellingCountdown": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "retellRepeatInfo": "Round {current}/{total}",
+  "@retellRepeatInfo": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "retellCompleteFirstStudy": "Complete First Study",
+  "retellCompleteReview": "Complete Review",
+  "retellCompleteFreePlay": "Practice Complete",
+  "retellCompleteTitle": "Retelling Complete",
+  "retellPracticeAgain": "Practice Again",
+  "retellCompleteMessage": "{count} paragraphs retold",
+  "@retellCompleteMessage": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellExitConfirmTitle": "Exit Retelling?",
+  "retellExitConfirmMessage": "Current paragraph progress will be saved.",
+  "retellDisplayKeywordsOnly": "Visible Only",
+  "retellDisplayShowAll": "Show All",
+  "retellDisplayHideAll": "Hide All",
+  "retellSettingsTitle": "Retell Settings",
+  "retellRepeatCount": "Repeat per paragraph",
+  "retellPauseMode": "Retell pause",
+  "retellPassInfo": "Retell {count}x",
+  "@retellPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellNoDifficultSentences": "No sentences to retell. Complete intensive listening first.",
+
+  "retellKeywordMethod": "Visible words",
+  "retellKeywordMethodOff": "Off",
+  "retellKeywordMethodRandom": "Random",
+  "retellKeywordMethodAi": "AI",
+  "retellKeywordMethodAiComingSoon": "Coming soon",
+  "retellKeywordRatio": "Visible ratio",
+
+  "pauseModeSmart": "Smart",
+  "pauseModeFixed": "Fixed",
+  "pauseModeMultiplier": "Multiplier",
+  "fixedPauseSeconds": "Fixed pause",
+  "pauseMultiplier": "Multiplier",
+  "settingsSessionOnly": "Settings apply to current session only"
 }

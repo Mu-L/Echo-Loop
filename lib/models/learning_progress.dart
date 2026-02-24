@@ -48,6 +48,12 @@ class LearningProgress {
   /// 跟读断点续学句子索引（null 表示从头开始）
   final int? shadowingSentenceIndex;
 
+  /// 复述断点续学段落索引（null 表示从头开始）
+  final int? retellParagraphIndex;
+
+  /// 复述总完成遍数（每次完成复述 +1）
+  final int? retellPassCount;
+
   /// 最后更新时间
   final DateTime updatedAt;
 
@@ -66,6 +72,8 @@ class LearningProgress {
     this.shadowingPassCount,
     this.intensiveListenSentenceIndex,
     this.shadowingSentenceIndex,
+    this.retellParagraphIndex,
+    this.retellPassCount,
     required this.updatedAt,
   });
 
@@ -168,9 +176,12 @@ class LearningProgress {
     int? shadowingPassCount,
     int? intensiveListenSentenceIndex,
     int? shadowingSentenceIndex,
+    int? retellParagraphIndex,
+    int? retellPassCount,
     DateTime? updatedAt,
     bool clearIntensiveListenSentenceIndex = false,
     bool clearShadowingSentenceIndex = false,
+    bool clearRetellParagraphIndex = false,
   }) {
     return LearningProgress(
       audioItemId: audioItemId ?? this.audioItemId,
@@ -195,6 +206,10 @@ class LearningProgress {
       shadowingSentenceIndex: clearShadowingSentenceIndex
           ? null
           : (shadowingSentenceIndex ?? this.shadowingSentenceIndex),
+      retellParagraphIndex: clearRetellParagraphIndex
+          ? null
+          : (retellParagraphIndex ?? this.retellParagraphIndex),
+      retellPassCount: retellPassCount ?? this.retellPassCount,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

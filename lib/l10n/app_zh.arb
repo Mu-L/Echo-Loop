@@ -387,5 +387,97 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "retellBriefingTitle": "段级复述",
+  "retellBriefingSubtitle": "听一段音频，然后尝试复述。关键词会帮助你回忆内容。",
+  "retellBriefingTargetDuration": "目标段落时长",
+  "retellBriefingParagraphCount": "将分为 {count} 个段落",
+  "@retellBriefingParagraphCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellBriefingSeconds": "{seconds}s",
+  "@retellBriefingSeconds": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "retellBriefingSentenceLevel": "逐句",
+  "retellBriefingSentenceCount": "共 {count} 个句子",
+  "@retellBriefingSentenceCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "retellTitle": "段级复述",
+  "retellParagraphProgress": "段落 {current}/{total}",
+  "@retellParagraphProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "retellParagraphDuration": "段落时长 {duration}",
+  "@retellParagraphDuration": {
+    "placeholders": {
+      "duration": { "type": "String" }
+    }
+  },
+  "retellListeningPhase": "认真听...",
+  "retellRetellingCountdown": "请复述 {seconds}s",
+  "@retellRetellingCountdown": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "retellRepeatInfo": "第 {current}/{total} 遍",
+  "@retellRepeatInfo": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "retellCompleteFirstStudy": "完成首学",
+  "retellCompleteReview": "完成复习",
+  "retellCompleteFreePlay": "练习完成",
+  "retellCompleteTitle": "复述完成",
+  "retellPracticeAgain": "再来一遍",
+  "retellCompleteMessage": "共 {count} 段复述完成",
+  "@retellCompleteMessage": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellExitConfirmTitle": "退出复述？",
+  "retellExitConfirmMessage": "当前段落进度将被保存。",
+  "retellDisplayKeywordsOnly": "仅可见词",
+  "retellDisplayShowAll": "全部显示",
+  "retellDisplayHideAll": "全部隐藏",
+  "retellSettingsTitle": "复述设置",
+  "retellRepeatCount": "每段重复次数",
+  "retellPauseMode": "复述停顿",
+  "retellPassInfo": "复述 {count} 遍",
+  "@retellPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "retellNoDifficultSentences": "没有可复述的句子。请先完成逐句精听。",
+
+  "retellKeywordMethod": "可见词生成方式",
+  "retellKeywordMethodOff": "关闭",
+  "retellKeywordMethodRandom": "随机",
+  "retellKeywordMethodAi": "AI",
+  "retellKeywordMethodAiComingSoon": "即将推出",
+  "retellKeywordRatio": "可见词比例",
+
+  "pauseModeSmart": "智能",
+  "pauseModeFixed": "固定",
+  "pauseModeMultiplier": "倍数",
+  "fixedPauseSeconds": "固定间隔",
+  "pauseMultiplier": "倍数",
+  "settingsSessionOnly": "设置仅对本次会话生效"
 }

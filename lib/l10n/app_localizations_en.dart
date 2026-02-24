@@ -972,4 +972,148 @@ class AppLocalizationsEn extends AppLocalizations {
   String shadowingPassInfo(int count) {
     return 'Shadowing ${count}x';
   }
+
+  @override
+  String get retellBriefingTitle => 'Paragraph Retelling';
+
+  @override
+  String get retellBriefingSubtitle =>
+      'Listen to a paragraph, then retell in your own words. Keywords help you recall the content.';
+
+  @override
+  String get retellBriefingTargetDuration => 'Target paragraph duration';
+
+  @override
+  String retellBriefingParagraphCount(int count) {
+    return 'Will be divided into $count paragraphs';
+  }
+
+  @override
+  String retellBriefingSeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String get retellBriefingSentenceLevel => 'Per Sentence';
+
+  @override
+  String retellBriefingSentenceCount(int count) {
+    return '$count sentences total';
+  }
+
+  @override
+  String get retellTitle => 'Paragraph Retelling';
+
+  @override
+  String retellParagraphProgress(int current, int total) {
+    return 'Paragraph $current/$total';
+  }
+
+  @override
+  String retellParagraphDuration(String duration) {
+    return 'Duration $duration';
+  }
+
+  @override
+  String get retellListeningPhase => 'Listening...';
+
+  @override
+  String retellRetellingCountdown(int seconds) {
+    return 'Retell ${seconds}s';
+  }
+
+  @override
+  String retellRepeatInfo(int current, int total) {
+    return 'Round $current/$total';
+  }
+
+  @override
+  String get retellCompleteFirstStudy => 'Complete First Study';
+
+  @override
+  String get retellCompleteReview => 'Complete Review';
+
+  @override
+  String get retellCompleteFreePlay => 'Practice Complete';
+
+  @override
+  String get retellCompleteTitle => 'Retelling Complete';
+
+  @override
+  String get retellPracticeAgain => 'Practice Again';
+
+  @override
+  String retellCompleteMessage(int count) {
+    return '$count paragraphs retold';
+  }
+
+  @override
+  String get retellExitConfirmTitle => 'Exit Retelling?';
+
+  @override
+  String get retellExitConfirmMessage =>
+      'Current paragraph progress will be saved.';
+
+  @override
+  String get retellDisplayKeywordsOnly => 'Visible Only';
+
+  @override
+  String get retellDisplayShowAll => 'Show All';
+
+  @override
+  String get retellDisplayHideAll => 'Hide All';
+
+  @override
+  String get retellSettingsTitle => 'Retell Settings';
+
+  @override
+  String get retellRepeatCount => 'Repeat per paragraph';
+
+  @override
+  String get retellPauseMode => 'Retell pause';
+
+  @override
+  String retellPassInfo(int count) {
+    return 'Retell ${count}x';
+  }
+
+  @override
+  String get retellNoDifficultSentences =>
+      'No sentences to retell. Complete intensive listening first.';
+
+  @override
+  String get retellKeywordMethod => 'Visible words';
+
+  @override
+  String get retellKeywordMethodOff => 'Off';
+
+  @override
+  String get retellKeywordMethodRandom => 'Random';
+
+  @override
+  String get retellKeywordMethodAi => 'AI';
+
+  @override
+  String get retellKeywordMethodAiComingSoon => 'Coming soon';
+
+  @override
+  String get retellKeywordRatio => 'Visible ratio';
+
+  @override
+  String get pauseModeSmart => 'Smart';
+
+  @override
+  String get pauseModeFixed => 'Fixed';
+
+  @override
+  String get pauseModeMultiplier => 'Multiplier';
+
+  @override
+  String get fixedPauseSeconds => 'Fixed pause';
+
+  @override
+  String get pauseMultiplier => 'Multiplier';
+
+  @override
+  String get settingsSessionOnly => 'Settings apply to current session only';
 }

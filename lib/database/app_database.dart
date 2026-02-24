@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -67,9 +67,9 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           await m.createTable(learningProgresses);
         }
-        // v2→v10：learning_progresses 多次变更（列类型、新增列、字段重命名等）
+        // v2→v11：learning_progresses 多次变更（列类型、新增列、字段重命名等）
         // App 尚未发布，直接重建表
-        if (from < 10) {
+        if (from < 11) {
           await m.deleteTable('learning_progresses');
           await m.createTable(learningProgresses);
           // v4 新增 stage_completions 表
