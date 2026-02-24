@@ -178,9 +178,16 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
     final safeIndex = startIndex.clamp(0, sentences.length - 1);
 
+    // 从句子的 isBookmarked 字段预填历史难句
+    final preBookmarked = <int>{
+      for (final (i, s) in _sentences.indexed)
+        if (s.isBookmarked) i,
+    };
+
     state = IntensiveListenState(
       currentSentenceIndex: safeIndex,
       totalSentences: sentences.length,
+      difficultSentences: preBookmarked,
     );
   }
 

@@ -67,8 +67,8 @@ class _IntensiveListenPlayerScreenState
 
     final session = ref.read(learningSessionProvider);
     if (session.isFreePlay) {
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
       if (mounted) context.pop();
+      await ref.read(learningSessionProvider.notifier).exitLearningMode();
       return;
     }
 
@@ -114,8 +114,10 @@ class _IntensiveListenPlayerScreenState
           playerState.difficultSentences.length,
         );
 
-    await ref.read(learningSessionProvider.notifier).exitLearningMode();
+    // 先 pop 页面，再 exitLearningMode（dispose 会重置 state，
+    // 若先 dispose 再 pop 会导致星标状态闪烁）
     if (mounted) context.pop();
+    await ref.read(learningSessionProvider.notifier).exitLearningMode();
   }
 
   /// 保存精听断点进度
@@ -129,13 +131,67 @@ class _IntensiveListenPlayerScreenState
         );
   }
 
-  /// 保存难句书签到数据库
+  /// 切换难句标记并即时持久化到数据库
+  ///
+  /// 先切换内存状态，再根据新状态决定新增或移除书签，
+  /// 最后同步难句数快照到 learning_progress。
+  Future<void> _toggleAndSaveDifficult() async {
+    final player = ref.read(intensiveListenPlayerProvider.notifier);
+    final playerState = ref.read(intensiveListenPlayerProvider);
+    final idx = playerState.currentSentenceIndex;
+
+    // 1. 切换内存状态
+    player.toggleDifficultSentence();
+
+    // 2. 读取切换后的状态，判断是新增还是移除
+    final newState = ref.read(intensiveListenPlayerProvider);
+    final isNowDifficult = newState.difficultSentences.contains(idx);
+
+    // 3. 即时持久化到 DB
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (isNowDifficult) {
+      if (idx < player.sentences.length) {
+        final sentence = player.sentences[idx];
+        await BookmarkManager.addBookmarkToDb(
+          widget.audioItemId,
+          sentence,
+          dao: bookmarkDao,
+        );
+      }
+    } else {
+      await bookmarkDao.removeBookmark(
+        widget.audioItemId,
+        player.sentences[idx].index,
+      );
+    }
+
+    // 4. 同步难句数快照到 learning_progress
+    await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .saveDifficultCount(
+          widget.audioItemId,
+          newState.difficultSentences.length,
+        );
+  }
+
+  /// 保存难句书签到数据库（增量同步：新增 + 移除）
+  ///
+  /// 对比初始书签状态与当前 difficultSentences，
+  /// 新标记的添加到数据库，取消标记的从数据库移除。
   Future<void> _saveDifficultSentences() async {
     final playerState = ref.read(intensiveListenPlayerProvider);
     final player = ref.read(intensiveListenPlayerProvider.notifier);
     final bookmarkDao = ref.read(bookmarkDaoProvider);
 
-    for (final index in playerState.difficultSentences) {
+    // 初始书签集合（深拷贝句子保留了原始 isBookmarked）
+    final initialBookmarks = <int>{
+      for (final s in player.sentences)
+        if (s.isBookmarked) s.index,
+    };
+
+    // 新增的难句书签
+    final added = playerState.difficultSentences.difference(initialBookmarks);
+    for (final index in added) {
       if (index < player.sentences.length) {
         final sentence = player.sentences[index];
         await BookmarkManager.addBookmarkToDb(
@@ -144,6 +200,16 @@ class _IntensiveListenPlayerScreenState
           dao: bookmarkDao,
         );
       }
+    }
+
+    // 取消标记的书签
+    final removed = initialBookmarks.difference(playerState.difficultSentences);
+    if (removed.isNotEmpty) {
+      await BookmarkManager.removeBookmarksFromDb(
+        widget.audioItemId,
+        removed,
+        dao: bookmarkDao,
+      );
     }
   }
 
@@ -180,10 +246,7 @@ class _IntensiveListenPlayerScreenState
       onStartPractice: () async {
         await ref
             .read(learningSessionProvider.notifier)
-            .enterListenAndRepeatMode(
-              widget.audioItemId,
-              lpState.sentences,
-            );
+            .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
         if (mounted) {
           context.pushReplacement(
             AppRoutes.listenAndRepeatPlayer(
@@ -204,7 +267,7 @@ class _IntensiveListenPlayerScreenState
     String? nextStepName,
     bool isLastStep,
   })
-      _getStepContext() {
+  _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
     final progress = ref
         .read(learningProgressNotifierProvider)
@@ -371,17 +434,18 @@ class _IntensiveListenPlayerScreenState
 
     // 句子时长（如 "3.5s"）和时间戳（如 "00:32.1 - 00:35.6"）分开传递，
     // 由 _ProgressSection 用不同样式渲染以建立视觉层级。
-    final hasDuration = currentSentence != null &&
-        currentSentence.duration > Duration.zero;
+    final hasDuration =
+        currentSentence != null && currentSentence.duration > Duration.zero;
     final durationText = hasDuration
         ? l10n.sentenceDuration(
-            (currentSentence.duration.inMilliseconds / 1000.0)
-                .toStringAsFixed(1),
+            (currentSentence.duration.inMilliseconds / 1000.0).toStringAsFixed(
+              1,
+            ),
           )
         : null;
     final timestampText = hasDuration
         ? '${_formatTimestamp(currentSentence.startTime)}'
-          ' - ${_formatTimestamp(currentSentence.endTime)}'
+              ' - ${_formatTimestamp(currentSentence.endTime)}'
         : null;
 
     return PopScope(
@@ -433,8 +497,7 @@ class _IntensiveListenPlayerScreenState
                         ),
                         l10n: l10n,
                         onContinue: () => player.exitAnnotationMode(),
-                        onToggleDifficult: () =>
-                            player.toggleDifficultSentence(),
+                        onToggleDifficult: _toggleAndSaveDifficult,
                       )
                     : _NormalModeView(
                         key: const ValueKey('normal'),
@@ -443,6 +506,7 @@ class _IntensiveListenPlayerScreenState
                         theme: theme,
                         onPeek: () => player.toggleTextReveal(),
                         onCantUnderstand: () => player.enterAnnotationMode(),
+                        onToggleDifficult: _toggleAndSaveDifficult,
                         sentenceText: currentSentence?.text,
                       ),
               ),
@@ -521,8 +585,7 @@ class _ProgressSection extends StatelessWidget {
                 style: subtitleStyle,
               ),
               const Spacer(),
-              if (durationText case final dur?)
-                Text(dur, style: subtitleStyle),
+              if (durationText case final dur?) Text(dur, style: subtitleStyle),
               if (timestampText case final ts?) ...[
                 const SizedBox(width: 6),
                 Text(ts, style: timestampStyle),
@@ -542,6 +605,9 @@ class _NormalModeView extends StatelessWidget {
   final ThemeData theme;
   final VoidCallback onPeek;
   final VoidCallback onCantUnderstand;
+
+  /// 取消难句标记回调
+  final VoidCallback onToggleDifficult;
   final String? sentenceText;
 
   const _NormalModeView({
@@ -551,16 +617,48 @@ class _NormalModeView extends StatelessWidget {
     required this.theme,
     required this.onPeek,
     required this.onCantUnderstand,
+    required this.onToggleDifficult,
     this.sentenceText,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDifficult = playerState.difficultSentences.contains(
+      playerState.currentSentenceIndex,
+    );
+
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.l),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // 难句标记行（始终显示，点击切换标记状态）
+          GestureDetector(
+            onTap: onToggleDifficult,
+            child: Row(
+              children: [
+                Icon(
+                  isDifficult ? Icons.star : Icons.star_border,
+                  color: isDifficult ? Colors.amber : Colors.grey,
+                  size: 18,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    isDifficult
+                        ? l10n.intensiveListenMarkedDifficult
+                        : l10n.intensiveListenNotDifficult,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: isDifficult ? Colors.amber.shade700 : Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // 遮盖/偷看区域
           Expanded(
             child: Center(
@@ -948,7 +1046,10 @@ class _IntensiveListenCompleteDialog extends StatelessWidget {
             const SizedBox(height: AppSpacing.s),
             // 完成统计
             Text(
-              l10n.intensiveListenCompleteMessage(totalSentences, difficultCount),
+              l10n.intensiveListenCompleteMessage(
+                totalSentences,
+                difficultCount,
+              ),
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -990,7 +1091,8 @@ class _IntensiveListenCompleteDialog extends StatelessWidget {
     } else if (isLastStep) {
       // 情况 2：末步骤 — 完成按钮全宽
       final l10nCtx = AppLocalizations.of(context)!;
-      final isFirstStudy = stageName == l10nCtx.firstStudy ||
+      final isFirstStudy =
+          stageName == l10nCtx.firstStudy ||
           stageName == LearningStage.firstLearn.label;
       final completeText = isFirstStudy
           ? l10n.completeFirstStudy

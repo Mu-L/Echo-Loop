@@ -12,9 +12,24 @@ import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
+import 'package:fluency/database/daos/bookmark_dao.dart';
+import 'package:fluency/database/providers.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import '../helpers/mock_providers.dart';
+
+/// 测试用 BookmarkDao — 所有方法通过 noSuchMethod 返回空值
+class _TestBookmarkDao implements BookmarkDao {
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final memberName = invocation.memberName.toString();
+    if (memberName.contains('watchByAudioId')) {
+      return Stream<List<dynamic>>.value([]);
+    }
+    // 大部分 DAO 方法返回 Future<void>
+    return Future<void>.value();
+  }
+}
 
 void main() {
   /// 创建测试用的精听状态
@@ -97,6 +112,7 @@ void main() {
             sentences,
           ),
         ),
+        bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -324,7 +340,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 实心星标
+      // 实心星标（标注卡片内）
       expect(find.byIcon(Icons.star), findsOneWidget);
       expect(find.byIcon(Icons.star_border), findsNothing);
       // 难句文案
@@ -378,13 +394,67 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 点击星标区域（GestureDetector）
+      // 点击标注卡片内的星标
       await tester.tap(find.byIcon(Icons.star));
       await tester.pumpAndSettle();
 
       // 验证状态变更：难句集合不再包含当前句子
       // （TestIntensiveListenPlayer 会处理 toggleDifficultSentence）
       expect(find.byIcon(Icons.star_border), findsOneWidget);
+    });
+
+    testWidgets('正常模式下难句显示标记行', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            currentSentenceIndex: 0,
+            difficultSentences: {0},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 难句标记行：★ + 文案
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(find.text('Auto-marked difficult, tap to undo'), findsOneWidget);
+      // "听不懂"按钮仍然存在
+      expect(find.text("Can't understand"), findsOneWidget);
+    });
+
+    testWidgets('正常模式下非难句显示空心星标', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            currentSentenceIndex: 0,
+            difficultSentences: {1, 2},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 当前句子（索引0）不在难句集合中，显示空心星标 + 灰色文案
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
+      expect(find.text('Tap to mark as difficult'), findsOneWidget);
+    });
+
+    testWidgets('正常模式下点击标记行可取消标记', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            currentSentenceIndex: 0,
+            difficultSentences: {0},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 点击标记行取消难句
+      await tester.tap(find.byIcon(Icons.star));
+      await tester.pumpAndSettle();
+
+      // 取消后变为空心星标 + 灰色文案
+      expect(find.byIcon(Icons.star_border), findsOneWidget);
+      expect(find.text('Tap to mark as difficult'), findsOneWidget);
     });
 
     testWidgets('标注模式下导航按钮禁用', (tester) async {

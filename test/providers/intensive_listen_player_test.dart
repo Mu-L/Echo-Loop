@@ -210,6 +210,54 @@ void main() {
     });
   });
 
+  group('initialize 预填历史书签', () {
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer(
+        overrides: [audioEngineProvider.overrideWith(() => TestAudioEngine())],
+      );
+    });
+
+    tearDown(() => container.dispose());
+
+    test('句子 isBookmarked 为 true 时加入 difficultSentences', () async {
+      final sentences = createTestSentences(count: 5);
+      // 标记第 1 和第 3 句为书签
+      sentences[1].isBookmarked = true;
+      sentences[3].isBookmarked = true;
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(sentences);
+
+      final state = container.read(intensiveListenPlayerProvider);
+      expect(state.difficultSentences, {1, 3});
+    });
+
+    test('无书签时 difficultSentences 为空', () async {
+      final sentences = createTestSentences(count: 3);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(sentences);
+
+      final state = container.read(intensiveListenPlayerProvider);
+      expect(state.difficultSentences, isEmpty);
+    });
+
+    test('所有句子都有书签时全部预填', () async {
+      final sentences = createTestSentences(count: 3);
+      for (final s in sentences) {
+        s.isBookmarked = true;
+      }
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(sentences);
+
+      final state = container.read(intensiveListenPlayerProvider);
+      expect(state.difficultSentences, {0, 1, 2});
+    });
+  });
+
   group('toggleDifficultSentence（通过 TestIntensiveListenPlayer）', () {
     late ProviderContainer container;
     late TestIntensiveListenPlayer notifier;
