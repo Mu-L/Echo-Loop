@@ -957,4 +957,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String sentenceDuration(String duration) {
     return '${duration}s';
   }
+
+  @override
+  String difficultSentenceCount(int count) {
+    return '$count difficult sentences';
+  }
+
+  @override
+  String intensiveListenPassInfo(int count) {
+    return 'Intensive listen ${count}x';
+  }
+
+  @override
+  String shadowingPassInfo(int count) {
+    return 'Shadowing ${count}x';
+  }
 }

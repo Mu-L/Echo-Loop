@@ -1783,6 +1783,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{duration}s'**
   String sentenceDuration(String duration);
+
+  /// No description provided for @difficultSentenceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} difficult sentences'**
+  String difficultSentenceCount(int count);
+
+  /// No description provided for @intensiveListenPassInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Intensive listen {count}x'**
+  String intensiveListenPassInfo(int count);
+
+  /// No description provided for @shadowingPassInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadowing {count}x'**
+  String shadowingPassInfo(int count);
 }
 
 class _AppLocalizationsDelegate

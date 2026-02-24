@@ -932,4 +932,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String sentenceDuration(String duration) {
     return '$duration秒';
   }
+
+  @override
+  String difficultSentenceCount(int count) {
+    return '标记 $count 个难句';
+  }
+
+  @override
+  String intensiveListenPassInfo(int count) {
+    return '精听 $count 遍';
+  }
+
+  @override
+  String shadowingPassInfo(int count) {
+    return '跟读 $count 遍';
+  }
 }

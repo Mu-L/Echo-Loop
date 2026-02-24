@@ -33,6 +33,15 @@ class LearningProgress {
   /// 盲听已完成遍数
   final int blindListenPassCount;
 
+  /// 精听标记的难句数量
+  final int? intensiveListenDifficultCount;
+
+  /// 精听总完成遍数（每次完成精听 +1）
+  final int? intensiveListenPassCount;
+
+  /// 跟读总完成遍数（每次完成跟读 +1）
+  final int? shadowingPassCount;
+
   /// 精听断点续学句子索引（null 表示从头开始）
   final int? intensiveListenSentenceIndex;
 
@@ -52,6 +61,9 @@ class LearningProgress {
     this.currentStageStartedAt,
     this.totalStudyDurationMs = 0,
     this.blindListenPassCount = 0,
+    this.intensiveListenDifficultCount,
+    this.intensiveListenPassCount,
+    this.shadowingPassCount,
     this.intensiveListenSentenceIndex,
     this.shadowingSentenceIndex,
     required this.updatedAt,
@@ -151,6 +163,9 @@ class LearningProgress {
     DateTime? currentStageStartedAt,
     int? totalStudyDurationMs,
     int? blindListenPassCount,
+    int? intensiveListenDifficultCount,
+    int? intensiveListenPassCount,
+    int? shadowingPassCount,
     int? intensiveListenSentenceIndex,
     int? shadowingSentenceIndex,
     DateTime? updatedAt,
@@ -169,6 +184,11 @@ class LearningProgress {
           currentStageStartedAt ?? this.currentStageStartedAt,
       totalStudyDurationMs: totalStudyDurationMs ?? this.totalStudyDurationMs,
       blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
+      intensiveListenDifficultCount:
+          intensiveListenDifficultCount ?? this.intensiveListenDifficultCount,
+      intensiveListenPassCount:
+          intensiveListenPassCount ?? this.intensiveListenPassCount,
+      shadowingPassCount: shadowingPassCount ?? this.shadowingPassCount,
       intensiveListenSentenceIndex: clearIntensiveListenSentenceIndex
           ? null
           : (intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex),

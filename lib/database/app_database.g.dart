@@ -2671,6 +2671,38 @@ class $LearningProgressesTable extends LearningProgresses
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _intensiveListenDifficultCountMeta =
+      const VerificationMeta('intensiveListenDifficultCount');
+  @override
+  late final GeneratedColumn<int> intensiveListenDifficultCount =
+      GeneratedColumn<int>(
+        'intensive_listen_difficult_count',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _intensiveListenPassCountMeta =
+      const VerificationMeta('intensiveListenPassCount');
+  @override
+  late final GeneratedColumn<int> intensiveListenPassCount =
+      GeneratedColumn<int>(
+        'intensive_listen_pass_count',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _shadowingPassCountMeta =
+      const VerificationMeta('shadowingPassCount');
+  @override
+  late final GeneratedColumn<int> shadowingPassCount = GeneratedColumn<int>(
+    'shadowing_pass_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _shadowingSentenceIndexMeta =
       const VerificationMeta('shadowingSentenceIndex');
   @override
@@ -2704,6 +2736,9 @@ class $LearningProgressesTable extends LearningProgresses
     totalStudyDurationMs,
     blindListenPassCount,
     intensiveListenSentenceIndex,
+    intensiveListenDifficultCount,
+    intensiveListenPassCount,
+    shadowingPassCount,
     shadowingSentenceIndex,
     updatedAt,
   ];
@@ -2808,6 +2843,33 @@ class $LearningProgressesTable extends LearningProgresses
         ),
       );
     }
+    if (data.containsKey('intensive_listen_difficult_count')) {
+      context.handle(
+        _intensiveListenDifficultCountMeta,
+        intensiveListenDifficultCount.isAcceptableOrUnknown(
+          data['intensive_listen_difficult_count']!,
+          _intensiveListenDifficultCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('intensive_listen_pass_count')) {
+      context.handle(
+        _intensiveListenPassCountMeta,
+        intensiveListenPassCount.isAcceptableOrUnknown(
+          data['intensive_listen_pass_count']!,
+          _intensiveListenPassCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shadowing_pass_count')) {
+      context.handle(
+        _shadowingPassCountMeta,
+        shadowingPassCount.isAcceptableOrUnknown(
+          data['shadowing_pass_count']!,
+          _shadowingPassCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('shadowing_sentence_index')) {
       context.handle(
         _shadowingSentenceIndexMeta,
@@ -2874,6 +2936,18 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.int,
         data['${effectivePrefix}intensive_listen_sentence_index'],
       ),
+      intensiveListenDifficultCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}intensive_listen_difficult_count'],
+      ),
+      intensiveListenPassCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}intensive_listen_pass_count'],
+      ),
+      shadowingPassCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}shadowing_pass_count'],
+      ),
       shadowingSentenceIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}shadowing_sentence_index'],
@@ -2923,6 +2997,15 @@ class LearningProgressesData extends DataClass
   /// 精听断点续学句子索引（null 表示从头开始）
   final int? intensiveListenSentenceIndex;
 
+  /// 精听标记的难句数量
+  final int? intensiveListenDifficultCount;
+
+  /// 精听总完成遍数（每次完成精听 +1，类似盲听的 blindListenPassCount）
+  final int? intensiveListenPassCount;
+
+  /// 跟读总完成遍数（每次完成跟读 +1）
+  final int? shadowingPassCount;
+
   /// 跟读断点续学句子索引（null 表示从头开始）
   final int? shadowingSentenceIndex;
 
@@ -2939,6 +3022,9 @@ class LearningProgressesData extends DataClass
     required this.totalStudyDurationMs,
     required this.blindListenPassCount,
     this.intensiveListenSentenceIndex,
+    this.intensiveListenDifficultCount,
+    this.intensiveListenPassCount,
+    this.shadowingPassCount,
     this.shadowingSentenceIndex,
     required this.updatedAt,
   });
@@ -2969,6 +3055,19 @@ class LearningProgressesData extends DataClass
         intensiveListenSentenceIndex,
       );
     }
+    if (!nullToAbsent || intensiveListenDifficultCount != null) {
+      map['intensive_listen_difficult_count'] = Variable<int>(
+        intensiveListenDifficultCount,
+      );
+    }
+    if (!nullToAbsent || intensiveListenPassCount != null) {
+      map['intensive_listen_pass_count'] = Variable<int>(
+        intensiveListenPassCount,
+      );
+    }
+    if (!nullToAbsent || shadowingPassCount != null) {
+      map['shadowing_pass_count'] = Variable<int>(shadowingPassCount);
+    }
     if (!nullToAbsent || shadowingSentenceIndex != null) {
       map['shadowing_sentence_index'] = Variable<int>(shadowingSentenceIndex);
     }
@@ -2997,6 +3096,16 @@ class LearningProgressesData extends DataClass
           intensiveListenSentenceIndex == null && nullToAbsent
           ? const Value.absent()
           : Value(intensiveListenSentenceIndex),
+      intensiveListenDifficultCount:
+          intensiveListenDifficultCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(intensiveListenDifficultCount),
+      intensiveListenPassCount: intensiveListenPassCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(intensiveListenPassCount),
+      shadowingPassCount: shadowingPassCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shadowingPassCount),
       shadowingSentenceIndex: shadowingSentenceIndex == null && nullToAbsent
           ? const Value.absent()
           : Value(shadowingSentenceIndex),
@@ -3032,6 +3141,13 @@ class LearningProgressesData extends DataClass
       intensiveListenSentenceIndex: serializer.fromJson<int?>(
         json['intensiveListenSentenceIndex'],
       ),
+      intensiveListenDifficultCount: serializer.fromJson<int?>(
+        json['intensiveListenDifficultCount'],
+      ),
+      intensiveListenPassCount: serializer.fromJson<int?>(
+        json['intensiveListenPassCount'],
+      ),
+      shadowingPassCount: serializer.fromJson<int?>(json['shadowingPassCount']),
       shadowingSentenceIndex: serializer.fromJson<int?>(
         json['shadowingSentenceIndex'],
       ),
@@ -3060,6 +3176,13 @@ class LearningProgressesData extends DataClass
       'intensiveListenSentenceIndex': serializer.toJson<int?>(
         intensiveListenSentenceIndex,
       ),
+      'intensiveListenDifficultCount': serializer.toJson<int?>(
+        intensiveListenDifficultCount,
+      ),
+      'intensiveListenPassCount': serializer.toJson<int?>(
+        intensiveListenPassCount,
+      ),
+      'shadowingPassCount': serializer.toJson<int?>(shadowingPassCount),
       'shadowingSentenceIndex': serializer.toJson<int?>(shadowingSentenceIndex),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -3076,6 +3199,9 @@ class LearningProgressesData extends DataClass
     int? totalStudyDurationMs,
     int? blindListenPassCount,
     Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+    Value<int?> intensiveListenDifficultCount = const Value.absent(),
+    Value<int?> intensiveListenPassCount = const Value.absent(),
+    Value<int?> shadowingPassCount = const Value.absent(),
     Value<int?> shadowingSentenceIndex = const Value.absent(),
     DateTime? updatedAt,
   }) => LearningProgressesData(
@@ -3097,6 +3223,15 @@ class LearningProgressesData extends DataClass
     intensiveListenSentenceIndex: intensiveListenSentenceIndex.present
         ? intensiveListenSentenceIndex.value
         : this.intensiveListenSentenceIndex,
+    intensiveListenDifficultCount: intensiveListenDifficultCount.present
+        ? intensiveListenDifficultCount.value
+        : this.intensiveListenDifficultCount,
+    intensiveListenPassCount: intensiveListenPassCount.present
+        ? intensiveListenPassCount.value
+        : this.intensiveListenPassCount,
+    shadowingPassCount: shadowingPassCount.present
+        ? shadowingPassCount.value
+        : this.shadowingPassCount,
     shadowingSentenceIndex: shadowingSentenceIndex.present
         ? shadowingSentenceIndex.value
         : this.shadowingSentenceIndex,
@@ -3134,6 +3269,15 @@ class LearningProgressesData extends DataClass
       intensiveListenSentenceIndex: data.intensiveListenSentenceIndex.present
           ? data.intensiveListenSentenceIndex.value
           : this.intensiveListenSentenceIndex,
+      intensiveListenDifficultCount: data.intensiveListenDifficultCount.present
+          ? data.intensiveListenDifficultCount.value
+          : this.intensiveListenDifficultCount,
+      intensiveListenPassCount: data.intensiveListenPassCount.present
+          ? data.intensiveListenPassCount.value
+          : this.intensiveListenPassCount,
+      shadowingPassCount: data.shadowingPassCount.present
+          ? data.shadowingPassCount.value
+          : this.shadowingPassCount,
       shadowingSentenceIndex: data.shadowingSentenceIndex.present
           ? data.shadowingSentenceIndex.value
           : this.shadowingSentenceIndex,
@@ -3156,6 +3300,11 @@ class LearningProgressesData extends DataClass
           ..write(
             'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
           )
+          ..write(
+            'intensiveListenDifficultCount: $intensiveListenDifficultCount, ',
+          )
+          ..write('intensiveListenPassCount: $intensiveListenPassCount, ')
+          ..write('shadowingPassCount: $shadowingPassCount, ')
           ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -3174,6 +3323,9 @@ class LearningProgressesData extends DataClass
     totalStudyDurationMs,
     blindListenPassCount,
     intensiveListenSentenceIndex,
+    intensiveListenDifficultCount,
+    intensiveListenPassCount,
+    shadowingPassCount,
     shadowingSentenceIndex,
     updatedAt,
   );
@@ -3192,6 +3344,10 @@ class LearningProgressesData extends DataClass
           other.blindListenPassCount == this.blindListenPassCount &&
           other.intensiveListenSentenceIndex ==
               this.intensiveListenSentenceIndex &&
+          other.intensiveListenDifficultCount ==
+              this.intensiveListenDifficultCount &&
+          other.intensiveListenPassCount == this.intensiveListenPassCount &&
+          other.shadowingPassCount == this.shadowingPassCount &&
           other.shadowingSentenceIndex == this.shadowingSentenceIndex &&
           other.updatedAt == this.updatedAt);
 }
@@ -3208,6 +3364,9 @@ class LearningProgressesCompanion
   final Value<int> totalStudyDurationMs;
   final Value<int> blindListenPassCount;
   final Value<int?> intensiveListenSentenceIndex;
+  final Value<int?> intensiveListenDifficultCount;
+  final Value<int?> intensiveListenPassCount;
+  final Value<int?> shadowingPassCount;
   final Value<int?> shadowingSentenceIndex;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -3222,6 +3381,9 @@ class LearningProgressesCompanion
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
     this.intensiveListenSentenceIndex = const Value.absent(),
+    this.intensiveListenDifficultCount = const Value.absent(),
+    this.intensiveListenPassCount = const Value.absent(),
+    this.shadowingPassCount = const Value.absent(),
     this.shadowingSentenceIndex = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -3237,6 +3399,9 @@ class LearningProgressesCompanion
     this.totalStudyDurationMs = const Value.absent(),
     this.blindListenPassCount = const Value.absent(),
     this.intensiveListenSentenceIndex = const Value.absent(),
+    this.intensiveListenDifficultCount = const Value.absent(),
+    this.intensiveListenPassCount = const Value.absent(),
+    this.shadowingPassCount = const Value.absent(),
     this.shadowingSentenceIndex = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -3253,6 +3418,9 @@ class LearningProgressesCompanion
     Expression<int>? totalStudyDurationMs,
     Expression<int>? blindListenPassCount,
     Expression<int>? intensiveListenSentenceIndex,
+    Expression<int>? intensiveListenDifficultCount,
+    Expression<int>? intensiveListenPassCount,
+    Expression<int>? shadowingPassCount,
     Expression<int>? shadowingSentenceIndex,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -3274,6 +3442,12 @@ class LearningProgressesCompanion
         'blind_listen_pass_count': blindListenPassCount,
       if (intensiveListenSentenceIndex != null)
         'intensive_listen_sentence_index': intensiveListenSentenceIndex,
+      if (intensiveListenDifficultCount != null)
+        'intensive_listen_difficult_count': intensiveListenDifficultCount,
+      if (intensiveListenPassCount != null)
+        'intensive_listen_pass_count': intensiveListenPassCount,
+      if (shadowingPassCount != null)
+        'shadowing_pass_count': shadowingPassCount,
       if (shadowingSentenceIndex != null)
         'shadowing_sentence_index': shadowingSentenceIndex,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -3292,6 +3466,9 @@ class LearningProgressesCompanion
     Value<int>? totalStudyDurationMs,
     Value<int>? blindListenPassCount,
     Value<int?>? intensiveListenSentenceIndex,
+    Value<int?>? intensiveListenDifficultCount,
+    Value<int?>? intensiveListenPassCount,
+    Value<int?>? shadowingPassCount,
     Value<int?>? shadowingSentenceIndex,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -3310,6 +3487,11 @@ class LearningProgressesCompanion
       blindListenPassCount: blindListenPassCount ?? this.blindListenPassCount,
       intensiveListenSentenceIndex:
           intensiveListenSentenceIndex ?? this.intensiveListenSentenceIndex,
+      intensiveListenDifficultCount:
+          intensiveListenDifficultCount ?? this.intensiveListenDifficultCount,
+      intensiveListenPassCount:
+          intensiveListenPassCount ?? this.intensiveListenPassCount,
+      shadowingPassCount: shadowingPassCount ?? this.shadowingPassCount,
       shadowingSentenceIndex:
           shadowingSentenceIndex ?? this.shadowingSentenceIndex,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -3362,6 +3544,19 @@ class LearningProgressesCompanion
         intensiveListenSentenceIndex.value,
       );
     }
+    if (intensiveListenDifficultCount.present) {
+      map['intensive_listen_difficult_count'] = Variable<int>(
+        intensiveListenDifficultCount.value,
+      );
+    }
+    if (intensiveListenPassCount.present) {
+      map['intensive_listen_pass_count'] = Variable<int>(
+        intensiveListenPassCount.value,
+      );
+    }
+    if (shadowingPassCount.present) {
+      map['shadowing_pass_count'] = Variable<int>(shadowingPassCount.value);
+    }
     if (shadowingSentenceIndex.present) {
       map['shadowing_sentence_index'] = Variable<int>(
         shadowingSentenceIndex.value,
@@ -3391,6 +3586,11 @@ class LearningProgressesCompanion
           ..write(
             'intensiveListenSentenceIndex: $intensiveListenSentenceIndex, ',
           )
+          ..write(
+            'intensiveListenDifficultCount: $intensiveListenDifficultCount, ',
+          )
+          ..write('intensiveListenPassCount: $intensiveListenPassCount, ')
+          ..write('shadowingPassCount: $shadowingPassCount, ')
           ..write('shadowingSentenceIndex: $shadowingSentenceIndex, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -7147,6 +7347,9 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
       Value<int?> intensiveListenSentenceIndex,
+      Value<int?> intensiveListenDifficultCount,
+      Value<int?> intensiveListenPassCount,
+      Value<int?> shadowingPassCount,
       Value<int?> shadowingSentenceIndex,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -7163,6 +7366,9 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<int> totalStudyDurationMs,
       Value<int> blindListenPassCount,
       Value<int?> intensiveListenSentenceIndex,
+      Value<int?> intensiveListenDifficultCount,
+      Value<int?> intensiveListenPassCount,
+      Value<int?> shadowingPassCount,
       Value<int?> shadowingSentenceIndex,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -7258,6 +7464,21 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get intensiveListenDifficultCount => $composableBuilder(
+    column: $table.intensiveListenDifficultCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get intensiveListenPassCount => $composableBuilder(
+    column: $table.intensiveListenPassCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get shadowingPassCount => $composableBuilder(
+    column: $table.shadowingPassCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get shadowingSentenceIndex => $composableBuilder(
     column: $table.shadowingSentenceIndex,
     builder: (column) => ColumnFilters(column),
@@ -7343,6 +7564,21 @@ class $$LearningProgressesTableOrderingComposer
 
   ColumnOrderings<int> get intensiveListenSentenceIndex => $composableBuilder(
     column: $table.intensiveListenSentenceIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get intensiveListenDifficultCount => $composableBuilder(
+    column: $table.intensiveListenDifficultCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get intensiveListenPassCount => $composableBuilder(
+    column: $table.intensiveListenPassCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get shadowingPassCount => $composableBuilder(
+    column: $table.shadowingPassCount,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7434,6 +7670,21 @@ class $$LearningProgressesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get intensiveListenDifficultCount => $composableBuilder(
+    column: $table.intensiveListenDifficultCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get intensiveListenPassCount => $composableBuilder(
+    column: $table.intensiveListenPassCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get shadowingPassCount => $composableBuilder(
+    column: $table.shadowingPassCount,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get shadowingSentenceIndex => $composableBuilder(
     column: $table.shadowingSentenceIndex,
     builder: (column) => column,
@@ -7509,6 +7760,10 @@ class $$LearningProgressesTableTableManager
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
                 Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+                Value<int?> intensiveListenDifficultCount =
+                    const Value.absent(),
+                Value<int?> intensiveListenPassCount = const Value.absent(),
+                Value<int?> shadowingPassCount = const Value.absent(),
                 Value<int?> shadowingSentenceIndex = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -7523,6 +7778,9 @@ class $$LearningProgressesTableTableManager
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
                 intensiveListenSentenceIndex: intensiveListenSentenceIndex,
+                intensiveListenDifficultCount: intensiveListenDifficultCount,
+                intensiveListenPassCount: intensiveListenPassCount,
+                shadowingPassCount: shadowingPassCount,
                 shadowingSentenceIndex: shadowingSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -7539,6 +7797,10 @@ class $$LearningProgressesTableTableManager
                 Value<int> totalStudyDurationMs = const Value.absent(),
                 Value<int> blindListenPassCount = const Value.absent(),
                 Value<int?> intensiveListenSentenceIndex = const Value.absent(),
+                Value<int?> intensiveListenDifficultCount =
+                    const Value.absent(),
+                Value<int?> intensiveListenPassCount = const Value.absent(),
+                Value<int?> shadowingPassCount = const Value.absent(),
                 Value<int?> shadowingSentenceIndex = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -7553,6 +7815,9 @@ class $$LearningProgressesTableTableManager
                 totalStudyDurationMs: totalStudyDurationMs,
                 blindListenPassCount: blindListenPassCount,
                 intensiveListenSentenceIndex: intensiveListenSentenceIndex,
+                intensiveListenDifficultCount: intensiveListenDifficultCount,
+                intensiveListenPassCount: intensiveListenPassCount,
+                shadowingPassCount: shadowingPassCount,
                 shadowingSentenceIndex: shadowingSentenceIndex,
                 updatedAt: updatedAt,
                 rowid: rowid,

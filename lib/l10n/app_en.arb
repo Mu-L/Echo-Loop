@@ -511,5 +511,23 @@
     "placeholders": {
       "duration": { "type": "String" }
     }
+  },
+  "difficultSentenceCount": "{count} difficult sentences",
+  "@difficultSentenceCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "intensiveListenPassInfo": "Intensive listen {count}x",
+  "@intensiveListenPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "shadowingPassInfo": "Shadowing {count}x",
+  "@shadowingPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

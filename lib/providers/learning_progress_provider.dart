@@ -201,6 +201,60 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
+  /// 保存难句数快照（可多次调用，用于中途退出/自由练习时保存）
+  Future<void> saveDifficultCount(
+    String audioItemId,
+    int count,
+  ) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      intensiveListenDifficultCount: count,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
+  /// 精听完成时递增总遍数（+1）
+  Future<void> incrementIntensiveListenPassCount(String audioItemId) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      intensiveListenPassCount: (progress.intensiveListenPassCount ?? 0) + 1,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
+  /// 跟读完成时递增总遍数（+1）
+  Future<void> incrementShadowingPassCount(String audioItemId) async {
+    final progress = state.progressMap[audioItemId];
+    if (progress == null) return;
+
+    final updated = progress.copyWith(
+      shadowingPassCount: (progress.shadowingPassCount ?? 0) + 1,
+      updatedAt: DateTime.now(),
+    );
+
+    await _persistProgress(updated);
+
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = updated;
+    state = state.copyWith(progressMap: newMap);
+  }
+
   /// 删除指定音频的学习进度（音频删除时调用）
   Future<void> deleteProgress(String audioItemId) async {
     final dao = ref.read(learningProgressDaoProvider);
@@ -269,6 +323,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         currentStageStartedAt: Value(progress.currentStageStartedAt),
         totalStudyDurationMs: Value(progress.totalStudyDurationMs),
         blindListenPassCount: Value(progress.blindListenPassCount),
+        intensiveListenDifficultCount: Value(
+          progress.intensiveListenDifficultCount,
+        ),
+        intensiveListenPassCount: Value(
+          progress.intensiveListenPassCount,
+        ),
+        shadowingPassCount: Value(progress.shadowingPassCount),
         intensiveListenSentenceIndex: Value(
           progress.intensiveListenSentenceIndex,
         ),
@@ -290,6 +351,9 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       currentStageStartedAt: row.currentStageStartedAt,
       totalStudyDurationMs: row.totalStudyDurationMs,
       blindListenPassCount: row.blindListenPassCount,
+      intensiveListenDifficultCount: row.intensiveListenDifficultCount,
+      intensiveListenPassCount: row.intensiveListenPassCount,
+      shadowingPassCount: row.shadowingPassCount,
       intensiveListenSentenceIndex: row.intensiveListenSentenceIndex,
       shadowingSentenceIndex: row.shadowingSentenceIndex,
       updatedAt: row.updatedAt,

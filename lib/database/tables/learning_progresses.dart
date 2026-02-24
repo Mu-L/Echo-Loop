@@ -42,6 +42,15 @@ class LearningProgresses extends Table {
   /// 精听断点续学句子索引（null 表示从头开始）
   IntColumn get intensiveListenSentenceIndex => integer().nullable()();
 
+  /// 精听标记的难句数量
+  IntColumn get intensiveListenDifficultCount => integer().nullable()();
+
+  /// 精听总完成遍数（每次完成精听 +1，类似盲听的 blindListenPassCount）
+  IntColumn get intensiveListenPassCount => integer().nullable()();
+
+  /// 跟读总完成遍数（每次完成跟读 +1）
+  IntColumn get shadowingPassCount => integer().nullable()();
+
   /// 跟读断点续学句子索引（null 表示从头开始）
   IntColumn get shadowingSentenceIndex => integer().nullable()();
 

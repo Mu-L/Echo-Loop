@@ -369,5 +369,23 @@
     "placeholders": {
       "duration": { "type": "String" }
     }
+  },
+  "difficultSentenceCount": "标记 {count} 个难句",
+  "@difficultSentenceCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "intensiveListenPassInfo": "精听 {count} 遍",
+  "@intensiveListenPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "shadowingPassInfo": "跟读 {count} 遍",
+  "@shadowingPassInfo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }
