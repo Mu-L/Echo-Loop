@@ -480,7 +480,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reviewRound28 => '第七轮复习';
 
   @override
-  String get reviewIntervalNow => '当前';
+  String get reviewIntervalNow => '6小时后';
 
   @override
   String get reviewInterval1d => '1天后';
@@ -690,7 +690,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intensiveListenCantUnderstand => '听不懂';
 
   @override
-  String get intensiveListenMarkedDifficult => '已自动标记为难句，点此取消';
+  String get intensiveListenAutoMarkedDifficult => '已自动标记为难句，点此取消';
+
+  @override
+  String get intensiveListenMarkedDifficult => '已标记为难句，点此取消';
 
   @override
   String get intensiveListenNotDifficult => '点击标记为难句';

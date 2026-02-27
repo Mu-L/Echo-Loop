@@ -53,7 +53,7 @@ class SentenceAnnotationCard extends StatelessWidget {
               Flexible(
                 child: Text(
                   isDifficult
-                      ? l10n.intensiveListenMarkedDifficult
+                      ? l10n.intensiveListenAutoMarkedDifficult
                       : l10n.intensiveListenNotDifficult,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: isDifficult ? Colors.amber.shade700 : Colors.grey,

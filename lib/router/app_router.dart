@@ -20,6 +20,7 @@ import '../screens/blind_listen_player_screen.dart';
 import '../screens/intensive_listen_player_screen.dart';
 import '../screens/listen_and_repeat_player_screen.dart';
 import '../screens/retell_player_screen.dart';
+import '../screens/review_placeholder_screen.dart';
 import 'main_shell.dart';
 
 /// 全局根导航器 key
@@ -73,6 +74,10 @@ abstract class AppRoutes {
 
   /// 独立音频播放器页路径（不依赖合集）
   static String audioPlayer(String audioId) => '/audio/$audioId/player';
+
+  /// 独立音频复习子步骤占位页路径
+  static String audioReviewSubStage(String audioId, String subStageKey) =>
+      '/audio/$audioId/review/$subStageKey';
 }
 
 /// GoRouter Provider（keepAlive，不可 invalidate）
@@ -175,9 +180,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final audioId = state.pathParameters['audioId']!;
-          return RetellPlayerScreen(
-            collectionId: null,
+          return RetellPlayerScreen(collectionId: null, audioItemId: audioId);
+        },
+      ),
+      GoRoute(
+        path: '/audio/:audioId/review/:subStage',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final audioId = state.pathParameters['audioId']!;
+          final subStageKey = state.pathParameters['subStage']!;
+          return ReviewPlaceholderScreen(
             audioItemId: audioId,
+            subStageKey: subStageKey,
           );
         },
       ),

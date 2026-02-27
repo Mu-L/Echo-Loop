@@ -16,7 +16,7 @@ void navigationTests() {
       await tester.pumpAndSettle();
 
       // 默认显示学习页面
-      expect(find.text('Study feature coming soon'), findsOneWidget);
+      expect(find.text('No study tasks yet'), findsOneWidget);
     });
 
     testWidgets('点击各导航切换页面', (tester) async {
@@ -24,7 +24,7 @@ void navigationTests() {
       await tester.pumpAndSettle();
 
       // 默认在学习页
-      expect(find.text('Study feature coming soon'), findsOneWidget);
+      expect(find.text('No study tasks yet'), findsOneWidget);
 
       // 切换到收藏页
       await tester.tap(find.byIcon(Icons.favorite_border));

@@ -106,13 +106,10 @@ class _IntensiveListenPlayerScreenState
     await _saveSentenceProgress();
     await _saveDifficultSentences();
 
-    final playerState = ref.read(intensiveListenPlayerProvider);
+    final totalDifficultCount = await _loadTotalDifficultCount();
     await ref
         .read(learningProgressNotifierProvider.notifier)
-        .saveDifficultCount(
-          widget.audioItemId,
-          playerState.difficultSentences.length,
-        );
+        .saveDifficultCount(widget.audioItemId, totalDifficultCount);
 
     // 先 pop 页面，再 exitLearningMode（dispose 会重置 state，
     // 若先 dispose 再 pop 会导致星标状态闪烁）
@@ -129,6 +126,15 @@ class _IntensiveListenPlayerScreenState
           widget.audioItemId,
           player.currentIndex,
         );
+  }
+
+  /// 获取当前音频的难句总数（以数据库书签为准）
+  ///
+  /// 该值代表“全部已标记难句”，而非“本次会话临时集合”。
+  Future<int> _loadTotalDifficultCount() async {
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    final bookmarks = await bookmarkDao.getByAudioId(widget.audioItemId);
+    return bookmarks.length;
   }
 
   /// 切换难句标记并即时持久化到数据库
@@ -165,13 +171,11 @@ class _IntensiveListenPlayerScreenState
       );
     }
 
-    // 4. 同步难句数快照到 learning_progress
+    // 4. 同步难句数快照到 learning_progress（以数据库总量为准）
+    final totalDifficultCount = await _loadTotalDifficultCount();
     await ref
         .read(learningProgressNotifierProvider.notifier)
-        .saveDifficultCount(
-          widget.audioItemId,
-          newState.difficultSentences.length,
-        );
+        .saveDifficultCount(widget.audioItemId, totalDifficultCount);
   }
 
   /// 保存难句书签到数据库（增量同步：新增 + 移除）
@@ -226,37 +230,37 @@ class _IntensiveListenPlayerScreenState
       return;
     }
 
-    // 读取难句书签数量（用于 briefing sheet）
-    final playerState = ref.read(intensiveListenPlayerProvider);
-    final difficultCount = playerState.difficultSentences.length;
+    _loadTotalDifficultCount().then((difficultCount) {
+      if (!mounted) return;
 
-    if (difficultCount == 0) {
-      // 无难句 → 跳过跟读，回到计划页
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+      if (difficultCount == 0) {
+        // 无难句 → 跳过跟读，回到计划页
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.listenAndRepeatNoDifficultSentences)),
+        );
+        context.pop();
+        return;
+      }
+
+      showListenAndRepeatBriefingSheet(
+        context: context,
+        difficultCount: difficultCount,
+        playCount: 3, // 默认遍数（实际由难度决定，此处为预览估值）
+        onStartPractice: () async {
+          await ref
+              .read(learningSessionProvider.notifier)
+              .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
+          if (mounted) {
+            context.pushReplacement(
+              AppRoutes.listenAndRepeatPlayer(
+                widget.collectionId,
+                widget.audioItemId,
+              ),
+            );
+          }
+        },
       );
-      context.pop();
-      return;
-    }
-
-    showListenAndRepeatBriefingSheet(
-      context: context,
-      difficultCount: difficultCount,
-      playCount: 3, // 默认遍数（实际由难度决定，此处为预览估值）
-      onStartPractice: () async {
-        await ref
-            .read(learningSessionProvider.notifier)
-            .enterListenAndRepeatMode(widget.audioItemId, lpState.sentences);
-        if (mounted) {
-          context.pushReplacement(
-            AppRoutes.listenAndRepeatPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
-          );
-        }
-      },
-    );
+    });
   }
 
   /// 获取当前步骤的上下文信息
@@ -328,6 +332,7 @@ class _IntensiveListenPlayerScreenState
 
     // 保存难句书签
     await _saveDifficultSentences();
+    final totalDifficultCount = await _loadTotalDifficultCount();
 
     if (!mounted) {
       _isShowingDialog = false;
@@ -338,10 +343,7 @@ class _IntensiveListenPlayerScreenState
     if (session.isFreePlay) {
       await ref
           .read(learningProgressNotifierProvider.notifier)
-          .saveDifficultCount(
-            widget.audioItemId,
-            playerState.difficultSentences.length,
-          );
+          .saveDifficultCount(widget.audioItemId, totalDifficultCount);
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .incrementIntensiveListenPassCount(widget.audioItemId);
@@ -359,7 +361,7 @@ class _IntensiveListenPlayerScreenState
       barrierDismissible: false,
       builder: (ctx) => _IntensiveListenCompleteDialog(
         totalSentences: playerState.totalSentences,
-        difficultCount: playerState.difficultSentences.length,
+        difficultCount: totalDifficultCount,
         stepIndex: stepCtx.stepIndex,
         totalSteps: stepCtx.totalSteps,
         stageName: stepCtx.stageName,
@@ -374,13 +376,9 @@ class _IntensiveListenPlayerScreenState
     if (result != null) {
       try {
         // 保存精听统计（难句数快照 + 递增总遍数）
-        final stats = ref.read(intensiveListenPlayerProvider);
         await ref
             .read(learningProgressNotifierProvider.notifier)
-            .saveDifficultCount(
-              widget.audioItemId,
-              stats.difficultSentences.length,
-            );
+            .saveDifficultCount(widget.audioItemId, totalDifficultCount);
         await ref
             .read(learningProgressNotifierProvider.notifier)
             .incrementIntensiveListenPassCount(widget.audioItemId);
@@ -1128,6 +1126,9 @@ bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.intensiveListen => true,
   SubStageType.listenAndRepeat => true,
   SubStageType.retell => true,
+  SubStageType.reviewDifficultPractice => false,
+  SubStageType.reviewRetellParagraph => false,
+  SubStageType.reviewRetellSummary => false,
 };
 
 /// 获取子步骤的本地化名称
@@ -1137,6 +1138,9 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.intensiveListen => l10n.stepIntensiveListening,
       SubStageType.listenAndRepeat => l10n.stepShadowing,
       SubStageType.retell => l10n.stepRetelling,
+      SubStageType.reviewDifficultPractice => 'Difficult practice',
+      SubStageType.reviewRetellParagraph => 'Paragraph retelling',
+      SubStageType.reviewRetellSummary => 'Summary retelling',
     };
 
 /// 格式化时间戳为 MM:SS.m 格式（如 01:02.3）

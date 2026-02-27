@@ -47,7 +47,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 验证 App 正常加载 — 默认显示学习页
-    expect(find.text('Study feature coming soon'), findsOneWidget);
+    // 验证 App 正常加载 — 默认显示学习任务页空状态
+    expect(find.text('No study tasks yet'), findsOneWidget);
   });
 }

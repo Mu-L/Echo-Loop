@@ -105,12 +105,69 @@ class LearningProgress {
     );
   }
 
+  /// 复习可学习窗口时长（仅复习阶段有意义）。
+  ///
+  /// - review0：到点后 6 小时内不算逾期
+  /// - review1~review28：到点后 24 小时内不算逾期
+  Duration? get reviewWindowDuration {
+    if (!isInReviewStage) return null;
+    if (currentStage == LearningStage.review0) {
+      return const Duration(hours: 6);
+    }
+    return const Duration(hours: 24);
+  }
+
+  /// 复习可学习窗口结束时间。
+  DateTime? get reviewWindowEndAt {
+    final reviewAt = nextReviewAt;
+    final window = reviewWindowDuration;
+    if (reviewAt == null || window == null) return null;
+    return reviewAt.add(window);
+  }
+
   /// 当前是否可以开始复习
   bool get isReviewReady {
+    return isReviewReadyAt(DateTime.now());
+  }
+
+  /// 指定时间点是否可以开始复习。
+  ///
+  /// 规则：`now >= nextReviewAt` 即可复习；无复习时间时视为可复习。
+  bool isReviewReadyAt(DateTime now) {
     final reviewAt = nextReviewAt;
     if (reviewAt == null) return true;
-    return DateTime.now().isAfter(reviewAt) ||
-        DateTime.now().isAtSameMomentAs(reviewAt);
+    return now.isAfter(reviewAt) || now.isAtSameMomentAs(reviewAt);
+  }
+
+  /// 当前是否处于复习阶段（review0 ~ review28）
+  bool get isInReviewStage =>
+      currentStage.index >= LearningStage.review0.index &&
+      currentStage.index <= LearningStage.review28.index;
+
+  /// 复习是否未解锁（处于复习阶段且未到时间）
+  bool get isReviewLocked => isReviewLockedAt(DateTime.now());
+
+  /// 指定时间点的复习锁定状态。
+  bool isReviewLockedAt(DateTime now) =>
+      isInReviewStage && !isReviewReadyAt(now);
+
+  /// 当前是否已逾期（超过可学习窗口结束时间）。
+  bool get isReviewOverdue => isReviewOverdueAt(DateTime.now());
+
+  /// 指定时间点是否已逾期。
+  ///
+  /// 规则：`now > reviewWindowEndAt` 才算逾期。
+  bool isReviewOverdueAt(DateTime now) {
+    final windowEnd = reviewWindowEndAt;
+    if (windowEnd == null) return false;
+    return now.isAfter(windowEnd);
+  }
+
+  /// 指定时间点的逾期时长（未逾期返回 null）。
+  Duration? overdueDurationAt(DateTime now) {
+    final windowEnd = reviewWindowEndAt;
+    if (windowEnd == null || !isReviewOverdueAt(now)) return null;
+    return now.difference(windowEnd);
   }
 
   /// 总完成进度（0.0 ~ 1.0）

@@ -483,7 +483,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewRound28 => 'Review 7';
 
   @override
-  String get reviewIntervalNow => 'Now';
+  String get reviewIntervalNow => 'After 6 hours';
 
   @override
   String get reviewInterval1d => 'After 1 day';
@@ -698,8 +698,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intensiveListenCantUnderstand => 'Can\'t understand';
 
   @override
-  String get intensiveListenMarkedDifficult =>
+  String get intensiveListenAutoMarkedDifficult =>
       'Auto-marked difficult, tap to undo';
+
+  @override
+  String get intensiveListenMarkedDifficult => 'Marked difficult, tap to undo';
 
   @override
   String get intensiveListenNotDifficult => 'Tap to mark as difficult';

@@ -110,10 +110,7 @@ class _ListenAndRepeatPlayerScreenState
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     await ref
         .read(learningProgressNotifierProvider.notifier)
-        .saveShadowingSentenceIndex(
-          widget.audioItemId,
-          player.currentIndex,
-        );
+        .saveShadowingSentenceIndex(widget.audioItemId, player.currentIndex);
   }
 
   /// 取消当前句子的难句收藏
@@ -124,10 +121,7 @@ class _ListenAndRepeatPlayerScreenState
     if (removed != null) {
       // 从数据库删除书签
       final bookmarkDao = ref.read(bookmarkDaoProvider);
-      await bookmarkDao.removeBookmark(
-        widget.audioItemId,
-        removed.index,
-      );
+      await bookmarkDao.removeBookmark(widget.audioItemId, removed.index);
     }
 
     // 如果还有句子且未完成，自动开始播放下一句
@@ -294,17 +288,10 @@ class _ListenAndRepeatPlayerScreenState
 
         await ref
             .read(learningSessionProvider.notifier)
-            .enterRetellMode(
-              widget.audioItemId,
-              paragraphs,
-              keywordsMap,
-            );
+            .enterRetellMode(widget.audioItemId, paragraphs, keywordsMap);
         if (mounted) {
           context.pushReplacement(
-            AppRoutes.retellPlayer(
-              widget.collectionId,
-              widget.audioItemId,
-            ),
+            AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
           );
         }
       },
@@ -333,17 +320,18 @@ class _ListenAndRepeatPlayerScreenState
 
     // 句子时长（如 "3.5s"）和时间戳（如 "00:32.1 - 00:35.6"）分开传递，
     // 由 _ProgressSection 用不同样式渲染以建立视觉层级。
-    final hasDuration = currentSentence != null &&
-        currentSentence.duration > Duration.zero;
+    final hasDuration =
+        currentSentence != null && currentSentence.duration > Duration.zero;
     final durationText = hasDuration
         ? l10n.sentenceDuration(
-            (currentSentence.duration.inMilliseconds / 1000.0)
-                .toStringAsFixed(1),
+            (currentSentence.duration.inMilliseconds / 1000.0).toStringAsFixed(
+              1,
+            ),
           )
         : null;
     final timestampText = hasDuration
         ? '${_formatTimestamp(currentSentence.startTime)}'
-          ' - ${_formatTimestamp(currentSentence.endTime)}'
+              ' - ${_formatTimestamp(currentSentence.endTime)}'
         : null;
 
     return PopScope(
@@ -359,9 +347,8 @@ class _ListenAndRepeatPlayerScreenState
           actions: [
             IconButton(
               icon: const Icon(Icons.tune),
-              onPressed: () => showListenAndRepeatSettingsSheet(
-                context: context,
-              ),
+              onPressed: () =>
+                  showListenAndRepeatSettingsSheet(context: context),
             ),
           ],
         ),
@@ -494,8 +481,7 @@ class _ProgressSection extends StatelessWidget {
                 style: subtitleStyle,
               ),
               const Spacer(),
-              if (durationText case final dur?)
-                Text(dur, style: subtitleStyle),
+              if (durationText case final dur?) Text(dur, style: subtitleStyle),
               if (timestampText case final ts?) ...[
                 const SizedBox(width: 6),
                 Text(ts, style: timestampStyle),
@@ -621,7 +607,8 @@ class _PlaybackControls extends StatelessWidget {
 
           // 下一句
           IconButton(
-            onPressed: playerState.currentSentenceIndex >=
+            onPressed:
+                playerState.currentSentenceIndex >=
                     playerState.totalSentences - 1
                 ? null
                 : onNext,
@@ -712,7 +699,8 @@ class _ListenAndRepeatCompleteDialog extends StatelessWidget {
       ];
     } else if (isLastStep) {
       final l10nCtx = AppLocalizations.of(context)!;
-      final isFirstStudy = stageName == l10nCtx.firstStudy ||
+      final isFirstStudy =
+          stageName == l10nCtx.firstStudy ||
           stageName == LearningStage.firstLearn.label;
       final completeText = isFirstStudy
           ? l10n.completeFirstStudy
@@ -747,6 +735,9 @@ bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.intensiveListen => true,
   SubStageType.listenAndRepeat => true,
   SubStageType.retell => true,
+  SubStageType.reviewDifficultPractice => false,
+  SubStageType.reviewRetellParagraph => false,
+  SubStageType.reviewRetellSummary => false,
 };
 
 /// 获取子步骤的本地化名称
@@ -756,6 +747,9 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.intensiveListen => l10n.stepIntensiveListening,
       SubStageType.listenAndRepeat => l10n.stepShadowing,
       SubStageType.retell => l10n.stepRetelling,
+      SubStageType.reviewDifficultPractice => 'Difficult practice',
+      SubStageType.reviewRetellParagraph => 'Paragraph retelling',
+      SubStageType.reviewRetellSummary => 'Summary retelling',
     };
 
 /// 格式化时间戳为 MM:SS.m 格式（如 01:02.3）

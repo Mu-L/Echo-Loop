@@ -5,6 +5,7 @@ import '../database/enums.dart';
 import '../database/providers.dart';
 import '../database/app_database.dart' as db;
 import '../models/learning_progress.dart';
+import 'time_provider.dart';
 
 part 'learning_progress_provider.g.dart';
 
@@ -69,7 +70,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     final existing = state.progressMap[audioItemId];
     if (existing != null) return existing;
 
-    final now = DateTime.now();
+    final now = ref.read(nowProvider)();
     final progress = LearningProgress(
       audioItemId: audioItemId,
       currentStageStartedAt: now,
@@ -104,8 +105,9 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   Future<void> completeCurrentSubStage(String audioItemId) async {
     final progress = state.progressMap[audioItemId];
     if (progress == null || progress.isCompleted) return;
+    final now = ref.read(nowProvider)();
+    if (progress.isReviewLockedAt(now)) return;
 
-    final now = DateTime.now();
     final stage = progress.currentStage;
     final subStages = stage.subStages;
     final currentIdx = subStages.indexOf(progress.currentSubStage);
@@ -202,10 +204,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
   }
 
   /// 保存难句数快照（可多次调用，用于中途退出/自由练习时保存）
-  Future<void> saveDifficultCount(
-    String audioItemId,
-    int count,
-  ) async {
+  Future<void> saveDifficultCount(String audioItemId, int count) async {
     final progress = state.progressMap[audioItemId];
     if (progress == null) return;
 
@@ -364,9 +363,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         intensiveListenDifficultCount: Value(
           progress.intensiveListenDifficultCount,
         ),
-        intensiveListenPassCount: Value(
-          progress.intensiveListenPassCount,
-        ),
+        intensiveListenPassCount: Value(progress.intensiveListenPassCount),
         shadowingPassCount: Value(progress.shadowingPassCount),
         intensiveListenSentenceIndex: Value(
           progress.intensiveListenSentenceIndex,
@@ -381,10 +378,16 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
   /// 从数据库行转换为模型
   LearningProgress _fromDbRow(db.LearningProgressesData row) {
+    final stage = LearningStage.fromKey(row.currentStage);
+    final normalizedSubStage = _normalizeSubStageForStage(
+      stage: stage,
+      rawSubStageKey: row.currentSubStage,
+    );
+
     return LearningProgress(
       audioItemId: row.audioItemId,
-      currentStage: LearningStage.fromKey(row.currentStage),
-      currentSubStage: SubStageType.fromKey(row.currentSubStage),
+      currentStage: stage,
+      currentSubStage: normalizedSubStage,
       difficulty: DifficultyLevel.fromValue(row.difficulty),
       firstLearnCompletedAt: row.firstLearnCompletedAt,
       lastStageCompletedAt: row.lastStageCompletedAt,
@@ -400,5 +403,56 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       retellPassCount: row.retellPassCount,
       updatedAt: row.updatedAt,
     );
+  }
+
+  /// 复习阶段兼容旧子步骤键，避免枚举扩展后旧数据无法推进。
+  ///
+  /// 兼容规则：
+  /// - 首学阶段：保留原有子步骤；
+  /// - review0：旧 blindListen/listenAndRepeat/retell 都归一到难句补练或段级复述；
+  /// - 中间轮：旧 listenAndRepeat -> 难句补练，旧 retell -> 段级复述；
+  /// - 末轮 review28：旧 retell -> 全文总结复述。
+  SubStageType _normalizeSubStageForStage({
+    required LearningStage stage,
+    required String rawSubStageKey,
+  }) {
+    final raw = SubStageType.fromKey(rawSubStageKey);
+    if (stage == LearningStage.firstLearn || stage == LearningStage.completed) {
+      return raw;
+    }
+
+    if (stage == LearningStage.review0) {
+      return switch (raw) {
+        SubStageType.reviewDifficultPractice =>
+          SubStageType.reviewDifficultPractice,
+        SubStageType.reviewRetellParagraph =>
+          SubStageType.reviewRetellParagraph,
+        SubStageType.reviewRetellSummary => SubStageType.reviewRetellParagraph,
+        SubStageType.retell => SubStageType.reviewRetellParagraph,
+        _ => SubStageType.reviewDifficultPractice,
+      };
+    }
+
+    if (stage == LearningStage.review28) {
+      return switch (raw) {
+        SubStageType.reviewDifficultPractice =>
+          SubStageType.reviewDifficultPractice,
+        SubStageType.reviewRetellSummary => SubStageType.reviewRetellSummary,
+        SubStageType.reviewRetellParagraph => SubStageType.reviewRetellSummary,
+        SubStageType.listenAndRepeat => SubStageType.reviewDifficultPractice,
+        SubStageType.retell => SubStageType.reviewRetellSummary,
+        _ => SubStageType.blindListen,
+      };
+    }
+
+    return switch (raw) {
+      SubStageType.reviewDifficultPractice =>
+        SubStageType.reviewDifficultPractice,
+      SubStageType.reviewRetellParagraph => SubStageType.reviewRetellParagraph,
+      SubStageType.reviewRetellSummary => SubStageType.reviewRetellParagraph,
+      SubStageType.listenAndRepeat => SubStageType.reviewDifficultPractice,
+      SubStageType.retell => SubStageType.reviewRetellParagraph,
+      _ => SubStageType.blindListen,
+    };
   }
 }

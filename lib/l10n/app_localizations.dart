@@ -1007,7 +1007,7 @@ abstract class AppLocalizations {
   /// No description provided for @reviewIntervalNow.
   ///
   /// In en, this message translates to:
-  /// **'Now'**
+  /// **'After 6 hours'**
   String get reviewIntervalNow;
 
   /// No description provided for @reviewInterval1d.
@@ -1376,10 +1376,16 @@ abstract class AppLocalizations {
   /// **'Can\'t understand'**
   String get intensiveListenCantUnderstand;
 
-  /// No description provided for @intensiveListenMarkedDifficult.
+  /// No description provided for @intensiveListenAutoMarkedDifficult.
   ///
   /// In en, this message translates to:
   /// **'Auto-marked difficult, tap to undo'**
+  String get intensiveListenAutoMarkedDifficult;
+
+  /// No description provided for @intensiveListenMarkedDifficult.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked difficult, tap to undo'**
   String get intensiveListenMarkedDifficult;
 
   /// No description provided for @intensiveListenNotDifficult.

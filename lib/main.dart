@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:audio_session/audio_session.dart';
@@ -11,8 +12,10 @@ import 'database/providers.dart';
 import 'database/migration/sp_to_drift_migration.dart';
 import 'providers/package_info_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/review_reminder_provider.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
+import 'services/notification_tap_router_bridge.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,11 +77,53 @@ void main() async {
   );
 }
 
-class FluencyApp extends ConsumerWidget {
+class FluencyApp extends ConsumerStatefulWidget {
   const FluencyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FluencyApp> createState() => _FluencyAppState();
+}
+
+class _FluencyAppState extends ConsumerState<FluencyApp> {
+  StreamSubscription<NotificationIntent>? _intentSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final bridge = ref.read(notificationTapRouterBridgeProvider);
+      _intentSubscription = bridge.intents.listen(_handleNotificationIntent);
+
+      final pendingIntent = bridge.takePendingIntent();
+      if (pendingIntent != null) {
+        _handleNotificationIntent(pendingIntent);
+      }
+
+      await ref.read(reviewReminderServiceProvider).init();
+      final latestPendingIntent = bridge.takePendingIntent();
+      if (latestPendingIntent != null) {
+        _handleNotificationIntent(latestPendingIntent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _intentSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleNotificationIntent(NotificationIntent intent) {
+    if (!mounted) return;
+    switch (intent) {
+      case NotificationIntent.openStudyTasks:
+        ref.read(appRouterProvider).go(AppRoutes.study);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
     final router = ref.watch(appRouterProvider);
 

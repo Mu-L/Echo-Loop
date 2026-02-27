@@ -12,6 +12,8 @@ import '../l10n/app_localizations.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/review_reminder_provider.dart';
+import '../providers/study_task_provider.dart';
 import '../providers/tag_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -27,18 +29,40 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  ProviderSubscription<int>? _pendingTaskCountSubscription;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(audioLibraryProvider.notifier).loadLibrary().then((_) {
         ref.read(collectionListProvider.notifier).loadCollections();
         ref.read(tagListProvider.notifier).loadTags();
         ref.read(audioLibraryProvider.notifier).backfillDurations();
         ref.read(audioLibraryProvider.notifier).backfillTranscriptStats();
       });
-      ref.read(learningProgressNotifierProvider.notifier).loadAll();
+      await ref.read(learningProgressNotifierProvider.notifier).loadAll();
+
+      _pendingTaskCountSubscription = ref.listenManual<int>(
+        pendingStudyTaskCountProvider,
+        (_, next) {
+          _syncDailyReminder(next);
+        },
+        fireImmediately: true,
+      );
     });
+  }
+
+  @override
+  void dispose() {
+    _pendingTaskCountSubscription?.close();
+    super.dispose();
+  }
+
+  Future<void> _syncDailyReminder(int pendingTaskCount) async {
+    await ref
+        .read(reviewReminderServiceProvider)
+        .syncDailyReminder(pendingTaskCount: pendingTaskCount);
   }
 
   @override

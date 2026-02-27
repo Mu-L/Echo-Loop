@@ -36,7 +36,16 @@ enum SubStageType {
   listenAndRepeat('listenAndRepeat'),
 
   /// 段级复述
-  retell('retell');
+  retell('retell'),
+
+  /// 复习：难句补练（盲听听不懂后进入跟读/精听式补练）
+  reviewDifficultPractice('reviewDifficultPractice'),
+
+  /// 复习：段级复述
+  reviewRetellParagraph('reviewRetellParagraph'),
+
+  /// 复习：全文总结复述（3-5句话概述大意）
+  reviewRetellSummary('reviewRetellSummary');
 
   const SubStageType(this.key);
 
@@ -49,6 +58,9 @@ enum SubStageType {
     intensiveListen => '逐句精听',
     listenAndRepeat => '跟读',
     retell => '段级复述',
+    reviewDifficultPractice => '难句补练',
+    reviewRetellParagraph => '段级复述',
+    reviewRetellSummary => '全文总结复述',
   };
 
   /// 从字符串键创建枚举
@@ -69,7 +81,7 @@ enum LearningStage {
   /// 首学阶段（4 个子步骤：盲听、精听、跟读、复述）
   firstLearn('firstLearn'),
 
-  /// 首轮复习（当前，完成首学后立即可做）
+  /// 首轮复习（6 小时后）
   review0('review0'),
 
   /// 第二轮复习（1 天后）
@@ -106,11 +118,20 @@ enum LearningStage {
       SubStageType.listenAndRepeat,
       SubStageType.retell,
     ],
+    review0 => [
+      SubStageType.reviewDifficultPractice,
+      SubStageType.reviewRetellParagraph,
+    ],
+    review28 => [
+      SubStageType.blindListen,
+      SubStageType.reviewDifficultPractice,
+      SubStageType.reviewRetellSummary,
+    ],
     completed => [],
     _ => [
       SubStageType.blindListen,
-      SubStageType.listenAndRepeat,
-      SubStageType.retell,
+      SubStageType.reviewDifficultPractice,
+      SubStageType.reviewRetellParagraph,
     ],
   };
 
@@ -120,7 +141,7 @@ enum LearningStage {
   /// 复习间隔（小时）
   int get intervalHours => switch (this) {
     firstLearn => 0,
-    review0 => 0,
+    review0 => 6,
     review1 => 24,
     review2 => 48,
     review4 => 96,

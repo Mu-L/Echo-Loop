@@ -151,7 +151,7 @@ class _BlindListenPlayerScreenState
     String? nextStepName,
     bool isLastStep,
   })
-      _getStepContext() {
+  _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
     final progress = ref
         .read(learningProgressNotifierProvider)
@@ -359,9 +359,7 @@ class _BlindListenPlayerScreenState
                     Icon(
                       Icons.headphones,
                       size: 80,
-                      color: theme.colorScheme.primary.withValues(
-                        alpha: 0.3,
-                      ),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: AppSpacing.xl),
 
@@ -436,6 +434,9 @@ bool _hasPlayerScreen(SubStageType type) => switch (type) {
   SubStageType.intensiveListen => true,
   SubStageType.listenAndRepeat => true,
   SubStageType.retell => true,
+  SubStageType.reviewDifficultPractice => false,
+  SubStageType.reviewRetellParagraph => false,
+  SubStageType.reviewRetellSummary => false,
 };
 
 /// 获取子步骤的本地化名称
@@ -445,6 +446,9 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.intensiveListen => l10n.stepIntensiveListening,
       SubStageType.listenAndRepeat => l10n.stepShadowing,
       SubStageType.retell => l10n.stepRetelling,
+      SubStageType.reviewDifficultPractice => 'Difficult practice',
+      SubStageType.reviewRetellParagraph => 'Paragraph retelling',
+      SubStageType.reviewRetellSummary => 'Summary retelling',
     };
 
 /// 底部进度条区域 — 完全由 BlindListenPlayer 状态驱动
@@ -562,10 +566,7 @@ class _CountdownIndicator extends StatelessWidget {
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        TextButton(
-          onPressed: onSkip,
-          child: Text(l10n.skipCountdown),
-        ),
+        TextButton(onPressed: onSkip, child: Text(l10n.skipCountdown)),
       ],
     );
   }

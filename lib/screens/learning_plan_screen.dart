@@ -14,6 +14,7 @@ import '../models/learning_progress.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/time_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../l10n/app_localizations.dart';
@@ -27,6 +28,7 @@ import '../widgets/blind_listen_briefing_sheet.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
 import '../widgets/retell/retell_briefing_sheet.dart';
+import '../widgets/review/review_briefing_sheet.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../database/providers.dart';
 import '../providers/learning_session/sentence_playback_engine.dart';
@@ -93,10 +95,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
   /// 处理"开始学习/继续学习"按钮点击
   void _handleStartLearning(BuildContext context, LearningProgress? progress) {
+    final now = ref.read(nowProvider)();
+    if (progress?.isReviewLockedAt(now) ?? false) return;
+
     if (progress != null &&
         progress.currentStage.index >= LearningStage.review0.index &&
         progress.currentStage.index <= LearningStage.review28.index) {
-      context.push(AppRoutes.audioReviewHub(widget.audioItemId));
+      _startReviewSubStage(context, progress);
       return;
     }
 
@@ -121,6 +126,23 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         context.push(AppRoutes.audioPlayer(widget.audioItemId));
       }
     }
+  }
+
+  /// 复习阶段：先展示任务提示弹窗，再进入当前复习步骤页面。
+  void _startReviewSubStage(BuildContext context, LearningProgress progress) {
+    showReviewBriefingSheet(
+      context: context,
+      stage: progress.currentStage,
+      subStage: progress.currentSubStage,
+      onStartPractice: () {
+        context.push(
+          AppRoutes.audioReviewSubStage(
+            widget.audioItemId,
+            progress.currentSubStage.key,
+          ),
+        );
+      },
+    );
   }
 
   /// 进入全文盲听
@@ -324,6 +346,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         (s) => s.progressMap[widget.audioItemId],
       ),
     );
+    final now = ref.watch(nowProvider)();
 
     // audioItem 找不到时显示错误页面
     if (audioItem == null) {
@@ -336,6 +359,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     final reviewStages = _buildReviewStages(l10n);
 
     final hasTranscript = audioItem.hasTranscript;
+    final isLockedReview = progress?.isReviewLockedAt(now) ?? false;
 
     return Scaffold(
       appBar: AppBar(title: Text(audioItem.name)),
@@ -376,6 +400,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                       l10n: l10n,
                       progress: progress,
                       review: review,
+                      now: now,
                       isExpanded: _isReviewRoundExpanded(
                         review.stage,
                         progress,
@@ -390,7 +415,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           _BottomButton(
             l10n: l10n,
             progress: progress,
-            onPressed: hasTranscript
+            onPressed: hasTranscript && !isLockedReview
                 ? () => _handleStartLearning(context, progress)
                 : null,
           ),
@@ -1081,6 +1106,7 @@ class _ReviewRoundSection extends StatelessWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
   final _ReviewStageData review;
+  final DateTime now;
   final bool isExpanded;
   final VoidCallback onToggle;
 
@@ -1088,6 +1114,7 @@ class _ReviewRoundSection extends StatelessWidget {
     required this.l10n,
     this.progress,
     required this.review,
+    required this.now,
     required this.isExpanded,
     required this.onToggle,
   });
@@ -1106,23 +1133,43 @@ class _ReviewRoundSection extends StatelessWidget {
     return 0;
   }
 
-  /// 当前复习轮次倒计时文案（仅当前轮次显示）
-  String? _reviewTimingText() {
+  /// 当前复习轮次时间文案（仅当前轮次显示）。
+  ///
+  /// 展示优先级：未到时间倒计时 > 逾期提示 > 可复习。
+  String? _reviewTimingText(BuildContext context) {
     if (progress == null) return null;
     if (!progress!.isCurrentStage(review.stage)) return null;
 
     final nextReview = progress!.nextReviewAt;
     if (nextReview == null) return null;
 
-    final now = DateTime.now();
-    if (now.isAfter(nextReview) || now.isAtSameMomentAs(nextReview)) {
-      return l10n.reviewReady;
+    if (now.isBefore(nextReview)) {
+      final diff = nextReview.difference(now);
+      if (diff.inDays > 0) {
+        return l10n.reviewCountdown(diff.inDays);
+      }
+      return l10n.reviewCountdownHours(diff.inHours.clamp(1, 999));
     }
-    final diff = nextReview.difference(now);
-    if (diff.inDays > 0) {
-      return l10n.reviewCountdown(diff.inDays);
+
+    if (progress!.isReviewOverdueAt(now)) {
+      return _formatOverdueText(context, progress!.overdueDurationAt(now));
     }
-    return l10n.reviewCountdownHours(diff.inHours.clamp(1, 999));
+
+    return l10n.reviewReady;
+  }
+
+  String _formatOverdueText(BuildContext context, Duration? overdue) {
+    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    if (overdue == null) {
+      return isZh ? '已逾期' : 'Overdue';
+    }
+    if (overdue.inDays > 0) {
+      return isZh
+          ? '已逾期 ${overdue.inDays} 天'
+          : 'Overdue by ${overdue.inDays} day(s)';
+    }
+    final hours = overdue.inHours.clamp(1, 999);
+    return isZh ? '已逾期 $hours 小时' : 'Overdue by $hours hour(s)';
   }
 
   /// 复习子阶段名称与描述映射
@@ -1180,7 +1227,7 @@ class _ReviewRoundSection extends StatelessWidget {
     final theme = Theme.of(context);
     final subStages = review.stage.subStages;
     final completedCount = _completedSubStageCount();
-    final timingText = _reviewTimingText();
+    final timingText = _reviewTimingText(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1233,21 +1280,18 @@ class _ReviewRoundSection extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      review.interval,
+                      // 当前轮次优先显示“实时状态”（倒计时/可复习），
+                      // 其它轮次显示固定间隔，避免同一行出现两个时间文案。
+                      timingText ?? review.interval,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: timingText != null
+                            ? theme.colorScheme.tertiary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: timingText != null
+                            ? FontWeight.w500
+                            : FontWeight.normal,
                       ),
                     ),
-                    if (timingText != null) ...[
-                      const SizedBox(width: AppSpacing.s),
-                      Text(
-                        timingText,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.tertiary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ],

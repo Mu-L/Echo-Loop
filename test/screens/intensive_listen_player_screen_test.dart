@@ -6,28 +6,47 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/models/intensive_listen_settings.dart';
+import 'package:fluency/models/sentence.dart';
 import 'package:fluency/screens/intensive_listen_player_screen.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
+import 'package:fluency/database/app_database.dart' show Bookmark;
 import 'package:fluency/database/daos/bookmark_dao.dart';
 import 'package:fluency/database/providers.dart';
 import 'package:fluency/theme/app_theme.dart';
 
 import '../helpers/mock_providers.dart';
 
-/// 测试用 BookmarkDao — 所有方法通过 noSuchMethod 返回空值
+/// 测试用 BookmarkDao
 class _TestBookmarkDao implements BookmarkDao {
+  _TestBookmarkDao({List<Bookmark> bookmarks = const []})
+    : _bookmarks = bookmarks;
+
+  final List<Bookmark> _bookmarks;
+
+  @override
+  Future<List<Bookmark>> getByAudioId(String audioItemId) async => _bookmarks;
+
+  @override
+  Stream<List<Bookmark>> watchByAudioId(String audioItemId) =>
+      Stream<List<Bookmark>>.value(_bookmarks);
+
   @override
   dynamic noSuchMethod(Invocation invocation) {
-    final memberName = invocation.memberName.toString();
-    if (memberName.contains('watchByAudioId')) {
-      return Stream<List<dynamic>>.value([]);
-    }
-    // 大部分 DAO 方法返回 Future<void>
     return Future<void>.value();
+  }
+}
+
+/// 启动后立即进入完成态，用于触发完成对话框逻辑
+class _AutoCompleteIntensiveListenPlayer extends TestIntensiveListenPlayer {
+  _AutoCompleteIntensiveListenPlayer(super.initialState, super.testSentences);
+
+  @override
+  Future<void> startPlaying() async {
+    state = state.copyWith(isPlaying: false, isCompleted: true);
   }
 }
 
@@ -67,12 +86,34 @@ void main() {
     );
   }
 
+  Bookmark createBookmark({required int id, required int sentenceIndex}) {
+    final now = DateTime(2026, 2, 25);
+    return Bookmark(
+      id: id,
+      audioItemId: 'test-1',
+      sentenceIndex: sentenceIndex,
+      sentenceText: 'Sentence $sentenceIndex',
+      startTime: sentenceIndex.toDouble(),
+      endTime: sentenceIndex.toDouble() + 1,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 0,
+    );
+  }
+
   Widget createTestWidget({
     Locale locale = const Locale('en'),
     IntensiveListenState? playerState,
     LearningSessionState? sessionState,
+    _TestBookmarkDao? bookmarkDao,
+    TestIntensiveListenPlayer Function(
+      IntensiveListenState initialState,
+      List<Sentence> sentences,
+    )?
+    playerFactory,
   }) {
     final sentences = createTestSentences(count: 5);
+    final initialPlayerState = playerState ?? createPlayerState();
 
     final router = GoRouter(
       initialLocation: '/collections/col-1/test-1/intensive-listen',
@@ -107,12 +148,13 @@ void main() {
               TestLearningSession(sessionState ?? const LearningSessionState()),
         ),
         intensiveListenPlayerProvider.overrideWith(
-          () => TestIntensiveListenPlayer(
-            playerState ?? createPlayerState(),
-            sentences,
-          ),
+          () =>
+              playerFactory?.call(initialPlayerState, sentences) ??
+              TestIntensiveListenPlayer(initialPlayerState, sentences),
         ),
-        bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+        bookmarkDaoProvider.overrideWithValue(
+          bookmarkDao ?? _TestBookmarkDao(),
+        ),
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -317,6 +359,32 @@ void main() {
       expect(find.text('听不懂'), findsOneWidget);
     });
 
+    testWidgets('完成统计使用数据库难句总数而非本次会话数量', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            isCompleted: false,
+            totalSentences: 5,
+            difficultSentences: {0},
+          ),
+          playerFactory: (state, sentences) =>
+              _AutoCompleteIntensiveListenPlayer(state, sentences),
+          bookmarkDao: _TestBookmarkDao(
+            bookmarks: [
+              createBookmark(id: 1, sentenceIndex: 0),
+              createBookmark(id: 2, sentenceIndex: 3),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('2 sentence(s) marked as difficult.'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('点击设置按钮打开设置面板', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
@@ -416,7 +484,7 @@ void main() {
 
       // 难句标记行：★ + 文案
       expect(find.byIcon(Icons.star), findsOneWidget);
-      expect(find.text('Auto-marked difficult, tap to undo'), findsOneWidget);
+      expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
       // "听不懂"按钮仍然存在
       expect(find.text("Can't understand"), findsOneWidget);
     });
