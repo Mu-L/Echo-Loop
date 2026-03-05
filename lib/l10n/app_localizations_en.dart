@@ -716,11 +716,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Analysis will be available in a future version';
 
   @override
-  String get intensiveListenWordDictTitle => 'Word Dictionary';
-
-  @override
-  String get intensiveListenWordDictPlaceholder =>
-      'Dictionary feature coming soon';
+  String get intensiveListenWordDictNotFound => 'Word not found in dictionary';
 
   @override
   String get intensiveListenContinue => 'Continue';

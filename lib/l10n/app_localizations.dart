@@ -1406,17 +1406,11 @@ abstract class AppLocalizations {
   /// **'Analysis will be available in a future version'**
   String get intensiveListenAnalysisPlaceholder;
 
-  /// No description provided for @intensiveListenWordDictTitle.
+  /// No description provided for @intensiveListenWordDictNotFound.
   ///
   /// In en, this message translates to:
-  /// **'Word Dictionary'**
-  String get intensiveListenWordDictTitle;
-
-  /// No description provided for @intensiveListenWordDictPlaceholder.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictionary feature coming soon'**
-  String get intensiveListenWordDictPlaceholder;
+  /// **'Word not found in dictionary'**
+  String get intensiveListenWordDictNotFound;
 
   /// No description provided for @intensiveListenContinue.
   ///

@@ -705,10 +705,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intensiveListenAnalysisPlaceholder => '分析功能将在未来版本中提供';
 
   @override
-  String get intensiveListenWordDictTitle => '词典';
-
-  @override
-  String get intensiveListenWordDictPlaceholder => '词典功能即将上线';
+  String get intensiveListenWordDictNotFound => '未收录该单词';
 
   @override
   String get intensiveListenContinue => '继续';
