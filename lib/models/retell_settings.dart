@@ -121,8 +121,7 @@ class RetellSettings {
   Duration calculatePauseDuration(Duration paragraphDuration) {
     return switch (pauseMode) {
       PauseMode.smart => Duration(
-          milliseconds: (paragraphDuration.inMilliseconds * 1.5)
-              .round()
+          milliseconds: (2000 + paragraphDuration.inMilliseconds * 3)
               .clamp(5000, 300000),
         ),
       PauseMode.fixed => Duration(seconds: fixedPauseSeconds),
