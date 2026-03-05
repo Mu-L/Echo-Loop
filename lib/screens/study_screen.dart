@@ -150,6 +150,7 @@ class _TaskCard extends StatelessWidget {
     };
 
     return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: ListTile(
         leading: Icon(
           task.type == StudyTaskType.firstStudy
