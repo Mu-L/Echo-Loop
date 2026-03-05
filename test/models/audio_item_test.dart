@@ -11,6 +11,9 @@ void main() {
       int sentenceCount = 10,
       int wordCount = 50,
       bool isStarred = false,
+      TranscriptSource? transcriptSource,
+      String? audioSha256,
+      String? transcriptLanguage,
     }) {
       return AudioItem(
         id: 'audio-1',
@@ -22,6 +25,9 @@ void main() {
         sentenceCount: sentenceCount,
         wordCount: wordCount,
         isStarred: isStarred,
+        transcriptSource: transcriptSource,
+        audioSha256: audioSha256,
+        transcriptLanguage: transcriptLanguage,
       );
     }
 
@@ -171,6 +177,151 @@ void main() {
       expect(item.sentenceCount, 0);
       expect(item.wordCount, 0);
       expect(item.isStarred, isFalse);
+    });
+
+    group('TranscriptSource 枚举', () {
+      test('fromIndex 正确映射', () {
+        expect(TranscriptSource.fromIndex(0), TranscriptSource.local);
+        expect(TranscriptSource.fromIndex(1), TranscriptSource.ai);
+        expect(TranscriptSource.fromIndex(null), isNull);
+        expect(TranscriptSource.fromIndex(99), isNull);
+        expect(TranscriptSource.fromIndex(-1), isNull);
+      });
+
+      test('index 属性正确', () {
+        expect(TranscriptSource.local.index, 0);
+        expect(TranscriptSource.ai.index, 1);
+      });
+    });
+
+    group('transcriptSource 字段', () {
+      test('toJson / fromJson 往返一致 — local', () {
+        final item = createSample(transcriptSource: TranscriptSource.local);
+        final json = item.toJson();
+        expect(json['transcriptSource'], 0);
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.transcriptSource, TranscriptSource.local);
+      });
+
+      test('toJson / fromJson 往返一致 — ai', () {
+        final item = createSample(transcriptSource: TranscriptSource.ai);
+        final json = item.toJson();
+        expect(json['transcriptSource'], 1);
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.transcriptSource, TranscriptSource.ai);
+      });
+
+      test('toJson / fromJson 往返一致 — null', () {
+        final item = createSample(transcriptSource: null);
+        final json = item.toJson();
+        expect(json['transcriptSource'], isNull);
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.transcriptSource, isNull);
+      });
+
+      test('copyWith 覆盖为 ai', () {
+        final item = createSample(transcriptSource: TranscriptSource.local);
+        final copied = item.copyWith(transcriptSource: TranscriptSource.ai);
+        expect(copied.transcriptSource, TranscriptSource.ai);
+      });
+
+      test('copyWith 不传参保持原值', () {
+        final item = createSample(transcriptSource: TranscriptSource.ai);
+        final copied = item.copyWith();
+        expect(copied.transcriptSource, TranscriptSource.ai);
+      });
+
+      test('copyWith 显式传 null', () {
+        final item = createSample(transcriptSource: TranscriptSource.local);
+        final copied = item.copyWith(transcriptSource: null);
+        expect(copied.transcriptSource, isNull);
+      });
+    });
+
+    group('audioSha256 字段', () {
+      test('toJson / fromJson 往返一致', () {
+        final item = createSample(audioSha256: 'abc123sha');
+        final json = item.toJson();
+        expect(json['audioSha256'], 'abc123sha');
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.audioSha256, 'abc123sha');
+      });
+
+      test('copyWith 覆盖', () {
+        final item = createSample();
+        final copied = item.copyWith(audioSha256: 'new-sha');
+        expect(copied.audioSha256, 'new-sha');
+      });
+
+      test('copyWith 不传参保持原值', () {
+        final item = createSample(audioSha256: 'keep-me');
+        final copied = item.copyWith();
+        expect(copied.audioSha256, 'keep-me');
+      });
+
+      test('copyWith 显式传 null', () {
+        final item = createSample(audioSha256: 'to-clear');
+        final copied = item.copyWith(audioSha256: null);
+        expect(copied.audioSha256, isNull);
+      });
+    });
+
+    group('transcriptLanguage 字段', () {
+      test('toJson / fromJson 往返一致', () {
+        final item = createSample(transcriptLanguage: 'en');
+        final json = item.toJson();
+        expect(json['transcriptLanguage'], 'en');
+
+        final restored = AudioItem.fromJson(json);
+        expect(restored.transcriptLanguage, 'en');
+      });
+
+      test('copyWith 覆盖', () {
+        final item = createSample(transcriptLanguage: 'en');
+        final copied = item.copyWith(transcriptLanguage: 'multi');
+        expect(copied.transcriptLanguage, 'multi');
+      });
+
+      test('copyWith 显式传 null', () {
+        final item = createSample(transcriptLanguage: 'en');
+        final copied = item.copyWith(transcriptLanguage: null);
+        expect(copied.transcriptLanguage, isNull);
+      });
+    });
+
+    test(
+      'fromJson 处理缺失 transcriptSource/audioSha256/transcriptLanguage 字段',
+      () {
+        final json = {
+          'id': 'audio-1',
+          'name': '测试',
+          'audioPath': 'audios/test.mp3',
+          'transcriptPath': null,
+          'addedDate': now.toIso8601String(),
+          'totalDuration': 60,
+          // 无新增字段
+        };
+        final item = AudioItem.fromJson(json);
+        expect(item.transcriptSource, isNull);
+        expect(item.audioSha256, isNull);
+        expect(item.transcriptLanguage, isNull);
+      },
+    );
+
+    test('默认 transcriptSource, audioSha256, transcriptLanguage 为 null', () {
+      final item = AudioItem(
+        id: 'audio-1',
+        name: '测试',
+        audioPath: 'audios/test.mp3',
+        addedDate: now,
+      );
+      expect(item.transcriptSource, isNull);
+      expect(item.audioSha256, isNull);
+      expect(item.transcriptLanguage, isNull);
     });
   });
 }

@@ -22,6 +22,8 @@ import 'package:fluency/providers/learning_session/learning_session_provider.dar
 import 'package:fluency/providers/learning_session/blind_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
+import 'package:fluency/providers/transcription_task_provider.dart';
+import 'package:fluency/services/transcription_api_client.dart';
 import 'package:fluency/database/enums.dart';
 import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/models/sentence.dart';
@@ -125,6 +127,11 @@ class TestAudioLibrary extends AudioLibrary {
     // 测试中不做任何 I/O
   }
 
+  /// 直接设置音频列表（测试用）
+  void setItems(List<AudioItem> items) {
+    state = state.copyWith(audioItems: items);
+  }
+
   @override
   Future<void> addAudioItem(AudioItem item) async {
     state = state.copyWith(audioItems: [...state.audioItems, item]);
@@ -152,9 +159,7 @@ class TestAudioLibrary extends AudioLibrary {
     final items = [...state.audioItems];
     final index = items.indexWhere((item) => item.id == id);
     if (index != -1) {
-      items[index] = items[index].copyWith(
-        isStarred: !items[index].isStarred,
-      );
+      items[index] = items[index].copyWith(isStarred: !items[index].isStarred);
       state = state.copyWith(audioItems: items);
     }
   }
@@ -319,8 +324,7 @@ class TestTagList extends TagList {
     String audioId,
     Set<String> targetTagIds,
   ) async {
-    final currentTags =
-        state.audioToTagsMap[audioId]?.toSet() ?? <String>{};
+    final currentTags = state.audioToTagsMap[audioId]?.toSet() ?? <String>{};
     final toAdd = targetTagIds.difference(currentTags);
     final toRemove = currentTags.difference(targetTagIds);
 
@@ -945,4 +949,34 @@ class TestAudioEngine extends AudioEngine {
 
   @override
   bool isActiveSession(int id) => true;
+}
+
+/// 测试用 TranscriptionTaskManager — 不执行真实转录
+class TestTranscriptionTaskManager extends TranscriptionTaskManager {
+  final Map<String, TranscriptionTaskState> _initialState;
+
+  TestTranscriptionTaskManager([this._initialState = const {}]);
+
+  @override
+  Map<String, TranscriptionTaskState> build() => Map.of(_initialState);
+
+  @override
+  Future<void> startTranscription(AudioItem audioItem, String language) async {
+    // 测试中不执行真实转录
+  }
+
+  @override
+  void cancelTranscription(String audioId) {
+    state = Map.of(state)..remove(audioId);
+  }
+
+  @override
+  void clearState(String audioId) {
+    state = Map.of(state)..remove(audioId);
+  }
+}
+
+/// 测试用 TranscriptionApiClient Provider 值
+TranscriptionApiClient createTestTranscriptionApiClient() {
+  return TranscriptionApiClient(baseUrl: 'https://test.local');
 }

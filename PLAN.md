@@ -1,11 +1,35 @@
 # Fluency 项目规划
 
-> 最后更新：2026-03-02
-> 当前任务：Bug 修复（3 个）
+> 最后更新：2026-03-05
+> 当前任务：管理字幕功能已完成（Phase 1 + Phase 2）
 
 ---
 
-## 当前计划：Bug 修复
+## 已完成：管理字幕功能（AI 转录）
+
+**完成时间**: 2026-03-05
+
+实现了"管理字幕"底部弹窗功能，支持本地上传、AI 转录和删除字幕三种操作：
+
+### Phase 1（客户端 UI）
+- 数据模型扩展：TranscriptSource 枚举 + AudioItem 新字段 + DB 迁移 v12→v13
+- ManageSubtitlesSheet 底部弹窗（本地上传/AI 转录/删除字幕）
+- 菜单入口从"上传字幕"改为"管理字幕"
+- 国际化（25 个新 key）
+
+### Phase 2（AI 转录完整流程）
+- SHA256 音频指纹计算（Isolate + crypto 包）
+- 后端 user_audios + user_audio_transcripts 表 + 5 个 HTTP API Routes
+- Dio HTTP 客户端 + 转录状态 Provider（keepAlive，后台运行）
+- SRT 格式转换 + AudioListTile 进度指示
+- 两级缓存：音频 SHA256 去重 + 字幕语言去重
+
+### 测试覆盖
+- 65+ 个测试全部通过（模型 31 + Widget 10 + SRT 8 + SHA256 5 + API 11）
+
+---
+
+## 已完成：Bug 修复（3 个）
 
 ### Bug 1：跟读自由练习模式最后一句无停顿直接退出
 

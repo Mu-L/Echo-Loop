@@ -184,9 +184,7 @@ class TestAudioLibrary extends AudioLibrary {
     final items = [...state.audioItems];
     final index = items.indexWhere((item) => item.id == id);
     if (index != -1) {
-      items[index] = items[index].copyWith(
-        isStarred: !items[index].isStarred,
-      );
+      items[index] = items[index].copyWith(isStarred: !items[index].isStarred);
       state = state.copyWith(audioItems: items);
     }
   }
@@ -295,8 +293,7 @@ class TestTagList extends TagList {
     String audioId,
     Set<String> targetTagIds,
   ) async {
-    final currentTags =
-        state.audioToTagsMap[audioId]?.toSet() ?? <String>{};
+    final currentTags = state.audioToTagsMap[audioId]?.toSet() ?? <String>{};
     final toAdd = targetTagIds.difference(currentTags);
     final toRemove = currentTags.difference(targetTagIds);
 
@@ -412,8 +409,9 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
         currentSubStage: nextStage.subStages.first,
         lastStageCompletedAt: now,
         currentStageStartedAt: now,
-        firstLearnCompletedAt:
-            stage == LearningStage.firstLearn ? now : progress.firstLearnCompletedAt,
+        firstLearnCompletedAt: stage == LearningStage.firstLearn
+            ? now
+            : progress.firstLearnCompletedAt,
         updatedAt: now,
       );
     }
@@ -486,10 +484,7 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
   }
 
   @override
-  Future<void> saveDifficultCount(
-    String audioItemId,
-    int count,
-  ) async {
+  Future<void> saveDifficultCount(String audioItemId, int count) async {
     final progress = state.progressMap[audioItemId];
     if (progress == null) return;
 
@@ -1051,9 +1046,9 @@ class TestRetellPlayer extends RetellPlayer {
   @override
   List<Sentence> get currentParagraphSentences =>
       _testParagraphs.isNotEmpty &&
-              state.currentParagraphIndex < _testParagraphs.length
-          ? _testParagraphs[state.currentParagraphIndex]
-          : [];
+          state.currentParagraphIndex < _testParagraphs.length
+      ? _testParagraphs[state.currentParagraphIndex]
+      : [];
 
   @override
   List<List<Sentence>> get paragraphs => List.unmodifiable(_testParagraphs);
@@ -1172,7 +1167,8 @@ class TestRetellPlayer extends RetellPlayer {
 
   @override
   void updateSettings(RetellSettings newSettings) {
-    final ratioChanged = newSettings.keywordRatio != state.settings.keywordRatio;
+    final ratioChanged =
+        newSettings.keywordRatio != state.settings.keywordRatio;
     state = state.copyWith(settings: newSettings);
     if (ratioChanged) {
       regenerateKeywords();
@@ -1212,15 +1208,14 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
   List<Sentence> _testSentences = [];
 
   @override
-  ReviewDifficultPracticeState build() =>
-      const ReviewDifficultPracticeState();
+  ReviewDifficultPracticeState build() => const ReviewDifficultPracticeState();
 
   @override
   Sentence? get currentSentence =>
       _testSentences.isNotEmpty &&
-              state.currentSentenceIndex < _testSentences.length
-          ? _testSentences[state.currentSentenceIndex]
-          : null;
+          state.currentSentenceIndex < _testSentences.length
+      ? _testSentences[state.currentSentenceIndex]
+      : null;
 
   @override
   List<Sentence> get sentences => List.unmodifiable(_testSentences);
@@ -1448,9 +1443,7 @@ class TestBookmarkDao implements BookmarkDao {
     final memberName = invocation.memberName.toString();
     if (memberName.contains('watchByAudioId')) {
       // watchByAudioId 返回 Stream<List<Bookmark>>
-      return Stream.value(
-        List.generate(bookmarkCount, (i) => null),
-      );
+      return Stream.value(List.generate(bookmarkCount, (i) => null));
     }
     return null;
   }
@@ -1509,13 +1502,14 @@ Widget createTestApp() {
 /// 可通过 [progressOverride] 自定义初始进度。
 Widget createTestAppWithAudio({
   LearningProgress? progressOverride,
+  AudioItem? audioItemOverride,
 }) {
-  final audioItem = createTestAudioItem();
+  final audioItem = audioItemOverride ?? createTestAudioItem();
   final collection = createTestCollection();
   final sentences = createTestSentences();
-  final progress = progressOverride ?? createTestLearningProgress(
-    currentStageStartedAt: DateTime.now(),
-  );
+  final progress =
+      progressOverride ??
+      createTestLearningProgress(currentStageStartedAt: DateTime.now());
 
   return ProviderScope(
     overrides: [
@@ -1600,7 +1594,9 @@ class _AudioPreloadWrapperState extends ConsumerState<_AudioPreloadWrapper> {
         ref.read(collectionListProvider.notifier) as TestCollectionList;
     collectionList.state = collectionList.state.copyWith(
       rawCollections: [widget.collection],
-      audioIdsMap: {widget.collection.id: [widget.audioItem.id]},
+      audioIdsMap: {
+        widget.collection.id: [widget.audioItem.id],
+      },
     );
 
     // 预置学习进度
@@ -1624,4 +1620,3 @@ class _AudioPreloadWrapperState extends ConsumerState<_AudioPreloadWrapper> {
     return const FluencyApp();
   }
 }
-

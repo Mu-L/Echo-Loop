@@ -28,47 +28,57 @@ void statsDisplayTests() {
     // ========== 精听完成保存统计 ==========
 
     testWidgets('精听正常完成 → 保存难句数 + 递增精听遍数', (tester) async {
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: createTestLearningProgress(
-          currentSubStage: SubStageType.intensiveListen,
-          blindListenPassCount: 2,
-          currentStageStartedAt: DateTime.now(),
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.intensiveListen,
+            blindListenPassCount: 2,
+            currentStageStartedAt: DateTime.now(),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // 导航到精听播放器
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.intensiveListen,
-        audioItemId: 'test-audio-1',
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.intensiveListen,
+          audioItemId: 'test-audio-1',
+        ),
+      );
 
-      final player = container.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final player =
+          container.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       final sentences = createTestSentences();
       player.setTestSentences(sentences);
-      player.setState(IntensiveListenState(
-        currentSentenceIndex: 0,
-        totalSentences: sentences.length,
-        difficultSentences: {0, 2, 4}, // 标记 3 个难句
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/intensive-listen',
+      player.setState(
+        IntensiveListenState(
+          currentSentenceIndex: 0,
+          totalSentences: sentences.length,
+          difficultSentences: {0, 2, 4}, // 标记 3 个难句
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/intensive-listen');
       await tester.pumpAndSettle();
 
       // 触发完成
-      final screenContext =
-          tester.element(find.byType(IntensiveListenPlayerScreen));
+      final screenContext = tester.element(
+        find.byType(IntensiveListenPlayerScreen),
+      );
       final screenContainer = ProviderScope.containerOf(screenContext);
-      final p = screenContainer.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final p =
+          screenContainer.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       p.setState(p.state.copyWith(isCompleted: true));
       await tester.pumpAndSettle();
 
@@ -91,39 +101,47 @@ void statsDisplayTests() {
     });
 
     testWidgets('精听中途退出 → 保存难句数快照', (tester) async {
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: createTestLearningProgress(
-          currentSubStage: SubStageType.intensiveListen,
-          blindListenPassCount: 2,
-          currentStageStartedAt: DateTime.now(),
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.intensiveListen,
+            blindListenPassCount: 2,
+            currentStageStartedAt: DateTime.now(),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // 导航到精听播放器
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.intensiveListen,
-        audioItemId: 'test-audio-1',
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.intensiveListen,
+          audioItemId: 'test-audio-1',
+        ),
+      );
 
-      final player = container.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final player =
+          container.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       final sentences = createTestSentences();
       player.setTestSentences(sentences);
-      player.setState(IntensiveListenState(
-        currentSentenceIndex: 2,
-        totalSentences: sentences.length,
-        difficultSentences: {1, 3}, // 标记 2 个难句
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/intensive-listen',
+      player.setState(
+        IntensiveListenState(
+          currentSentenceIndex: 2,
+          totalSentences: sentences.length,
+          difficultSentences: {1, 3}, // 标记 2 个难句
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/intensive-listen');
       await tester.pumpAndSettle();
 
       // 点击返回按钮触发退出
@@ -151,52 +169,66 @@ void statsDisplayTests() {
     });
 
     testWidgets('精听自由练习完成 → 保存难句数 + 递增遍数', (tester) async {
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: createTestLearningProgress(
-          currentSubStage: SubStageType.listenAndRepeat,
-          blindListenPassCount: 2,
-          currentStageStartedAt: DateTime.now(),
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.listenAndRepeat,
+            blindListenPassCount: 2,
+            currentStageStartedAt: DateTime.now(),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // 导航到精听播放器（自由练习模式）
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.intensiveListen,
-        audioItemId: 'test-audio-1',
-        isFreePlay: true,
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.intensiveListen,
+          audioItemId: 'test-audio-1',
+          isFreePlay: true,
+        ),
+      );
 
-      final player = container.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final player =
+          container.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       final sentences = createTestSentences();
       player.setTestSentences(sentences);
-      player.setState(IntensiveListenState(
-        currentSentenceIndex: 0,
-        totalSentences: sentences.length,
-        difficultSentences: {0, 1}, // 标记 2 个难句
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/intensive-listen',
+      player.setState(
+        IntensiveListenState(
+          currentSentenceIndex: 0,
+          totalSentences: sentences.length,
+          difficultSentences: {0, 1}, // 标记 2 个难句
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/intensive-listen');
       await tester.pumpAndSettle();
 
-      // 触发完成（自由练习模式直接退出，不弹对话框）
-      final screenContext =
-          tester.element(find.byType(IntensiveListenPlayerScreen));
+      // 触发完成（自由练习模式弹出完成对话框）
+      final screenContext = tester.element(
+        find.byType(IntensiveListenPlayerScreen),
+      );
       final screenContainer = ProviderScope.containerOf(screenContext);
-      final p = screenContainer.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final p =
+          screenContainer.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       p.setState(p.state.copyWith(isCompleted: true));
       await tester.pumpAndSettle();
 
-      // 自由练习完成后自动退出，无对话框
+      // 自由练习完成后弹窗，点击"完成"退出
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
       // 验证进度
       final appContext2 = tester.element(find.byType(FluencyApp));
       final container2 = ProviderScope.containerOf(appContext2);
@@ -213,47 +245,59 @@ void statsDisplayTests() {
     // ========== 跟读完成保存统计 ==========
 
     testWidgets('跟读正常完成 → 递增跟读遍数', (tester) async {
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: createTestLearningProgress(
-          currentSubStage: SubStageType.listenAndRepeat,
-          blindListenPassCount: 2,
-          currentStageStartedAt: DateTime.now(),
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.listenAndRepeat,
+            blindListenPassCount: 2,
+            currentStageStartedAt: DateTime.now(),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // 导航到跟读播放器
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.listenAndRepeat,
-        audioItemId: 'test-audio-1',
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.listenAndRepeat,
+          audioItemId: 'test-audio-1',
+        ),
+      );
 
-      final player = container.read(listenAndRepeatPlayerProvider.notifier)
-          as TestListenAndRepeatPlayer;
+      final player =
+          container.read(listenAndRepeatPlayerProvider.notifier)
+              as TestListenAndRepeatPlayer;
       final sentences = createTestSentences(count: 3);
       player.setTestSentences(sentences);
-      player.setState(ListenAndRepeatPlayerState(
-        currentSentenceIndex: 0,
-        totalSentences: sentences.length,
-        targetPlayCount: 3,
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/listen-and-repeat',
+      player.setState(
+        ListenAndRepeatPlayerState(
+          currentSentenceIndex: 0,
+          totalSentences: sentences.length,
+          targetPlayCount: 3,
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push(
+            '/collections/test-collection-1/test-audio-1/listen-and-repeat',
+          );
       await tester.pumpAndSettle();
 
       // 触发完成
-      final screenContext =
-          tester.element(find.byType(ListenAndRepeatPlayerScreen));
+      final screenContext = tester.element(
+        find.byType(ListenAndRepeatPlayerScreen),
+      );
       final screenContainer = ProviderScope.containerOf(screenContext);
-      final p = screenContainer.read(listenAndRepeatPlayerProvider.notifier)
-          as TestListenAndRepeatPlayer;
+      final p =
+          screenContainer.read(listenAndRepeatPlayerProvider.notifier)
+              as TestListenAndRepeatPlayer;
       p.setState(p.state.copyWith(isCompleted: true));
       await tester.pumpAndSettle();
 
@@ -273,48 +317,60 @@ void statsDisplayTests() {
     });
 
     testWidgets('跟读自由练习完成 → 递增跟读遍数', (tester) async {
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: createTestLearningProgress(
-          currentSubStage: SubStageType.retell,
-          blindListenPassCount: 2,
-          currentStageStartedAt: DateTime.now(),
+      await tester.pumpWidget(
+        createTestAppWithAudio(
+          progressOverride: createTestLearningProgress(
+            currentSubStage: SubStageType.retell,
+            blindListenPassCount: 2,
+            currentStageStartedAt: DateTime.now(),
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // 导航到跟读播放器（自由练习模式）
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.listenAndRepeat,
-        audioItemId: 'test-audio-1',
-        isFreePlay: true,
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.listenAndRepeat,
+          audioItemId: 'test-audio-1',
+          isFreePlay: true,
+        ),
+      );
 
-      final player = container.read(listenAndRepeatPlayerProvider.notifier)
-          as TestListenAndRepeatPlayer;
+      final player =
+          container.read(listenAndRepeatPlayerProvider.notifier)
+              as TestListenAndRepeatPlayer;
       final sentences = createTestSentences(count: 3);
       player.setTestSentences(sentences);
-      player.setState(ListenAndRepeatPlayerState(
-        currentSentenceIndex: 0,
-        totalSentences: sentences.length,
-        targetPlayCount: 3,
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/listen-and-repeat',
+      player.setState(
+        ListenAndRepeatPlayerState(
+          currentSentenceIndex: 0,
+          totalSentences: sentences.length,
+          targetPlayCount: 3,
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push(
+            '/collections/test-collection-1/test-audio-1/listen-and-repeat',
+          );
       await tester.pumpAndSettle();
 
       // 触发完成（自由练习模式弹出完成对话框）
-      final screenContext =
-          tester.element(find.byType(ListenAndRepeatPlayerScreen));
+      final screenContext = tester.element(
+        find.byType(ListenAndRepeatPlayerScreen),
+      );
       final screenContainer = ProviderScope.containerOf(screenContext);
-      final p = screenContainer.read(listenAndRepeatPlayerProvider.notifier)
-          as TestListenAndRepeatPlayer;
+      final p =
+          screenContainer.read(listenAndRepeatPlayerProvider.notifier)
+              as TestListenAndRepeatPlayer;
       p.setState(p.state.copyWith(isCompleted: true));
       await tester.pumpAndSettle();
 
@@ -346,17 +402,17 @@ void statsDisplayTests() {
         currentStageStartedAt: DateTime.now(),
       );
 
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: progress,
-      ));
+      await tester.pumpWidget(
+        createTestAppWithAudio(progressOverride: progress),
+      );
       await tester.pumpAndSettle();
 
       // 导航到学习计划页
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/plan',
-      );
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/plan');
       await tester.pumpAndSettle();
 
       // 验证精听遍数显示（"Intensive listen 2x"）
@@ -375,43 +431,51 @@ void statsDisplayTests() {
         currentStageStartedAt: DateTime.now(),
       );
 
-      await tester.pumpWidget(createTestAppWithAudio(
-        progressOverride: progress,
-      ));
+      await tester.pumpWidget(
+        createTestAppWithAudio(progressOverride: progress),
+      );
       await tester.pumpAndSettle();
 
       // 导航到精听播放器
       final context = tester.element(find.byType(FluencyApp));
       final container = ProviderScope.containerOf(context);
 
-      final session = container.read(learningSessionProvider.notifier)
-          as TestLearningSession;
-      session.setState(const LearningSessionState(
-        learningMode: LearningMode.intensiveListen,
-        audioItemId: 'test-audio-1',
-      ));
+      final session =
+          container.read(learningSessionProvider.notifier)
+              as TestLearningSession;
+      session.setState(
+        const LearningSessionState(
+          learningMode: LearningMode.intensiveListen,
+          audioItemId: 'test-audio-1',
+        ),
+      );
 
-      final player = container.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final player =
+          container.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       final sentences = createTestSentences();
       player.setTestSentences(sentences);
-      player.setState(IntensiveListenState(
-        currentSentenceIndex: 0,
-        totalSentences: sentences.length,
-        difficultSentences: {0, 1, 2},
-      ));
-
-      container.read(appRouterProvider).push(
-        '/collections/test-collection-1/test-audio-1/intensive-listen',
+      player.setState(
+        IntensiveListenState(
+          currentSentenceIndex: 0,
+          totalSentences: sentences.length,
+          difficultSentences: {0, 1, 2},
+        ),
       );
+
+      container
+          .read(appRouterProvider)
+          .push('/collections/test-collection-1/test-audio-1/intensive-listen');
       await tester.pumpAndSettle();
 
       // 触发完成
-      final screenContext =
-          tester.element(find.byType(IntensiveListenPlayerScreen));
+      final screenContext = tester.element(
+        find.byType(IntensiveListenPlayerScreen),
+      );
       final screenContainer = ProviderScope.containerOf(screenContext);
-      final p = screenContainer.read(intensiveListenPlayerProvider.notifier)
-          as TestIntensiveListenPlayer;
+      final p =
+          screenContainer.read(intensiveListenPlayerProvider.notifier)
+              as TestIntensiveListenPlayer;
       p.setState(p.state.copyWith(isCompleted: true));
       await tester.pumpAndSettle();
 
