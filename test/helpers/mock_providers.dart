@@ -764,8 +764,8 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
   }
 
   @override
-  void toggleTextReveal() {
-    state = state.copyWith(isTextRevealed: !state.isTextRevealed);
+  void setTextRevealed(bool revealed) {
+    state = state.copyWith(isTextRevealed: revealed);
   }
 
   @override

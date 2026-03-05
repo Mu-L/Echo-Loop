@@ -343,9 +343,9 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     state = state.copyWith(difficultSentences: newSet);
   }
 
-  /// 切换偷看字幕
-  void toggleTextReveal() {
-    state = state.copyWith(isTextRevealed: !state.isTextRevealed);
+  /// 设置偷看字幕状态（按住显示，松开隐藏）
+  void setTextRevealed(bool revealed) {
+    state = state.copyWith(isTextRevealed: revealed);
   }
 
   /// 更新精听设置（仅会话内生效，不持久化）

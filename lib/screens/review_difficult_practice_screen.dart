@@ -316,7 +316,8 @@ class _ReviewDifficultPracticeScreenState
                         playerState: playerState,
                         l10n: l10n,
                         theme: theme,
-                        onPeek: () => player.toggleTextReveal(),
+                        onPeekStart: () => player.setTextRevealed(true),
+                        onPeekEnd: () => player.setTextRevealed(false),
                         onCantUnderstand: () => player.enterAnnotationMode(),
                         onRemoveDifficult: _handleRemoveDifficult,
                         sentenceText: currentSentence?.text,
@@ -410,7 +411,8 @@ class _NormalModeView extends StatelessWidget {
   final ReviewDifficultPracticeState playerState;
   final AppLocalizations l10n;
   final ThemeData theme;
-  final VoidCallback onPeek;
+  final VoidCallback onPeekStart;
+  final VoidCallback onPeekEnd;
   final VoidCallback onCantUnderstand;
   final VoidCallback onRemoveDifficult;
   final String? sentenceText;
@@ -420,7 +422,8 @@ class _NormalModeView extends StatelessWidget {
     required this.playerState,
     required this.l10n,
     required this.theme,
-    required this.onPeek,
+    required this.onPeekStart,
+    required this.onPeekEnd,
     required this.onCantUnderstand,
     required this.onRemoveDifficult,
     this.sentenceText,
@@ -508,17 +511,14 @@ class _NormalModeView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              OutlinedButton.icon(
-                onPressed: onPeek,
-                icon: Icon(
-                  playerState.isTextRevealed
-                      ? Icons.visibility_off
-                      : Icons.visibility,
-                ),
-                label: Text(
-                  playerState.isTextRevealed
-                      ? l10n.intensiveListenHideSubtitle
-                      : l10n.intensiveListenPeek,
+              Listener(
+                onPointerDown: (_) => onPeekStart(),
+                onPointerUp: (_) => onPeekEnd(),
+                onPointerCancel: (_) => onPeekEnd(),
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.visibility),
+                  label: Text(l10n.intensiveListenPeek),
                 ),
               ),
               const SizedBox(width: AppSpacing.m),

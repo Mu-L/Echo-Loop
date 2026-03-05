@@ -246,9 +246,9 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = state.copyWith(isPlaying: false);
   }
 
-  /// 切换偷看字幕
-  void toggleTextReveal() {
-    state = state.copyWith(isTextRevealed: !state.isTextRevealed);
+  /// 设置偷看字幕状态（按住显示，松开隐藏）
+  void setTextRevealed(bool revealed) {
+    state = state.copyWith(isTextRevealed: revealed);
   }
 
   /// 取消当前句子的难句标记
