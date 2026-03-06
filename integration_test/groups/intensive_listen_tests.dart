@@ -262,7 +262,7 @@ void intensiveListenTests() {
       expect(find.textContaining('3/5'), findsOneWidget);
 
       // 点击返回按钮触发退出
-      final backButton = find.byType(BackButton);
+      final backButton = find.byIcon(Icons.close);
       await tester.tap(backButton);
       await tester.pumpAndSettle();
 

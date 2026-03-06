@@ -316,8 +316,8 @@ void retellTests() {
       // 验证当前在第 2 段
       expect(find.textContaining('2/3'), findsWidgets);
 
-      // 点击返回按钮触发退出
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      // 点击关闭按钮触发退出
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       // 验证确认对话框弹出

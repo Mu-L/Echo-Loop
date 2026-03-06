@@ -145,7 +145,7 @@ void statsDisplayTests() {
       await tester.pumpAndSettle();
 
       // 点击返回按钮触发退出
-      await tester.tap(find.byType(BackButton));
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       // 确认对话框 → 点击 Exit

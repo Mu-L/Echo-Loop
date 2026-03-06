@@ -195,7 +195,7 @@ void blindListenTests() {
       await tester.pumpAndSettle();
 
       // 点击返回按钮
-      final backButton = find.byType(BackButton);
+      final backButton = find.byIcon(Icons.close);
       await tester.tap(backButton);
       await tester.pumpAndSettle();
 
