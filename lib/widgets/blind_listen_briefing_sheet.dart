@@ -19,6 +19,7 @@ Future<void> showBlindListenBriefingSheet({
   required bool isFirstStudy,
   int reviewRound = 0,
   Duration? audioDuration,
+  Duration? estimatedDuration,
   required VoidCallback onStartPractice,
 }) {
   return showModalBottomSheet(
@@ -31,6 +32,7 @@ Future<void> showBlindListenBriefingSheet({
       isFirstStudy: isFirstStudy,
       reviewRound: reviewRound,
       audioDuration: audioDuration,
+      estimatedDuration: estimatedDuration,
       onStartPractice: onStartPractice,
     ),
   );
@@ -47,6 +49,9 @@ class BlindListenBriefingSheet extends StatelessWidget {
   /// 音频总时长
   final Duration? audioDuration;
 
+  /// 预估练习时长
+  final Duration? estimatedDuration;
+
   /// 开始练习回调
   final VoidCallback onStartPractice;
 
@@ -55,6 +60,7 @@ class BlindListenBriefingSheet extends StatelessWidget {
     required this.isFirstStudy,
     this.reviewRound = 0,
     this.audioDuration,
+    this.estimatedDuration,
     required this.onStartPractice,
   });
 
@@ -63,6 +69,13 @@ class BlindListenBriefingSheet extends StatelessWidget {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  /// 格式化预估时长为"预计 X 分钟"
+  String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
+    final minutes = (duration.inSeconds / 60).ceil();
+    if (minutes < 1) return l10n.estimatedLessThanOneMinute;
+    return l10n.estimatedMinutes(minutes);
   }
 
   @override
@@ -147,15 +160,62 @@ class BlindListenBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
 
-          // 音频时长
-          if (audioDuration != null)
+          // 音频时长 + 预估时长
+          if (audioDuration != null || estimatedDuration != null)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.l),
-              child: Text(
-                l10n.audioDuration(_formatDuration(audioDuration!)),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (audioDuration != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.music_note,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDuration(audioDuration!),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (audioDuration != null && estimatedDuration != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s,
+                      ),
+                      child: Text(
+                        '·',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  if (estimatedDuration != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatEstimatedDuration(l10n, estimatedDuration!),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
 

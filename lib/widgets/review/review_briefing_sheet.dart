@@ -11,6 +11,7 @@ Future<void> showReviewBriefingSheet({
   required BuildContext context,
   required LearningStage stage,
   required SubStageType subStage,
+  Duration? estimatedDuration,
   required VoidCallback onStartPractice,
 }) {
   return showModalBottomSheet(
@@ -22,6 +23,7 @@ Future<void> showReviewBriefingSheet({
     builder: (context) => _ReviewBriefingSheet(
       stage: stage,
       subStage: subStage,
+      estimatedDuration: estimatedDuration,
       onStartPractice: onStartPractice,
     ),
   );
@@ -30,13 +32,22 @@ Future<void> showReviewBriefingSheet({
 class _ReviewBriefingSheet extends StatelessWidget {
   final LearningStage stage;
   final SubStageType subStage;
+  final Duration? estimatedDuration;
   final VoidCallback onStartPractice;
 
   const _ReviewBriefingSheet({
     required this.stage,
     required this.subStage,
+    this.estimatedDuration,
     required this.onStartPractice,
   });
+
+  /// 格式化预估时长
+  String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
+    final minutes = (duration.inSeconds / 60).ceil();
+    if (minutes < 1) return l10n.estimatedLessThanOneMinute;
+    return l10n.estimatedMinutes(minutes);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +120,26 @@ class _ReviewBriefingSheet extends StatelessWidget {
               ],
             ),
           ),
+          if (estimatedDuration != null) ...[
+            const SizedBox(height: AppSpacing.m),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.l),
           SizedBox(
             width: double.infinity,

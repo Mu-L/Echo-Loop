@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 Future<void> showIntensiveListenBriefingSheet({
   required BuildContext context,
   required int sentenceCount,
+  Duration? estimatedDuration,
   required VoidCallback onStartPractice,
 }) {
   return showModalBottomSheet(
@@ -22,6 +23,7 @@ Future<void> showIntensiveListenBriefingSheet({
     ),
     builder: (context) => IntensiveListenBriefingSheet(
       sentenceCount: sentenceCount,
+      estimatedDuration: estimatedDuration,
       onStartPractice: onStartPractice,
     ),
   );
@@ -32,14 +34,25 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
   /// 句子总数
   final int sentenceCount;
 
+  /// 预估练习时长
+  final Duration? estimatedDuration;
+
   /// 开始练习回调
   final VoidCallback onStartPractice;
 
   const IntensiveListenBriefingSheet({
     super.key,
     required this.sentenceCount,
+    this.estimatedDuration,
     required this.onStartPractice,
   });
+
+  /// 格式化预估时长
+  String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
+    final minutes = (duration.inSeconds / 60).ceil();
+    if (minutes < 1) return l10n.estimatedLessThanOneMinute;
+    return l10n.estimatedMinutes(minutes);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,12 +131,42 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
 
-          // 句子总数
-          Text(
-            l10n.intensiveListenBriefingSentenceCount(sentenceCount),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          // 句子总数 + 预估时长
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                l10n.intensiveListenBriefingSentenceCount(sentenceCount),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (estimatedDuration != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s,
+                  ),
+                  child: Text(
+                    '·',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.timer_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: AppSpacing.l),
 

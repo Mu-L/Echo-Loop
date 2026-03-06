@@ -137,10 +137,14 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       return;
     }
 
+    // 预估时长
+    final estimatedDuration = _estimateReviewDuration(subStage);
+
     showReviewBriefingSheet(
       context: context,
       stage: progress.currentStage,
       subStage: subStage,
+      estimatedDuration: estimatedDuration,
       onStartPractice: () {
         switch (subStage) {
           case SubStageType.blindListen:
@@ -155,6 +159,29 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         }
       },
     );
+  }
+
+  /// 预估复习子步骤时长
+  Duration? _estimateReviewDuration(SubStageType subStage) {
+    switch (subStage) {
+      case SubStageType.blindListen:
+        // 盲听 = 音频时长
+        return ref.read(audioEngineProvider).totalDuration;
+      case SubStageType.reviewDifficultPractice:
+        // 难句补练 = 难句总时长 × 2（盲听 + 跟读）
+        final lpState = ref.read(listeningPracticeProvider);
+        final difficultDuration = lpState.sentences
+            .where((s) => s.isBookmarked)
+            .fold<Duration>(Duration.zero, (sum, s) => sum + s.duration);
+        if (difficultDuration == Duration.zero) return null;
+        return difficultDuration * 2;
+      case SubStageType.reviewRetellSummary:
+        // 全文总结复述 = 音频时长 × 4（听 + 停顿复述）
+        final totalDuration = ref.read(audioEngineProvider).totalDuration;
+        return totalDuration != null ? totalDuration * 4 : null;
+      default:
+        return null;
+    }
   }
 
   /// 复习盲听：复用 BlindListenPlayerScreen，1 遍、无难度选择
@@ -281,6 +308,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       isFirstStudy: isFirstStudy,
       reviewRound: reviewRound,
       audioDuration: totalDuration,
+      estimatedDuration: totalDuration,
       onStartPractice: () async {
         await ref
             .read(learningSessionProvider.notifier)
@@ -320,9 +348,17 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       return;
     }
 
+    // 预估时长：每句 = 句子时长 × 2（听 + 停顿处理）
+    final totalSentenceDuration = lpState.sentences.fold<Duration>(
+      Duration.zero,
+      (sum, s) => sum + s.duration,
+    );
+    final intensiveEstimate = totalSentenceDuration * 2;
+
     showIntensiveListenBriefingSheet(
       context: context,
       sentenceCount: lpState.sentences.length,
+      estimatedDuration: intensiveEstimate,
       onStartPractice: () async {
         await ref
             .read(learningSessionProvider.notifier)
@@ -385,10 +421,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         progress?.difficulty.index ?? 2,
       );
 
+      // 预估时长：难句总时长 × 遍数 × 2（播放 + 跟读留白）
+      final difficultDuration = difficultIndices.fold<Duration>(
+        Duration.zero,
+        (sum, idx) =>
+            sum +
+            (idx < lpState.sentences.length
+                ? lpState.sentences[idx].duration
+                : Duration.zero),
+      );
+      final repeatEstimate = difficultDuration * playCount * 2;
+
       showListenAndRepeatBriefingSheet(
         context: context,
         difficultCount: difficultIndices.length,
         playCount: playCount,
+        estimatedDuration: repeatEstimate,
         onStartPractice: () async {
           await ref
               .read(learningSessionProvider.notifier)

@@ -13,6 +13,7 @@ Future<void> showListenAndRepeatBriefingSheet({
   required BuildContext context,
   required int difficultCount,
   required int playCount,
+  Duration? estimatedDuration,
   required VoidCallback onStartPractice,
 }) {
   return showModalBottomSheet(
@@ -24,6 +25,7 @@ Future<void> showListenAndRepeatBriefingSheet({
     builder: (context) => ListenAndRepeatBriefingSheet(
       difficultCount: difficultCount,
       playCount: playCount,
+      estimatedDuration: estimatedDuration,
       onStartPractice: onStartPractice,
     ),
   );
@@ -37,6 +39,9 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
   /// 每句播放遍数
   final int playCount;
 
+  /// 预估练习时长
+  final Duration? estimatedDuration;
+
   /// 开始练习回调
   final VoidCallback onStartPractice;
 
@@ -44,8 +49,16 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
     super.key,
     required this.difficultCount,
     required this.playCount,
+    this.estimatedDuration,
     required this.onStartPractice,
   });
+
+  /// 格式化预估时长
+  String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
+    final minutes = (duration.inSeconds / 60).ceil();
+    if (minutes < 1) return l10n.estimatedLessThanOneMinute;
+    return l10n.estimatedMinutes(minutes);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +141,7 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
 
-          // 难句数量 + 遍数信息
+          // 难句数量 + 遍数 + 预估时长
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -138,20 +151,46 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: AppSpacing.m),
-              Text(
-                '·',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+                child: Text(
+                  '·',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.m),
               Text(
                 l10n.listenAndRepeatBriefingPlayCount(playCount),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (estimatedDuration != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s,
+                  ),
+                  child: Text(
+                    '·',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.timer_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.l),

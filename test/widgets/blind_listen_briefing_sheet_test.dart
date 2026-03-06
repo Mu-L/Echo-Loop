@@ -94,7 +94,7 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Duration: 3:45'), findsOneWidget);
+      expect(find.text('3:45'), findsOneWidget);
     });
 
     testWidgets('无音频时长时不显示时长行', (tester) async {
@@ -118,7 +118,8 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Duration'), findsNothing);
+      // 无音频时长时不显示 music_note 图标
+      expect(find.byIcon(Icons.music_note), findsNothing);
     });
   });
 }
