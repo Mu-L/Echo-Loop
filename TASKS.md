@@ -232,6 +232,16 @@
 
   **完成时间**: 2026-03-08
 
+## 已完成：Milestone 3 测试覆盖补充
+- [x] FavoritesScreen Widget 测试（15 个）— 句子/单词视图切换、空状态、音频分组、时间戳、收藏图标、练习按钮、中文本地化
+- [x] BookmarkReviewScreen Widget 测试（24 个）— 盲听/跟读模式 UI、进度显示、偷看字幕、完成弹窗、中文本地化
+- [x] 偷看字幕点击切换交互测试（7 个）— IntensiveListenPlayer 4 个 + ReviewDifficultPractice 3 个
+- [x] DifficultPracticeSettingsSheet Widget 测试（10 个）— 标题/提示、循环次数、停顿模式切换、中文本地化
+- [x] StudyStatsHeader Widget 测试（9 个）— 统计卡片、时间格式化、柱状图条件渲染、中文本地化
+- [x] TestReviewDifficultPractice 补充 updateSettings 方法
+
+  **完成时间**: 2026-03-09
+
 ## 优化UI，使得用户看起来更舒服而不单调
 - 支持自定义背景、背景音
 
