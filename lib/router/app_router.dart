@@ -21,6 +21,7 @@ import '../screens/intensive_listen_player_screen.dart';
 import '../screens/listen_and_repeat_player_screen.dart';
 import '../screens/retell_player_screen.dart';
 import '../screens/review_difficult_practice_screen.dart';
+import '../screens/bookmark_review_screen.dart';
 import 'main_shell.dart';
 
 /// 全局根导航器 key
@@ -74,6 +75,9 @@ abstract class AppRoutes {
 
   /// 独立音频播放器页路径（不依赖合集）
   static String audioPlayer(String audioId) => '/audio/$audioId/player';
+
+  /// 收藏句子复习页路径
+  static const bookmarkReview = '/bookmark-review';
 
   /// 难句补练页路径
   static String reviewDifficultPractice(
@@ -132,6 +136,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      // 收藏句子复习（全屏）
+      GoRoute(
+        path: '/bookmark-review',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const BookmarkReviewScreen(),
       ),
       // 独立音频路由（不依赖合集）
       GoRoute(

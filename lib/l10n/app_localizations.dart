@@ -2291,7 +2291,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteSubtitleWarning.
   ///
   /// In en, this message translates to:
-  /// **'Deleting the subtitle will affect learning progress.'**
+  /// **'Deleting the subtitle will also remove all bookmarked sentences for this audio.'**
   String get deleteSubtitleWarning;
 
   /// No description provided for @languageMulti.
@@ -2551,6 +2551,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{reviewName} - {subStage}'**
   String subStageLabelReview(String reviewName, String subStage);
+
+  /// No description provided for @favoritesSentences.
+  ///
+  /// In en, this message translates to:
+  /// **'Sentences'**
+  String get favoritesSentences;
+
+  /// No description provided for @favoritesWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Words'**
+  String get favoritesWords;
+
+  /// No description provided for @favoritesNoSentences.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved sentences yet'**
+  String get favoritesNoSentences;
+
+  /// No description provided for @favoritesNoSentencesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark difficult sentences during intensive listening or shadowing'**
+  String get favoritesNoSentencesHint;
+
+  /// No description provided for @favoritesNoWords.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved words yet'**
+  String get favoritesNoWords;
+
+  /// No description provided for @favoritesNoWordsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a word during learning to look it up and save it'**
+  String get favoritesNoWordsHint;
+
+  /// No description provided for @favoritesBookmarkCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sentences'**
+  String favoritesBookmarkCount(int count);
+
+  /// No description provided for @favoritesWordSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Word saved'**
+  String get favoritesWordSaved;
+
+  /// No description provided for @favoritesWordRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Word removed'**
+  String get favoritesWordRemoved;
+
+  /// No description provided for @favoritesBookmarkRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark removed'**
+  String get favoritesBookmarkRemoved;
+
+  /// No description provided for @favoritesSaveWord.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Word'**
+  String get favoritesSaveWord;
+
+  /// No description provided for @favoritesUnsaveWord.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Saved Word'**
+  String get favoritesUnsaveWord;
+
+  /// No description provided for @bookmarkReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark Review'**
+  String get bookmarkReviewTitle;
+
+  /// No description provided for @bookmarkReviewStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Review'**
+  String get bookmarkReviewStart;
+
+  /// No description provided for @bookmarkReviewStartCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Review ({count})'**
+  String bookmarkReviewStartCount(int count);
+
+  /// No description provided for @bookmarkReviewComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Complete'**
+  String get bookmarkReviewComplete;
+
+  /// No description provided for @bookmarkReviewCompleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reviewed all {count} bookmarked sentences.'**
+  String bookmarkReviewCompleteMessage(int count);
+
+  /// No description provided for @bookmarkReviewAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Again'**
+  String get bookmarkReviewAgain;
+
+  /// No description provided for @bookmarkReviewAudioSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio unavailable, skipping this sentence'**
+  String get bookmarkReviewAudioSkipped;
+
+  /// No description provided for @bookmarkReviewFromAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'From: {name}'**
+  String bookmarkReviewFromAudio(String name);
+
+  /// No description provided for @bookmarkReviewProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{current}/{total} sentences'**
+  String bookmarkReviewProgress(int current, int total);
 }
 
 class _AppLocalizationsDelegate

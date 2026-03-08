@@ -692,7 +692,7 @@
     "placeholders": { "maxMin": { "type": "int" } }
   },
   "deleteSubtitleConfirm": "Are you sure you want to delete the subtitle?",
-  "deleteSubtitleWarning": "Deleting the subtitle will affect learning progress.",
+  "deleteSubtitleWarning": "Deleting the subtitle will also remove all bookmarked sentences for this audio.",
   "languageMulti": "Mixed Languages",
   "selectLanguage": "Select Language",
   "overwriteExistingSubtitle": "Overwrite existing subtitle?",
@@ -804,6 +804,47 @@
     "placeholders": {
       "reviewName": { "type": "String" },
       "subStage": { "type": "String" }
+    }
+  },
+
+  "favoritesSentences": "Sentences",
+  "favoritesWords": "Words",
+  "favoritesNoSentences": "No saved sentences yet",
+  "favoritesNoSentencesHint": "Mark difficult sentences during intensive listening or shadowing",
+  "favoritesNoWords": "No saved words yet",
+  "favoritesNoWordsHint": "Tap a word during learning to look it up and save it",
+  "favoritesBookmarkCount": "{count} sentences",
+  "@favoritesBookmarkCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "favoritesWordSaved": "Word saved",
+  "favoritesWordRemoved": "Word removed",
+  "favoritesBookmarkRemoved": "Bookmark removed",
+  "favoritesSaveWord": "Save Word",
+  "favoritesUnsaveWord": "Remove Saved Word",
+
+  "bookmarkReviewTitle": "Bookmark Review",
+  "bookmarkReviewStart": "Start Review",
+  "bookmarkReviewStartCount": "Start Review ({count})",
+  "@bookmarkReviewStartCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "bookmarkReviewComplete": "Review Complete",
+  "bookmarkReviewCompleteMessage": "You've reviewed all {count} bookmarked sentences.",
+  "@bookmarkReviewCompleteMessage": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "bookmarkReviewAgain": "Review Again",
+  "bookmarkReviewAudioSkipped": "Audio unavailable, skipping this sentence",
+  "bookmarkReviewFromAudio": "From: {name}",
+  "@bookmarkReviewFromAudio": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "bookmarkReviewProgress": "{current}/{total} sentences",
+  "@bookmarkReviewProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
     }
   }
 }

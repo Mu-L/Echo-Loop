@@ -1222,7 +1222,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteSubtitleConfirm => '确定删除字幕？';
 
   @override
-  String get deleteSubtitleWarning => '删除字幕将影响学习进度。';
+  String get deleteSubtitleWarning => '删除字幕将同时删除该音频的所有收藏句子。';
 
   @override
   String get languageMulti => '混合语言';
@@ -1385,5 +1385,78 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String subStageLabelReview(String reviewName, String subStage) {
     return '$reviewName - $subStage';
+  }
+
+  @override
+  String get favoritesSentences => '句子';
+
+  @override
+  String get favoritesWords => '单词';
+
+  @override
+  String get favoritesNoSentences => '暂无收藏句子';
+
+  @override
+  String get favoritesNoSentencesHint => '在精听或跟读中标记难句';
+
+  @override
+  String get favoritesNoWords => '暂无收藏单词';
+
+  @override
+  String get favoritesNoWordsHint => '在学习中点击单词查词并收藏';
+
+  @override
+  String favoritesBookmarkCount(int count) {
+    return '$count 个句子';
+  }
+
+  @override
+  String get favoritesWordSaved => '已收藏';
+
+  @override
+  String get favoritesWordRemoved => '已取消收藏';
+
+  @override
+  String get favoritesBookmarkRemoved => '已取消收藏';
+
+  @override
+  String get favoritesSaveWord => '收藏单词';
+
+  @override
+  String get favoritesUnsaveWord => '取消收藏';
+
+  @override
+  String get bookmarkReviewTitle => '收藏复习';
+
+  @override
+  String get bookmarkReviewStart => '开始复习';
+
+  @override
+  String bookmarkReviewStartCount(int count) {
+    return '开始复习 ($count)';
+  }
+
+  @override
+  String get bookmarkReviewComplete => '复习完成';
+
+  @override
+  String bookmarkReviewCompleteMessage(int count) {
+    return '已复习全部 $count 个收藏句子。';
+  }
+
+  @override
+  String get bookmarkReviewAgain => '再来一遍';
+
+  @override
+  String get bookmarkReviewAudioSkipped => '音频不可用，跳过该句';
+
+  @override
+  String bookmarkReviewFromAudio(String name) {
+    return '来自：$name';
+  }
+
+  @override
+  String bookmarkReviewProgress(int current, int total) {
+    return '$current/$total 句';
   }
 }

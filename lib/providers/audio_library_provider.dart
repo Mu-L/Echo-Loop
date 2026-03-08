@@ -198,6 +198,11 @@ class AudioLibrary extends _$AudioLibrary {
       audioItems: state.audioItems.where((item) => item.id != id).toList(),
     );
 
+    // 清除收藏单词的上下文信息（sentenceText/sentenceIndex 非 FK 字段，需手动置 NULL）
+    // 必须在 hardDelete 之前调用，因为 hardDelete 的 CASCADE 会将 audioItemId SET NULL
+    final savedWordDao = ref.read(savedWordDaoProvider);
+    await savedWordDao.clearContextForAudio(id);
+
     // 硬删除（CASCADE 会自动清理 junction、bookmarks、playback_states、learning_progresses）
     final dao = ref.read(audioItemDaoProvider);
     await dao.hardDelete(id);

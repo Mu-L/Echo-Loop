@@ -1255,7 +1255,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteSubtitleWarning =>
-      'Deleting the subtitle will affect learning progress.';
+      'Deleting the subtitle will also remove all bookmarked sentences for this audio.';
 
   @override
   String get languageMulti => 'Mixed Languages';
@@ -1419,5 +1419,81 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String subStageLabelReview(String reviewName, String subStage) {
     return '$reviewName - $subStage';
+  }
+
+  @override
+  String get favoritesSentences => 'Sentences';
+
+  @override
+  String get favoritesWords => 'Words';
+
+  @override
+  String get favoritesNoSentences => 'No saved sentences yet';
+
+  @override
+  String get favoritesNoSentencesHint =>
+      'Mark difficult sentences during intensive listening or shadowing';
+
+  @override
+  String get favoritesNoWords => 'No saved words yet';
+
+  @override
+  String get favoritesNoWordsHint =>
+      'Tap a word during learning to look it up and save it';
+
+  @override
+  String favoritesBookmarkCount(int count) {
+    return '$count sentences';
+  }
+
+  @override
+  String get favoritesWordSaved => 'Word saved';
+
+  @override
+  String get favoritesWordRemoved => 'Word removed';
+
+  @override
+  String get favoritesBookmarkRemoved => 'Bookmark removed';
+
+  @override
+  String get favoritesSaveWord => 'Save Word';
+
+  @override
+  String get favoritesUnsaveWord => 'Remove Saved Word';
+
+  @override
+  String get bookmarkReviewTitle => 'Bookmark Review';
+
+  @override
+  String get bookmarkReviewStart => 'Start Review';
+
+  @override
+  String bookmarkReviewStartCount(int count) {
+    return 'Start Review ($count)';
+  }
+
+  @override
+  String get bookmarkReviewComplete => 'Review Complete';
+
+  @override
+  String bookmarkReviewCompleteMessage(int count) {
+    return 'You\'ve reviewed all $count bookmarked sentences.';
+  }
+
+  @override
+  String get bookmarkReviewAgain => 'Review Again';
+
+  @override
+  String get bookmarkReviewAudioSkipped =>
+      'Audio unavailable, skipping this sentence';
+
+  @override
+  String bookmarkReviewFromAudio(String name) {
+    return 'From: $name';
+  }
+
+  @override
+  String bookmarkReviewProgress(int current, int total) {
+    return '$current/$total sentences';
   }
 }

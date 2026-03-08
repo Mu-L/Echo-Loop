@@ -539,7 +539,7 @@
   "transcriptionErrorFileTooLarge": "文件过大（最大 {maxMb}MB）",
   "transcriptionErrorTooLong": "音频过长（最长 {maxMin} 分钟）",
   "deleteSubtitleConfirm": "确定删除字幕？",
-  "deleteSubtitleWarning": "删除字幕将影响学习进度。",
+  "deleteSubtitleWarning": "删除字幕将同时删除该音频的所有收藏句子。",
   "languageMulti": "混合语言",
   "selectLanguage": "选择语言",
   "overwriteExistingSubtitle": "覆盖现有字幕？",
@@ -594,5 +594,28 @@
   "availableInDays": "{count} 天后",
   "availableInHours": "{count} 小时后",
   "subStageLabelFirstLearn": "首学 - {subStage}",
-  "subStageLabelReview": "{reviewName} - {subStage}"
+  "subStageLabelReview": "{reviewName} - {subStage}",
+
+  "favoritesSentences": "句子",
+  "favoritesWords": "单词",
+  "favoritesNoSentences": "暂无收藏句子",
+  "favoritesNoSentencesHint": "在精听或跟读中标记难句",
+  "favoritesNoWords": "暂无收藏单词",
+  "favoritesNoWordsHint": "在学习中点击单词查词并收藏",
+  "favoritesBookmarkCount": "{count} 个句子",
+  "favoritesWordSaved": "已收藏",
+  "favoritesWordRemoved": "已取消收藏",
+  "favoritesBookmarkRemoved": "已取消收藏",
+  "favoritesSaveWord": "收藏单词",
+  "favoritesUnsaveWord": "取消收藏",
+
+  "bookmarkReviewTitle": "收藏复习",
+  "bookmarkReviewStart": "开始复习",
+  "bookmarkReviewStartCount": "开始复习 ({count})",
+  "bookmarkReviewComplete": "复习完成",
+  "bookmarkReviewCompleteMessage": "已复习全部 {count} 个收藏句子。",
+  "bookmarkReviewAgain": "再来一遍",
+  "bookmarkReviewAudioSkipped": "音频不可用，跳过该句",
+  "bookmarkReviewFromAudio": "来自：{name}",
+  "bookmarkReviewProgress": "{current}/{total} 句"
 }
