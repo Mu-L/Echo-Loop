@@ -15,6 +15,7 @@ import 'tables/stage_completions.dart';
 import 'tables/tags.dart';
 import 'tables/audio_item_tags.dart';
 import 'tables/sentence_ai_cache.dart';
+import 'tables/saved_words.dart';
 import 'daos/audio_item_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/bookmark_dao.dart';
@@ -23,12 +24,14 @@ import 'daos/learning_progress_dao.dart';
 import 'daos/stage_completion_dao.dart';
 import 'daos/tag_dao.dart';
 import 'daos/sentence_ai_cache_dao.dart';
+import 'daos/saved_word_dao.dart';
 
 part 'app_database.g.dart';
 
 /// Fluency 应用数据库
-/// 包含 9 张表：audio_items, collections, collection_audio_items, bookmarks,
-/// playback_states, learning_progresses, stage_completions, tags, audio_item_tags
+/// 包含 11 张表：audio_items, collections, collection_audio_items, bookmarks,
+/// playback_states, learning_progresses, stage_completions, tags, audio_item_tags,
+/// sentence_ai_cache, saved_words
 @DriftDatabase(
   tables: [
     AudioItems,
@@ -41,6 +44,7 @@ part 'app_database.g.dart';
     Tags,
     AudioItemTags,
     SentenceAiCache,
+    SavedWords,
   ],
   daos: [
     AudioItemDao,
@@ -51,13 +55,14 @@ part 'app_database.g.dart';
     StageCompletionDao,
     TagDao,
     SentenceAiCacheDao,
+    SavedWordDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration {
@@ -92,6 +97,28 @@ class AppDatabase extends _$AppDatabase {
         // v13→v14：新增 sentence_ai_cache 表（AI 翻译/解析缓存）
         if (from < 14) {
           await m.createTable(sentenceAiCache);
+        }
+        // v14→v15：新增 saved_words 表（收藏单词）
+        if (from < 15) {
+          await m.createTable(savedWords);
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_saved_words_active
+            ON saved_words(created_at DESC)
+            WHERE deleted_at IS NULL
+          ''');
+        }
+        // v15→v16：saved_words 新增 sentence_start_ms, sentence_end_ms 列
+        if (from >= 15 && from < 16) {
+          await _addColumnIfNotExists(
+            'saved_words',
+            'sentence_start_ms',
+            'INTEGER',
+          );
+          await _addColumnIfNotExists(
+            'saved_words',
+            'sentence_end_ms',
+            'INTEGER',
+          );
         }
         // v12→v13：audio_items 新增 transcript_source, audio_sha256, transcript_language 列
         if (from < 13) {
@@ -207,6 +234,13 @@ class AppDatabase extends _$AppDatabase {
     await customStatement('''
       CREATE INDEX IF NOT EXISTS idx_audio_item_tags_reverse
       ON audio_item_tags(audio_item_id)
+    ''');
+
+    // 收藏单词按时间倒序（排除已删除）
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS idx_saved_words_active
+      ON saved_words(created_at DESC)
+      WHERE deleted_at IS NULL
     ''');
   }
 }

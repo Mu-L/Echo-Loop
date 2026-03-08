@@ -1,13 +1,30 @@
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../tables/audio_items.dart';
 import '../tables/bookmarks.dart';
 
 part 'bookmark_dao.g.dart';
 
+/// 书签 + 音频名称的复合数据类
+///
+/// 用于 Favorites 页面按音频分组展示收藏句子。
+class BookmarkWithAudio {
+  /// 书签数据
+  final Bookmark bookmark;
+
+  /// 音频名称
+  final String audioName;
+
+  const BookmarkWithAudio({
+    required this.bookmark,
+    required this.audioName,
+  });
+}
+
 /// 书签 DAO
 /// 提供书签的 CRUD 操作
-@DriftAccessor(tables: [Bookmarks])
+@DriftAccessor(tables: [Bookmarks, AudioItems])
 class BookmarkDao extends DatabaseAccessor<AppDatabase>
     with _$BookmarkDaoMixin {
   BookmarkDao(super.db);
@@ -94,5 +111,32 @@ class BookmarkDao extends DatabaseAccessor<AppDatabase>
             ))
             .get();
     return rows.map((r) => r.sentenceIndex).toSet();
+  }
+
+  /// 监听所有未删除书签（含音频名称），按音频分组
+  ///
+  /// JOIN audio_items 获取音频名称，用于 Favorites 页面展示。
+  /// 音频已删除（CASCADE）的书签不会出现在结果中。
+  Stream<List<BookmarkWithAudio>> watchAllWithAudioName() {
+    final query = select(bookmarks).join([
+      innerJoin(
+        audioItems,
+        audioItems.id.equalsExp(bookmarks.audioItemId),
+      ),
+    ])
+      ..where(bookmarks.deletedAt.isNull() & audioItems.deletedAt.isNull())
+      ..orderBy([
+        OrderingTerm.asc(audioItems.name),
+        OrderingTerm.asc(bookmarks.sentenceIndex),
+      ]);
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        return BookmarkWithAudio(
+          bookmark: row.readTable(bookmarks),
+          audioName: row.readTable(audioItems).name,
+        );
+      }).toList();
+    });
   }
 }

@@ -9,6 +9,7 @@ import 'daos/learning_progress_dao.dart';
 import 'daos/stage_completion_dao.dart';
 import 'daos/tag_dao.dart';
 import 'daos/sentence_ai_cache_dao.dart';
+import 'daos/saved_word_dao.dart';
 
 /// 数据库 Provider
 /// 在 main.dart 中通过 ProviderScope override 注入实例
@@ -54,4 +55,9 @@ final tagDaoProvider = Provider<TagDao>((ref) {
 /// SentenceAiCache DAO Provider
 final sentenceAiCacheDaoProvider = Provider<SentenceAiCacheDao>((ref) {
   return ref.watch(appDatabaseProvider).sentenceAiCacheDao;
+});
+
+/// SavedWord DAO Provider
+final savedWordDaoProvider = Provider<SavedWordDao>((ref) {
+  return ref.watch(appDatabaseProvider).savedWordDao;
 });

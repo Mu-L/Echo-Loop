@@ -5567,6 +5567,712 @@ class SentenceAiCacheCompanion extends UpdateCompanion<SentenceAiCacheData> {
   }
 }
 
+class $SavedWordsTable extends SavedWords
+    with TableInfo<$SavedWordsTable, SavedWord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SavedWordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _wordMeta = const VerificationMeta('word');
+  @override
+  late final GeneratedColumn<String> word = GeneratedColumn<String>(
+    'word',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _audioItemIdMeta = const VerificationMeta(
+    'audioItemId',
+  );
+  @override
+  late final GeneratedColumn<String> audioItemId = GeneratedColumn<String>(
+    'audio_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES audio_items (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _sentenceIndexMeta = const VerificationMeta(
+    'sentenceIndex',
+  );
+  @override
+  late final GeneratedColumn<int> sentenceIndex = GeneratedColumn<int>(
+    'sentence_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sentenceTextMeta = const VerificationMeta(
+    'sentenceText',
+  );
+  @override
+  late final GeneratedColumn<String> sentenceText = GeneratedColumn<String>(
+    'sentence_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sentenceStartMsMeta = const VerificationMeta(
+    'sentenceStartMs',
+  );
+  @override
+  late final GeneratedColumn<int> sentenceStartMs = GeneratedColumn<int>(
+    'sentence_start_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sentenceEndMsMeta = const VerificationMeta(
+    'sentenceEndMs',
+  );
+  @override
+  late final GeneratedColumn<int> sentenceEndMs = GeneratedColumn<int>(
+    'sentence_end_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<int> syncStatus = GeneratedColumn<int>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    word,
+    audioItemId,
+    sentenceIndex,
+    sentenceText,
+    sentenceStartMs,
+    sentenceEndMs,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    syncStatus,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'saved_words';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SavedWord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('word')) {
+      context.handle(
+        _wordMeta,
+        word.isAcceptableOrUnknown(data['word']!, _wordMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wordMeta);
+    }
+    if (data.containsKey('audio_item_id')) {
+      context.handle(
+        _audioItemIdMeta,
+        audioItemId.isAcceptableOrUnknown(
+          data['audio_item_id']!,
+          _audioItemIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sentence_index')) {
+      context.handle(
+        _sentenceIndexMeta,
+        sentenceIndex.isAcceptableOrUnknown(
+          data['sentence_index']!,
+          _sentenceIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sentence_text')) {
+      context.handle(
+        _sentenceTextMeta,
+        sentenceText.isAcceptableOrUnknown(
+          data['sentence_text']!,
+          _sentenceTextMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sentence_start_ms')) {
+      context.handle(
+        _sentenceStartMsMeta,
+        sentenceStartMs.isAcceptableOrUnknown(
+          data['sentence_start_ms']!,
+          _sentenceStartMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sentence_end_ms')) {
+      context.handle(
+        _sentenceEndMsMeta,
+        sentenceEndMs.isAcceptableOrUnknown(
+          data['sentence_end_ms']!,
+          _sentenceEndMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SavedWord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SavedWord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      word: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}word'],
+      )!,
+      audioItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_item_id'],
+      ),
+      sentenceIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sentence_index'],
+      ),
+      sentenceText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sentence_text'],
+      ),
+      sentenceStartMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sentence_start_ms'],
+      ),
+      sentenceEndMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sentence_end_ms'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sync_status'],
+      )!,
+    );
+  }
+
+  @override
+  $SavedWordsTable createAlias(String alias) {
+    return $SavedWordsTable(attachedDatabase, alias);
+  }
+}
+
+class SavedWord extends DataClass implements Insertable<SavedWord> {
+  /// 自增主键
+  final int id;
+
+  /// 单词原形（小写，lemmatized），全局唯一
+  final String word;
+
+  /// 来源音频 ID，FK → audio_items，音频删除时置空
+  final String? audioItemId;
+
+  /// 来源句子索引
+  final int? sentenceIndex;
+
+  /// 来源句子文本（冗余存储，防止索引错位或音频删除后丢失上下文）
+  final String? sentenceText;
+
+  /// 来源句子起始时间（毫秒），冗余存储，删除字幕后仍可播放
+  final int? sentenceStartMs;
+
+  /// 来源句子结束时间（毫秒），冗余存储，删除字幕后仍可播放
+  final int? sentenceEndMs;
+
+  /// 收藏时间
+  final DateTime createdAt;
+
+  /// 最后修改时间
+  final DateTime updatedAt;
+
+  /// 软删除标记
+  final DateTime? deletedAt;
+
+  /// 同步状态（预留）
+  final int syncStatus;
+  const SavedWord({
+    required this.id,
+    required this.word,
+    this.audioItemId,
+    this.sentenceIndex,
+    this.sentenceText,
+    this.sentenceStartMs,
+    this.sentenceEndMs,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.syncStatus,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['word'] = Variable<String>(word);
+    if (!nullToAbsent || audioItemId != null) {
+      map['audio_item_id'] = Variable<String>(audioItemId);
+    }
+    if (!nullToAbsent || sentenceIndex != null) {
+      map['sentence_index'] = Variable<int>(sentenceIndex);
+    }
+    if (!nullToAbsent || sentenceText != null) {
+      map['sentence_text'] = Variable<String>(sentenceText);
+    }
+    if (!nullToAbsent || sentenceStartMs != null) {
+      map['sentence_start_ms'] = Variable<int>(sentenceStartMs);
+    }
+    if (!nullToAbsent || sentenceEndMs != null) {
+      map['sentence_end_ms'] = Variable<int>(sentenceEndMs);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['sync_status'] = Variable<int>(syncStatus);
+    return map;
+  }
+
+  SavedWordsCompanion toCompanion(bool nullToAbsent) {
+    return SavedWordsCompanion(
+      id: Value(id),
+      word: Value(word),
+      audioItemId: audioItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioItemId),
+      sentenceIndex: sentenceIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentenceIndex),
+      sentenceText: sentenceText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentenceText),
+      sentenceStartMs: sentenceStartMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentenceStartMs),
+      sentenceEndMs: sentenceEndMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentenceEndMs),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      syncStatus: Value(syncStatus),
+    );
+  }
+
+  factory SavedWord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SavedWord(
+      id: serializer.fromJson<int>(json['id']),
+      word: serializer.fromJson<String>(json['word']),
+      audioItemId: serializer.fromJson<String?>(json['audioItemId']),
+      sentenceIndex: serializer.fromJson<int?>(json['sentenceIndex']),
+      sentenceText: serializer.fromJson<String?>(json['sentenceText']),
+      sentenceStartMs: serializer.fromJson<int?>(json['sentenceStartMs']),
+      sentenceEndMs: serializer.fromJson<int?>(json['sentenceEndMs']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      syncStatus: serializer.fromJson<int>(json['syncStatus']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'word': serializer.toJson<String>(word),
+      'audioItemId': serializer.toJson<String?>(audioItemId),
+      'sentenceIndex': serializer.toJson<int?>(sentenceIndex),
+      'sentenceText': serializer.toJson<String?>(sentenceText),
+      'sentenceStartMs': serializer.toJson<int?>(sentenceStartMs),
+      'sentenceEndMs': serializer.toJson<int?>(sentenceEndMs),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'syncStatus': serializer.toJson<int>(syncStatus),
+    };
+  }
+
+  SavedWord copyWith({
+    int? id,
+    String? word,
+    Value<String?> audioItemId = const Value.absent(),
+    Value<int?> sentenceIndex = const Value.absent(),
+    Value<String?> sentenceText = const Value.absent(),
+    Value<int?> sentenceStartMs = const Value.absent(),
+    Value<int?> sentenceEndMs = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? syncStatus,
+  }) => SavedWord(
+    id: id ?? this.id,
+    word: word ?? this.word,
+    audioItemId: audioItemId.present ? audioItemId.value : this.audioItemId,
+    sentenceIndex: sentenceIndex.present
+        ? sentenceIndex.value
+        : this.sentenceIndex,
+    sentenceText: sentenceText.present ? sentenceText.value : this.sentenceText,
+    sentenceStartMs: sentenceStartMs.present
+        ? sentenceStartMs.value
+        : this.sentenceStartMs,
+    sentenceEndMs: sentenceEndMs.present
+        ? sentenceEndMs.value
+        : this.sentenceEndMs,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+  );
+  SavedWord copyWithCompanion(SavedWordsCompanion data) {
+    return SavedWord(
+      id: data.id.present ? data.id.value : this.id,
+      word: data.word.present ? data.word.value : this.word,
+      audioItemId: data.audioItemId.present
+          ? data.audioItemId.value
+          : this.audioItemId,
+      sentenceIndex: data.sentenceIndex.present
+          ? data.sentenceIndex.value
+          : this.sentenceIndex,
+      sentenceText: data.sentenceText.present
+          ? data.sentenceText.value
+          : this.sentenceText,
+      sentenceStartMs: data.sentenceStartMs.present
+          ? data.sentenceStartMs.value
+          : this.sentenceStartMs,
+      sentenceEndMs: data.sentenceEndMs.present
+          ? data.sentenceEndMs.value
+          : this.sentenceEndMs,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedWord(')
+          ..write('id: $id, ')
+          ..write('word: $word, ')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('sentenceIndex: $sentenceIndex, ')
+          ..write('sentenceText: $sentenceText, ')
+          ..write('sentenceStartMs: $sentenceStartMs, ')
+          ..write('sentenceEndMs: $sentenceEndMs, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('syncStatus: $syncStatus')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    word,
+    audioItemId,
+    sentenceIndex,
+    sentenceText,
+    sentenceStartMs,
+    sentenceEndMs,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    syncStatus,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SavedWord &&
+          other.id == this.id &&
+          other.word == this.word &&
+          other.audioItemId == this.audioItemId &&
+          other.sentenceIndex == this.sentenceIndex &&
+          other.sentenceText == this.sentenceText &&
+          other.sentenceStartMs == this.sentenceStartMs &&
+          other.sentenceEndMs == this.sentenceEndMs &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.syncStatus == this.syncStatus);
+}
+
+class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
+  final Value<int> id;
+  final Value<String> word;
+  final Value<String?> audioItemId;
+  final Value<int?> sentenceIndex;
+  final Value<String?> sentenceText;
+  final Value<int?> sentenceStartMs;
+  final Value<int?> sentenceEndMs;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> syncStatus;
+  const SavedWordsCompanion({
+    this.id = const Value.absent(),
+    this.word = const Value.absent(),
+    this.audioItemId = const Value.absent(),
+    this.sentenceIndex = const Value.absent(),
+    this.sentenceText = const Value.absent(),
+    this.sentenceStartMs = const Value.absent(),
+    this.sentenceEndMs = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+  });
+  SavedWordsCompanion.insert({
+    this.id = const Value.absent(),
+    required String word,
+    this.audioItemId = const Value.absent(),
+    this.sentenceIndex = const Value.absent(),
+    this.sentenceText = const Value.absent(),
+    this.sentenceStartMs = const Value.absent(),
+    this.sentenceEndMs = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+  }) : word = Value(word),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<SavedWord> custom({
+    Expression<int>? id,
+    Expression<String>? word,
+    Expression<String>? audioItemId,
+    Expression<int>? sentenceIndex,
+    Expression<String>? sentenceText,
+    Expression<int>? sentenceStartMs,
+    Expression<int>? sentenceEndMs,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? syncStatus,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (word != null) 'word': word,
+      if (audioItemId != null) 'audio_item_id': audioItemId,
+      if (sentenceIndex != null) 'sentence_index': sentenceIndex,
+      if (sentenceText != null) 'sentence_text': sentenceText,
+      if (sentenceStartMs != null) 'sentence_start_ms': sentenceStartMs,
+      if (sentenceEndMs != null) 'sentence_end_ms': sentenceEndMs,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+    });
+  }
+
+  SavedWordsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? word,
+    Value<String?>? audioItemId,
+    Value<int?>? sentenceIndex,
+    Value<String?>? sentenceText,
+    Value<int?>? sentenceStartMs,
+    Value<int?>? sentenceEndMs,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? syncStatus,
+  }) {
+    return SavedWordsCompanion(
+      id: id ?? this.id,
+      word: word ?? this.word,
+      audioItemId: audioItemId ?? this.audioItemId,
+      sentenceIndex: sentenceIndex ?? this.sentenceIndex,
+      sentenceText: sentenceText ?? this.sentenceText,
+      sentenceStartMs: sentenceStartMs ?? this.sentenceStartMs,
+      sentenceEndMs: sentenceEndMs ?? this.sentenceEndMs,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (word.present) {
+      map['word'] = Variable<String>(word.value);
+    }
+    if (audioItemId.present) {
+      map['audio_item_id'] = Variable<String>(audioItemId.value);
+    }
+    if (sentenceIndex.present) {
+      map['sentence_index'] = Variable<int>(sentenceIndex.value);
+    }
+    if (sentenceText.present) {
+      map['sentence_text'] = Variable<String>(sentenceText.value);
+    }
+    if (sentenceStartMs.present) {
+      map['sentence_start_ms'] = Variable<int>(sentenceStartMs.value);
+    }
+    if (sentenceEndMs.present) {
+      map['sentence_end_ms'] = Variable<int>(sentenceEndMs.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<int>(syncStatus.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedWordsCompanion(')
+          ..write('id: $id, ')
+          ..write('word: $word, ')
+          ..write('audioItemId: $audioItemId, ')
+          ..write('sentenceIndex: $sentenceIndex, ')
+          ..write('sentenceText: $sentenceText, ')
+          ..write('sentenceStartMs: $sentenceStartMs, ')
+          ..write('sentenceEndMs: $sentenceEndMs, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('syncStatus: $syncStatus')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5586,6 +6292,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SentenceAiCacheTable sentenceAiCache = $SentenceAiCacheTable(
     this,
   );
+  late final $SavedWordsTable savedWords = $SavedWordsTable(this);
   late final AudioItemDao audioItemDao = AudioItemDao(this as AppDatabase);
   late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
@@ -5602,6 +6309,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final SentenceAiCacheDao sentenceAiCacheDao = SentenceAiCacheDao(
     this as AppDatabase,
   );
+  late final SavedWordDao savedWordDao = SavedWordDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5617,6 +6325,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tags,
     audioItemTags,
     sentenceAiCache,
+    savedWords,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5675,6 +6384,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('audio_item_tags', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'audio_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('saved_words', kind: UpdateKind.update)],
     ),
   ]);
 }
@@ -5855,6 +6571,27 @@ final class $$AudioItemsTableReferences
     ).filter((f) => f.audioItemId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_audioItemTagsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SavedWordsTable, List<SavedWord>>
+  _savedWordsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.savedWords,
+    aliasName: $_aliasNameGenerator(
+      db.audioItems.id,
+      db.savedWords.audioItemId,
+    ),
+  );
+
+  $$SavedWordsTableProcessedTableManager get savedWordsRefs {
+    final manager = $$SavedWordsTableTableManager(
+      $_db,
+      $_db.savedWords,
+    ).filter((f) => f.audioItemId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_savedWordsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -6086,6 +6823,31 @@ class $$AudioItemsTableFilterComposer
           }) => $$AudioItemTagsTableFilterComposer(
             $db: $db,
             $table: $db.audioItemTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> savedWordsRefs(
+    Expression<bool> Function($$SavedWordsTableFilterComposer f) f,
+  ) {
+    final $$SavedWordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.savedWords,
+      getReferencedColumn: (t) => t.audioItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedWordsTableFilterComposer(
+            $db: $db,
+            $table: $db.savedWords,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6400,6 +7162,31 @@ class $$AudioItemsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> savedWordsRefs<T extends Object>(
+    Expression<T> Function($$SavedWordsTableAnnotationComposer a) f,
+  ) {
+    final $$SavedWordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.savedWords,
+      getReferencedColumn: (t) => t.audioItemId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedWordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.savedWords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$AudioItemsTableTableManager
@@ -6422,6 +7209,7 @@ class $$AudioItemsTableTableManager
             bool learningProgressesRefs,
             bool stageCompletionsRefs,
             bool audioItemTagsRefs,
+            bool savedWordsRefs,
           })
         > {
   $$AudioItemsTableTableManager(_$AppDatabase db, $AudioItemsTable table)
@@ -6523,6 +7311,7 @@ class $$AudioItemsTableTableManager
                 learningProgressesRefs = false,
                 stageCompletionsRefs = false,
                 audioItemTagsRefs = false,
+                savedWordsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -6533,6 +7322,7 @@ class $$AudioItemsTableTableManager
                     if (learningProgressesRefs) db.learningProgresses,
                     if (stageCompletionsRefs) db.stageCompletions,
                     if (audioItemTagsRefs) db.audioItemTags,
+                    if (savedWordsRefs) db.savedWords,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -6663,6 +7453,27 @@ class $$AudioItemsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (savedWordsRefs)
+                        await $_getPrefetchedData<
+                          AudioItem,
+                          $AudioItemsTable,
+                          SavedWord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$AudioItemsTableReferences
+                              ._savedWordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$AudioItemsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).savedWordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.audioItemId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -6690,6 +7501,7 @@ typedef $$AudioItemsTableProcessedTableManager =
         bool learningProgressesRefs,
         bool stageCompletionsRefs,
         bool audioItemTagsRefs,
+        bool savedWordsRefs,
       })
     >;
 typedef $$CollectionsTableCreateCompanionBuilder =
@@ -10089,6 +10901,443 @@ typedef $$SentenceAiCacheTableProcessedTableManager =
       SentenceAiCacheData,
       PrefetchHooks Function()
     >;
+typedef $$SavedWordsTableCreateCompanionBuilder =
+    SavedWordsCompanion Function({
+      Value<int> id,
+      required String word,
+      Value<String?> audioItemId,
+      Value<int?> sentenceIndex,
+      Value<String?> sentenceText,
+      Value<int?> sentenceStartMs,
+      Value<int?> sentenceEndMs,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> syncStatus,
+    });
+typedef $$SavedWordsTableUpdateCompanionBuilder =
+    SavedWordsCompanion Function({
+      Value<int> id,
+      Value<String> word,
+      Value<String?> audioItemId,
+      Value<int?> sentenceIndex,
+      Value<String?> sentenceText,
+      Value<int?> sentenceStartMs,
+      Value<int?> sentenceEndMs,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> syncStatus,
+    });
+
+final class $$SavedWordsTableReferences
+    extends BaseReferences<_$AppDatabase, $SavedWordsTable, SavedWord> {
+  $$SavedWordsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $AudioItemsTable _audioItemIdTable(_$AppDatabase db) =>
+      db.audioItems.createAlias(
+        $_aliasNameGenerator(db.savedWords.audioItemId, db.audioItems.id),
+      );
+
+  $$AudioItemsTableProcessedTableManager? get audioItemId {
+    final $_column = $_itemColumn<String>('audio_item_id');
+    if ($_column == null) return null;
+    final manager = $$AudioItemsTableTableManager(
+      $_db,
+      $_db.audioItems,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_audioItemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SavedWordsTableFilterComposer
+    extends Composer<_$AppDatabase, $SavedWordsTable> {
+  $$SavedWordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get word => $composableBuilder(
+    column: $table.word,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sentenceIndex => $composableBuilder(
+    column: $table.sentenceIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sentenceText => $composableBuilder(
+    column: $table.sentenceText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sentenceStartMs => $composableBuilder(
+    column: $table.sentenceStartMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sentenceEndMs => $composableBuilder(
+    column: $table.sentenceEndMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$AudioItemsTableFilterComposer get audioItemId {
+    final $$AudioItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedWordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SavedWordsTable> {
+  $$SavedWordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get word => $composableBuilder(
+    column: $table.word,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sentenceIndex => $composableBuilder(
+    column: $table.sentenceIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sentenceText => $composableBuilder(
+    column: $table.sentenceText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sentenceStartMs => $composableBuilder(
+    column: $table.sentenceStartMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sentenceEndMs => $composableBuilder(
+    column: $table.sentenceEndMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$AudioItemsTableOrderingComposer get audioItemId {
+    final $$AudioItemsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableOrderingComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedWordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SavedWordsTable> {
+  $$SavedWordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get word =>
+      $composableBuilder(column: $table.word, builder: (column) => column);
+
+  GeneratedColumn<int> get sentenceIndex => $composableBuilder(
+    column: $table.sentenceIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sentenceText => $composableBuilder(
+    column: $table.sentenceText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sentenceStartMs => $composableBuilder(
+    column: $table.sentenceStartMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sentenceEndMs => $composableBuilder(
+    column: $table.sentenceEndMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  $$AudioItemsTableAnnotationComposer get audioItemId {
+    final $$AudioItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.audioItemId,
+      referencedTable: $db.audioItems,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.audioItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedWordsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SavedWordsTable,
+          SavedWord,
+          $$SavedWordsTableFilterComposer,
+          $$SavedWordsTableOrderingComposer,
+          $$SavedWordsTableAnnotationComposer,
+          $$SavedWordsTableCreateCompanionBuilder,
+          $$SavedWordsTableUpdateCompanionBuilder,
+          (SavedWord, $$SavedWordsTableReferences),
+          SavedWord,
+          PrefetchHooks Function({bool audioItemId})
+        > {
+  $$SavedWordsTableTableManager(_$AppDatabase db, $SavedWordsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SavedWordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SavedWordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SavedWordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> word = const Value.absent(),
+                Value<String?> audioItemId = const Value.absent(),
+                Value<int?> sentenceIndex = const Value.absent(),
+                Value<String?> sentenceText = const Value.absent(),
+                Value<int?> sentenceStartMs = const Value.absent(),
+                Value<int?> sentenceEndMs = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> syncStatus = const Value.absent(),
+              }) => SavedWordsCompanion(
+                id: id,
+                word: word,
+                audioItemId: audioItemId,
+                sentenceIndex: sentenceIndex,
+                sentenceText: sentenceText,
+                sentenceStartMs: sentenceStartMs,
+                sentenceEndMs: sentenceEndMs,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                syncStatus: syncStatus,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String word,
+                Value<String?> audioItemId = const Value.absent(),
+                Value<int?> sentenceIndex = const Value.absent(),
+                Value<String?> sentenceText = const Value.absent(),
+                Value<int?> sentenceStartMs = const Value.absent(),
+                Value<int?> sentenceEndMs = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> syncStatus = const Value.absent(),
+              }) => SavedWordsCompanion.insert(
+                id: id,
+                word: word,
+                audioItemId: audioItemId,
+                sentenceIndex: sentenceIndex,
+                sentenceText: sentenceText,
+                sentenceStartMs: sentenceStartMs,
+                sentenceEndMs: sentenceEndMs,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                syncStatus: syncStatus,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SavedWordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({audioItemId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (audioItemId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.audioItemId,
+                                referencedTable: $$SavedWordsTableReferences
+                                    ._audioItemIdTable(db),
+                                referencedColumn: $$SavedWordsTableReferences
+                                    ._audioItemIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SavedWordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SavedWordsTable,
+      SavedWord,
+      $$SavedWordsTableFilterComposer,
+      $$SavedWordsTableOrderingComposer,
+      $$SavedWordsTableAnnotationComposer,
+      $$SavedWordsTableCreateCompanionBuilder,
+      $$SavedWordsTableUpdateCompanionBuilder,
+      (SavedWord, $$SavedWordsTableReferences),
+      SavedWord,
+      PrefetchHooks Function({bool audioItemId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10112,4 +11361,6 @@ class $AppDatabaseManager {
       $$AudioItemTagsTableTableManager(_db, _db.audioItemTags);
   $$SentenceAiCacheTableTableManager get sentenceAiCache =>
       $$SentenceAiCacheTableTableManager(_db, _db.sentenceAiCache);
+  $$SavedWordsTableTableManager get savedWords =>
+      $$SavedWordsTableTableManager(_db, _db.savedWords);
 }
