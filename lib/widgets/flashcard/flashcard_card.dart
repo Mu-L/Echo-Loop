@@ -271,6 +271,8 @@ class _BackContentState extends ConsumerState<_BackContent> {
     if (widget.autoPlayWord) {
       await TtsService.instance.speak(widget.item.savedWord.word);
       if (!mounted) return;
+      // TTS 播完，计入 1 个输入词
+      ref.read(flashcardNotifierProvider.notifier).onWordPlayed();
     }
 
     // 自动播放来源例句
@@ -331,8 +333,13 @@ class _BackContentState extends ConsumerState<_BackContent> {
                             width: 32,
                             height: 32,
                             child: IconButton(
-                              onPressed: () =>
-                                  TtsService.instance.speak(word.word),
+                              onPressed: () async {
+                                await TtsService.instance.speak(word.word);
+                                if (!mounted) return;
+                                ref
+                                    .read(flashcardNotifierProvider.notifier)
+                                    .onWordPlayed();
+                              },
                               icon: const Icon(Icons.volume_up, size: 18),
                               color: theme.colorScheme.primary,
                               padding: EdgeInsets.zero,
@@ -504,6 +511,13 @@ class _BackContentState extends ConsumerState<_BackContent> {
 
       final sessionId = engine.newSession();
       await engine.playRangeOnce(startTime, endTime, sessionId);
+
+      // 例句播放完成，计入输入词数
+      if (mounted && word.sentenceText != null) {
+        ref
+            .read(flashcardNotifierProvider.notifier)
+            .onSentencePlayed(word.sentenceText!);
+      }
     } catch (_) {
       // 忽略播放错误（音频文件不存在等）
     } finally {

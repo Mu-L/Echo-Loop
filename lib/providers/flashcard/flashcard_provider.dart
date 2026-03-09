@@ -17,7 +17,10 @@ import '../../models/dict_entry.dart';
 import '../../models/flashcard_settings.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
 import '../../services/dictionary_service.dart';
+import '../../services/study_time_service.dart';
 import '../../services/tts_service.dart';
+import '../daily_study_time_provider.dart';
+import '../study_stats_provider.dart';
 import 'flashcard_timer.dart';
 
 part 'flashcard_provider.g.dart';
@@ -144,10 +147,17 @@ const _settingsKey = 'flashcard_settings';
 class FlashcardNotifier extends _$FlashcardNotifier {
   final FlashcardTimer _timer = FlashcardTimer();
 
+  /// 学习时长存储服务
+  final StudyTimeService _studyTimeService = StudyTimeService();
+
+  /// 学习计时器
+  final Stopwatch _studyStopwatch = Stopwatch();
+
   @override
   FlashcardState build() {
     ref.onDispose(() {
       _timer.cancel();
+      _saveAndRefreshStudyTime();
     });
     return const FlashcardState();
   }
@@ -174,6 +184,10 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       cardStartTime: DateTime.now(),
     );
 
+    // 启动学习计时
+    _studyStopwatch.reset();
+    _studyStopwatch.start();
+
     if (items.isNotEmpty) {
       // 预加载词典（当前 + 前后 2 张）
       _preloadDictionaries();
@@ -195,7 +209,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
     if (!wasShowingBack) {
       // 翻到背面：记录练习统计
-      // TTS + 例句由 _BackContent widget 自动处理
+      // 输入词数由 _BackContent 在 TTS/例句播放完成后计入
       _recordPracticeStats();
     } else {
       // 翻回正面：朗读单词
@@ -322,6 +336,22 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     await _saveSettings(newSettings);
   }
 
+  /// 单词 TTS 播放完成后计入 1 个输入词
+  ///
+  /// 由 _BackContent widget 在 TTS 朗读结束后调用。
+  Future<void> onWordPlayed() => _addInputWords(1);
+
+  /// 例句播放完成后计入输入词数
+  ///
+  /// 由 _BackContent widget 在例句音频播放结束后调用。
+  Future<void> onSentencePlayed(String sentenceText) {
+    final wordCount = sentenceText
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    return _addInputWords(wordCount);
+  }
+
   /// TTS 朗读当前单词
   void speakCurrentWord() {
     _speakCurrentWord();
@@ -330,12 +360,14 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 暂停（AppLifecycle / 弹窗时调用）
   void pause() {
     _timer.pause();
+    _studyStopwatch.stop();
     state = state.copyWith(isPaused: true);
   }
 
   /// 恢复
   void resume() {
     if (state.isCompleted) return;
+    _studyStopwatch.start();
     state = state.copyWith(isPaused: false);
     _timer.resume(
       onTick: (remaining) {
@@ -357,14 +389,17 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 重新开始（再来一遍）
   Future<void> reset() async {
     _timer.cancel();
+    // 先保存已累计时间
+    await _saveAndRefreshStudyTime();
     final savedWords = state.words.map((w) => w.savedWord).toList();
     await initialize(savedWords);
   }
 
   /// 释放资源
-  void disposePlayer() {
+  Future<void> disposePlayer() async {
+    await _saveAndRefreshStudyTime();
     _timer.cancel();
-    TtsService.instance.stop();
+    _stopAllPlayback();
     state = const FlashcardState();
   }
 
@@ -395,20 +430,49 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   }
 
   /// 获取当前倒计时秒数
+  ///
+  /// 背面且开启自动播放例句时，额外追加例句音频时长 + TTS/延迟缓冲，
+  /// 避免例句还没播完就被倒计时截断自动跳到下一张。
   int _getTimerSeconds() {
+    int baseSeconds;
     switch (state.settings.timerMode) {
       case FlashcardTimerMode.fixed:
-        return state.settings.fixedTimerSeconds;
+        baseSeconds = state.settings.fixedTimerSeconds;
       case FlashcardTimerMode.smart:
         final word = state.currentWord?.savedWord;
         if (word == null) return 8;
-        return FlashcardSettings.calculateSmartSeconds(
+        baseSeconds = FlashcardSettings.calculateSmartSeconds(
           wordLength: word.word.length,
           practiceCount: word.practiceCount,
         );
       case FlashcardTimerMode.off:
         return 0;
     }
+
+    // 背面 + 自动播放例句：追加例句音频时长
+    if (state.isShowingBack && state.settings.autoPlaySentence) {
+      baseSeconds += _getExampleSentenceExtraSeconds();
+    }
+
+    return baseSeconds;
+  }
+
+  /// 计算例句自动播放所需的额外秒数
+  ///
+  /// 包含：TTS 朗读单词时长 (~1s) + 600ms 延迟 + 例句音频时长。
+  int _getExampleSentenceExtraSeconds() {
+    final word = state.currentWord?.savedWord;
+    if (word == null || word.sentenceText == null) return 0;
+
+    // 例句音频时长（毫秒）
+    int sentenceDurationMs = 0;
+    if (word.sentenceStartMs != null && word.sentenceEndMs != null) {
+      sentenceDurationMs = word.sentenceEndMs! - word.sentenceStartMs!;
+    }
+
+    // TTS 朗读（~1s）+ 延迟 600ms + 例句音频
+    final ttsBufferMs = state.settings.autoPlayWord ? 1600 : 600;
+    return ((ttsBufferMs + sentenceDurationMs) / 1000).ceil();
   }
 
   /// 倒计时到期回调
@@ -429,11 +493,12 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   }
 
   /// TTS 朗读当前单词（受 autoPlayWord 设置控制）
-  void _speakCurrentWord() {
+  Future<void> _speakCurrentWord() async {
     if (!state.settings.autoPlayWord) return;
     final word = state.currentWord?.savedWord.word;
     if (word != null) {
-      TtsService.instance.speak(word);
+      await TtsService.instance.speak(word);
+      await _addInputWords(1);
     }
   }
 
@@ -538,6 +603,30 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       debugPrint('Flashcard: 加载设置失败: $e');
     }
     return const FlashcardSettings();
+  }
+
+  /// 停止计时并保存已记录的学习时长，刷新统计 UI
+  Future<void> _saveAndRefreshStudyTime() async {
+    if (!_studyStopwatch.isRunning &&
+        _studyStopwatch.elapsed == Duration.zero) {
+      return;
+    }
+    _studyStopwatch.stop();
+    final seconds = _studyStopwatch.elapsed.inSeconds;
+    _studyStopwatch.reset();
+    if (seconds > 0) {
+      await _studyTimeService.addStudyTime(seconds);
+    }
+    ref.read(dailyStudyTimeProvider.notifier).refresh();
+    ref.read(studyStatsNotifierProvider.notifier).refresh();
+  }
+
+  /// 累加输入词数并刷新统计 UI
+  Future<void> _addInputWords(int count) async {
+    if (count > 0) {
+      await _studyTimeService.addInputWords(count);
+      ref.read(studyStatsNotifierProvider.notifier).refresh();
+    }
   }
 
   /// 持久化设置

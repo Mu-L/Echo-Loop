@@ -41,6 +41,12 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
     super.dispose();
   }
 
+  /// 退出页面前清理资源并返回
+  Future<void> _handleExit() async {
+    await ref.read(flashcardNotifierProvider.notifier).disposePlayer();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(flashcardNotifierProvider);
@@ -53,8 +59,17 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleExit();
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _handleExit,
+        ),
         title: Text(
           state.words.isNotEmpty
               ? l10n.flashcardProgress(
@@ -131,6 +146,7 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 
