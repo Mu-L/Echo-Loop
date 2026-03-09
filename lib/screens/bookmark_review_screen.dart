@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../theme/app_theme.dart';
@@ -91,13 +92,11 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen> {
     final playerState = ref.read(bookmarkReviewProvider);
     final l10n = AppLocalizations.of(context)!;
 
-    final result = await showDialog<bool>(
+    final result = await showFreePlayCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _CompleteDialog(
-        totalSentences: playerState.totalSentences,
-        l10n: l10n,
-      ),
+      title: l10n.bookmarkReviewComplete,
+      message: l10n.bookmarkReviewCompleteMessage(playerState.totalSentences),
+      replayLabel: l10n.bookmarkReviewAgain,
     );
 
     _isShowingDialog = false;
@@ -839,55 +838,6 @@ class _NavButton extends StatelessWidget {
           size: 32,
           color: Theme.of(context).colorScheme.onSurface,
         ),
-      ),
-    );
-  }
-}
-
-/// 收藏复习完成对话框
-class _CompleteDialog extends StatelessWidget {
-  final int totalSentences;
-  final AppLocalizations l10n;
-
-  const _CompleteDialog({required this.totalSentences, required this.l10n});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(l10n.bookmarkReviewComplete)),
-          ],
-        ),
-        content: Text(
-          l10n.bookmarkReviewCompleteMessage(totalSentences),
-          style: theme.textTheme.bodyMedium,
-        ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.done),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.bookmarkReviewAgain),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

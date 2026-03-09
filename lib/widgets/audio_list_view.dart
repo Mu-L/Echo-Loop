@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_audio_dialog.dart';
 import 'audio_list_tile.dart';
+import 'dialogs/confirm_dialog.dart';
 import 'edit_collection_membership_sheet.dart';
 import 'edit_tag_membership_sheet.dart';
 
@@ -108,41 +109,24 @@ class AudioListView extends ConsumerWidget {
   }
 
   /// 确认删除音频
-  void _confirmDeleteAudio(
+  Future<void> _confirmDeleteAudio(
     BuildContext context,
     WidgetRef ref,
     AudioItem item,
-  ) {
+  ) async {
     final l10n = AppLocalizations.of(context)!;
-    showDialog(
+    final confirmed = await showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.warning_amber_rounded,
-          color: Theme.of(ctx).colorScheme.error,
-          size: 32,
-        ),
-        title: Text(l10n.deleteAudio),
-        content: Text(l10n.deleteAudioConfirm(item.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              ref.read(audioLibraryProvider.notifier).removeAudioItem(item.id);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
+      title: l10n.deleteAudio,
+      message: l10n.deleteAudioConfirm(item.name),
+      icon: Icons.warning_amber_rounded,
+      isDestructive: true,
+      confirmLabel: l10n.delete,
+      cancelLabel: l10n.cancel,
     );
+    if (confirmed == true) {
+      ref.read(audioLibraryProvider.notifier).removeAudioItem(item.id);
+    }
   }
 }
 

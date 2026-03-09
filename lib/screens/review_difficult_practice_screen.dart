@@ -21,6 +21,8 @@ import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/sentence_ai_provider.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
+import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/difficult_practice/difficult_practice_settings_sheet.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/player_hotkey_scope.dart';
@@ -191,14 +193,11 @@ class _ReviewDifficultPracticeScreenState
       final playerState = ref.read(reviewDifficultPracticeProvider);
       final l10n = AppLocalizations.of(context)!;
 
-      final result = await showDialog<bool>(
+      final result = await showFreePlayCompleteDialog(
         context: context,
-        barrierDismissible: false,
-        builder: (ctx) => _FreePlayCompleteDialog(
-          title: l10n.reviewDifficultPracticeCompleteTitle,
-          message: l10n.reviewDifficultPracticeCompleteMessage(
-            playerState.totalSentences,
-          ),
+        title: l10n.reviewDifficultPracticeCompleteTitle,
+        message: l10n.reviewDifficultPracticeCompleteMessage(
+          playerState.totalSentences,
         ),
       );
 
@@ -223,17 +222,19 @@ class _ReviewDifficultPracticeScreenState
     final playerState = ref.read(reviewDifficultPracticeProvider);
     final stepCtx = _getStepContext();
 
-    final result = await showDialog<bool>(
+    final l10n = AppLocalizations.of(context)!;
+    final result = await showStepCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _CompleteDialog(
-        totalSentences: playerState.totalSentences,
-        stepIndex: stepCtx.stepIndex,
-        totalSteps: stepCtx.totalSteps,
-        stageName: stepCtx.stageName,
-        nextStepName: stepCtx.nextStepName,
-        isLastStep: stepCtx.isLastStep,
+      title: l10n.reviewDifficultPracticeCompleteTitle,
+      contentBody: Text(
+        l10n.reviewDifficultPracticeCompleteMessage(playerState.totalSentences),
+        style: Theme.of(context).textTheme.bodyMedium,
       ),
+      stepIndex: stepCtx.stepIndex,
+      totalSteps: stepCtx.totalSteps,
+      stageName: stepCtx.stageName,
+      nextStepName: stepCtx.nextStepName,
+      isLastStep: stepCtx.isLastStep,
     );
 
     _isShowingDialog = false;
@@ -252,7 +253,7 @@ class _ReviewDifficultPracticeScreenState
         debugPrint('难句补练完成处理出错: $e');
       }
 
-      if (result == true && stepCtx.nextStepName != null) {
+      if (result.continueToNext && stepCtx.nextStepName != null) {
         // 继续下一步 → 退出当前模式，返回计划页让路由分发
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
         if (mounted) context.pop();
@@ -964,155 +965,6 @@ class _NavButton extends StatelessWidget {
           size: 32,
           color: Theme.of(context).colorScheme.onSurface,
         ),
-      ),
-    );
-  }
-}
-
-/// 完成对话框
-class _CompleteDialog extends StatelessWidget {
-  final int totalSentences;
-  final int stepIndex;
-  final int totalSteps;
-  final String stageName;
-  final String? nextStepName;
-  final bool isLastStep;
-
-  const _CompleteDialog({
-    required this.totalSentences,
-    required this.stepIndex,
-    required this.totalSteps,
-    required this.stageName,
-    this.nextStepName,
-    this.isLastStep = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(l10n.reviewDifficultPracticeCompleteTitle)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.stepProgressLabel(stepIndex + 1, totalSteps, stageName),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s),
-            Text(
-              l10n.reviewDifficultPracticeCompleteMessage(totalSentences),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        actions: _buildActions(context, l10n),
-      ),
-    );
-  }
-
-  List<Widget> _buildActions(BuildContext context, AppLocalizations l10n) {
-    if (nextStepName != null) {
-      return [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l10n.backToPlan),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.s),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(l10n.continueToStep(nextStepName!)),
-              ),
-            ),
-          ],
-        ),
-      ];
-    } else if (isLastStep) {
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.completeReview),
-          ),
-        ),
-      ];
-    } else {
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.backToPlan),
-          ),
-        ),
-      ];
-    }
-  }
-}
-
-/// 难句补练自由练习完成对话框
-///
-/// 返回 `true` 表示完成退出，`false` 表示再练一遍。
-class _FreePlayCompleteDialog extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _FreePlayCompleteDialog({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(title)),
-          ],
-        ),
-        content: Text(message, style: theme.textTheme.bodyMedium),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.done),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.practiceAgain),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

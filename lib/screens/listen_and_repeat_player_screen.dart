@@ -25,6 +25,8 @@ import '../utils/paragraph_grouping.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
+import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/retell/retell_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 
@@ -233,14 +235,12 @@ class _ListenAndRepeatPlayerScreenState
 
     // 自由练习模式：弹窗询问"完成"或"再来一遍"
     if (session.isFreePlay) {
-      final result = await showDialog<bool>(
+      final l10n = AppLocalizations.of(context)!;
+      final result = await showFreePlayCompleteDialog(
         context: context,
-        barrierDismissible: false,
-        builder: (ctx) => _FreePlayCompleteDialog(
-          title: AppLocalizations.of(ctx)!.listenAndRepeatCompleteTitle,
-          message: AppLocalizations.of(
-            ctx,
-          )!.listenAndRepeatCompleteMessage(playerState.totalSentences),
+        title: l10n.listenAndRepeatCompleteTitle,
+        message: l10n.listenAndRepeatCompleteMessage(
+          playerState.totalSentences,
         ),
       );
 
@@ -265,17 +265,18 @@ class _ListenAndRepeatPlayerScreenState
 
     final stepCtx = _getStepContext();
 
-    final result = await showDialog<bool>(
+    final l10nStep = AppLocalizations.of(context)!;
+    final result = await showStepCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _ListenAndRepeatCompleteDialog(
-        totalSentences: playerState.totalSentences,
-        stepIndex: stepCtx.stepIndex,
-        totalSteps: stepCtx.totalSteps,
-        stageName: stepCtx.stageName,
-        nextStepName: stepCtx.nextStepName,
-        isLastStep: stepCtx.isLastStep,
+      title: l10nStep.listenAndRepeatCompleteTitle,
+      contentBody: Text(
+        l10nStep.listenAndRepeatCompleteMessage(playerState.totalSentences),
       ),
+      stepIndex: stepCtx.stepIndex,
+      totalSteps: stepCtx.totalSteps,
+      stageName: stepCtx.stageName,
+      nextStepName: stepCtx.nextStepName,
+      isLastStep: stepCtx.isLastStep,
     );
 
     _isShowingDialog = false;
@@ -301,7 +302,7 @@ class _ListenAndRepeatPlayerScreenState
         debugPrint('跟读完成处理出错: $e');
       }
 
-      if (result == true) {
+      if (result.continueToNext) {
         // 继续下一步：段级复述
         await _navigateToRetell();
       } else {
@@ -755,164 +756,6 @@ class _NavButton extends StatelessWidget {
           size: 32,
           color: Theme.of(context).colorScheme.onSurface,
         ),
-      ),
-    );
-  }
-}
-
-/// 跟读完成对话框 — 双按钮（返回计划 / 继续下一步）
-class _ListenAndRepeatCompleteDialog extends StatelessWidget {
-  final int totalSentences;
-  final int stepIndex;
-  final int totalSteps;
-  final String stageName;
-  final String? nextStepName;
-  final bool isLastStep;
-
-  const _ListenAndRepeatCompleteDialog({
-    required this.totalSentences,
-    required this.stepIndex,
-    required this.totalSteps,
-    required this.stageName,
-    this.nextStepName,
-    this.isLastStep = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(l10n.listenAndRepeatCompleteTitle)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.stepProgressLabel(stepIndex + 1, totalSteps, stageName),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s),
-            Text(
-              l10n.listenAndRepeatCompleteMessage(totalSentences),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        actions: _buildActions(context, l10n),
-      ),
-    );
-  }
-
-  List<Widget> _buildActions(BuildContext context, AppLocalizations l10n) {
-    if (nextStepName != null) {
-      return [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l10n.backToPlan),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.s),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(l10n.continueToStep(nextStepName!)),
-              ),
-            ),
-          ],
-        ),
-      ];
-    } else if (isLastStep) {
-      final l10nCtx = AppLocalizations.of(context)!;
-      final isFirstStudy =
-          stageName == l10nCtx.firstStudy ||
-          stageName == LearningStage.firstLearn.label;
-      final completeText = isFirstStudy
-          ? l10n.completeFirstStudy
-          : l10n.completeReview;
-
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(completeText),
-          ),
-        ),
-      ];
-    } else {
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.backToPlan),
-          ),
-        ),
-      ];
-    }
-  }
-}
-
-/// 自由练习完成对话框
-///
-/// 显示完成标题和消息，提供「完成」和「再来一遍」两个操作按钮。
-/// 返回 `true` 表示完成退出，`false` 表示再来一遍。
-class _FreePlayCompleteDialog extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _FreePlayCompleteDialog({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(title)),
-          ],
-        ),
-        content: Text(message, style: theme.textTheme.bodyMedium),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.done),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.listenAgain),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

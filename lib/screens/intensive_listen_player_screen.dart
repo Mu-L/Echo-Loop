@@ -23,6 +23,8 @@ import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
 import '../providers/sentence_ai_provider.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
+import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/player_hotkey_scope.dart';
 
@@ -356,15 +358,13 @@ class _IntensiveListenPlayerScreenState
 
     // 自由练习模式：弹窗询问"完成"或"再来一遍"
     if (session.isFreePlay) {
-      final result = await showDialog<bool>(
+      final l10n = AppLocalizations.of(context)!;
+      final result = await showFreePlayCompleteDialog(
         context: context,
-        barrierDismissible: false,
-        builder: (ctx) => _FreePlayCompleteDialog(
-          title: AppLocalizations.of(ctx)!.intensiveListenCompleteTitle,
-          message: AppLocalizations.of(ctx)!.intensiveListenCompleteMessage(
-            playerState.totalSentences,
-            totalDifficultCount,
-          ),
+        title: l10n.intensiveListenCompleteTitle,
+        message: l10n.intensiveListenCompleteMessage(
+          playerState.totalSentences,
+          totalDifficultCount,
         ),
       );
 
@@ -391,19 +391,23 @@ class _IntensiveListenPlayerScreenState
 
     final stepCtx = _getStepContext();
 
+    final l10nDialog = AppLocalizations.of(context)!;
     // continueToNext: true = 继续, false = 返回计划, null = 对话框未响应
-    final result = await showDialog<bool>(
+    final result = await showStepCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _IntensiveListenCompleteDialog(
-        totalSentences: playerState.totalSentences,
-        difficultCount: totalDifficultCount,
-        stepIndex: stepCtx.stepIndex,
-        totalSteps: stepCtx.totalSteps,
-        stageName: stepCtx.stageName,
-        nextStepName: stepCtx.nextStepName,
-        isLastStep: stepCtx.isLastStep,
+      title: l10nDialog.intensiveListenCompleteTitle,
+      contentBody: Text(
+        l10nDialog.intensiveListenCompleteMessage(
+          playerState.totalSentences,
+          totalDifficultCount,
+        ),
+        style: Theme.of(context).textTheme.bodyMedium,
       ),
+      stepIndex: stepCtx.stepIndex,
+      totalSteps: stepCtx.totalSteps,
+      stageName: stepCtx.stageName,
+      nextStepName: stepCtx.nextStepName,
+      isLastStep: stepCtx.isLastStep,
     );
 
     _isShowingDialog = false;
@@ -432,7 +436,7 @@ class _IntensiveListenPlayerScreenState
         debugPrint('精听完成处理出错: $e');
       }
 
-      if (result == true) {
+      if (result.continueToNext) {
         // 继续下一步 → 进入难句跟读
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
         if (mounted) {
@@ -1201,183 +1205,6 @@ class _NavButton extends StatelessWidget {
         opacity: enabled ? 0.6 : 0.15,
         duration: const Duration(milliseconds: 150),
         child: Icon(icon, size: 32, color: theme.colorScheme.onSurface),
-      ),
-    );
-  }
-}
-
-/// 精听完成对话框 — 双按钮（返回计划 / 继续下一步）
-///
-/// 返回 true 表示"继续下一步"，false 表示"返回计划"。
-class _IntensiveListenCompleteDialog extends StatelessWidget {
-  final int totalSentences;
-  final int difficultCount;
-  final int stepIndex;
-  final int totalSteps;
-  final String stageName;
-  final String? nextStepName;
-  final bool isLastStep;
-
-  const _IntensiveListenCompleteDialog({
-    required this.totalSentences,
-    required this.difficultCount,
-    required this.stepIndex,
-    required this.totalSteps,
-    required this.stageName,
-    this.nextStepName,
-    this.isLastStep = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(l10n.intensiveListenCompleteTitle)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 步骤进度
-            Text(
-              l10n.stepProgressLabel(stepIndex + 1, totalSteps, stageName),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s),
-            // 完成统计
-            Text(
-              l10n.intensiveListenCompleteMessage(
-                totalSentences,
-                difficultCount,
-              ),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        // 底部操作按钮（返回计划 + 继续 同一行）
-        actions: _buildActions(context, l10n),
-      ),
-    );
-  }
-
-  /// 构建底部操作按钮
-  ///
-  /// 三种情况：
-  /// 1. 有下一步可继续：[返回计划 Outlined] [继续：X Filled] 同一行
-  /// 2. 末步骤：[完成首学/复习 Filled]（全宽）
-  /// 3. 非末步骤但下一步不可用：[返回计划 Filled]（全宽）
-  List<Widget> _buildActions(BuildContext context, AppLocalizations l10n) {
-    if (nextStepName != null) {
-      // 情况 1：有下一步可继续 — 返回计划（左） + 继续（右）
-      return [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l10n.backToPlan),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.s),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(l10n.continueToStep(nextStepName!)),
-              ),
-            ),
-          ],
-        ),
-      ];
-    } else if (isLastStep) {
-      // 情况 2：末步骤 — 完成按钮全宽
-      final l10nCtx = AppLocalizations.of(context)!;
-      final isFirstStudy =
-          stageName == l10nCtx.firstStudy ||
-          stageName == LearningStage.firstLearn.label;
-      final completeText = isFirstStudy
-          ? l10n.completeFirstStudy
-          : l10n.completeReview;
-
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(completeText),
-          ),
-        ),
-      ];
-    } else {
-      // 情况 3：非末步骤但下一步不可用 — 返回计划全宽
-      return [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.backToPlan),
-          ),
-        ),
-      ];
-    }
-  }
-}
-
-/// 精听自由练习完成对话框
-///
-/// 显示完成标题和消息，提供「完成」和「再来一遍」两个操作按钮。
-/// 返回 `true` 表示完成退出，`false` 表示再来一遍。
-class _FreePlayCompleteDialog extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _FreePlayCompleteDialog({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(title)),
-          ],
-        ),
-        content: Text(message, style: theme.textTheme.bodyMedium),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.done),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.listenAgain),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

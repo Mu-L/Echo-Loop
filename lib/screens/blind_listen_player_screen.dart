@@ -30,6 +30,7 @@ import '../providers/listening_practice/listening_practice_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blind_listen_complete_dialog.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 盲听播放器页面
@@ -110,11 +111,9 @@ class _BlindListenPlayerScreenState
     _isShowingDialog = true;
     final l10n = AppLocalizations.of(context)!;
 
-    final result = await showDialog<bool>(
+    final result = await showFreePlayCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) =>
-          _FreePlayCompleteDialog(title: l10n.blindListenComplete),
+      title: l10n.blindListenComplete,
     );
 
     _isShowingDialog = false;
@@ -647,53 +646,6 @@ class _CountdownIndicator extends StatelessWidget {
         ),
         TextButton(onPressed: onSkip, child: Text(l10n.skipCountdown)),
       ],
-    );
-  }
-}
-
-/// 盲听自由练习完成对话框
-///
-/// 返回 `true` 表示完成退出，`false` 表示再听一遍。
-class _FreePlayCompleteDialog extends StatelessWidget {
-  final String title;
-
-  const _FreePlayCompleteDialog({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(title)),
-          ],
-        ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.done),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.listenAgain),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

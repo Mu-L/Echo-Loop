@@ -11,6 +11,8 @@ import '../providers/collection_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import '../widgets/dialogs/confirm_dialog.dart';
+import '../widgets/dialogs/text_input_dialog.dart';
 
 /// 合集排序按钮（公开供 LibraryScreen 使用）
 class CollectionSortButton extends ConsumerWidget {
@@ -28,13 +30,21 @@ class CollectionSortButton extends ConsumerWidget {
       itemBuilder: (context) {
         final current = ref.read(collectionListProvider).sortType;
         return [
-          _sortMenuItem(l10n.sortByNameAsc, CollectionSortType.nameAsc, current),
+          _sortMenuItem(
+            l10n.sortByNameAsc,
+            CollectionSortType.nameAsc,
+            current,
+          ),
           _sortMenuItem(
             l10n.sortByNameDesc,
             CollectionSortType.nameDesc,
             current,
           ),
-          _sortMenuItem(l10n.sortByDateAsc, CollectionSortType.dateAsc, current),
+          _sortMenuItem(
+            l10n.sortByDateAsc,
+            CollectionSortType.dateAsc,
+            current,
+          ),
           _sortMenuItem(
             l10n.sortByDateDesc,
             CollectionSortType.dateDesc,
@@ -149,11 +159,34 @@ class CollectionListView extends StatelessWidget {
 }
 
 /// 显示创建合集对话框（公开供 LibraryScreen 使用）
+///
+/// 需要 [WidgetRef] 来读取合集列表状态并创建合集。
 void showCreateCollectionDialog(BuildContext context) {
-  showDialog(
+  // 从 context 中找到最近的 ProviderScope
+  final container = ProviderScope.containerOf(context);
+  final l10n = AppLocalizations.of(context)!;
+
+  showTextInputDialog(
     context: context,
-    builder: (context) => const _CreateCollectionDialog(),
-  );
+    title: l10n.createCollection,
+    labelText: l10n.collectionName,
+    hintText: l10n.enterCollectionName,
+    confirmLabel: l10n.add,
+    cancelLabel: l10n.cancel,
+    validator: (name) {
+      if (name.isEmpty) return l10n.collectionNameEmpty;
+      final collectionState = container.read(collectionListProvider);
+      final exists = collectionState.collections.any(
+        (c) => c.name.toLowerCase() == name.toLowerCase(),
+      );
+      if (exists) return l10n.collectionNameExists;
+      return null;
+    },
+  ).then((name) {
+    if (name != null) {
+      container.read(collectionListProvider.notifier).createCollection(name);
+    }
+  });
 }
 
 /// 文件夹网格卡片
@@ -398,74 +431,6 @@ class _CollectionListTile extends ConsumerWidget {
   }
 }
 
-/// 创建合集对话框
-class _CreateCollectionDialog extends ConsumerStatefulWidget {
-  const _CreateCollectionDialog();
-
-  @override
-  ConsumerState<_CreateCollectionDialog> createState() =>
-      _CreateCollectionDialogState();
-}
-
-class _CreateCollectionDialogState
-    extends ConsumerState<_CreateCollectionDialog> {
-  final _controller = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return AlertDialog(
-      title: Text(l10n.createCollection),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: InputDecoration(
-          labelText: l10n.collectionName,
-          hintText: l10n.enterCollectionName,
-          errorText: _error,
-        ),
-        onSubmitted: (_) => _create(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(onPressed: _create, child: Text(l10n.add)),
-      ],
-    );
-  }
-
-  void _create() {
-    final l10n = AppLocalizations.of(context)!;
-    final name = _controller.text.trim();
-
-    if (name.isEmpty) {
-      setState(() => _error = l10n.collectionNameEmpty);
-      return;
-    }
-
-    final collectionState = ref.read(collectionListProvider);
-    final exists = collectionState.collections.any(
-      (c) => c.name.toLowerCase() == name.toLowerCase(),
-    );
-    if (exists) {
-      setState(() => _error = l10n.collectionNameExists);
-      return;
-    }
-
-    ref.read(collectionListProvider.notifier).createCollection(name);
-    Navigator.pop(context);
-  }
-}
-
 // ===== 公共辅助方法 =====
 
 /// 重命名合集对话框
@@ -473,48 +438,23 @@ void _showRenameCollectionDialog(
   BuildContext context,
   WidgetRef ref,
   Collection collection,
-) {
+) async {
   final l10n = AppLocalizations.of(context)!;
-  final controller = TextEditingController(text: collection.name);
 
-  showDialog(
+  final name = await showTextInputDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(l10n.renameCollection),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(labelText: l10n.collectionName),
-        onSubmitted: (_) {
-          final name = controller.text.trim();
-          if (name.isNotEmpty) {
-            ref
-                .read(collectionListProvider.notifier)
-                .renameCollection(collection.id, name);
-            Navigator.pop(ctx);
-          }
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(l10n.cancel),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final name = controller.text.trim();
-            if (name.isNotEmpty) {
-              ref
-                  .read(collectionListProvider.notifier)
-                  .renameCollection(collection.id, name);
-              Navigator.pop(ctx);
-            }
-          },
-          child: Text(l10n.ok),
-        ),
-      ],
-    ),
+    title: l10n.renameCollection,
+    labelText: l10n.collectionName,
+    initialValue: collection.name,
+    confirmLabel: l10n.ok,
+    cancelLabel: l10n.cancel,
   );
+
+  if (name != null) {
+    ref
+        .read(collectionListProvider.notifier)
+        .renameCollection(collection.id, name);
+  }
 }
 
 /// 删除确认对话框
@@ -522,34 +462,20 @@ void _showDeleteConfirmDialog(
   BuildContext context,
   WidgetRef ref,
   Collection collection,
-) {
+) async {
   final l10n = AppLocalizations.of(context)!;
-  showDialog(
+
+  final confirmed = await showConfirmDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      icon: Icon(Icons.warning_amber_rounded,
-          color: Theme.of(ctx).colorScheme.error, size: 32),
-      title: Text(l10n.deleteCollection),
-      content: Text(l10n.deleteCollectionConfirm(collection.name)),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            ref
-                .read(collectionListProvider.notifier)
-                .deleteCollection(collection.id);
-            Navigator.pop(ctx);
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(ctx).colorScheme.error,
-            foregroundColor: Theme.of(ctx).colorScheme.onError,
-          ),
-          child: Text(l10n.delete),
-        ),
-      ],
-    ),
+    title: l10n.deleteCollection,
+    message: l10n.deleteCollectionConfirm(collection.name),
+    icon: Icons.warning_amber_rounded,
+    isDestructive: true,
+    confirmLabel: l10n.delete,
+    cancelLabel: l10n.cancel,
   );
+
+  if (confirmed == true) {
+    ref.read(collectionListProvider.notifier).deleteCollection(collection.id);
+  }
 }

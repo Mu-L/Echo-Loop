@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:universal_io/io.dart';
 import '../models/audio_item.dart';
+import '../models/learning_progress.dart';
 import '../models/tag.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
@@ -17,6 +18,7 @@ import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../providers/transcription_task_provider.dart';
+import 'dialogs/text_input_dialog.dart';
 import 'manage_subtitles_sheet.dart';
 
 /// 音频列表项 — 资源库全局列表和合集详情页共用
@@ -91,36 +93,122 @@ class AudioListTile extends ConsumerWidget {
       transcriptionTaskManagerProvider.select((map) => map[audioItem.id]),
     );
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      color: isCurrentlyPlaying
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-          : null,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.transparent,
-          child: Icon(
-            Icons.audiotrack,
-            color: audioItem.isStarred
-                ? AppTheme.bookmarkColor
-                : theme.colorScheme.primary,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 600;
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          color: isCurrentlyPlaying
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+              : null,
+          child: ListTile(
+            contentPadding: isDesktop
+                ? const EdgeInsets.symmetric(horizontal: 20, vertical: 4)
+                : null,
+            leading: _buildLeadingProgress(theme, progress),
+            title: Text(
+              audioItem.name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: _buildSubtitle(
+              context,
+              l10n,
+              theme,
+              progress,
+              collectionNames,
+              tagData,
+              transcriptionTask,
+            ),
+            trailing: _buildTrailing(
+              context,
+              ref,
+              l10n,
+              theme,
+              isCurrentlyPlaying,
+            ),
+            onTap: () => _handleTap(context, l10n),
           ),
+        );
+      },
+    );
+  }
+
+  /// 构建左侧环形进度图标
+  ///
+  /// - 未学习：音频图标在浅色圆形背景上
+  /// - 进行中：环形进度 + 中心音频图标
+  /// - 已完成：满环（绿色）+ 勾号图标
+  Widget _buildLeadingProgress(ThemeData theme, LearningProgress? progress) {
+    const size = 40.0;
+    const iconSize = 20.0;
+    const strokeWidth = 3.0;
+    // 已完成使用明确的绿色，不依赖 tertiary（在当前主题下是紫色）
+    const completedColor = Color(0xFF4CAF50);
+
+    // 未学习状态
+    if (progress == null || !progress.isStarted) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: theme.colorScheme.surfaceContainerHighest,
         ),
-        title: Text(
-          audioItem.name,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+        child: Icon(
+          Icons.audiotrack,
+          size: iconSize,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        subtitle: _buildSubtitle(
-          context,
-          l10n,
-          theme,
-          progress,
-          collectionNames,
-          tagData,
-          transcriptionTask,
+      );
+    }
+
+    // 已完成状态
+    if (progress.isCompleted) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: size,
+              height: size,
+              child: CircularProgressIndicator(
+                value: 1.0,
+                strokeWidth: strokeWidth,
+                color: completedColor,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              ),
+            ),
+            Icon(Icons.check, size: iconSize, color: completedColor),
+          ],
         ),
-        trailing: _buildTrailing(context, ref, l10n, theme, isCurrentlyPlaying),
-        onTap: () => _handleTap(context, l10n),
+      );
+    }
+
+    // 进行中状态
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              value: progress.progressPercent,
+              strokeWidth: strokeWidth,
+              color: theme.colorScheme.primary,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            ),
+          ),
+          Icon(
+            Icons.audiotrack,
+            size: iconSize,
+            color: theme.colorScheme.primary,
+          ),
+        ],
       ),
     );
   }
@@ -162,11 +250,14 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 构建副标题 Wrap 区域
+  ///
+  /// 元数据用 `·` 分隔符合并为单行文本，减少 icon 噪音。
+  /// 转录进度、学习 badge、合集 chips、标签 chips 仍为独立 widget。
   Widget _buildSubtitle(
     BuildContext context,
     AppLocalizations l10n,
     ThemeData theme,
-    dynamic progress,
+    LearningProgress? progress,
     List<String> collectionNames,
     List<Tag> tagData,
     TranscriptionTaskState? transcriptionTask,
@@ -177,29 +268,28 @@ class AudioListTile extends ConsumerWidget {
         transcriptionTask is TranscriptionUploading ||
         transcriptionTask is TranscriptionProcessing;
 
+    // 构建元数据文本片段，用 · 分隔
+    final metaParts = <String>[];
+    if (audioItem.totalDuration > 0) {
+      metaParts.add(_formatDuration(audioItem.totalDuration));
+    }
+    if (audioItem.hasTranscript && !isTranscribing) {
+      metaParts.add(l10n.transcript);
+    }
+    metaParts.add(l10n.addedOn(_formatDate(audioItem.addedDate)));
+
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
     return Wrap(
-      spacing: 12,
+      spacing: 8,
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        // 音频时长
-        if (audioItem.totalDuration > 0)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                _formatDuration(audioItem.totalDuration),
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
-        // 后台转录进度指示
+        // 合并的元数据文本行
+        Text(metaParts.join(' · '), style: metaStyle),
+        // 后台转录进度指示（带 spinner，需独立显示）
         if (isTranscribing)
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -222,27 +312,6 @@ class AudioListTile extends ConsumerWidget {
               ),
             ],
           ),
-        // 字幕图标 + 文字（转录中不显示，避免重复）
-        if (audioItem.hasTranscript && !isTranscribing)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.subtitles, size: 16, color: theme.colorScheme.primary),
-              const SizedBox(width: 4),
-              Text(
-                l10n.transcript,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        // 添加时间
-        Text(
-          l10n.addedOn(_formatDate(audioItem.addedDate)),
-          style: theme.textTheme.bodySmall,
-        ),
         // 学习进度 badge
         if (progress != null && progress.isStarted)
           Container(
@@ -494,47 +563,20 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 重命名音频对话框
-  void _showRenameDialog(BuildContext context, WidgetRef ref) {
+  Future<void> _showRenameDialog(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
-    final controller = TextEditingController(text: audioItem.name);
-
-    showDialog(
+    final name = await showTextInputDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.renameAudio),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(labelText: l10n.audioName),
-          onSubmitted: (_) {
-            final name = controller.text.trim();
-            if (name.isNotEmpty) {
-              ref
-                  .read(audioLibraryProvider.notifier)
-                  .updateAudioItem(audioItem.copyWith(name: name));
-              Navigator.pop(ctx);
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                ref
-                    .read(audioLibraryProvider.notifier)
-                    .updateAudioItem(audioItem.copyWith(name: name));
-                Navigator.pop(ctx);
-              }
-            },
-            child: Text(l10n.ok),
-          ),
-        ],
-      ),
+      title: l10n.renameAudio,
+      labelText: l10n.audioName,
+      initialValue: audioItem.name,
+      confirmLabel: l10n.ok,
+      cancelLabel: l10n.cancel,
     );
+    if (name != null) {
+      ref
+          .read(audioLibraryProvider.notifier)
+          .updateAudioItem(audioItem.copyWith(name: name));
+    }
   }
 }

@@ -16,6 +16,7 @@ import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/retell_player_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
+import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/retell/retell_sentence_tile.dart';
 import '../widgets/retell/retell_settings_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
@@ -140,34 +141,22 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
     final l10n = AppLocalizations.of(context)!;
     final sessionState = ref.read(learningSessionProvider);
     final retellState = ref.read(retellPlayerProvider);
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[widget.audioItemId];
-
-    // 确定完成按钮文案
-    final String completeButtonText;
-    if (sessionState.isFreePlay) {
-      completeButtonText = l10n.retellCompleteFreePlay;
-    } else if (progress?.currentStage == LearningStage.firstLearn) {
-      completeButtonText = l10n.retellCompleteFirstStudy;
-    } else {
-      completeButtonText = l10n.retellCompleteReview;
-    }
 
     // 获取步骤上下文
     final stepCtx = sessionState.isFreePlay ? null : _getStepContext();
 
-    // 弹出完成对话框：true = 完成退出, null = 再来一遍
-    final result = await showDialog<bool>(
+    // 弹出完成对话框：非 null = 完成退出, null = 再来一遍
+    final result = await showStepCompleteDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _RetellCompleteDialog(
-        completeButtonText: completeButtonText,
-        totalParagraphs: retellState.totalParagraphs,
-        stepIndex: stepCtx?.stepIndex,
-        totalSteps: stepCtx?.totalSteps,
-        stageName: stepCtx?.stageName,
+      title: l10n.retellCompleteTitle,
+      contentBody: Text(
+        l10n.retellCompleteMessage(retellState.totalParagraphs),
       ),
+      stepIndex: stepCtx?.stepIndex,
+      totalSteps: stepCtx?.totalSteps,
+      stageName: stepCtx?.stageName,
+      isLastStep: !sessionState.isFreePlay,
+      replayLabel: l10n.retellPracticeAgain,
     );
 
     _isShowingDialog = false;
@@ -178,7 +167,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
         .read(learningProgressNotifierProvider.notifier)
         .incrementRetellPassCount(widget.audioItemId);
 
-    if (result == true) {
+    if (result != null) {
       // 完成退出
       if (!sessionState.isFreePlay) {
         await ref
@@ -345,10 +334,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen> {
                           audioItemId: widget.audioItemId,
                           sentenceIndex: index,
                           sentenceText: sentence.text,
-                          sentenceStartMs:
-                              sentence.startTime.inMilliseconds,
-                          sentenceEndMs:
-                              sentence.endTime.inMilliseconds,
+                          sentenceStartMs: sentence.startTime.inMilliseconds,
+                          sentenceEndMs: sentence.endTime.inMilliseconds,
                         ),
                       );
                     },
@@ -642,82 +629,6 @@ class _NavButton extends StatelessWidget {
           size: 32,
           color: Theme.of(context).colorScheme.onSurface,
         ),
-      ),
-    );
-  }
-}
-
-/// 复述完成对话框
-///
-/// 布局与精听/跟读完成对话框保持一致：
-/// 标题行（Icon + 文本）→ 内容区（步骤进度 + 统计）→ 底部按钮区。
-/// 返回 true = 完成退出，返回 null = 再来一遍。
-class _RetellCompleteDialog extends StatelessWidget {
-  final String completeButtonText;
-  final int totalParagraphs;
-  final int? stepIndex;
-  final int? totalSteps;
-  final String? stageName;
-
-  const _RetellCompleteDialog({
-    required this.completeButtonText,
-    required this.totalParagraphs,
-    this.stepIndex,
-    this.totalSteps,
-    this.stageName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: theme.colorScheme.primary),
-            const SizedBox(width: AppSpacing.s),
-            Flexible(child: Text(l10n.retellCompleteTitle)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 步骤进度（非自由练习模式）
-            if (stepIndex != null && totalSteps != null && stageName != null)
-              Text(
-                l10n.stepProgressLabel(stepIndex! + 1, totalSteps!, stageName!),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            if (stepIndex != null) const SizedBox(height: AppSpacing.s),
-            // 完成统计
-            Text(
-              l10n.retellCompleteMessage(totalParagraphs),
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: Text(l10n.retellPracticeAgain),
-            ),
-          ),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(completeButtonText),
-            ),
-          ),
-        ],
       ),
     );
   }
