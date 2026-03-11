@@ -10,7 +10,7 @@
 
 - App 显示名已做多语言：
   - 英文系统：`Echo Loop`
-  - 简体中文系统：`语环`
+  - 简体中文系统：`Echo Loop`
 - Bundle ID：`top.echo-loop`
 - App 类别：`Education`
 - App Icon 资源集已存在：`ios/Runner/Assets.xcassets/AppIcon.appiconset`

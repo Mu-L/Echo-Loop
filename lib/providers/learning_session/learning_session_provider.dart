@@ -248,6 +248,11 @@ class LearningSession extends _$LearningSession {
     // 暂停 LP 的 stream 监听，避免干扰盲听播放
     practice.suspendListeners();
 
+    // 确保音频引擎已加载目标音频
+    // （LearningPlanScreen.initState 中的 loadAudio 是异步且未 await 的，
+    //   用户快速点击时引擎可能仍在加载中，currentAudioId 还是上一首音频）
+    await _ensureAudioLoaded(audioItemId);
+
     // 初始化盲听播放器，始终从音频开头播放（激励用户一次听完）
     final engineState = ref.read(audioEngineProvider);
     final blindPlayer = ref.read(blindListenPlayerProvider.notifier);
@@ -590,6 +595,20 @@ class LearningSession extends _$LearningSession {
       } else {
         break;
       }
+    }
+  }
+
+  /// 等待音频引擎加载目标音频
+  ///
+  /// LearningPlanScreen.initState 中的 loadAudio 是 fire-and-forget 的异步调用，
+  /// 用户快速点击"开始"时引擎可能还在加载中。此方法轮询等待引擎完成加载，
+  /// 最多等待 10 秒（200 × 50ms），避免播放错误的音频。
+  Future<void> _ensureAudioLoaded(String audioItemId) async {
+    if (ref.read(audioEngineProvider).currentAudioId == audioItemId) return;
+    for (var i = 0; i < 200; i++) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      final current = ref.read(audioEngineProvider);
+      if (current.currentAudioId == audioItemId && !current.isLoading) return;
     }
   }
 
