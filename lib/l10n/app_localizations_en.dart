@@ -504,6 +504,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewInterval28d => 'After 28 days';
 
   @override
+  String reviewUnlockIn(int days) {
+    return 'Unlocks in $days days';
+  }
+
+  @override
+  String reviewUnlockInHours(int hours) {
+    return 'Unlocks in $hours hours';
+  }
+
+  @override
+  String get reviewUnlocked => 'Unlocked';
+
+  @override
   String get startLearning => 'Start Learning';
 
   @override

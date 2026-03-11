@@ -220,6 +220,19 @@
   "reviewInterval7d": "After 7 days",
   "reviewInterval14d": "After 14 days",
   "reviewInterval28d": "After 28 days",
+  "reviewUnlockIn": "Unlocks in {days} days",
+  "@reviewUnlockIn": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "reviewUnlockInHours": "Unlocks in {hours} hours",
+  "@reviewUnlockInHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "reviewUnlocked": "Unlocked",
   "startLearning": "Start Learning",
   "continueLearning": "Continue Learning",
   "learningInProgress": "In Progress",

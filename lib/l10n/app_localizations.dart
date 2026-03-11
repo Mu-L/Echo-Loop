@@ -1046,6 +1046,24 @@ abstract class AppLocalizations {
   /// **'After 28 days'**
   String get reviewInterval28d;
 
+  /// No description provided for @reviewUnlockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocks in {days} days'**
+  String reviewUnlockIn(int days);
+
+  /// No description provided for @reviewUnlockInHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocks in {hours} hours'**
+  String reviewUnlockInHours(int hours);
+
+  /// No description provided for @reviewUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get reviewUnlocked;
+
   /// No description provided for @startLearning.
   ///
   /// In en, this message translates to:

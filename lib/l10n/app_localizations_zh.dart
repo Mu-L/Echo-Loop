@@ -501,6 +501,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reviewInterval28d => '28天后';
 
   @override
+  String reviewUnlockIn(int days) {
+    return '$days天后解锁';
+  }
+
+  @override
+  String reviewUnlockInHours(int hours) {
+    return '$hours小时后解锁';
+  }
+
+  @override
+  String get reviewUnlocked => '已解锁';
+
+  @override
   String get startLearning => '开始学习';
 
   @override
