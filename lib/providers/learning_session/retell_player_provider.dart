@@ -17,6 +17,7 @@ import '../../utils/keyword_extraction.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import 'countdown_controller.dart';
+import '../learning_progress_provider.dart';
 import 'learning_session_provider.dart';
 
 part 'retell_player_provider.g.dart';
@@ -215,6 +216,22 @@ class RetellPlayer extends _$RetellPlayer {
     return sentences.last.endTime - sentences.first.startTime;
   }
 
+  /// 异步保存复述断点，记录当前段首句的全局索引。
+  void _persistCurrentParagraphIndexAsync() {
+    final session = ref.read(learningSessionProvider);
+    final audioItemId = session.audioItemId;
+    final sentenceIndex = currentParagraphFirstSentenceIndex;
+    if (session.isFreePlay || audioItemId == null || sentenceIndex == null) {
+      return;
+    }
+
+    unawaited(
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveRetellParagraphIndex(audioItemId, sentenceIndex),
+    );
+  }
+
   /// 重新开始：重置到第一段，重新播放
   Future<void> restart() async {
     await _cancelAll();
@@ -405,6 +422,7 @@ class RetellPlayer extends _$RetellPlayer {
       playingSentenceIndex: 0,
       isRetellCountdown: false,
     );
+    _persistCurrentParagraphIndexAsync();
 
     // 订阅 position stream 实现句子高亮
     _startPositionTracking(sentences);

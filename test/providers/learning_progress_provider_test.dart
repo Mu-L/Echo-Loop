@@ -474,8 +474,11 @@ void main() {
       ).saveDifficultPracticeSentenceIndex('nonexistent', 5);
       await notifier(container).saveRetellParagraphIndex('nonexistent', 5);
 
-      final intensiveProgress = readProgress(container, 'nonexistent');
-      expect(intensiveProgress?.intensiveListenSentenceIndex, 5);
+      final progress = readProgress(container, 'nonexistent');
+      expect(progress?.intensiveListenSentenceIndex, 5);
+      expect(progress?.shadowingSentenceIndex, 5);
+      expect(progress?.difficultPracticeSentenceIndex, 5);
+      expect(progress?.retellParagraphIndex, 5);
       verify(() => mockDao.upsert(any())).called(greaterThanOrEqualTo(1));
     });
   });

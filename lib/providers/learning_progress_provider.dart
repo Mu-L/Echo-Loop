@@ -304,8 +304,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     String audioItemId,
     int? sentenceIndex,
   ) async {
-    final progress = state.progressMap[audioItemId];
-    if (progress == null) return;
+    final progress = await ensureProgress(audioItemId);
 
     final updated = progress.copyWith(
       shadowingSentenceIndex: sentenceIndex,
@@ -325,8 +324,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     String audioItemId,
     int? sentenceIndex,
   ) async {
-    final progress = state.progressMap[audioItemId];
-    if (progress == null) return;
+    final progress = await ensureProgress(audioItemId);
 
     final updated = progress.copyWith(
       difficultPracticeSentenceIndex: sentenceIndex,
@@ -346,8 +344,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     String audioItemId,
     int? paragraphIndex,
   ) async {
-    final progress = state.progressMap[audioItemId];
-    if (progress == null) return;
+    final progress = await ensureProgress(audioItemId);
 
     final updated = progress.copyWith(
       retellParagraphIndex: paragraphIndex,

@@ -1274,8 +1274,17 @@ class TestRetellPlayer extends RetellPlayer {
   }) {
     _testParagraphs = paragraphs;
     _testKeywords = keywordsMap;
+    var safeIndex = 0;
+    if (startSentenceIndex != null && paragraphs.isNotEmpty) {
+      for (var i = 0; i < paragraphs.length; i++) {
+        if (paragraphs[i].any((s) => s.index == startSentenceIndex)) {
+          safeIndex = i;
+          break;
+        }
+      }
+    }
     state = RetellPlayerState(
-      currentParagraphIndex: 0,
+      currentParagraphIndex: safeIndex,
       totalParagraphs: paragraphs.length,
     );
   }

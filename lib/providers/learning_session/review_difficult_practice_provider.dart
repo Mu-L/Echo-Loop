@@ -16,6 +16,7 @@ import '../../models/difficult_practice_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../learning_progress_provider.dart';
 import 'learning_session_provider.dart';
 import 'sentence_playback_engine.dart';
 
@@ -183,6 +184,22 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 获取句子列表（只读）
   List<Sentence> get sentences => List.unmodifiable(_sentences);
+
+  /// 异步保存难句补练断点，不阻塞当前句开始播放。
+  void _persistCurrentSentenceIndexAsync() {
+    final session = ref.read(learningSessionProvider);
+    final audioItemId = session.audioItemId;
+    if (session.isFreePlay || audioItemId == null) return;
+
+    unawaited(
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveDifficultPracticeSentenceIndex(
+            audioItemId,
+            state.currentSentenceIndex,
+          ),
+    );
+  }
 
   /// 开始播放（从当前句子开始盲听）
   Future<void> startPlaying() async {
@@ -465,6 +482,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
     );
+    _persistCurrentSentenceIndexAsync();
 
     final wordCount = countWords(sentence.text);
     final session = ref.read(learningSessionProvider.notifier);

@@ -17,6 +17,7 @@ import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../learning_progress_provider.dart';
 import 'learning_session_provider.dart';
 import 'sentence_playback_engine.dart';
 
@@ -171,6 +172,19 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
 
   /// 获取当前句子索引（供外部保存断点用）
   int get currentIndex => state.currentSentenceIndex;
+
+  /// 异步保存跟读断点，不阻塞当前句开始播放。
+  void _persistCurrentSentenceIndexAsync() {
+    final session = ref.read(learningSessionProvider);
+    final audioItemId = session.audioItemId;
+    if (session.isFreePlay || audioItemId == null) return;
+
+    unawaited(
+      ref
+          .read(learningProgressNotifierProvider.notifier)
+          .saveShadowingSentenceIndex(audioItemId, state.currentSentenceIndex),
+    );
+  }
 
   /// 开始播放当前句子
   Future<void> startPlaying() async {
@@ -364,6 +378,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
     );
+    _persistCurrentSentenceIndexAsync();
 
     final wordCount = countWords(sentence.text);
     final session = ref.read(learningSessionProvider.notifier);

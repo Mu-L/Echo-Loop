@@ -345,12 +345,12 @@ class LearningSession extends _$LearningSession {
         .where((s) => bookmarkedIndices.contains(s.index))
         .toList();
 
-    // 从数据库读取断点和难度
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[audioItemId];
-    final startIndex = progress?.shadowingSentenceIndex ?? 0;
-    final difficultyValue = progress?.difficulty.value ?? 2;
+    // 跟读断点与难度都需要优先使用持久化的最新值，避免只吃到陈旧内存态。
+    final progress = await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .ensureProgress(audioItemId);
+    final startIndex = progress.shadowingSentenceIndex ?? 0;
+    final difficultyValue = progress.difficulty.value;
     final targetPlayCount = targetPlayCountForDifficulty(difficultyValue);
 
     state = state.copyWith(
@@ -388,11 +388,11 @@ class LearningSession extends _$LearningSession {
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
 
-    // 从数据库读取断点句子索引
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[audioItemId];
-    final startSentenceIndex = progress?.retellParagraphIndex;
+    // 复述断点保存的是段首句子的全局索引，进入时需要读取最新持久化值。
+    final progress = await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .ensureProgress(audioItemId);
+    final startSentenceIndex = progress.retellParagraphIndex;
 
     state = state.copyWith(
       learningMode: LearningMode.retell,
@@ -440,11 +440,11 @@ class LearningSession extends _$LearningSession {
         .where((s) => bookmarkedIndices.contains(s.index))
         .toList();
 
-    // 从数据库读取断点句子索引
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[audioItemId];
-    final startIndex = progress?.difficultPracticeSentenceIndex ?? 0;
+    // 难句补练进入时优先恢复最新持久化断点。
+    final progress = await ref
+        .read(learningProgressNotifierProvider.notifier)
+        .ensureProgress(audioItemId);
+    final startIndex = progress.difficultPracticeSentenceIndex ?? 0;
 
     state = state.copyWith(
       learningMode: LearningMode.reviewDifficultPractice,

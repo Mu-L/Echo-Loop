@@ -9,12 +9,18 @@ import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/blind_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
+import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
+import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/models/playback_settings.dart';
 import 'package:fluency/models/sentence.dart';
+import 'package:fluency/database/providers.dart';
+import 'package:fluency/database/daos/bookmark_dao.dart';
+import 'package:fluency/database/app_database.dart' show Bookmark;
 
 import '../../helpers/mock_providers.dart';
 
@@ -34,6 +40,29 @@ class _DaoFallbackLearningProgressNotifier
       return persisted;
     }
     return super.ensureProgress(audioItemId);
+  }
+}
+
+class _TestBookmarkDao implements BookmarkDao {
+  final Set<int> bookmarkedIndices;
+
+  _TestBookmarkDao(this.bookmarkedIndices);
+
+  @override
+  Future<Set<int>> getBookmarkedIndices(String audioItemId) async {
+    return bookmarkedIndices;
+  }
+
+  @override
+  Future<List<Bookmark>> getByAudioId(String audioItemId) async => [];
+
+  @override
+  Stream<List<Bookmark>> watchByAudioId(String audioItemId) =>
+      Stream<List<Bookmark>>.value([]);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    return Future<void>.value();
   }
 }
 
@@ -439,6 +468,175 @@ void main() {
       simulateEnterHidden();
 
       expect(s.isStudyTimerRunning, false);
+    });
+  });
+
+  group('其他学习模式断点恢复', () {
+    final sentences = [
+      Sentence(
+        index: 0,
+        text: 'First sentence',
+        startTime: Duration.zero,
+        endTime: const Duration(seconds: 1),
+      ),
+      Sentence(
+        index: 1,
+        text: 'Second sentence',
+        startTime: const Duration(seconds: 2),
+        endTime: const Duration(seconds: 3),
+      ),
+      Sentence(
+        index: 2,
+        text: 'Third sentence',
+        startTime: const Duration(seconds: 4),
+        endTime: const Duration(seconds: 5),
+      ),
+      Sentence(
+        index: 3,
+        text: 'Fourth sentence',
+        startTime: const Duration(seconds: 6),
+        endTime: const Duration(seconds: 7),
+      ),
+    ];
+
+    ProviderContainer createContainer(
+      LearningProgressNotifier progressNotifier,
+    ) {
+      return ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => TestAudioEngine()),
+          listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+          listenAndRepeatPlayerProvider.overrideWith(
+            () => TestListenAndRepeatPlayer(),
+          ),
+          reviewDifficultPracticeProvider.overrideWith(
+            () => TestReviewDifficultPractice(),
+          ),
+          retellPlayerProvider.overrideWith(() => TestRetellPlayer()),
+          blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
+          dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
+          bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao({1, 3})),
+        ],
+      );
+    }
+
+    test('跟读模式进入时优先恢复已保存句子断点', () async {
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        shadowingSentenceIndex: 1,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final container = createContainer(
+        TestLearningProgressNotifier(
+          LearningProgressState(progressMap: {'audio-1': progress}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterListenAndRepeatMode('audio-1', sentences);
+
+      final playerState = container.read(listenAndRepeatPlayerProvider);
+      expect(playerState.currentSentenceIndex, 1);
+    });
+
+    test('难句补练进入时优先恢复已保存句子断点', () async {
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.review1,
+        currentSubStage: SubStageType.reviewDifficultPractice,
+        difficultPracticeSentenceIndex: 1,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final container = createContainer(
+        TestLearningProgressNotifier(
+          LearningProgressState(progressMap: {'audio-1': progress}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterReviewDifficultPracticeMode('audio-1', sentences);
+
+      final playerState = container.read(reviewDifficultPracticeProvider);
+      expect(playerState.currentSentenceIndex, 1);
+    });
+
+    test('复述模式进入时优先恢复段首句断点', () async {
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        retellParagraphIndex: 2,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final paragraphs = [
+        [sentences[0], sentences[1]],
+        [sentences[2], sentences[3]],
+      ];
+      final container = createContainer(
+        TestLearningProgressNotifier(
+          LearningProgressState(progressMap: {'audio-1': progress}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container.read(learningSessionProvider.notifier).enterRetellMode(
+        'audio-1',
+        paragraphs,
+        const {},
+      );
+
+      final playerState = container.read(retellPlayerProvider);
+      expect(playerState.currentParagraphIndex, 1);
+    });
+
+    test('冷启动内存缺失时也能从 DB 断点恢复跟读/补练/复述', () async {
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        shadowingSentenceIndex: 1,
+        difficultPracticeSentenceIndex: 1,
+        retellParagraphIndex: 2,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final paragraphs = [
+        [sentences[0], sentences[1]],
+        [sentences[2], sentences[3]],
+      ];
+      final container = createContainer(
+        _DaoFallbackLearningProgressNotifier(progress),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterListenAndRepeatMode('audio-1', sentences);
+      expect(
+        container.read(listenAndRepeatPlayerProvider).currentSentenceIndex,
+        1,
+      );
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterReviewDifficultPracticeMode('audio-1', sentences);
+      expect(
+        container.read(reviewDifficultPracticeProvider).currentSentenceIndex,
+        1,
+      );
+
+      await container.read(learningSessionProvider.notifier).enterRetellMode(
+        'audio-1',
+        paragraphs,
+        const {},
+      );
+      expect(container.read(retellPlayerProvider).currentParagraphIndex, 1);
     });
   });
 }

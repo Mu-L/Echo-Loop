@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 
+import 'package:fluency/database/enums.dart';
 import 'package:fluency/models/audio_engine_state.dart';
+import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 
@@ -74,6 +77,35 @@ class SequencedTestAudioEngine extends AudioEngine {
   }
 }
 
+class _RecordingLearningProgressNotifier extends TestLearningProgressNotifier {
+  _RecordingLearningProgressNotifier(super.initialState);
+
+  final List<int?> savedIndices = [];
+
+  @override
+  Future<void> saveRetellParagraphIndex(
+    String audioItemId,
+    int? paragraphIndex,
+  ) async {
+    savedIndices.add(paragraphIndex);
+    final progress =
+        state.progressMap[audioItemId] ??
+        LearningProgress(
+          audioItemId: audioItemId,
+          currentStage: LearningStage.firstLearn,
+          currentSubStage: SubStageType.retell,
+          updatedAt: DateTime(2026, 3, 11),
+        );
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = progress.copyWith(
+      retellParagraphIndex: paragraphIndex,
+      clearRetellParagraphIndex: paragraphIndex == null,
+      updatedAt: DateTime(2026, 3, 11, 12),
+    );
+    state = state.copyWith(progressMap: newMap);
+  }
+}
+
 void main() {
   group('RetellPlayer', () {
     late ProviderContainer container;
@@ -126,6 +158,56 @@ void main() {
       expect(engine.playRangeOnceCallCount, 1);
       expect(engine.playCalledBeforeStopCompleted, false);
       expect(container.read(retellPlayerProvider).currentParagraphIndex, 1);
+    });
+
+    test('startPlaying 会异步保存当前段首句索引', () async {
+      final progressNotifier = _RecordingLearningProgressNotifier(
+        LearningProgressState(
+          progressMap: {
+            'audio-1': LearningProgress(
+              audioItemId: 'audio-1',
+              currentStage: LearningStage.firstLearn,
+              currentSubStage: SubStageType.retell,
+              updatedAt: DateTime(2026, 3, 11),
+            ),
+          },
+        ),
+      );
+      final saveContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => SequencedTestAudioEngine()),
+          learningSessionProvider.overrideWith(
+            () => TestLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => progressNotifier,
+          ),
+        ],
+      );
+      addTearDown(saveContainer.dispose);
+
+      final saveNotifier = saveContainer.read(retellPlayerProvider.notifier);
+      saveNotifier.initialize([
+        [
+          Sentence(
+            index: 3,
+            text: 'Paragraph one',
+            startTime: Duration.zero,
+            endTime: const Duration(seconds: 3),
+          ),
+        ],
+      ], const {});
+
+      await saveNotifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(progressNotifier.savedIndices, contains(3));
+      expect(progressNotifier.savedIndices.first, 3);
     });
   });
 }
