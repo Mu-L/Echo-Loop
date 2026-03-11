@@ -63,6 +63,7 @@ void main() {
 
     // 默认 stub
     when(() => mockDao.upsert(any())).thenAnswer((_) async {});
+    when(() => mockDao.getByAudioId(any())).thenAnswer((_) async => null);
     when(() => mockDao.deleteByAudioId(any())).thenAnswer((_) async {});
     when(
       () => mockStageCompletionDao.insertRecord(any()),
@@ -600,6 +601,39 @@ void main() {
 
       expect(result.currentStage, LearningStage.review1);
       // DAO 不应被调用
+      verifyNever(() => mockDao.upsert(any()));
+    });
+
+    test('内存缺失但数据库已存在时返回持久化断点且不覆盖', () async {
+      final persistedRow = db.LearningProgressesData(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn.key,
+        currentSubStage: SubStageType.intensiveListen.key,
+        difficulty: DifficultyLevel.medium.value,
+        firstLearnCompletedAt: null,
+        lastStageCompletedAt: null,
+        currentStageStartedAt: DateTime(2026, 3, 11, 9, 0),
+        totalStudyDurationMs: 0,
+        blindListenPassCount: 0,
+        intensiveListenDifficultCount: null,
+        intensiveListenPassCount: null,
+        shadowingPassCount: null,
+        intensiveListenSentenceIndex: 3,
+        shadowingSentenceIndex: null,
+        difficultPracticeSentenceIndex: null,
+        retellParagraphIndex: null,
+        retellPassCount: null,
+        updatedAt: DateTime(2026, 3, 11, 9, 30),
+      );
+      when(() => mockDao.getByAudioId('a1')).thenAnswer((_) async => persistedRow);
+
+      final container = createContainer(const LearningProgressState());
+
+      final result = await notifier(container).ensureProgress('a1');
+
+      expect(result.intensiveListenSentenceIndex, 3);
+      expect(readProgress(container, 'a1')?.intensiveListenSentenceIndex, 3);
+      verify(() => mockDao.getByAudioId('a1')).called(1);
       verifyNever(() => mockDao.upsert(any()));
     });
   });

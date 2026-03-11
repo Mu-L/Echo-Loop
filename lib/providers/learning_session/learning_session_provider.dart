@@ -293,12 +293,13 @@ class LearningSession extends _$LearningSession {
     _studyStopwatch.start();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
+    final progressNotifier = ref.read(
+      learningProgressNotifierProvider.notifier,
+    );
 
-    // 从数据库读取断点句子索引
-    final progress = ref
-        .read(learningProgressNotifierProvider)
-        .progressMap[audioItemId];
-    final startIndex = progress?.intensiveListenSentenceIndex ?? 0;
+    // 先确保进度存在；若数据库已有断点，直接返回持久化结果。
+    final progress = await progressNotifier.ensureProgress(audioItemId);
+    final startIndex = progress.intensiveListenSentenceIndex ?? 0;
 
     state = state.copyWith(
       learningMode: LearningMode.intensiveListen,
@@ -567,7 +568,11 @@ class LearningSession extends _$LearningSession {
     final engine = ref.read(audioEngineProvider.notifier);
     _blindListenPositionSub = engine.absolutePositionStream.listen((position) {
       // 找出所有已播放完成（position >= endTime）但尚未计入的句子
-      for (var i = _blindListenLastCountedIndex + 1; i < sentences.length; i++) {
+      for (
+        var i = _blindListenLastCountedIndex + 1;
+        i < sentences.length;
+        i++
+      ) {
         if (position >= sentences[i].endTime) {
           addInputWords(countWords(sentences[i].text));
           _blindListenLastCountedIndex = i;

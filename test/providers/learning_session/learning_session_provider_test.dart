@@ -4,15 +4,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:fluency/database/enums.dart';
+import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/blind_listen_player_provider.dart';
+import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/listening_practice/listening_practice_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/models/playback_settings.dart';
+import 'package:fluency/models/sentence.dart';
 
 import '../../helpers/mock_providers.dart';
+
+class _DaoFallbackLearningProgressNotifier
+    extends TestLearningProgressNotifier {
+  final LearningProgress? _dbProgress;
+
+  _DaoFallbackLearningProgressNotifier(this._dbProgress);
+
+  @override
+  Future<LearningProgress> ensureProgress(String audioItemId) async {
+    final persisted = _dbProgress;
+    if (persisted != null) {
+      final newMap = Map<String, LearningProgress>.from(state.progressMap);
+      newMap[audioItemId] = persisted;
+      state = state.copyWith(progressMap: newMap);
+      return persisted;
+    }
+    return super.ensureProgress(audioItemId);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -184,6 +207,90 @@ void main() {
     });
   });
 
+  group('enterIntensiveListenMode 断点恢复', () {
+    ProviderContainer createContainer(
+      LearningProgressNotifier progressNotifier,
+    ) {
+      return ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => TestAudioEngine()),
+          listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+          intensiveListenPlayerProvider.overrideWith(
+            () => TestIntensiveListenPlayer(),
+          ),
+          blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
+          dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
+        ],
+      );
+    }
+
+    final sentences = [
+      Sentence(
+        index: 0,
+        text: 'First sentence',
+        startTime: Duration.zero,
+        endTime: const Duration(seconds: 1),
+      ),
+      Sentence(
+        index: 1,
+        text: 'Second sentence',
+        startTime: const Duration(seconds: 2),
+        endTime: const Duration(seconds: 3),
+      ),
+      Sentence(
+        index: 2,
+        text: 'Third sentence',
+        startTime: const Duration(seconds: 4),
+        endTime: const Duration(seconds: 5),
+      ),
+    ];
+
+    test('优先使用已保存的精听断点初始化播放器', () async {
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        intensiveListenSentenceIndex: 2,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final container = createContainer(
+        TestLearningProgressNotifier(
+          LearningProgressState(progressMap: {'audio-1': progress}),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterIntensiveListenMode('audio-1', sentences);
+
+      final playerState = container.read(intensiveListenPlayerProvider);
+      expect(playerState.currentSentenceIndex, 2);
+    });
+
+    test('内存缺失时也能通过最新进度兜底恢复断点', () async {
+      final dbProgress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        intensiveListenSentenceIndex: 1,
+        updatedAt: DateTime(2026, 3, 11),
+      );
+      final container = createContainer(
+        _DaoFallbackLearningProgressNotifier(dbProgress),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(learningSessionProvider.notifier)
+          .enterIntensiveListenMode('audio-1', sentences);
+
+      final playerState = container.read(intensiveListenPlayerProvider);
+      expect(playerState.currentSentenceIndex, 1);
+    });
+  });
+
   group('LearningSession App 生命周期计时', () {
     late ProviderContainer container;
     late TestAudioEngine testAudioEngine;
@@ -194,15 +301,11 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           audioEngineProvider.overrideWith(() => testAudioEngine),
-          listeningPracticeProvider.overrideWith(
-            () => TestListeningPractice(),
-          ),
+          listeningPracticeProvider.overrideWith(() => TestListeningPractice()),
           learningProgressNotifierProvider.overrideWith(
             () => TestLearningProgressNotifier(),
           ),
-          blindListenPlayerProvider.overrideWith(
-            () => TestBlindListenPlayer(),
-          ),
+          blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
           dailyStudyTimeProvider.overrideWith(() => TestDailyStudyTime()),
         ],
       );

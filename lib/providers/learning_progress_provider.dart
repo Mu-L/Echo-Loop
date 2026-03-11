@@ -65,10 +65,40 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     return state.progressMap[audioItemId];
   }
 
+  /// 获取指定音频的最新学习进度
+  ///
+  /// 优先返回数据库中的最新记录，并在内存态缺失或落后时回填 state。
+  Future<LearningProgress?> getLatestByAudioId(String audioItemId) async {
+    final dao = ref.read(learningProgressDaoProvider);
+    final row = await dao.getByAudioId(audioItemId);
+    if (row == null) {
+      return state.progressMap[audioItemId];
+    }
+
+    final latest = _fromDbRow(row);
+    final current = state.progressMap[audioItemId];
+    if (current != latest) {
+      final newMap = Map<String, LearningProgress>.from(state.progressMap);
+      newMap[audioItemId] = latest;
+      state = state.copyWith(progressMap: newMap);
+    }
+    return latest;
+  }
+
   /// 确保音频有学习进度记录（首次打开时自动创建）
   Future<LearningProgress> ensureProgress(String audioItemId) async {
     final existing = state.progressMap[audioItemId];
     if (existing != null) return existing;
+
+    final dao = ref.read(learningProgressDaoProvider);
+    final row = await dao.getByAudioId(audioItemId);
+    if (row != null) {
+      final persisted = _fromDbRow(row);
+      final newMap = Map<String, LearningProgress>.from(state.progressMap);
+      newMap[audioItemId] = persisted;
+      state = state.copyWith(progressMap: newMap);
+      return persisted;
+    }
 
     // 持久化时间始终用真实时间
     final now = DateTime.now();
@@ -78,7 +108,6 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       updatedAt: now,
     );
 
-    final dao = ref.read(learningProgressDaoProvider);
     await dao.upsert(
       db.LearningProgressesCompanion(
         audioItemId: Value(audioItemId),
