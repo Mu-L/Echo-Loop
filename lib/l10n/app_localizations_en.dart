@@ -1629,4 +1629,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get flashcardAutoPlayWord => 'Auto-play Word';
+
+  @override
+  String get freePlay => 'Free Play';
 }

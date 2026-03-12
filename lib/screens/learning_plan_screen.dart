@@ -560,7 +560,24 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     final isLockedReview = progress?.isReviewLockedAt(now) ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: Text(audioItem.name)),
+      appBar: AppBar(
+        title: Text(audioItem.name),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              if (widget.collectionId != null) {
+                context.push(
+                  AppRoutes.player(widget.collectionId!, widget.audioItemId),
+                );
+              } else {
+                context.push(AppRoutes.audioPlayer(widget.audioItemId));
+              }
+            },
+            icon: const Icon(Icons.headphones),
+            label: Text(l10n.freePlay),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(

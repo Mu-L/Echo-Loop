@@ -2923,6 +2923,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-play Word'**
   String get flashcardAutoPlayWord;
+
+  /// No description provided for @freePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Free Play'**
+  String get freePlay;
 }
 
 class _AppLocalizationsDelegate
