@@ -393,6 +393,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       onPauseStarted: (pauseDur) {
         // 播放完成 = 输入，停顿开始 = 用户跟读 = 输出
         session.addInputWords(wordCount);
+        session.recordLearnedSentence(sentence.text);
         session.addOutputWords(wordCount);
         state = state.copyWith(
           isPauseBetweenPlays: true,
@@ -416,6 +417,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       onAllPlaysCompleted: () async {
         // 最后一遍只有输入，没有跟读停顿
         session.addInputWords(wordCount);
+        session.recordLearnedSentence(sentence.text);
         await _autoAdvance();
       },
     );

@@ -568,7 +568,9 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
 
       // 每遍播完计入输入词数
       final wordCount = countWords(sentence.text);
-      ref.read(learningSessionProvider.notifier).addInputWords(wordCount);
+      final session = ref.read(learningSessionProvider.notifier);
+      session.addInputWords(wordCount);
+      session.recordLearnedSentence(sentence.text);
 
       // 遍间停顿（最后一遍不停顿）
       if (playCount < repeatCount) {

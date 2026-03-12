@@ -7,7 +7,7 @@ part of 'study_stats_provider.dart';
 // **************************************************************************
 
 String _$studyStatsNotifierHash() =>
-    r'2039cb4ed15177eb3b1af289786beae1d1b920b0';
+    r'865fa3f1b4624fd3d0d242280dca218b3bc44024';
 
 /// 学习统计 Provider
 ///

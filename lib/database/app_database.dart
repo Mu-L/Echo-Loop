@@ -16,6 +16,7 @@ import 'tables/tags.dart';
 import 'tables/audio_item_tags.dart';
 import 'tables/sentence_ai_cache.dart';
 import 'tables/saved_words.dart';
+import 'tables/learned_word_forms.dart';
 import 'daos/audio_item_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/bookmark_dao.dart';
@@ -25,13 +26,14 @@ import 'daos/stage_completion_dao.dart';
 import 'daos/tag_dao.dart';
 import 'daos/sentence_ai_cache_dao.dart';
 import 'daos/saved_word_dao.dart';
+import 'daos/learned_word_form_dao.dart';
 
 part 'app_database.g.dart';
 
 /// Fluency 应用数据库
-/// 包含 11 张表：audio_items, collections, collection_audio_items, bookmarks,
+/// 包含 12 张表：audio_items, collections, collection_audio_items, bookmarks,
 /// playback_states, learning_progresses, stage_completions, tags, audio_item_tags,
-/// sentence_ai_cache, saved_words
+/// sentence_ai_cache, saved_words, learned_word_forms
 @DriftDatabase(
   tables: [
     AudioItems,
@@ -45,6 +47,7 @@ part 'app_database.g.dart';
     AudioItemTags,
     SentenceAiCache,
     SavedWords,
+    LearnedWordForms,
   ],
   daos: [
     AudioItemDao,
@@ -56,13 +59,14 @@ part 'app_database.g.dart';
     TagDao,
     SentenceAiCacheDao,
     SavedWordDao,
+    LearnedWordFormDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration {
@@ -105,6 +109,14 @@ class AppDatabase extends _$AppDatabase {
             CREATE INDEX IF NOT EXISTS idx_saved_words_active
             ON saved_words(created_at DESC)
             WHERE deleted_at IS NULL
+          ''');
+        }
+        // v17→v18：新增 learned_word_forms 表（已学习唯一词形）
+        if (from < 18) {
+          await m.createTable(learnedWordForms);
+          await customStatement('''
+            CREATE INDEX IF NOT EXISTS idx_learned_word_forms_first_learned_at
+            ON learned_word_forms(first_learned_at DESC)
           ''');
         }
         // v16→v17：saved_words 新增 Flashcard 练习统计列
@@ -264,6 +276,12 @@ class AppDatabase extends _$AppDatabase {
       CREATE INDEX IF NOT EXISTS idx_saved_words_active
       ON saved_words(created_at DESC)
       WHERE deleted_at IS NULL
+    ''');
+
+    // 已学习词形首次学习时间索引
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS idx_learned_word_forms_first_learned_at
+      ON learned_word_forms(first_learned_at DESC)
     ''');
   }
 }

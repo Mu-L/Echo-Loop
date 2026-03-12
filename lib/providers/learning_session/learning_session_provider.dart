@@ -14,6 +14,7 @@ import '../../models/sentence.dart';
 import '../../services/study_time_service.dart';
 import '../../utils/word_counter.dart';
 import '../daily_study_time_provider.dart';
+import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learning_progress_provider.dart';
@@ -213,6 +214,36 @@ class LearningSession extends _$LearningSession {
       _studyTimeService.addOutputWords(count);
       ref.read(studyStatsNotifierProvider.notifier).refresh();
     }
+  }
+
+  /// 异步记录一句已听到的词形，不阻塞播放流程。
+  void recordLearnedSentence(String text) {
+    final tracker = _readLearnedVocabularyTracker();
+    if (tracker == null) return;
+    unawaited(tracker.recordSentence(text));
+  }
+
+  /// 异步记录一组已听到的句子词形，适合段落播放完成时调用。
+  void recordLearnedSentences(Iterable<Sentence> sentences) {
+    final tracker = _readLearnedVocabularyTracker();
+    if (tracker == null) return;
+    unawaited(tracker.recordSentences(sentences));
+  }
+
+  /// 测试环境可能未注入数据库，此时跳过词形统计即可。
+  dynamic _readLearnedVocabularyTracker() {
+    try {
+      return ref.read(learnedVocabularyTrackerProvider);
+    } on UnimplementedError {
+      return null;
+    }
+  }
+
+  /// 尽量在退出时落掉待写入的词形统计。
+  Future<void> _flushLearnedVocabulary() async {
+    final tracker = _readLearnedVocabularyTracker();
+    if (tracker == null) return;
+    await tracker.flush();
   }
 
   /// 进入全文盲听模式
@@ -469,10 +500,6 @@ class LearningSession extends _$LearningSession {
   /// 根据当前学习模式分支处理：停止播放、释放资源、恢复 LP 监听。
   Future<void> exitLearningMode() async {
     await _saveStudyTime();
-    // 通知 UI 刷新今日学习时长
-    ref.read(dailyStudyTimeProvider.notifier).refresh();
-    ref.read(studyStatsNotifierProvider.notifier).refresh();
-
     final mode = state.learningMode;
 
     _playerStateSub?.cancel();
@@ -518,6 +545,12 @@ class LearningSession extends _$LearningSession {
 
     // 停止引擎播放（确保干净退出）
     await practice.stop();
+
+    await _flushLearnedVocabulary();
+
+    // 通知 UI 刷新今日学习时长
+    ref.read(dailyStudyTimeProvider.notifier).refresh();
+    ref.read(studyStatsNotifierProvider.notifier).refresh();
 
     state = const LearningSessionState();
   }
@@ -577,6 +610,7 @@ class LearningSession extends _$LearningSession {
       ) {
         if (position >= sentences[i].endTime) {
           addInputWords(countWords(sentences[i].text));
+          recordLearnedSentence(sentences[i].text);
           _blindListenLastCountedIndex = i;
         } else {
           break;
@@ -598,6 +632,7 @@ class LearningSession extends _$LearningSession {
     for (var i = _blindListenLastCountedIndex + 1; i < sentences.length; i++) {
       if (position >= sentences[i].startTime) {
         addInputWords(countWords(sentences[i].text));
+        recordLearnedSentence(sentences[i].text);
         _blindListenLastCountedIndex = i;
       } else {
         break;

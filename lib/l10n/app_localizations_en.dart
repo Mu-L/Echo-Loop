@@ -1539,6 +1539,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get outputWordsShort => 'Output';
 
   @override
+  String get learnedWordFormsShort => 'Vocab';
+
+  @override
+  String get todayNewShort => 'Today';
+
+  @override
+  String get learnedWordsEmptyHint =>
+      'No learned words yet. Finish some listening first.';
+
+  @override
+  String get learnedWordsSortTimeAsc => 'Oldest Learned';
+
+  @override
+  String get learnedWordsSortTimeDesc => 'Recently Learned';
+
+  @override
   String bookmarkReviewProgress(int current, int total) {
     return '$current/$total sentences';
   }

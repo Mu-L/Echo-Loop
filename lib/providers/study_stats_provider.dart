@@ -1,4 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../database/providers.dart';
 import '../services/study_time_service.dart';
 
 part 'study_stats_provider.g.dart';
@@ -23,6 +25,12 @@ class StudyStats {
   /// 今日输出词数（跟读/复述了多少词）
   final int todayOutputWords;
 
+  /// 累计唯一已学词形数
+  final int learnedWordFormCount;
+
+  /// 今日新增唯一词形数
+  final int todayNewWordForms;
+
   const StudyStats({
     this.streak = 0,
     this.todaySeconds = 0,
@@ -30,6 +38,8 @@ class StudyStats {
     this.dailySeconds = const [0, 0, 0, 0, 0, 0, 0],
     this.todayInputWords = 0,
     this.todayOutputWords = 0,
+    this.learnedWordFormCount = 0,
+    this.todayNewWordForms = 0,
   });
 }
 
@@ -45,6 +55,10 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
 
   Future<StudyStats> _load() async {
     final service = StudyTimeService();
+    final learnedWordFormDao = ref.read(learnedWordFormDaoProvider);
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
     final results = await Future.wait([
       service.getStudyStreak(),
       service.getTodayStudyTime(),
@@ -52,6 +66,8 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
       service.getWeeklyStudyTimes(),
       service.getTodayInputWords(),
       service.getTodayOutputWords(),
+      learnedWordFormDao.countAll(),
+      learnedWordFormDao.countFirstLearnedBetween(todayStart, tomorrowStart),
     ]);
     return StudyStats(
       streak: results[0] as int,
@@ -60,6 +76,8 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
       dailySeconds: results[3] as List<int>,
       todayInputWords: results[4] as int,
       todayOutputWords: results[5] as int,
+      learnedWordFormCount: results[6] as int,
+      todayNewWordForms: results[7] as int,
     );
   }
 

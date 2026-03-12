@@ -25,6 +25,7 @@ import '../../services/study_time_service.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../daily_study_time_provider.dart';
+import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
 import 'review_difficult_practice_provider.dart';
 import 'sentence_playback_engine.dart';
@@ -413,6 +414,7 @@ class BookmarkReview extends _$BookmarkReview {
           ? (dur) {
               // 每遍播完计入输入词数
               _addInputWords(wordCount);
+              _recordLearnedSentence(sentence.text);
               state = state.copyWith(
                 isPauseBetweenPlays: true,
                 isPlaying: false,
@@ -436,6 +438,7 @@ class BookmarkReview extends _$BookmarkReview {
       onAllPlaysCompleted: () async {
         // 最后一遍（或唯一一遍）播完计入输入词数
         _addInputWords(wordCount);
+        _recordLearnedSentence(sentence.text);
         await _autoAdvance();
       },
     );
@@ -469,6 +472,7 @@ class BookmarkReview extends _$BookmarkReview {
       onPauseStarted: (dur) {
         // 播放完成 = 输入，停顿开始 = 用户跟读 = 输出
         _addInputWords(wordCount);
+        _recordLearnedSentence(sentence.text);
         _addOutputWords(wordCount);
         state = state.copyWith(
           isPauseBetweenPlays: true,
@@ -488,6 +492,7 @@ class BookmarkReview extends _$BookmarkReview {
       onAllPlaysCompleted: () async {
         // 最后一遍只有输入，没有跟读停顿
         _addInputWords(wordCount);
+        _recordLearnedSentence(sentence.text);
         state = state.copyWith(
           isAnnotationMode: false,
           isPlaying: false,
@@ -512,6 +517,16 @@ class BookmarkReview extends _$BookmarkReview {
     }
     ref.read(dailyStudyTimeProvider.notifier).refresh();
     ref.read(studyStatsNotifierProvider.notifier).refresh();
+  }
+
+  /// 异步记录收藏复习中听到的词形，不影响播放流程。
+  void _recordLearnedSentence(String text) {
+    try {
+      final tracker = ref.read(learnedVocabularyTrackerProvider);
+      unawaited(tracker.recordSentence(text));
+    } on UnimplementedError {
+      // 测试环境可能未注入数据库，忽略词形统计即可。
+    }
   }
 
   /// 累加输入词数并刷新统计 UI

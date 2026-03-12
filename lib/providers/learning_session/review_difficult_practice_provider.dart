@@ -434,6 +434,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       onPauseStarted: (dur) {
         // 播放完成 = 输入，停顿开始 = 用户跟读 = 输出
         session.addInputWords(wordCount);
+        session.recordLearnedSentence(sentence.text);
         session.addOutputWords(wordCount);
         state = state.copyWith(
           isPauseBetweenPlays: true,
@@ -453,6 +454,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       onAllPlaysCompleted: () async {
         // 最后一遍只有输入，没有跟读停顿
         session.addInputWords(wordCount);
+        session.recordLearnedSentence(sentence.text);
         state = state.copyWith(
           isAnnotationMode: false,
           isPlaying: false,
@@ -503,6 +505,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
           ? (dur) {
               // 每遍播完计入输入词数
               session.addInputWords(wordCount);
+              session.recordLearnedSentence(sentence.text);
               state = state.copyWith(
                 isPauseBetweenPlays: true,
                 isPlaying: false,
@@ -526,6 +529,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       onAllPlaysCompleted: () async {
         // 最后一遍（或唯一一遍）播完计入输入词数
         session.addInputWords(wordCount);
+        session.recordLearnedSentence(sentence.text);
         // 盲听完成 → 句间停顿 → 自动推进
         await _autoAdvance();
       },

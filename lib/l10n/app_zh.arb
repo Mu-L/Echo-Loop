@@ -632,6 +632,11 @@
 
   "inputWordsShort": "输入",
   "outputWordsShort": "输出",
+  "learnedWordFormsShort": "词汇量",
+  "todayNewShort": "今日",
+  "learnedWordsEmptyHint": "还没有记录到已学词汇，先完成一些学习内容吧。",
+  "learnedWordsSortTimeAsc": "最早学习",
+  "learnedWordsSortTimeDesc": "最近学习",
 
   "bookmarkReviewProgress": "{current}/{total} 句",
 

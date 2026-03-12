@@ -6491,6 +6491,272 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
   }
 }
 
+class $LearnedWordFormsTable extends LearnedWordForms
+    with TableInfo<$LearnedWordFormsTable, LearnedWordForm> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LearnedWordFormsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _wordFormMeta = const VerificationMeta(
+    'wordForm',
+  );
+  @override
+  late final GeneratedColumn<String> wordForm = GeneratedColumn<String>(
+    'word_form',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _firstLearnedAtMeta = const VerificationMeta(
+    'firstLearnedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> firstLearnedAt =
+      GeneratedColumn<DateTime>(
+        'first_learned_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [id, wordForm, firstLearnedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'learned_word_forms';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LearnedWordForm> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('word_form')) {
+      context.handle(
+        _wordFormMeta,
+        wordForm.isAcceptableOrUnknown(data['word_form']!, _wordFormMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wordFormMeta);
+    }
+    if (data.containsKey('first_learned_at')) {
+      context.handle(
+        _firstLearnedAtMeta,
+        firstLearnedAt.isAcceptableOrUnknown(
+          data['first_learned_at']!,
+          _firstLearnedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstLearnedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LearnedWordForm map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LearnedWordForm(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      wordForm: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}word_form'],
+      )!,
+      firstLearnedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}first_learned_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LearnedWordFormsTable createAlias(String alias) {
+    return $LearnedWordFormsTable(attachedDatabase, alias);
+  }
+}
+
+class LearnedWordForm extends DataClass implements Insertable<LearnedWordForm> {
+  /// 自增主键
+  final int id;
+
+  /// 统一清洗后的小写词形，全局唯一
+  final String wordForm;
+
+  /// 首次学习时间
+  final DateTime firstLearnedAt;
+  const LearnedWordForm({
+    required this.id,
+    required this.wordForm,
+    required this.firstLearnedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['word_form'] = Variable<String>(wordForm);
+    map['first_learned_at'] = Variable<DateTime>(firstLearnedAt);
+    return map;
+  }
+
+  LearnedWordFormsCompanion toCompanion(bool nullToAbsent) {
+    return LearnedWordFormsCompanion(
+      id: Value(id),
+      wordForm: Value(wordForm),
+      firstLearnedAt: Value(firstLearnedAt),
+    );
+  }
+
+  factory LearnedWordForm.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LearnedWordForm(
+      id: serializer.fromJson<int>(json['id']),
+      wordForm: serializer.fromJson<String>(json['wordForm']),
+      firstLearnedAt: serializer.fromJson<DateTime>(json['firstLearnedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'wordForm': serializer.toJson<String>(wordForm),
+      'firstLearnedAt': serializer.toJson<DateTime>(firstLearnedAt),
+    };
+  }
+
+  LearnedWordForm copyWith({
+    int? id,
+    String? wordForm,
+    DateTime? firstLearnedAt,
+  }) => LearnedWordForm(
+    id: id ?? this.id,
+    wordForm: wordForm ?? this.wordForm,
+    firstLearnedAt: firstLearnedAt ?? this.firstLearnedAt,
+  );
+  LearnedWordForm copyWithCompanion(LearnedWordFormsCompanion data) {
+    return LearnedWordForm(
+      id: data.id.present ? data.id.value : this.id,
+      wordForm: data.wordForm.present ? data.wordForm.value : this.wordForm,
+      firstLearnedAt: data.firstLearnedAt.present
+          ? data.firstLearnedAt.value
+          : this.firstLearnedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LearnedWordForm(')
+          ..write('id: $id, ')
+          ..write('wordForm: $wordForm, ')
+          ..write('firstLearnedAt: $firstLearnedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, wordForm, firstLearnedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LearnedWordForm &&
+          other.id == this.id &&
+          other.wordForm == this.wordForm &&
+          other.firstLearnedAt == this.firstLearnedAt);
+}
+
+class LearnedWordFormsCompanion extends UpdateCompanion<LearnedWordForm> {
+  final Value<int> id;
+  final Value<String> wordForm;
+  final Value<DateTime> firstLearnedAt;
+  const LearnedWordFormsCompanion({
+    this.id = const Value.absent(),
+    this.wordForm = const Value.absent(),
+    this.firstLearnedAt = const Value.absent(),
+  });
+  LearnedWordFormsCompanion.insert({
+    this.id = const Value.absent(),
+    required String wordForm,
+    required DateTime firstLearnedAt,
+  }) : wordForm = Value(wordForm),
+       firstLearnedAt = Value(firstLearnedAt);
+  static Insertable<LearnedWordForm> custom({
+    Expression<int>? id,
+    Expression<String>? wordForm,
+    Expression<DateTime>? firstLearnedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (wordForm != null) 'word_form': wordForm,
+      if (firstLearnedAt != null) 'first_learned_at': firstLearnedAt,
+    });
+  }
+
+  LearnedWordFormsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? wordForm,
+    Value<DateTime>? firstLearnedAt,
+  }) {
+    return LearnedWordFormsCompanion(
+      id: id ?? this.id,
+      wordForm: wordForm ?? this.wordForm,
+      firstLearnedAt: firstLearnedAt ?? this.firstLearnedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (wordForm.present) {
+      map['word_form'] = Variable<String>(wordForm.value);
+    }
+    if (firstLearnedAt.present) {
+      map['first_learned_at'] = Variable<DateTime>(firstLearnedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LearnedWordFormsCompanion(')
+          ..write('id: $id, ')
+          ..write('wordForm: $wordForm, ')
+          ..write('firstLearnedAt: $firstLearnedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6511,6 +6777,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $SavedWordsTable savedWords = $SavedWordsTable(this);
+  late final $LearnedWordFormsTable learnedWordForms = $LearnedWordFormsTable(
+    this,
+  );
   late final AudioItemDao audioItemDao = AudioItemDao(this as AppDatabase);
   late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
@@ -6528,6 +6797,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this as AppDatabase,
   );
   late final SavedWordDao savedWordDao = SavedWordDao(this as AppDatabase);
+  late final LearnedWordFormDao learnedWordFormDao = LearnedWordFormDao(
+    this as AppDatabase,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6544,6 +6816,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     audioItemTags,
     sentenceAiCache,
     savedWords,
+    learnedWordForms,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -11640,6 +11913,170 @@ typedef $$SavedWordsTableProcessedTableManager =
       SavedWord,
       PrefetchHooks Function({bool audioItemId})
     >;
+typedef $$LearnedWordFormsTableCreateCompanionBuilder =
+    LearnedWordFormsCompanion Function({
+      Value<int> id,
+      required String wordForm,
+      required DateTime firstLearnedAt,
+    });
+typedef $$LearnedWordFormsTableUpdateCompanionBuilder =
+    LearnedWordFormsCompanion Function({
+      Value<int> id,
+      Value<String> wordForm,
+      Value<DateTime> firstLearnedAt,
+    });
+
+class $$LearnedWordFormsTableFilterComposer
+    extends Composer<_$AppDatabase, $LearnedWordFormsTable> {
+  $$LearnedWordFormsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get wordForm => $composableBuilder(
+    column: $table.wordForm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get firstLearnedAt => $composableBuilder(
+    column: $table.firstLearnedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LearnedWordFormsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LearnedWordFormsTable> {
+  $$LearnedWordFormsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get wordForm => $composableBuilder(
+    column: $table.wordForm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get firstLearnedAt => $composableBuilder(
+    column: $table.firstLearnedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LearnedWordFormsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LearnedWordFormsTable> {
+  $$LearnedWordFormsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get wordForm =>
+      $composableBuilder(column: $table.wordForm, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get firstLearnedAt => $composableBuilder(
+    column: $table.firstLearnedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$LearnedWordFormsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LearnedWordFormsTable,
+          LearnedWordForm,
+          $$LearnedWordFormsTableFilterComposer,
+          $$LearnedWordFormsTableOrderingComposer,
+          $$LearnedWordFormsTableAnnotationComposer,
+          $$LearnedWordFormsTableCreateCompanionBuilder,
+          $$LearnedWordFormsTableUpdateCompanionBuilder,
+          (
+            LearnedWordForm,
+            BaseReferences<
+              _$AppDatabase,
+              $LearnedWordFormsTable,
+              LearnedWordForm
+            >,
+          ),
+          LearnedWordForm,
+          PrefetchHooks Function()
+        > {
+  $$LearnedWordFormsTableTableManager(
+    _$AppDatabase db,
+    $LearnedWordFormsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LearnedWordFormsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LearnedWordFormsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LearnedWordFormsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> wordForm = const Value.absent(),
+                Value<DateTime> firstLearnedAt = const Value.absent(),
+              }) => LearnedWordFormsCompanion(
+                id: id,
+                wordForm: wordForm,
+                firstLearnedAt: firstLearnedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String wordForm,
+                required DateTime firstLearnedAt,
+              }) => LearnedWordFormsCompanion.insert(
+                id: id,
+                wordForm: wordForm,
+                firstLearnedAt: firstLearnedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LearnedWordFormsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LearnedWordFormsTable,
+      LearnedWordForm,
+      $$LearnedWordFormsTableFilterComposer,
+      $$LearnedWordFormsTableOrderingComposer,
+      $$LearnedWordFormsTableAnnotationComposer,
+      $$LearnedWordFormsTableCreateCompanionBuilder,
+      $$LearnedWordFormsTableUpdateCompanionBuilder,
+      (
+        LearnedWordForm,
+        BaseReferences<_$AppDatabase, $LearnedWordFormsTable, LearnedWordForm>,
+      ),
+      LearnedWordForm,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11665,4 +12102,6 @@ class $AppDatabaseManager {
       $$SentenceAiCacheTableTableManager(_db, _db.sentenceAiCache);
   $$SavedWordsTableTableManager get savedWords =>
       $$SavedWordsTableTableManager(_db, _db.savedWords);
+  $$LearnedWordFormsTableTableManager get learnedWordForms =>
+      $$LearnedWordFormsTableTableManager(_db, _db.learnedWordForms);
 }

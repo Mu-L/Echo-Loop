@@ -865,6 +865,11 @@
 
   "inputWordsShort": "Input",
   "outputWordsShort": "Output",
+  "learnedWordFormsShort": "Vocab",
+  "todayNewShort": "Today",
+  "learnedWordsEmptyHint": "No learned words yet. Finish some listening first.",
+  "learnedWordsSortTimeAsc": "Oldest Learned",
+  "learnedWordsSortTimeDesc": "Recently Learned",
 
   "bookmarkReviewProgress": "{current}/{total} sentences",
   "@bookmarkReviewProgress": {

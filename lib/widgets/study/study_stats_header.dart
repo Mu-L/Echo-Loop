@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/study_stats_provider.dart';
 import '../../theme/app_theme.dart';
+import 'learned_word_forms_sheet.dart';
 
 /// 学习统计头部组件
 ///
@@ -63,12 +64,23 @@ class _StatsChips extends StatelessWidget {
         _StatChip(
           icon: Icons.headphones_outlined,
           iconColor: Colors.teal,
-          label: '${l10n.inputWordsShort}: ${_formatWordCount(stats.todayInputWords)}',
+          label:
+              '${l10n.inputWordsShort}: ${_formatWordCount(stats.todayInputWords)}',
         ),
         _StatChip(
           icon: Icons.mic_outlined,
           iconColor: Colors.deepPurple,
-          label: '${l10n.outputWordsShort}: ${_formatWordCount(stats.todayOutputWords)}',
+          label:
+              '${l10n.outputWordsShort}: ${_formatWordCount(stats.todayOutputWords)}',
+        ),
+        _StatChip(
+          icon: Icons.spellcheck_rounded,
+          iconColor: Colors.indigo,
+          label:
+              '${l10n.learnedWordFormsShort}: ${_formatWordCount(stats.learnedWordFormCount)} · ${l10n.todayNewShort} +${_formatWordCount(stats.todayNewWordForms)}',
+          onTap: () {
+            showLearnedWordFormsSheet(context: context);
+          },
         ),
       ],
     );
@@ -82,17 +94,19 @@ class _StatChip extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
+  final VoidCallback? onTap;
 
   const _StatChip({
     required this.icon,
     required this.iconColor,
     required this.label,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: iconColor.withValues(alpha: 0.08),
@@ -111,6 +125,17 @@ class _StatChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: content,
       ),
     );
   }
@@ -167,8 +192,9 @@ class _WeeklyBarChart extends StatelessWidget {
                         _formatMinutes(seconds),
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontSize: 9,
-                          fontWeight:
-                              isToday ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isToday
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                           color: isToday
                               ? theme.colorScheme.primary
                               : theme.colorScheme.onSurfaceVariant,

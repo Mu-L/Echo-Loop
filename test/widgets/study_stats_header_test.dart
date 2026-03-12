@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:drift/native.dart';
 import 'package:fluency/l10n/app_localizations.dart';
+import 'package:fluency/database/app_database.dart';
+import 'package:fluency/database/providers.dart';
 import 'package:fluency/widgets/study/study_stats_header.dart';
 import 'package:fluency/providers/study_stats_provider.dart';
 import 'package:fluency/theme/app_theme.dart';
@@ -23,12 +26,22 @@ class _TestStudyStatsNotifier extends StudyStatsNotifier {
 }
 
 void main() {
+  AppDatabase createTestDb() {
+    return AppDatabase(
+      NativeDatabase.memory(
+        setup: (db) => db.execute('PRAGMA foreign_keys = ON'),
+      ),
+    );
+  }
+
   Widget createTestWidget({
     required StudyStats stats,
     Locale locale = const Locale('en'),
+    AppDatabase? db,
   }) {
     return ProviderScope(
       overrides: [
+        if (db != null) appDatabaseProvider.overrideWithValue(db),
         studyStatsNotifierProvider.overrideWith(
           () => _TestStudyStatsNotifier(stats),
         ),
@@ -49,12 +62,24 @@ void main() {
   }
 
   group('StudyStatsHeader — 统计卡片', () {
+    late AppDatabase db;
+
+    setUp(() {
+      db = createTestDb();
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
     testWidgets('显示今日和本周时长', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
           stats: const StudyStats(
             todaySeconds: 1800, // 30 min
             weekTotalSeconds: 7200, // 2h 0m
+            learnedWordFormCount: 1234,
+            todayNewWordForms: 12,
           ),
         ),
       );
@@ -62,6 +87,7 @@ void main() {
 
       expect(find.text('Today: 30 min'), findsOneWidget);
       expect(find.text('Week: 2h 0m'), findsOneWidget);
+      expect(find.text('Vocab: 1,234 · Today +12'), findsOneWidget);
     });
 
     testWidgets('零时长显示 0 min', (tester) async {
@@ -74,12 +100,37 @@ void main() {
 
     testWidgets('显示计时器和日期图标', (tester) async {
       await tester.pumpWidget(
-        createTestWidget(stats: const StudyStats(todaySeconds: 60)),
+        createTestWidget(stats: const StudyStats(todaySeconds: 60), db: db),
       );
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
       expect(find.byIcon(Icons.date_range_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.spellcheck_rounded), findsOneWidget);
+    });
+
+    testWidgets('点击词汇量 badge 打开底部弹窗', (tester) async {
+      await db.learnedWordFormDao.insertIfAbsentAll({
+        'beta': DateTime(2026, 3, 12, 10),
+      });
+
+      await tester.pumpWidget(
+        createTestWidget(
+          stats: const StudyStats(
+            learnedWordFormCount: 1,
+            todayNewWordForms: 1,
+          ),
+          db: db,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Vocab: 1 · Today +1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vocab'), findsWidgets);
+      expect(find.text('1 words'), findsOneWidget);
+      expect(find.text('beta'), findsOneWidget);
     });
 
     testWidgets('大时长格式化为小时分钟', (tester) async {
@@ -158,14 +209,20 @@ void main() {
     testWidgets('中文标签', (tester) async {
       await tester.pumpWidget(
         createTestWidget(
-          stats: const StudyStats(todaySeconds: 1800, weekTotalSeconds: 3600),
+          stats: const StudyStats(
+            todaySeconds: 1800,
+            weekTotalSeconds: 3600,
+            learnedWordFormCount: 1234,
+            todayNewWordForms: 12,
+          ),
           locale: const Locale('zh'),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('今日'), findsOneWidget);
-      expect(find.textContaining('本周'), findsOneWidget);
+      expect(find.text('今日: 30 分钟'), findsOneWidget);
+      expect(find.text('本周: 1小时0分钟'), findsOneWidget);
+      expect(find.text('词汇量: 1,234 · 今日 +12'), findsOneWidget);
     });
   });
 }

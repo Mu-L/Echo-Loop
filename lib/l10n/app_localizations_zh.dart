@@ -1502,6 +1502,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get outputWordsShort => '输出';
 
   @override
+  String get learnedWordFormsShort => '词汇量';
+
+  @override
+  String get todayNewShort => '今日';
+
+  @override
+  String get learnedWordsEmptyHint => '还没有记录到已学词汇，先完成一些学习内容吧。';
+
+  @override
+  String get learnedWordsSortTimeAsc => '最早学习';
+
+  @override
+  String get learnedWordsSortTimeDesc => '最近学习';
+
+  @override
   String bookmarkReviewProgress(int current, int total) {
     return '$current/$total 句';
   }

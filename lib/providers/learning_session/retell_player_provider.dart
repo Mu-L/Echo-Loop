@@ -442,9 +442,9 @@ class RetellPlayer extends _$RetellPlayer {
 
     // 计入输入词数（听完一遍段落）
     final paragraphWordCount = countWordsInSentences(sentences);
-    ref
-        .read(learningSessionProvider.notifier)
-        .addInputWords(paragraphWordCount);
+    final session = ref.read(learningSessionProvider.notifier);
+    session.addInputWords(paragraphWordCount);
+    session.recordLearnedSentences(sentences);
 
     _positionSub?.cancel();
     _enterRetellingPhase();

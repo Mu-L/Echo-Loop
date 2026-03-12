@@ -2756,6 +2756,36 @@ abstract class AppLocalizations {
   /// **'Output'**
   String get outputWordsShort;
 
+  /// No description provided for @learnedWordFormsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocab'**
+  String get learnedWordFormsShort;
+
+  /// No description provided for @todayNewShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get todayNewShort;
+
+  /// No description provided for @learnedWordsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No learned words yet. Finish some listening first.'**
+  String get learnedWordsEmptyHint;
+
+  /// No description provided for @learnedWordsSortTimeAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest Learned'**
+  String get learnedWordsSortTimeAsc;
+
+  /// No description provided for @learnedWordsSortTimeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently Learned'**
+  String get learnedWordsSortTimeDesc;
+
   /// No description provided for @bookmarkReviewProgress.
   ///
   /// In en, this message translates to:
