@@ -360,6 +360,54 @@ void main() {
       },
     );
 
+    test('ASR 有转录但 VAD 未触发时，仍应从 awaitingSpeech 转为 speaking', () {
+      fakeAsync((async) {
+        final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
+        final container = ProviderContainer(
+          overrides: [
+            speechPracticeBackendProvider.overrideWithValue(backend),
+            listenAndRepeatPlayerProvider.overrideWith(
+              () => TestListenAndRepeatPlayer(
+                const ListenAndRepeatPlayerState(
+                  currentSentenceIndex: 0,
+                  totalSentences: 1,
+                  currentPlayCount: 1,
+                  isPauseBetweenPlays: true,
+                ),
+                createTestSentences(count: 1),
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(
+          listenAndRepeatTurnControllerProvider.notifier,
+        );
+        controller.ensureAutoTurn(
+          promptId: 'shadowing:a1:0',
+          referenceText: 'Hello world',
+        );
+        async.flushMicrotasks();
+
+        expect(
+          container.read(listenAndRepeatTurnControllerProvider).phase,
+          ListenAndRepeatTurnPhase.awaitingSpeech,
+        );
+
+        // 只发送 partialTranscript，不发送 speechStarted（模拟压低声音）
+        backend.emitPartial('Hello');
+        async.flushMicrotasks();
+
+        expect(
+          container.read(listenAndRepeatTurnControllerProvider).phase,
+          ListenAndRepeatTurnPhase.speaking,
+        );
+
+        backend.dispose();
+        container.dispose();
+      });
+    });
+
     test('识别失败（noEnglishDetected）时进入 retryPending 自动重试', () async {
       final backend = _FakeSpeechPracticeBackend(autoEmitFinal: false);
       final container = ProviderContainer(

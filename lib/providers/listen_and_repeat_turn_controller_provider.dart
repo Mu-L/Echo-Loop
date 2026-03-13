@@ -452,8 +452,12 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
       return;
     }
 
+    // VAD 检测到语音，或 ASR 已产出文字（用户压低声音时 VAD 可能不触发）
+    final hasVoiceInput = attempt.hasDetectedSpeech ||
+        (attempt.liveTranscript?.trim().isNotEmpty ?? false);
+
     if (state.phase == ListenAndRepeatTurnPhase.awaitingSpeech &&
-        attempt.hasDetectedSpeech) {
+        hasVoiceInput) {
       _cancelAwaitingSpeechTimers();
       state = state.copyWith(phase: ListenAndRepeatTurnPhase.speaking);
     }
