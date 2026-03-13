@@ -142,10 +142,7 @@ class _SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
                             : l10n.intensiveListenMarkedDifficult)
                       : l10n.intensiveListenNotDifficult,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: widget.isDifficult
-                        ? Colors.amber.shade700
-                        : Colors.grey,
-                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.6),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

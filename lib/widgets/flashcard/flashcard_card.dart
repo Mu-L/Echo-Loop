@@ -644,7 +644,7 @@ class _UnsaveButton extends StatelessWidget {
         IconButton(
           onPressed: onUnsave,
           icon: const Icon(Icons.bookmark, size: 20),
-          color: theme.colorScheme.primary,
+          color: Colors.amber,
           tooltip: l10n.flashcardUnsaveHint,
         ),
       ],

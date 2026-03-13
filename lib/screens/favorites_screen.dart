@@ -215,7 +215,7 @@ class _FloatingFlashcardButton extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (words) {
-        if (words.length < 2) return const SizedBox.shrink();
+        if (words.isEmpty) return const SizedBox.shrink();
         final l10n = AppLocalizations.of(context)!;
         return _FloatingReviewButton(
           icon: Icons.style_outlined,

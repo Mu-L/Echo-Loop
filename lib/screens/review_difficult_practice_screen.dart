@@ -511,14 +511,13 @@ class _NormalModeView extends StatelessWidget {
                   child: Text(
                     l10n.intensiveListenMarkedDifficult,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.amber.shade700,
-                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.6),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                const Icon(Icons.bookmark, color: Colors.amber, size: 18),
+                Icon(Icons.bookmark, color: Colors.amber, size: 18),
               ],
             ),
           ),
