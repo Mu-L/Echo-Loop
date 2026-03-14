@@ -7,7 +7,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/speech_practice_models.dart';
-import 'learning_session/listen_and_repeat_player_provider.dart';
 import 'speech_practice_session_provider.dart';
 
 const _awaitingSpeechReminderDelay = Duration(seconds: 5);
@@ -224,6 +223,9 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
   int _consecutiveFailureCount = 0;
   bool _isStopping = false;
 
+  /// 外部注入的"继续"回调，由使用方（跟读页/难句补练页）注册。
+  Future<void> Function()? _onContinue;
+
   @override
   ListenAndRepeatTurnState build() {
     final lifecycleListener = AppLifecycleListener(
@@ -238,6 +240,11 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
       _handleSpeechPracticeStateChanged,
     );
     return const ListenAndRepeatTurnState();
+  }
+
+  /// 注册"继续"回调，由使用方在 initState 中调用。
+  void setOnContinue(Future<void> Function()? callback) {
+    _onContinue = callback;
   }
 
   Future<void> ensureTurn({
@@ -339,7 +346,11 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
   Future<void> handleContinue() async {
     _cancelReviewCountdown();
     state = state.copyWith(phase: ListenAndRepeatTurnPhase.idle);
-    await ref.read(listenAndRepeatPlayerProvider.notifier).completePausedTurn();
+    if (_onContinue != null) {
+      await _onContinue!();
+    } else {
+      debugPrint('[TurnController] handleContinue: _onContinue 未注册');
+    }
   }
 
   void pauseReviewCountdown() {
@@ -407,6 +418,7 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     _cancelAllTimers();
     _isStopping = false;
     _consecutiveFailureCount = 0;
+    _onContinue = null;
     state = const ListenAndRepeatTurnState();
   }
 
@@ -468,7 +480,8 @@ class ListenAndRepeatTurnController extends Notifier<ListenAndRepeatTurnState> {
     }
 
     // VAD 检测到语音，或 ASR 已产出文字（用户压低声音时 VAD 可能不触发）
-    final hasVoiceInput = attempt.hasDetectedSpeech ||
+    final hasVoiceInput =
+        attempt.hasDetectedSpeech ||
         (attempt.liveTranscript?.trim().isNotEmpty ?? false);
 
     if (state.phase == ListenAndRepeatTurnPhase.awaitingSpeech &&

@@ -31,8 +31,8 @@ import '../providers/sentence_ai_provider.dart';
 import '../providers/speech_practice_session_provider.dart';
 import '../widgets/intensive_listen/sentence_annotation_card.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_settings_sheet.dart';
-import '../widgets/common/countdown_chip.dart';
-import '../widgets/listen_and_repeat/speech_record_button.dart';
+import '../widgets/listen_and_repeat/speech_practice_turn_panel.dart';
+import '../widgets/listen_and_repeat/speech_practice_result_card.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/retell/retell_briefing_sheet.dart';
@@ -65,8 +65,15 @@ class _ListenAndRepeatPlayerScreenState
   @override
   void initState() {
     super.initState();
-    // 进入后自动开始播放
+    // 进入后自动开始播放，注册 TurnController 回调
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(listenAndRepeatTurnControllerProvider.notifier)
+          .setOnContinue(
+            () => ref
+                .read(listenAndRepeatPlayerProvider.notifier)
+                .completePausedTurn(),
+          );
       ref.read(listenAndRepeatPlayerProvider.notifier).startPlaying();
     });
   }
@@ -561,9 +568,7 @@ class _ListenAndRepeatPlayerScreenState
               // 主体内容：句子卡片
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.l,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
                   child: SingleChildScrollView(
                     child: currentSentence != null
                         ? _buildAnnotationCard(
@@ -572,9 +577,8 @@ class _ListenAndRepeatPlayerScreenState
                             highlightedSegments:
                                 currentAttempt?.referenceSegments,
                             inlineFeedback: switch (currentAttempt) {
-                              final attempt?
-                                  when attempt.hasFinalFeedback =>
-                                _SpeechPracticeResultCard(
+                              final attempt? when attempt.hasFinalFeedback =>
+                                SpeechPracticeResultCard(
                                   l10n: l10n,
                                   attempt: attempt,
                                   isPlayingAttempt:
@@ -607,10 +611,8 @@ class _ListenAndRepeatPlayerScreenState
                     // 录音面板 / 播放提示
                     if (playerState.isPauseBetweenPlays)
                       Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppSpacing.m,
-                        ),
-                        child: _SpeechPracticeTurnPanel(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                        child: SpeechPracticeTurnPanel(
                           l10n: l10n,
                           turnState: turnState,
                           isRecordingCurrent: isRecordingCurrent,
@@ -738,352 +740,6 @@ class _ProgressSection extends StatelessWidget {
   }
 }
 
-/// 跟读回合状态面板。
-class _SpeechPracticeTurnPanel extends StatelessWidget {
-  final AppLocalizations l10n;
-  final ListenAndRepeatTurnState turnState;
-  final bool isRecordingCurrent;
-  final VoidCallback onRecordTap;
-  final VoidCallback onFastForward;
-  final VoidCallback onCountdownTap;
-
-  const _SpeechPracticeTurnPanel({
-    required this.l10n,
-    required this.turnState,
-    required this.isRecordingCurrent,
-    required this.onRecordTap,
-    required this.onFastForward,
-    required this.onCountdownTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // reviewCountdown：倒计时按钮居中（与录音按钮同位置同大小），右侧快进图标
-    if (turnState.phase == ListenAndRepeatTurnPhase.reviewCountdown) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 24 + AppSpacing.xs),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 左侧占位，与右侧快进按钮等宽，保持倒计时居中
-              const SizedBox(width: 32),
-              const SizedBox(width: 48),
-              CountdownChip(
-                remaining: turnState.reviewCountdownRemaining,
-                total: const Duration(seconds: 5),
-                isPaused: turnState.isReviewCountdownPaused,
-                onTap: onCountdownTap,
-              ),
-              const SizedBox(width: 48),
-              // 与下方"下一句"按钮同列对齐
-              GestureDetector(
-                onTap: onFastForward,
-                child: Icon(
-                  Icons.fast_forward_rounded,
-                  size: 32,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
-
-    // 其余阶段统一布局：状态文字 + 录音按钮
-    final statusText = _statusText(turnState.phase);
-    final isProcessing =
-        turnState.phase == ListenAndRepeatTurnPhase.processing ||
-        turnState.phase == ListenAndRepeatTurnPhase.retryPending;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 状态区：固定高度，显示当前状态文字
-        SizedBox(
-          height: 24,
-          child: statusText != null
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isProcessing)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                    Text(
-                      statusText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                )
-              : null,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        // 录音按钮：processing 时禁用（灰显），其他阶段正常
-        IgnorePointer(
-          ignoring: isProcessing,
-          child: Opacity(
-            opacity: isProcessing ? 0.45 : 1.0,
-            child: SpeechRecordButton(
-              phase: switch (turnState.phase) {
-                ListenAndRepeatTurnPhase.idle ||
-                ListenAndRepeatTurnPhase.processing ||
-                ListenAndRepeatTurnPhase.retryPending =>
-                  ListenAndRepeatTurnPhase.awaitingSpeech,
-                final p => p,
-              },
-              onTap: onRecordTap,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 根据阶段返回状态文字，null 表示不显示。
-  String? _statusText(ListenAndRepeatTurnPhase phase) {
-    return switch (phase) {
-      ListenAndRepeatTurnPhase.idle =>
-        l10n.listenAndRepeatRecordingInProgress,
-      ListenAndRepeatTurnPhase.awaitingSpeech =>
-        turnState.hasShownSpeechReminder
-            ? l10n.listenAndRepeatStartSpeaking
-            : l10n.listenAndRepeatRecordingInProgress,
-      ListenAndRepeatTurnPhase.speaking =>
-        l10n.listenAndRepeatRecordingInProgress,
-      ListenAndRepeatTurnPhase.processing =>
-        l10n.listenAndRepeatAnalyzing,
-      ListenAndRepeatTurnPhase.manualFallback =>
-        l10n.listenAndRepeatTapToRecord,
-      ListenAndRepeatTurnPhase.retryPending =>
-        l10n.listenAndRepeatRetryPending,
-      ListenAndRepeatTurnPhase.reviewCountdown => null,
-    };
-  }
-}
-
-/// 跟读录音结果卡。
-class _SpeechPracticeResultCard extends StatelessWidget {
-  final AppLocalizations l10n;
-  final SpeechPracticeAttempt attempt;
-  final bool isPlayingAttempt;
-  final VoidCallback? onPlayAttempt;
-
-  const _SpeechPracticeResultCard({
-    required this.l10n,
-    required this.attempt,
-    required this.isPlayingAttempt,
-    this.onPlayAttempt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusColor = _statusColor(theme);
-    final ratingStyle = _ratingStyle(theme);
-    final hasTranscript = (attempt.finalTranscript ?? '').isNotEmpty;
-    if (!hasTranscript) {
-      return Text(
-        _feedbackText(),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: statusColor,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [ratingStyle.backgroundStart, ratingStyle.backgroundEnd],
-            ),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: ratingStyle.borderColor),
-          ),
-          child: Text(
-            _ratingLabel(),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: ratingStyle.textColor,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-        const Spacer(),
-        if (attempt.hasRecording) ...[
-          const SizedBox(width: AppSpacing.xs),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.28,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              visualDensity: VisualDensity.compact,
-              splashRadius: 16,
-              tooltip: isPlayingAttempt
-                  ? l10n.stop
-                  : l10n.listenAndRepeatPlayRecordingButton,
-              onPressed: onPlayAttempt,
-              icon: Icon(
-                isPlayingAttempt
-                    ? Icons.stop_rounded
-                    : Icons.volume_up_outlined,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.76,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  String _ratingLabel() {
-    final score = attempt.score ?? 0;
-    if (score >= 0.85) {
-      return l10n.listenAndRepeatRatingExcellent;
-    }
-    if (score >= 0.65) {
-      return l10n.listenAndRepeatRatingGood;
-    }
-    if (score >= 0.45) {
-      return l10n.listenAndRepeatRatingFair;
-    }
-    return l10n.listenAndRepeatRatingTryAgain;
-  }
-
-  String _feedbackText() {
-    return switch (attempt.status) {
-      SpeechPracticeAttemptStatus.noEnglishDetected =>
-        l10n.listenAndRepeatRecognitionNoEnglish,
-      SpeechPracticeAttemptStatus.permissionDenied =>
-        l10n.listenAndRepeatRecognitionPermissionDenied,
-      SpeechPracticeAttemptStatus.unavailable =>
-        l10n.listenAndRepeatRecognitionUnavailable,
-      SpeechPracticeAttemptStatus.error =>
-        l10n.listenAndRepeatRecognitionError,
-      SpeechPracticeAttemptStatus.awaitingFinal ||
-      SpeechPracticeAttemptStatus.passed ||
-      SpeechPracticeAttemptStatus.belowThreshold ||
-      SpeechPracticeAttemptStatus.recording ||
-      SpeechPracticeAttemptStatus.idle => '',
-    };
-  }
-
-  Color _statusColor(ThemeData theme) {
-    return switch (attempt.status) {
-      SpeechPracticeAttemptStatus.passed => const Color(0xFF2E9B51),
-      SpeechPracticeAttemptStatus.awaitingFinal => theme.colorScheme.primary,
-      SpeechPracticeAttemptStatus.belowThreshold ||
-      SpeechPracticeAttemptStatus.noEnglishDetected ||
-      SpeechPracticeAttemptStatus.permissionDenied ||
-      SpeechPracticeAttemptStatus.unavailable ||
-      SpeechPracticeAttemptStatus.error => theme.colorScheme.error,
-      _ => theme.colorScheme.onSurface,
-    };
-  }
-
-  _RatingBadgeStyle _ratingStyle(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-    final score = attempt.score ?? 0;
-    if (score >= 0.85) {
-      return isDark
-          ? const _RatingBadgeStyle(
-              textColor: Color(0xFFB9F5C8),
-              backgroundStart: Color(0x3347B66B),
-              backgroundEnd: Color(0x1A245B38),
-              borderColor: Color(0x4057C878),
-            )
-          : const _RatingBadgeStyle(
-              textColor: Color(0xFF1E7A3D),
-              backgroundStart: Color(0xFFEAF8EF),
-              backgroundEnd: Color(0xFFDDF2E4),
-              borderColor: Color(0xFFA8D6B6),
-            );
-    }
-    if (score >= 0.65) {
-      return isDark
-          ? const _RatingBadgeStyle(
-              textColor: Color(0xFFE4F3B2),
-              backgroundStart: Color(0x33A4B84B),
-              backgroundEnd: Color(0x1A56611F),
-              borderColor: Color(0x40BDD460),
-            )
-          : const _RatingBadgeStyle(
-              textColor: Color(0xFF687A18),
-              backgroundStart: Color(0xFFF6F8DF),
-              backgroundEnd: Color(0xFFEEF3C8),
-              borderColor: Color(0xFFD6DD9A),
-            );
-    }
-    if (score >= 0.45) {
-      return isDark
-          ? const _RatingBadgeStyle(
-              textColor: Color(0xFFF7D79B),
-              backgroundStart: Color(0x33C68A38),
-              backgroundEnd: Color(0x1A6D4617),
-              borderColor: Color(0x40E0A450),
-            )
-          : const _RatingBadgeStyle(
-              textColor: Color(0xFF8A5A14),
-              backgroundStart: Color(0xFFFFF1DD),
-              backgroundEnd: Color(0xFFF9E3BF),
-              borderColor: Color(0xFFE6C48C),
-            );
-    }
-    return isDark
-        ? const _RatingBadgeStyle(
-            textColor: Color(0xFFFFC4B8),
-            backgroundStart: Color(0x33C55A4F),
-            backgroundEnd: Color(0x1A642722),
-            borderColor: Color(0x40DD756A),
-          )
-        : const _RatingBadgeStyle(
-            textColor: Color(0xFFA0433C),
-            backgroundStart: Color(0xFFFFECE8),
-            backgroundEnd: Color(0xFFF8D9D4),
-            borderColor: Color(0xFFE5B2AA),
-          );
-  }
-}
-
-class _RatingBadgeStyle {
-  final Color textColor;
-  final Color backgroundStart;
-  final Color backgroundEnd;
-  final Color borderColor;
-
-  const _RatingBadgeStyle({
-    required this.textColor,
-    required this.backgroundStart,
-    required this.backgroundEnd,
-    required this.borderColor,
-  });
-}
-
 /// 底部播放控制
 ///
 /// 布局：[上一句] --- [播放/暂停] --- [下一句]
@@ -1205,4 +861,3 @@ String _getSubStageName(SubStageType type, AppLocalizations l10n) =>
       SubStageType.reviewRetellParagraph => l10n.stepRetelling,
       SubStageType.reviewRetellSummary => l10n.stepRetelling,
     };
-
