@@ -1614,6 +1614,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get outputWordsShort => 'Output';
 
   @override
+  String listenTimeWords(String time, String words) {
+    return 'Listen: $time · $words';
+  }
+
+  @override
+  String speakTimeWords(String time, String words) {
+    return 'Speak: $time · $words';
+  }
+
+  @override
   String get learnedWordFormsShort => 'Vocab';
 
   @override

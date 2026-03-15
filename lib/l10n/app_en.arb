@@ -897,6 +897,20 @@
 
   "inputWordsShort": "Input",
   "outputWordsShort": "Output",
+  "listenTimeWords": "Listen: {time} · {words}",
+  "@listenTimeWords": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "words": { "type": "String" }
+    }
+  },
+  "speakTimeWords": "Speak: {time} · {words}",
+  "@speakTimeWords": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "words": { "type": "String" }
+    }
+  },
   "learnedWordFormsShort": "Vocab",
   "todayNewShort": "Today",
   "learnedWordsEmptyHint": "No learned words yet. Finish some listening first.",

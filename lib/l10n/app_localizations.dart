@@ -2888,6 +2888,18 @@ abstract class AppLocalizations {
   /// **'Output'**
   String get outputWordsShort;
 
+  /// No description provided for @listenTimeWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen: {time} · {words}'**
+  String listenTimeWords(String time, String words);
+
+  /// No description provided for @speakTimeWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Speak: {time} · {words}'**
+  String speakTimeWords(String time, String words);
+
   /// No description provided for @learnedWordFormsShort.
   ///
   /// In en, this message translates to:

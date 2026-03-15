@@ -31,6 +31,18 @@ class StudyStats {
   /// 今日新增唯一词形数
   final int todayNewWordForms;
 
+  /// 今日输入时间（秒）— 音频播放时间
+  final int todayInputSeconds;
+
+  /// 今日输出时间（秒）— 跟读/复述暂停时间
+  final int todayOutputSeconds;
+
+  /// 过去 7 天每天输入时间（秒），索引 0 = 6 天前，索引 6 = 今天
+  final List<int> dailyInputSeconds;
+
+  /// 过去 7 天每天输出时间（秒），索引 0 = 6 天前，索引 6 = 今天
+  final List<int> dailyOutputSeconds;
+
   const StudyStats({
     this.streak = 0,
     this.todaySeconds = 0,
@@ -40,6 +52,10 @@ class StudyStats {
     this.todayOutputWords = 0,
     this.learnedWordFormCount = 0,
     this.todayNewWordForms = 0,
+    this.todayInputSeconds = 0,
+    this.todayOutputSeconds = 0,
+    this.dailyInputSeconds = const [0, 0, 0, 0, 0, 0, 0],
+    this.dailyOutputSeconds = const [0, 0, 0, 0, 0, 0, 0],
   });
 }
 
@@ -68,6 +84,10 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
       service.getTodayOutputWords(),
       learnedWordFormDao.countAll(),
       learnedWordFormDao.countFirstLearnedBetween(todayStart, tomorrowStart),
+      service.getTodayInputTime(),
+      service.getTodayOutputTime(),
+      service.getWeeklyInputTimes(),
+      service.getWeeklyOutputTimes(),
     ]);
     return StudyStats(
       streak: results[0] as int,
@@ -78,6 +98,10 @@ class StudyStatsNotifier extends _$StudyStatsNotifier {
       todayOutputWords: results[5] as int,
       learnedWordFormCount: results[6] as int,
       todayNewWordForms: results[7] as int,
+      todayInputSeconds: results[8] as int,
+      todayOutputSeconds: results[9] as int,
+      dailyInputSeconds: results[10] as List<int>,
+      dailyOutputSeconds: results[11] as List<int>,
     );
   }
 

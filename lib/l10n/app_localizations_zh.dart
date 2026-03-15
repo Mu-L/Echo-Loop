@@ -1572,6 +1572,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get outputWordsShort => '输出';
 
   @override
+  String listenTimeWords(String time, String words) {
+    return '听: $time · $words词';
+  }
+
+  @override
+  String speakTimeWords(String time, String words) {
+    return '说: $time · $words词';
+  }
+
+  @override
   String get learnedWordFormsShort => '词汇量';
 
   @override

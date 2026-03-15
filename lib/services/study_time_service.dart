@@ -8,6 +8,8 @@ class StudyTimeService {
   static const String _keyPrefix = 'study_time_';
   static const String _inputWordsPrefix = 'input_words_';
   static const String _outputWordsPrefix = 'output_words_';
+  static const String _inputTimePrefix = 'input_time_';
+  static const String _outputTimePrefix = 'output_time_';
 
   /// 获取指定日期的学习时长（秒）
   Future<int> getStudyTime(DateTime date) async {
@@ -127,6 +129,80 @@ class StudyTimeService {
     final key = _wordKeyFor(_outputWordsPrefix, targetDate);
     final current = prefs.getInt(key) ?? 0;
     await prefs.setInt(key, current + count);
+  }
+
+  // ========== 输入时间（秒） ==========
+
+  /// 获取指定日期的输入时间（秒）
+  Future<int> getInputTime(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_wordKeyFor(_inputTimePrefix, date)) ?? 0;
+  }
+
+  /// 获取今日输入时间（秒）
+  Future<int> getTodayInputTime() => getInputTime(DateTime.now());
+
+  /// 累加输入时间（秒）到指定日期
+  ///
+  /// [seconds] 必须 > 0，否则忽略。
+  Future<void> addInputTime(int seconds, {DateTime? date}) async {
+    if (seconds <= 0) return;
+    final targetDate = date ?? DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    final key = _wordKeyFor(_inputTimePrefix, targetDate);
+    final current = prefs.getInt(key) ?? 0;
+    await prefs.setInt(key, current + seconds);
+  }
+
+  /// 获取过去 7 天每天的输入时间（秒）
+  ///
+  /// 返回长度为 7 的列表，索引 0 = 6 天前，索引 6 = 今天。
+  Future<List<int>> getWeeklyInputTimes({DateTime? now}) async {
+    final today = _dateOnly(now ?? DateTime.now());
+    final prefs = await SharedPreferences.getInstance();
+    final result = <int>[];
+    for (int i = 6; i >= 0; i--) {
+      final date = today.subtract(Duration(days: i));
+      result.add(prefs.getInt(_wordKeyFor(_inputTimePrefix, date)) ?? 0);
+    }
+    return result;
+  }
+
+  // ========== 输出时间（秒） ==========
+
+  /// 获取指定日期的输出时间（秒）
+  Future<int> getOutputTime(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_wordKeyFor(_outputTimePrefix, date)) ?? 0;
+  }
+
+  /// 获取今日输出时间（秒）
+  Future<int> getTodayOutputTime() => getOutputTime(DateTime.now());
+
+  /// 累加输出时间（秒）到指定日期
+  ///
+  /// [seconds] 必须 > 0，否则忽略。
+  Future<void> addOutputTime(int seconds, {DateTime? date}) async {
+    if (seconds <= 0) return;
+    final targetDate = date ?? DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    final key = _wordKeyFor(_outputTimePrefix, targetDate);
+    final current = prefs.getInt(key) ?? 0;
+    await prefs.setInt(key, current + seconds);
+  }
+
+  /// 获取过去 7 天每天的输出时间（秒）
+  ///
+  /// 返回长度为 7 的列表，索引 0 = 6 天前，索引 6 = 今天。
+  Future<List<int>> getWeeklyOutputTimes({DateTime? now}) async {
+    final today = _dateOnly(now ?? DateTime.now());
+    final prefs = await SharedPreferences.getInstance();
+    final result = <int>[];
+    for (int i = 6; i >= 0; i--) {
+      final date = today.subtract(Duration(days: i));
+      result.add(prefs.getInt(_wordKeyFor(_outputTimePrefix, date)) ?? 0);
+    }
+    return result;
   }
 
   /// 生成词数存储 key

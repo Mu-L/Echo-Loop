@@ -664,6 +664,20 @@
 
   "inputWordsShort": "输入",
   "outputWordsShort": "输出",
+  "listenTimeWords": "听: {time} · {words}词",
+  "@listenTimeWords": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "words": { "type": "String" }
+    }
+  },
+  "speakTimeWords": "说: {time} · {words}词",
+  "@speakTimeWords": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "words": { "type": "String" }
+    }
+  },
   "learnedWordFormsShort": "词汇量",
   "todayNewShort": "今日",
   "learnedWordsEmptyHint": "还没有记录到已学词汇，先完成一些学习内容吧。",
