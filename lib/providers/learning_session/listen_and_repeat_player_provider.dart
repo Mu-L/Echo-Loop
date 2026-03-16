@@ -393,6 +393,17 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     await _startSentence(startPlayCount: nextPlayCount);
   }
 
+  /// 强制完成（用户在最后一句主动点击完成按钮）
+  void forceComplete() {
+    _engine.invalidateSession();
+    state = state.copyWith(
+      isCompleted: true,
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+    );
+  }
+
   /// 释放资源
   void disposePlayer() {
     _engine.cleanup();

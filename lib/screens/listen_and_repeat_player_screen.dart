@@ -675,7 +675,16 @@ class _ListenAndRepeatPlayerScreenState
                       },
                       onNext: () {
                         unawaited(_prepareForExternalPlaybackAction());
-                        unawaited(player.goToNext());
+                        final isLast = playerState.currentSentenceIndex >=
+                            playerState.totalSentences - 1;
+                        if (isLast) {
+                          // 最后一句：直接完成
+                          player.forceComplete();
+                        } else if (playerState.isPauseBetweenPlays) {
+                          unawaited(player.completePausedTurn());
+                        } else {
+                          unawaited(player.goToNext());
+                        }
                       },
                       onPlayPause: () {
                         unawaited(_prepareForExternalPlaybackAction());
@@ -787,8 +796,9 @@ class _PlaybackControls extends StatelessWidget {
     final theme = Theme.of(context);
 
     final canGoPrev = playerState.currentSentenceIndex > 0;
-    final canGoNext =
-        playerState.currentSentenceIndex < playerState.totalSentences - 1;
+    final isLastSentence =
+        playerState.currentSentenceIndex >= playerState.totalSentences - 1;
+    final canGoNext = true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -830,7 +840,9 @@ class _PlaybackControls extends StatelessWidget {
           const SizedBox(width: 48),
 
           _NavButton(
-            icon: Icons.skip_next_rounded,
+            icon: isLastSentence
+                ? Icons.check_circle_rounded
+                : Icons.skip_next_rounded,
             enabled: canGoNext,
             onTap: canGoNext ? onNext : null,
           ),
