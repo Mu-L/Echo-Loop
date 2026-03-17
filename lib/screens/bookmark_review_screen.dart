@@ -382,63 +382,56 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
 
               // 主体内容：盲听/跟读 双态切换
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: playerState.isAnnotationMode
-                      ? PracticeShadowReadingView(
-                          key: const ValueKey('shadow'),
-                          text: currentSentence?.text ?? '',
-                          playerState: playerState,
-                          l10n: l10n,
-                          onRemoveMark: _handleRemoveBookmark,
-                          aiNotifier: ref.read(sentenceAiNotifierProvider),
-                          audioItemId: currentBookmark?.audioItemId,
-                          sentenceIndex: currentBookmark?.originalSentenceIndex,
-                          recording: RecordingConfig(
-                            turnState: turnState,
-                            speechState: speechState,
-                            currentPromptId: currentPromptId,
-                            currentAttempt: currentAttempt,
-                            isRecordingCurrent: isRecordingCurrent,
-                            onRecordTap: _handleRecordTap,
-                            onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                            onFastForward: () => ref
-                                .read(
-                                  listenAndRepeatTurnControllerProvider
-                                      .notifier,
-                                )
-                                .fastForwardReviewCountdown(),
-                            onCountdownTap: turnState.isReviewCountdownPaused
-                                ? () => ref
-                                      .read(
-                                        listenAndRepeatTurnControllerProvider
-                                            .notifier,
-                                      )
-                                      .resumeReviewCountdown()
-                                : () => ref
-                                      .read(
-                                        listenAndRepeatTurnControllerProvider
-                                            .notifier,
-                                      )
-                                      .pauseReviewCountdown(),
-                          ),
-                        )
-                      : PracticeNormalModeView(
-                          key: const ValueKey('normal'),
-                          playerState: playerState,
-                          l10n: l10n,
-                          theme: theme,
-                          onPeekToggle: () => player.setTextRevealed(
-                            !playerState.isTextRevealed,
-                          ),
-                          onCantUnderstand: () => player.enterAnnotationMode(),
-                          onRemoveMark: _handleRemoveBookmark,
-                          onPauseCountdown: () => playerState.isCountdownPaused
-                              ? player.resumeCountdown()
-                              : player.pauseCountdown(),
-                          sentenceText: currentSentence?.text,
+                child: playerState.isAnnotationMode
+                    ? PracticeShadowReadingView(
+                        text: currentSentence?.text ?? '',
+                        playerState: playerState,
+                        l10n: l10n,
+                        onRemoveMark: _handleRemoveBookmark,
+                        aiNotifier: ref.read(sentenceAiNotifierProvider),
+                        audioItemId: currentBookmark?.audioItemId,
+                        sentenceIndex: currentBookmark?.originalSentenceIndex,
+                        recording: RecordingConfig(
+                          turnState: turnState,
+                          speechState: speechState,
+                          currentPromptId: currentPromptId,
+                          currentAttempt: currentAttempt,
+                          isRecordingCurrent: isRecordingCurrent,
+                          onRecordTap: _handleRecordTap,
+                          onAttemptPlaybackTap: _handleAttemptPlaybackTap,
+                          onFastForward: () => ref
+                              .read(
+                                listenAndRepeatTurnControllerProvider.notifier,
+                              )
+                              .fastForwardReviewCountdown(),
+                          onCountdownTap: turnState.isReviewCountdownPaused
+                              ? () => ref
+                                    .read(
+                                      listenAndRepeatTurnControllerProvider
+                                          .notifier,
+                                    )
+                                    .resumeReviewCountdown()
+                              : () => ref
+                                    .read(
+                                      listenAndRepeatTurnControllerProvider
+                                          .notifier,
+                                    )
+                                    .pauseReviewCountdown(),
                         ),
-                ),
+                      )
+                    : PracticeNormalModeView(
+                        playerState: playerState,
+                        l10n: l10n,
+                        theme: theme,
+                        onPeekToggle: () =>
+                            player.setTextRevealed(!playerState.isTextRevealed),
+                        onCantUnderstand: () => player.enterAnnotationMode(),
+                        onRemoveMark: _handleRemoveBookmark,
+                        onPauseCountdown: () => playerState.isCountdownPaused
+                            ? player.resumeCountdown()
+                            : player.pauseCountdown(),
+                        sentenceText: currentSentence?.text,
+                      ),
               ),
 
               // 底部播放控制

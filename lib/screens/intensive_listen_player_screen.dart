@@ -583,42 +583,35 @@ class _IntensiveListenPlayerScreenState
 
               // 主体内容
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child:
-                      playerState.isAnnotationMode ||
-                          playerState.isAnnotationReplay
-                      ? _AnnotationModeView(
-                          key: const ValueKey('details'),
-                          text: currentSentence?.text ?? '',
-                          isDifficult: playerState.difficultSentences.contains(
-                            playerState.currentSentenceIndex,
-                          ),
-                          isAutoMarked: playerState.isCurrentSentenceAutoMarked,
-                          aiNotifier: ref.read(sentenceAiNotifierProvider),
-                          audioItemId: widget.audioItemId,
-                          sentenceIndex: playerState.currentSentenceIndex,
-                          sentenceStartMs:
-                              currentSentence?.startTime.inMilliseconds,
-                          sentenceEndMs:
-                              currentSentence?.endTime.inMilliseconds,
-                        )
-                      : _NormalModeView(
-                          key: const ValueKey('normal'),
-                          playerState: playerState,
-                          l10n: l10n,
-                          theme: theme,
-                          onPeekToggle: () => player.setTextRevealed(
-                            !playerState.isTextRevealed,
-                          ),
-                          onToggleDifficult: _toggleAndSaveDifficult,
-                          onCantUnderstand: () => player.enterAnnotationMode(),
-                          onPauseCountdown: () => playerState.isCountdownPaused
-                              ? player.resumeCountdown()
-                              : player.pauseCountdown(),
-                          sentenceText: currentSentence?.text,
+                child:
+                    playerState.isAnnotationMode ||
+                        playerState.isAnnotationReplay
+                    ? _AnnotationModeView(
+                        text: currentSentence?.text ?? '',
+                        isDifficult: playerState.difficultSentences.contains(
+                          playerState.currentSentenceIndex,
                         ),
-                ),
+                        isAutoMarked: playerState.isCurrentSentenceAutoMarked,
+                        aiNotifier: ref.read(sentenceAiNotifierProvider),
+                        audioItemId: widget.audioItemId,
+                        sentenceIndex: playerState.currentSentenceIndex,
+                        sentenceStartMs:
+                            currentSentence?.startTime.inMilliseconds,
+                        sentenceEndMs: currentSentence?.endTime.inMilliseconds,
+                      )
+                    : _NormalModeView(
+                        playerState: playerState,
+                        l10n: l10n,
+                        theme: theme,
+                        onPeekToggle: () =>
+                            player.setTextRevealed(!playerState.isTextRevealed),
+                        onToggleDifficult: _toggleAndSaveDifficult,
+                        onCantUnderstand: () => player.enterAnnotationMode(),
+                        onPauseCountdown: () => playerState.isCountdownPaused
+                            ? player.resumeCountdown()
+                            : player.pauseCountdown(),
+                        sentenceText: currentSentence?.text,
+                      ),
               ),
 
               // 底部统一 Padding（对齐跟读页布局）
@@ -796,7 +789,6 @@ class _NormalModeView extends StatelessWidget {
   final String? sentenceText;
 
   const _NormalModeView({
-    super.key,
     required this.playerState,
     required this.l10n,
     required this.theme,
@@ -1007,7 +999,6 @@ class _AnnotationModeView extends StatelessWidget {
   final int? sentenceEndMs;
 
   const _AnnotationModeView({
-    super.key,
     required this.text,
     required this.isDifficult,
     required this.isAutoMarked,
