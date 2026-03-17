@@ -73,6 +73,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   /// autoStart 是否已触发
   bool _autoStartTriggered = false;
 
+  /// loadAudio 的 Future，用于在读取 sentences 前确保音频加载完成
+  Future<void>? _loadAudioFuture;
+
   /// 首次学习区域是否展开（首次学习阶段默认展开，进入复习阶段后默认折叠）
   bool? _isFirstLearnExpanded;
 
@@ -95,7 +98,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       if (audioItem == null) return;
 
       // 始终调用 loadAudio：同一音频时只重新读取字幕，不重新加载音频文件
-      ref.read(listeningPracticeProvider.notifier).loadAudio(audioItem);
+      _loadAudioFuture = ref.read(listeningPracticeProvider.notifier).loadAudio(audioItem);
 
       // 监听字幕变化（上传/AI转录完成后重新加载字幕）
       ref.listenManual(
@@ -111,12 +114,22 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                 .read(audioLibraryProvider.notifier)
                 .getItemById(widget.audioItemId);
             if (updated != null) {
-              ref.read(listeningPracticeProvider.notifier).loadAudio(updated);
+              _loadAudioFuture = ref.read(listeningPracticeProvider.notifier).loadAudio(updated);
             }
           }
         },
       );
     });
+  }
+
+  /// 等待音频加载完成，返回 LP 状态。
+  ///
+  /// 如果加载后 audioItemId 不匹配（加载失败等），返回 null。
+  Future<ListeningPracticeState?> _ensureAudioLoaded() async {
+    await _loadAudioFuture;
+    final lpState = ref.read(listeningPracticeProvider);
+    if (lpState.currentAudioItem?.id != widget.audioItemId) return null;
+    return lpState;
   }
 
   /// 处理"开始学习/继续学习"按钮点击
@@ -226,7 +239,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   ///
   /// 先检查书签数量，无难句时自动完成并跳到下一复述子阶段。
   Future<void> _startReviewDifficultPractice(BuildContext context) async {
-    final lpState = ref.read(listeningPracticeProvider);
+    final lpState = await _ensureAudioLoaded();
+    if (!context.mounted || lpState == null) return;
     final l10n = AppLocalizations.of(context)!;
 
     if (lpState.sentences.isEmpty) {
@@ -298,7 +312,8 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     BuildContext context, {
     required bool isSummary,
   }) async {
-    final lpState = ref.read(listeningPracticeProvider);
+    final lpState = await _ensureAudioLoaded();
+    if (!context.mounted || lpState == null) return;
 
     if (lpState.sentences.isEmpty) {
       if (mounted) {
@@ -389,9 +404,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   }
 
   /// 进入逐句精听
-  void _startIntensiveListen(BuildContext context) {
+  Future<void> _startIntensiveListen(BuildContext context) async {
+    final lpState = await _ensureAudioLoaded();
+    if (!context.mounted || lpState == null) return;
     final l10n = AppLocalizations.of(context)!;
-    final lpState = ref.read(listeningPracticeProvider);
 
     // 无字幕则提示用户上传
     if (lpState.sentences.isEmpty) {
@@ -439,8 +455,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 
   /// 进入难句跟读
   Future<void> _startListenAndRepeat(BuildContext context) async {
+    final lpState = await _ensureAudioLoaded();
+    if (!context.mounted || lpState == null) return;
     final l10n = AppLocalizations.of(context)!;
-    final lpState = ref.read(listeningPracticeProvider);
 
     if (lpState.sentences.isEmpty) {
       showDialog(
@@ -517,9 +534,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   }
 
   /// 进入段落复述
-  void _startRetelling(BuildContext context) {
+  Future<void> _startRetelling(BuildContext context) async {
+    final lpState = await _ensureAudioLoaded();
+    if (!context.mounted || lpState == null) return;
     final l10n = AppLocalizations.of(context)!;
-    final lpState = ref.read(listeningPracticeProvider);
 
     // 无字幕则提示
     if (lpState.sentences.isEmpty) {
