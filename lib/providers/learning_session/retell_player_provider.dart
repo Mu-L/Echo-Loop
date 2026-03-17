@@ -75,6 +75,9 @@ class RetellPlayerState {
   /// 倒计时是否快进中（10 倍速）
   final bool isCountdownFastForward;
 
+  /// 用户是否在当前段落中手动更改过显示模式
+  final bool userOverrodeDisplayMode;
+
   const RetellPlayerState({
     this.currentParagraphIndex = 0,
     this.totalParagraphs = 0,
@@ -90,6 +93,7 @@ class RetellPlayerState {
     this.isCompleted = false,
     this.isCountdownPaused = false,
     this.isCountdownFastForward = false,
+    this.userOverrodeDisplayMode = false,
   });
 
   RetellPlayerState copyWith({
@@ -107,6 +111,7 @@ class RetellPlayerState {
     bool? isCompleted,
     bool? isCountdownPaused,
     bool? isCountdownFastForward,
+    bool? userOverrodeDisplayMode,
   }) {
     return RetellPlayerState(
       currentParagraphIndex:
@@ -125,6 +130,8 @@ class RetellPlayerState {
       isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
       isCountdownFastForward:
           isCountdownFastForward ?? this.isCountdownFastForward,
+      userOverrodeDisplayMode:
+          userOverrodeDisplayMode ?? this.userOverrodeDisplayMode,
     );
   }
 }
@@ -373,7 +380,7 @@ class RetellPlayer extends _$RetellPlayer {
 
   /// 设置显示模式
   void setDisplayMode(RetellDisplayMode mode) {
-    state = state.copyWith(displayMode: mode);
+    state = state.copyWith(displayMode: mode, userOverrodeDisplayMode: true);
   }
 
   /// 更新设置
@@ -428,6 +435,7 @@ class RetellPlayer extends _$RetellPlayer {
       isPlaying: true,
       playingSentenceIndex: 0,
       isRetellCountdown: false,
+      userOverrodeDisplayMode: false,
     );
     _persistCurrentParagraphIndexAsync();
 
@@ -504,7 +512,9 @@ class RetellPlayer extends _$RetellPlayer {
       phase: RetellPhase.retelling,
       isPlaying: false,
       playingSentenceIndex: -1,
-      displayMode: RetellDisplayMode.keywordsOnly,
+      displayMode: state.userOverrodeDisplayMode
+          ? null
+          : RetellDisplayMode.keywordsOnly,
     );
 
     _startRetellCountdown(pauseDuration);

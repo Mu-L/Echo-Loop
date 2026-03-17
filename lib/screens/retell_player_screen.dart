@@ -368,6 +368,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                         showSelectedIcon: false,
                         segments: [
                           ButtonSegment(
+                            value: RetellDisplayMode.hideAll,
+                            label: _DisplayModeSegmentLabel(text: hideAllLabel),
+                          ),
+                          ButtonSegment(
                             value: RetellDisplayMode.keywordsOnly,
                             label: _DisplayModeSegmentLabel(
                               text: keywordsOnlyLabel,
@@ -376,10 +380,6 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                           ButtonSegment(
                             value: RetellDisplayMode.showAll,
                             label: _DisplayModeSegmentLabel(text: showAllLabel),
-                          ),
-                          ButtonSegment(
-                            value: RetellDisplayMode.hideAll,
-                            label: _DisplayModeSegmentLabel(text: hideAllLabel),
                           ),
                         ],
                         selected: {state.displayMode},

@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:fluency/database/enums.dart';
 import 'package:fluency/models/audio_engine_state.dart';
 import 'package:fluency/models/learning_progress.dart';
+import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
@@ -408,6 +409,137 @@ void main() {
       expect(
         countdownContainer.read(retellPlayerProvider).currentParagraphIndex,
         0,
+      );
+    });
+
+    test('用户在 listening phase 手动切换 displayMode 后，进入 retelling phase 时保持不变',
+        () async {
+      final countdownEngine = CountdownNavigationTestAudioEngine();
+      final testContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => countdownEngine),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+        ],
+      );
+      addTearDown(testContainer.dispose);
+
+      final testNotifier = testContainer.read(
+        retellPlayerProvider.notifier,
+      );
+      testNotifier.initialize([
+        [
+          Sentence(
+            index: 0,
+            text: 'Paragraph one',
+            startTime: Duration.zero,
+            endTime: const Duration(seconds: 3),
+          ),
+        ],
+      ], const {});
+
+      // 开始播放（playRangeOnce 立即完成 → 自动进入 retelling phase）
+      await testNotifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // 验证默认进入 retelling 时 displayMode 为 keywordsOnly
+      expect(
+        testContainer.read(retellPlayerProvider).phase,
+        RetellPhase.retelling,
+      );
+      expect(
+        testContainer.read(retellPlayerProvider).displayMode,
+        RetellDisplayMode.keywordsOnly,
+      );
+
+      // 重播回到 listening phase
+      countdownEngine.completeStopPlayback();
+      await testNotifier.replayDuringCountdown();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // 在播放完成前（或播放完成后）用户手动切换到 showAll
+      testNotifier.setDisplayMode(RetellDisplayMode.showAll);
+      expect(
+        testContainer.read(retellPlayerProvider).displayMode,
+        RetellDisplayMode.showAll,
+      );
+      expect(
+        testContainer.read(retellPlayerProvider).userOverrodeDisplayMode,
+        true,
+      );
+
+      // playRangeOnce 已完成，此时已进入 retelling phase
+      // 验证 displayMode 仍为 showAll（未被重置为 keywordsOnly）
+      expect(
+        testContainer.read(retellPlayerProvider).phase,
+        RetellPhase.retelling,
+      );
+      expect(
+        testContainer.read(retellPlayerProvider).displayMode,
+        RetellDisplayMode.showAll,
+      );
+    });
+
+    test('未手动切换 displayMode 时，进入 retelling phase 正常重置为 keywordsOnly',
+        () async {
+      final countdownEngine = CountdownNavigationTestAudioEngine();
+      final testContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => countdownEngine),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.retell,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            _InMemoryLearningProgressNotifier.new,
+          ),
+        ],
+      );
+      addTearDown(testContainer.dispose);
+
+      final testNotifier = testContainer.read(
+        retellPlayerProvider.notifier,
+      );
+      testNotifier.initialize([
+        [
+          Sentence(
+            index: 0,
+            text: 'Paragraph one',
+            startTime: Duration.zero,
+            endTime: const Duration(seconds: 3),
+          ),
+        ],
+      ], const {});
+
+      // 开始播放 → 自动进入 retelling phase
+      await testNotifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // 验证未手动操作时，displayMode 被重置为 keywordsOnly
+      expect(
+        testContainer.read(retellPlayerProvider).phase,
+        RetellPhase.retelling,
+      );
+      expect(
+        testContainer.read(retellPlayerProvider).displayMode,
+        RetellDisplayMode.keywordsOnly,
+      );
+      expect(
+        testContainer.read(retellPlayerProvider).userOverrodeDisplayMode,
+        false,
       );
     });
 
