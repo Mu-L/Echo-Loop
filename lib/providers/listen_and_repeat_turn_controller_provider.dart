@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/speech_practice_models.dart';
 import '../services/app_logger.dart';
+import '../services/speech_completion_detector.dart';
 import 'speech_practice_session_provider.dart';
 
 const _awaitingSpeechFallbackDelay = Duration(seconds: 60);
@@ -74,145 +75,49 @@ class ListenAndRepeatTurnState {
 class SpeechPracticeCompletionHeuristic {
   const SpeechPracticeCompletionHeuristic();
 
-  static final RegExp _englishWordPattern = RegExp(r"[A-Za-z]+(?:'[A-Za-z]+)?");
-
   /// 根据实时转录与参考句的匹配程度，计算所需静音等待时长。
   ///
-  /// 三条规则取最小值：
-  /// A. 连续尾部匹配 ≥ 1 且唯一 → 1s
-  /// B. 全句匹配率：100% → 1s, ≥95% → 2s, ≥90% → 3s
-  /// C. 末尾 5 词命中数 → 5s/4s/3s/2s/1s
+  /// 委托给 [speech_completion_detector.dart] 中的独立检测器：
+  /// A. [detectTailMatch] — 连续尾部匹配 + 唯一 → 1s
+  /// B. [detectOverallMatchRate] — 全句匹配率 → 1-3s
+  /// C. [detectTailHitCount] — 末尾 5 词命中数 → 1-5s
+  ///
+  /// 三条规则取最小值，无规则触发时返回 [_defaultSilenceThreshold]。
   Duration computeSilenceThreshold({
     required String referenceText,
     required String partialTranscript,
   }) {
-    final referenceTokens = _tokenize(referenceText);
-    final transcriptTokens = _tokenize(partialTranscript);
-    if (referenceTokens.isEmpty || transcriptTokens.isEmpty) {
-      return _defaultSilenceThreshold;
-    }
-
-    final lcsPairs = _computeLcsPairs(referenceTokens, transcriptTokens);
-    if (lcsPairs.isEmpty) {
-      return _defaultSilenceThreshold;
-    }
-
-    final matchedRefIndexes = lcsPairs.map((p) => p.$1).toSet();
-    final tailSize = referenceTokens.length < 5 ? referenceTokens.length : 5;
-    final tailStart = referenceTokens.length - tailSize;
-
-    // 规则 A：连续尾部完整匹配 + 唯一 → 1s
-    var ruleA = _defaultSilenceThreshold;
-    var consecutiveTail = 0;
-    for (var i = referenceTokens.length - 1; i >= 0; i--) {
-      if (matchedRefIndexes.contains(i)) {
-        consecutiveTail++;
-      } else {
-        break;
-      }
-    }
-    if (consecutiveTail >= 1) {
-      final uniqueStart = referenceTokens.length - consecutiveTail;
-      if (_isSubsequenceUnique(referenceTokens, uniqueStart)) {
-        ruleA = const Duration(seconds: 1);
-      }
-    }
-
-    // 规则 B：全句匹配率
-    var ruleB = _defaultSilenceThreshold;
-    final score = lcsPairs.length / referenceTokens.length;
-    if (score >= 1.0) {
-      ruleB = const Duration(seconds: 1);
-    } else if (score >= 0.95) {
-      ruleB = const Duration(seconds: 2);
-    } else if (score >= 0.90) {
-      ruleB = const Duration(seconds: 3);
-    }
-
-    // 规则 C：末尾 5 词命中数
-    var tailMatchCount = 0;
-    for (var i = tailStart; i < referenceTokens.length; i++) {
-      if (matchedRefIndexes.contains(i)) {
-        tailMatchCount++;
-      }
-    }
-    final ruleC = switch (tailMatchCount) {
-      <= 1 => const Duration(seconds: 5),
-      2 => const Duration(seconds: 4),
-      3 => const Duration(seconds: 3),
-      4 => const Duration(seconds: 2),
-      _ => const Duration(seconds: 1),
-    };
-
-    // 取三条规则最小值
-    var result = ruleA;
-    if (ruleB < result) result = ruleB;
-    if (ruleC < result) result = ruleC;
-    return result;
+    return computeSilenceThresholdDetailed(
+      referenceText: referenceText,
+      partialTranscript: partialTranscript,
+    ).threshold!;
   }
 
-  /// 检查 [tokens] 从 [start] 到末尾的连续子序列在 [tokens] 中是否只出现一次。
-  bool _isSubsequenceUnique(List<String> tokens, int start) {
-    final tail = tokens.sublist(start);
-    final tailLength = tail.length;
-    var count = 0;
-    for (var i = 0; i <= tokens.length - tailLength; i++) {
-      var match = true;
-      for (var j = 0; j < tailLength; j++) {
-        if (tokens[i + j] != tail[j]) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
-        count++;
-        if (count > 1) return false;
-      }
-    }
-    return count == 1;
-  }
-
-  List<String> _tokenize(String text) {
-    return _englishWordPattern
-        .allMatches(text.toLowerCase())
-        .map((match) => match.group(0) ?? '')
-        .where((token) => token.isNotEmpty)
-        .toList();
-  }
-
-  List<(int, int)> _computeLcsPairs(
-    List<String> referenceTokens,
-    List<String> transcriptTokens,
-  ) {
-    final rows = referenceTokens.length + 1;
-    final cols = transcriptTokens.length + 1;
-    final dp = List.generate(rows, (_) => List.filled(cols, 0));
-
-    for (var i = 1; i < rows; i++) {
-      for (var j = 1; j < cols; j++) {
-        if (referenceTokens[i - 1] == transcriptTokens[j - 1]) {
-          dp[i][j] = dp[i - 1][j - 1] + 1;
-        } else {
-          dp[i][j] = dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
-        }
-      }
+  /// 与 [computeSilenceThreshold] 逻辑一致，额外返回触发原因（用于调试日志）。
+  DetectionResult computeSilenceThresholdDetailed({
+    required String referenceText,
+    required String partialTranscript,
+  }) {
+    final ctx = buildMatchContext(
+      referenceText: referenceText,
+      partialTranscript: partialTranscript,
+    );
+    if (!ctx.hasMatch) {
+      return DetectionResult(
+        threshold: _defaultSilenceThreshold,
+        description: '无匹配, 默认${_defaultSilenceThreshold.inSeconds}s',
+      );
     }
 
-    final pairs = <(int, int)>[];
-    var i = referenceTokens.length;
-    var j = transcriptTokens.length;
-    while (i > 0 && j > 0) {
-      if (referenceTokens[i - 1] == transcriptTokens[j - 1]) {
-        pairs.add((i - 1, j - 1));
-        i -= 1;
-        j -= 1;
-      } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-        i -= 1;
-      } else {
-        j -= 1;
-      }
-    }
-    return pairs.reversed.toList();
+    return combineDetections(
+      [
+        detectTailMatch(ctx),
+        detectOverallMatchRate(ctx),
+        detectTailHitCount(ctx),
+      ],
+      ctx,
+      fallback: _defaultSilenceThreshold,
+    );
   }
 }
 

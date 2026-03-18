@@ -117,6 +117,14 @@ class RetellSettings {
     );
   }
 
+  /// 根据段落时长计算复述阶段最大录音时长
+  ///
+  /// 公式：`max(30s, 5s + 5×段落时长)`。
+  Duration calculateRetellingDuration(Duration paragraphDuration) {
+    final computed = 5000 + paragraphDuration.inMilliseconds * 5;
+    return Duration(milliseconds: computed < 30000 ? 30000 : computed);
+  }
+
   /// 根据段落时长计算复述停顿时间
   Duration calculatePauseDuration(Duration paragraphDuration) {
     return switch (pauseMode) {

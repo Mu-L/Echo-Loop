@@ -392,6 +392,10 @@ void main() {
       await countdownNotifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
+      // 模拟评估完成后 screen 层触发段间停顿
+      countdownNotifier.startPostEvaluationPause();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
       expect(
         countdownContainer.read(retellPlayerProvider).isRetellCountdown,
         true,
@@ -595,6 +599,10 @@ void main() {
 
       await countdownNotifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // 模拟评估完成后 screen 层触发段间停顿
+      countdownNotifier.startPostEvaluationPause();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
 
       expect(
         countdownContainer.read(retellPlayerProvider).isRetellCountdown,

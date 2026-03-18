@@ -228,6 +228,42 @@ class RetellPlayer extends _$RetellPlayer {
     return sentences.last.endTime - sentences.first.startTime;
   }
 
+  /// 当前段落所有句子文本拼接（空格分隔），用作录音识别的参考文本。
+  String get currentParagraphReferenceText {
+    return currentParagraphSentences.map((s) => s.text).join(' ');
+  }
+
+  /// 录音评估完成后的推进逻辑。
+  ///
+  /// 记录输出词数并检查遍数推进。
+  Future<void> completeRetellingTurn() async {
+    _recordParagraphOutputStats();
+    if (state.currentRepeatCount < state.settings.repeatCount) {
+      state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
+      await _playCurrentParagraph();
+    } else {
+      await goToNextParagraph();
+    }
+  }
+
+  /// 取消段间停顿倒计时
+  void cancelCountdown() {
+    _invalidateRetellCountdown();
+    state = state.copyWith(
+      isRetellCountdown: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+    );
+  }
+
+  /// 记录段落输出词数并停止输出计时。
+  void _recordParagraphOutputStats() {
+    final session = ref.read(learningSessionProvider.notifier);
+    final paragraphWordCount = countWordsInSentences(currentParagraphSentences);
+    session.addOutputWords(paragraphWordCount);
+    session.stopOutputTimer();
+  }
+
   /// 异步保存复述断点，记录当前段首句的全局索引。
   void _persistCurrentParagraphIndexAsync() {
     final session = ref.read(learningSessionProvider);
@@ -497,12 +533,10 @@ class RetellPlayer extends _$RetellPlayer {
   }
 
   /// 进入复述阶段
+  ///
+  /// 不自动启动倒计时。倒计时由 screen 层在录音评估完成后触发
+  /// [startPostEvaluationPause]。
   void _enterRetellingPhase() {
-    final paragraphDuration = currentParagraphDuration;
-    final pauseDuration = state.settings.calculatePauseDuration(
-      paragraphDuration,
-    );
-
     // 复述开始 = 输出时间开始
     try {
       ref.read(learningSessionProvider.notifier).startOutputTimer();
@@ -516,7 +550,16 @@ class RetellPlayer extends _$RetellPlayer {
           ? null
           : RetellDisplayMode.keywordsOnly,
     );
+  }
 
+  /// 启动评估后段间停顿倒计时（由 screen 层在评估完成后调用）
+  void startPostEvaluationPause() {
+    if (state.phase != RetellPhase.retelling) return;
+    if (state.isRetellCountdown) return;
+
+    final pauseDuration = state.settings.calculatePauseDuration(
+      currentParagraphDuration,
+    );
     _startRetellCountdown(pauseDuration);
   }
 
