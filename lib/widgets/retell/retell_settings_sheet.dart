@@ -34,9 +34,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
     final state = ref.watch(retellPlayerProvider);
     final settings = state.settings;
 
-    return Padding(
+    return SafeArea(
+      child: Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.l, AppSpacing.l, AppSpacing.l, AppSpacing.xl,
+        AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -45,21 +46,23 @@ class _RetellSettingsSheet extends ConsumerWidget {
           // 拖拽指示条
           Center(
             child: Container(
-              width: 40,
+              width: 32,
               height: 4,
+              margin: const EdgeInsets.only(bottom: AppSpacing.m),
               decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.4,
+                ),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.l),
 
           // 标题
           Text(
             l10n.retellSettingsTitle,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -256,6 +259,7 @@ class _RetellSettingsSheet extends ConsumerWidget {
           ],
         ],
       ),
+    ),
     );
   }
 }
