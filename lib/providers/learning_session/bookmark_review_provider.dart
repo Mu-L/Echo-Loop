@@ -30,6 +30,7 @@ import '../audio_engine/audio_engine_provider.dart';
 import '../daily_study_time_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
+import 'countdown_controller.dart';
 import 'review_difficult_practice_provider.dart';
 import 'sentence_playback_engine.dart';
 
@@ -65,6 +66,12 @@ class BookmarkReview extends _$BookmarkReview {
   /// 音频播放状态监听（用于输入时间追踪）
   StreamSubscription<ja.PlayerState>? _inputTimePlayerStateSub;
 
+  /// 评估后倒计时控制器
+  final CountdownController _countdown = CountdownController();
+
+  /// 倒计时运行 ID（用于使过期倒计时失效）
+  int _countdownRunId = 0;
+
   @override
   ReviewDifficultPracticeState build() {
     _studyTimeService = ref.read(studyTimeServiceProvider);
@@ -73,6 +80,7 @@ class BookmarkReview extends _$BookmarkReview {
     );
     ref.onDispose(() {
       _engine.cleanup();
+      _countdown.cancel();
       _inputTimePlayerStateSub?.cancel();
       _saveAndRefreshStudyTime();
     });
@@ -193,6 +201,7 @@ class BookmarkReview extends _$BookmarkReview {
   /// 暂停播放
   void pause() {
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     _outputStopwatch.stop();
     _studyStopwatch.stop();
     state = state.copyWith(
@@ -269,6 +278,7 @@ class BookmarkReview extends _$BookmarkReview {
   Future<void> goToNext() async {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex + 1,
       currentPlayCount: 1,
@@ -286,6 +296,7 @@ class BookmarkReview extends _$BookmarkReview {
   Future<void> goToPrevious() async {
     if (state.currentSentenceIndex <= 0) return;
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex - 1,
       currentPlayCount: 1,
@@ -314,6 +325,7 @@ class BookmarkReview extends _$BookmarkReview {
   /// 倒计时期间重播当前句子
   Future<void> replayDuringCountdown() async {
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     if (state.isAnnotationMode) {
       _startShadowReading();
     } else {
@@ -327,9 +339,73 @@ class BookmarkReview extends _$BookmarkReview {
     }
   }
 
+  /// 录音评估完成后启动 review 倒计时（5s）。
+  ///
+  /// 仅在跟读模式（annotationMode）下生效。
+  void startPostEvaluationPause() {
+    if (!state.isPauseBetweenPlays) return;
+    if (!state.isAnnotationMode) return;
+    if (state.isCompleted) return;
+    if (state.settings.isManualMode) return;
+
+    const pauseDuration = Duration(seconds: 5);
+    final runId = ++_countdownRunId;
+
+    state = state.copyWith(
+      isPostEvalCountdown: true,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      pauseDuration: pauseDuration,
+      pauseRemaining: pauseDuration,
+    );
+
+    _countdown
+        .start(pauseDuration, (remaining) {
+          state = state.copyWith(pauseRemaining: remaining);
+        })
+        .then((_) {
+          if (runId == _countdownRunId &&
+              state.isPauseBetweenPlays &&
+              state.isAnnotationMode) {
+            completePausedTurn();
+          }
+        });
+  }
+
+  /// 暂停评估后倒计时
+  void pausePostEvalCountdown() {
+    if (!_countdown.isActive || _countdown.isPaused) return;
+    _countdown.pause();
+    state = state.copyWith(isCountdownPaused: true);
+  }
+
+  /// 恢复评估后倒计时
+  void resumePostEvalCountdown() {
+    if (!_countdown.isActive || !_countdown.isPaused) return;
+    _countdown.resume();
+    state = state.copyWith(isCountdownPaused: false);
+  }
+
+  /// 取消评估后倒计时（不推进到下一句）
+  void cancelPostEvalCountdown() {
+    _invalidatePostEvalCountdown();
+    state = state.copyWith(
+      isPostEvalCountdown: false,
+      isCountdownPaused: false,
+      pauseRemaining: Duration.zero,
+    );
+  }
+
+  /// 使当前评估后倒计时失效
+  void _invalidatePostEvalCountdown() {
+    _countdownRunId += 1;
+    _countdown.cancel();
+  }
+
   /// 强制完成（用户在最后一句主动点击完成按钮）
   void forceComplete() {
     _engine.invalidateSession();
+    _invalidatePostEvalCountdown();
     _outputStopwatch.stop();
     state = state.copyWith(
       isCompleted: true,
@@ -341,8 +417,9 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 立即完成当前停顿回合，继续后续播放流程。
   ///
-  /// 由 TurnController 的 handleContinue 通过回调调用。
+  /// 由录音评估完成后的倒计时或 screen 层直接调用。
   Future<void> completePausedTurn() async {
+    _invalidatePostEvalCountdown();
     if (!state.isPauseBetweenPlays || !state.isAnnotationMode) return;
 
     // 句间停顿 → 走 autoAdvance 逻辑
@@ -353,6 +430,7 @@ class BookmarkReview extends _$BookmarkReview {
       state = state.copyWith(
         isPauseBetweenPlays: false,
         isPauseBetweenSentences: false,
+        isPostEvalCountdown: false,
         isCountdownPaused: false,
         isCountdownFastForward: false,
         pauseRemaining: Duration.zero,
@@ -376,6 +454,7 @@ class BookmarkReview extends _$BookmarkReview {
     state = state.copyWith(
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isPostEvalCountdown: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
       pauseRemaining: Duration.zero,
@@ -395,6 +474,7 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 重置到第一句并重新乱序播放（"再来一遍"）
   Future<void> resetToStart() async {
+    _invalidatePostEvalCountdown();
     // 先保存已累计时间
     _saveAndRefreshStudyTime();
     _engine.cleanup();

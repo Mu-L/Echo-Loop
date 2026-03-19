@@ -18,10 +18,11 @@ import '../daily_study_time_provider.dart';
 import '../../services/learned_vocabulary_tracker.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../study_stats_provider.dart';
+import '../../services/app_logger.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../learning_progress_provider.dart';
 import '../listen_and_repeat_turn_controller_provider.dart';
-import '../speech_practice_session_provider.dart';
+import '../retell_recording_controller_provider.dart';
 import '../listening_practice/listening_practice_provider.dart';
 import 'blind_listen_player_provider.dart';
 import 'intensive_listen_player_provider.dart';
@@ -409,6 +410,12 @@ class LearningSession extends _$LearningSession {
     List<Sentence> allSentences, {
     bool isFreePlay = false,
   }) async {
+    final engineAudioId = ref.read(audioEngineProvider).currentAudioId;
+    AppLogger.log(
+      'Session',
+      '🎯 enterListenAndRepeatMode: '
+          'target=$audioItemId, engine=$engineAudioId',
+    );
     _studyStopwatch.start();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -506,6 +513,12 @@ class LearningSession extends _$LearningSession {
     List<Sentence> allSentences, {
     bool isFreePlay = false,
   }) async {
+    final engineAudioId = ref.read(audioEngineProvider).currentAudioId;
+    AppLogger.log(
+      'Session',
+      '🎯 enterReviewDifficultPracticeMode: '
+          'target=$audioItemId, engine=$engineAudioId',
+    );
     _studyStopwatch.start();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -565,8 +578,6 @@ class LearningSession extends _$LearningSession {
       final intensivePlayer = ref.read(intensiveListenPlayerProvider.notifier);
       intensivePlayer.disposePlayer();
     } else if (mode == LearningMode.listenAndRepeat) {
-      // 清理 turn controller 定时器，防止退出后自动重试录音
-      ref.read(listenAndRepeatTurnControllerProvider.notifier).clearTurn();
       // 释放跟读播放器资源
       final player = ref.read(listenAndRepeatPlayerProvider.notifier);
       player.disposePlayer();
@@ -583,7 +594,13 @@ class LearningSession extends _$LearningSession {
     // 通用：清除 clip 防止残留影响 LP 的 absolutePositionStream
     final engine = ref.read(audioEngineProvider.notifier);
     await engine.clearClip();
-    await ref.read(speechPracticeSessionProvider.notifier).disposeSession();
+    // 按模式调用对应录音控制器的 fullReset
+    if (mode == LearningMode.retell) {
+      await ref.read(retellRecordingControllerProvider.notifier).fullReset();
+    } else if (mode == LearningMode.listenAndRepeat ||
+        mode == LearningMode.reviewDifficultPractice) {
+      await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
+    }
 
     // 恢复 LP 的 stream 监听
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -617,5 +634,4 @@ class LearningSession extends _$LearningSession {
       if (current.currentAudioId == audioItemId && !current.isLoading) return;
     }
   }
-
 }

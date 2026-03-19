@@ -39,8 +39,11 @@ const _awaitingSpeechTimeout = Duration(seconds: 60);
 /// 自动模式默认最大录音时长
 const _defaultMaxRecordingDuration = Duration(seconds: 30);
 
-/// 手动模式录音兜底上限
-const _manualModeMaxDuration = Duration(seconds: 60);
+/// 手动模式录音兜底上限（startRecording 时立即启动，检测到语音后按段长重算）
+const _manualModeInitialMax = Duration(seconds: 300);
+
+/// 手动模式倍率（检测到语音后：max(300s, 5 × 自动模式时长)）
+const _manualModeMultiplier = 5;
 
 /// 复述录音阶段
 enum RetellRecordingPhase {
@@ -234,9 +237,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       _eventSub?.cancel();
       _eventSub = _recordingService.events.listen(_handleRecordingEvent);
 
-      state = state.copyWith(
-        permissions: _recordingService.permissions,
-      );
+      state = state.copyWith(permissions: _recordingService.permissions);
     } on SpeechPracticePlatformException catch (error) {
       AppLogger.log('RetellRec', '└ 录音启动失败: ${error.code} → idle');
       state = state.copyWith(
@@ -250,9 +251,22 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       return;
     }
 
-    // 自动模式：启动 60s 等待开口计时器
-    if (!_isManualMode) {
-      AppLogger.log('RetellRec', '│ 启动 ${_awaitingSpeechTimeout.inSeconds}s 等待开口计时器');
+    if (_isManualMode) {
+      // 手动模式：立即启动兜底计时器（用户点击停止前的安全上限）
+      AppLogger.log(
+        'RetellRec',
+        '│ 手动模式兜底 ${_manualModeInitialMax.inSeconds}s',
+      );
+      _scheduleMaxDurationTimer(
+        promptId: promptId,
+        maxDuration: _manualModeInitialMax,
+      );
+    } else {
+      // 自动模式：启动 60s 等待开口计时器
+      AppLogger.log(
+        'RetellRec',
+        '│ 启动 ${_awaitingSpeechTimeout.inSeconds}s 等待开口计时器',
+      );
       _scheduleAwaitingSpeechTimer(promptId);
     }
 
@@ -260,9 +274,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
   }
 
   /// 手动停止录音并评估
-  Future<void> stopAndEvaluate({
-    required String referenceText,
-  }) async {
+  Future<void> stopAndEvaluate({required String referenceText}) async {
     final promptId = state.promptId;
     if (promptId == null) return;
 
@@ -329,7 +341,10 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     _eventSub = null;
 
     final result = await _recordingService.stopRecording(promptId: promptId);
-    AppLogger.log('RetellRec', '📋 final: "${result.finalTranscript ?? '(null)'}"');
+    AppLogger.log(
+      'RetellRec',
+      '📋 final: "${result.finalTranscript ?? '(null)'}"',
+    );
 
     if (!result.isSuccess) {
       final attempt = SpeechPracticeAttempt(promptId: promptId).copyWith(
@@ -375,10 +390,13 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       referenceSegments: matchResult.referenceSegments,
     );
 
-    AppLogger.log('RetellRec', '✓ 评估完成: '
-        'status=${attempt.status.name}, '
-        'score=${attempt.score?.toStringAsFixed(2)}, '
-        'matched=${attempt.matchedTokenCount}/${attempt.totalTargetTokenCount}');
+    AppLogger.log(
+      'RetellRec',
+      '✓ 评估完成: '
+          'status=${attempt.status.name}, '
+          'score=${attempt.score?.toStringAsFixed(2)}, '
+          'matched=${attempt.matchedTokenCount}/${attempt.totalTargetTokenCount}',
+    );
 
     state = state.copyWith(
       phase: RetellRecordingPhase.idle,
@@ -454,8 +472,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     final promptId = state.promptId;
     if (promptId == null) return;
 
-    final hasVoiceInput =
-        state.hasDetectedSpeech || liveText.isNotEmpty;
+    final hasVoiceInput = state.hasDetectedSpeech || liveText.isNotEmpty;
 
     // 首次检测到语音
     if (!_hasDetectedSpeech && hasVoiceInput) {
@@ -512,20 +529,27 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       }
     }
     final pct = (ctx.matchRate * 100).toInt();
-    final summary = '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
+    final summary =
+        '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
         '($pct%)';
     if (shortest != null && winnerDesc != _lastSilenceLogDesc) {
       _lastSilenceLogDesc = winnerDesc;
-      AppLogger.log('RetellRec', '静音阈值 ${shortest.inMilliseconds}ms | '
-          '$summary, $winnerDesc');
+      AppLogger.log(
+        'RetellRec',
+        '静音阈值 ${shortest.inMilliseconds}ms | '
+            '$summary, $winnerDesc',
+      );
     }
 
     for (final rule in rules) {
       if (rule.triggered && currentSilence >= rule.threshold!) {
-        AppLogger.log('RetellRec', '⏹ 静音停止: '
-            '${currentSilence.inMilliseconds}ms ≥ '
-            '${rule.threshold!.inMilliseconds}ms | '
-            '$summary, ${rule.description}');
+        AppLogger.log(
+          'RetellRec',
+          '⏹ 静音停止: '
+              '${currentSilence.inMilliseconds}ms ≥ '
+              '${rule.threshold!.inMilliseconds}ms | '
+              '$summary, ${rule.description}',
+        );
         _stopForEvaluation(promptId: promptId, reason: rule.description);
         return;
       }
@@ -542,7 +566,10 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
           state.phase != RetellRecordingPhase.recording) {
         return;
       }
-      AppLogger.log('RetellRec', '⏰ ${_awaitingSpeechTimeout.inSeconds}s 未检测到语音 → 退出自动录音');
+      AppLogger.log(
+        'RetellRec',
+        '⏰ ${_awaitingSpeechTimeout.inSeconds}s 未检测到语音 → 退出自动录音',
+      );
       await cancelActiveRecording();
       state = state.copyWith(
         phase: RetellRecordingPhase.idle,
@@ -557,11 +584,15 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     _awaitingSpeechTimer?.cancel();
     _awaitingSpeechTimer = null;
 
-    final effectiveMaxDuration =
-        _isManualMode ? _manualModeMaxDuration : _maxRecordingDuration;
+    final effectiveMaxDuration = _isManualMode
+        ? _computeManualMaxDuration(_maxRecordingDuration)
+        : _maxRecordingDuration;
 
     AppLogger.log('RetellRec', '🎤 检测到语音');
-    AppLogger.log('RetellRec', '│ 启动最大录音时长计时器: ${effectiveMaxDuration.inSeconds}s');
+    AppLogger.log(
+      'RetellRec',
+      '│ 启动最大录音时长计时器: ${effectiveMaxDuration.inSeconds}s',
+    );
     _scheduleMaxDurationTimer(
       promptId: promptId,
       maxDuration: effectiveMaxDuration,
@@ -590,7 +621,11 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
     );
     Duration? shortest;
     String? desc;
-    for (final rule in [ruleD, detectTailMatch(ctx), detectOverallMatchRate(ctx)]) {
+    for (final rule in [
+      ruleD,
+      detectTailMatch(ctx),
+      detectOverallMatchRate(ctx),
+    ]) {
       if (rule.triggered) {
         if (shortest == null || rule.threshold! < shortest) {
           shortest = rule.threshold;
@@ -609,15 +644,24 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       if (state.promptId != promptId || _isStopping) return;
       if (state.phase != RetellRecordingPhase.recording) return;
       final pct = (ctx.matchRate * 100).toInt();
-      AppLogger.log('RetellRec', '⏹ 转录停滞停止: '
-          '${shortest!.inMilliseconds}ms | '
-          '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
-          '($pct%), $desc');
+      AppLogger.log(
+        'RetellRec',
+        '⏹ 转录停滞停止: '
+            '${shortest!.inMilliseconds}ms | '
+            '匹配${ctx.lcsPairs.length}/${ctx.referenceTokens.length}词'
+            '($pct%), $desc',
+      );
       _stopForEvaluation(promptId: promptId, reason: '转录停滞($desc)');
     });
   }
 
   // ── 最大录音时长 ──
+
+  /// 手动模式最大录音时长：max(300s, 5 × 自动模式时长)
+  static Duration _computeManualMaxDuration(Duration autoMaxDuration) {
+    final computed = autoMaxDuration * _manualModeMultiplier;
+    return computed > _manualModeInitialMax ? computed : _manualModeInitialMax;
+  }
 
   void _scheduleMaxDurationTimer({
     required String promptId,
@@ -635,10 +679,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
 
   // ── 自动停止 ──
 
-  void _stopForEvaluation({
-    required String promptId,
-    String reason = '',
-  }) {
+  void _stopForEvaluation({required String promptId, String reason = ''}) {
     AppLogger.log('RetellRec', '⏹ 自动停止录音 ($reason)');
     _isStopping = true;
     _enterProcessing(promptId);
@@ -723,7 +764,7 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
       'RetellRec',
       '🧮 覆盖率=${coverageScore.toStringAsFixed(2)} (${coverageLevel.name})'
           ', Embedding=${embeddingScore?.toStringAsFixed(2) ?? "N/A"}'
-              ' (${embeddingLevel?.name ?? "N/A"})'
+          ' (${embeddingLevel?.name ?? "N/A"})'
           ', 最终=${effectiveScore.toStringAsFixed(2)} (${effectiveLevel.name})',
     );
 

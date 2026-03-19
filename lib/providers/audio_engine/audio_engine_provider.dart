@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/audio_engine_state.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
+import '../../services/app_logger.dart';
 import '../../services/subtitle_parser.dart';
 
 part 'audio_engine_provider.g.dart';
@@ -37,6 +38,10 @@ class AudioEngine extends _$AudioEngine {
       state = state.copyWith(isLoading: true, errorMessage: null);
 
       final fullAudioPath = await item.getFullAudioPath();
+      AppLogger.log(
+        'AudioEngine',
+        '🔊 loadAudio: id=${item.id}, path=$fullAudioPath',
+      );
       await _audioPlayer.setFilePath(fullAudioPath);
       await _audioPlayer.setSpeed(speed);
 
@@ -121,6 +126,11 @@ class AudioEngine extends _$AudioEngine {
   Future<void> playClipOnce(Sentence sentence, int sessionId) async {
     if (!isActiveSession(sessionId)) return;
 
+    AppLogger.log(
+      'AudioEngine',
+      '▶ playClip: loadedAudio=${state.currentAudioId}, '
+          'clip=${sentence.startTime.inMilliseconds}-${sentence.endTime.inMilliseconds}ms',
+    );
     state = state.copyWith(clipStart: sentence.startTime);
     await _audioPlayer.setClip(
       start: sentence.startTime,
