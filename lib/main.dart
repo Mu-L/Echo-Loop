@@ -18,6 +18,7 @@ import 'providers/package_info_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/review_reminder_provider.dart';
 import 'router/app_router.dart';
+import 'services/dictionary_service.dart';
 import 'theme/app_theme.dart';
 import 'config/api_config.dart';
 import 'services/notification_tap_router_bridge.dart';
@@ -118,6 +119,13 @@ void main() async {
   if (!kIsWeb && Platform.isIOS) {
     unawaited(_triggerNetworkPermission());
   }
+
+  // 预热本地词典数据库，避免首次查询时冷启动延迟（异步，不阻塞启动）
+  unawaited(
+    DictionaryService.instance.warmUp().catchError(
+      (e) => debugPrint('Dictionary warm-up skipped: $e'),
+    ),
+  );
 
   runApp(
     ProviderScope(

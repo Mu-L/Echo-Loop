@@ -21,8 +21,8 @@ import '../providers/flashcard/flashcard_provider.dart';
 import '../providers/learning_session/bookmark_review_provider.dart';
 import '../providers/saved_word_provider.dart';
 import '../providers/sentence_ai_provider.dart';
-import '../router/app_router.dart';
 import '../services/dictionary_service.dart';
+import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/ai_content_section.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
@@ -75,6 +75,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 return SizedBox(
                   width: double.infinity,
                   child: SegmentedButton<_FavoritesView>(
+                    showSelectedIcon: false,
                     segments: [
                       ButtonSegment(
                         value: _FavoritesView.sentences,
@@ -706,11 +707,45 @@ class _AnalysisContent extends StatelessWidget {
 // ============================================================
 
 /// 单词视图 — 按收藏时间倒序展示
-class _WordsView extends ConsumerWidget {
+///
+/// 批量预加载字典释义，所有释义一次性渲染（不会逐个闪烁）。
+class _WordsView extends ConsumerStatefulWidget {
   const _WordsView();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WordsView> createState() => _WordsViewState();
+}
+
+class _WordsViewState extends ConsumerState<_WordsView> {
+  /// 批量查询得到的字典条目缓存
+  Map<String, DictEntry> _dictMap = {};
+
+  /// 上次触发查询的单词列表，用于去重
+  List<String> _lastWordKeys = [];
+
+  /// 当单词列表变化时，批量查询字典释义
+  void _loadDictEntries(List<SavedWord> words) {
+    final wordStrings = words.map((w) => w.word).toList();
+    // 单词列表未变化时跳过
+    if (_listEquals(wordStrings, _lastWordKeys)) return;
+    _lastWordKeys = wordStrings;
+
+    DictionaryService.instance.lookupAll(wordStrings).then((entries) {
+      if (!mounted) return;
+      setState(() => _dictMap = entries);
+    });
+  }
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final savedWordsAsync = ref.watch(savedWordListProvider);
 
     return savedWordsAsync.when(
@@ -720,6 +755,9 @@ class _WordsView extends ConsumerWidget {
         if (words.isEmpty) {
           return _buildEmptyState(context, isSentences: false);
         }
+
+        // 触发批量字典查询（异步完成后 setState 更新释义）
+        _loadDictEntries(words);
 
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(
@@ -731,7 +769,11 @@ class _WordsView extends ConsumerWidget {
           itemCount: words.length,
           itemBuilder: (context, index) {
             final w = words[index];
-            return _SavedWordTile(key: ValueKey(w.id), savedWord: w);
+            return _SavedWordTile(
+              key: ValueKey(w.id),
+              savedWord: w,
+              dictEntry: _dictMap[w.word],
+            );
           },
         );
       },
@@ -743,45 +785,22 @@ class _WordsView extends ConsumerWidget {
 class _SavedWordTile extends ConsumerStatefulWidget {
   final SavedWord savedWord;
 
-  const _SavedWordTile({super.key, required this.savedWord});
+  /// 由父组件批量预加载的字典条目，避免每个 tile 独立异步查询
+  final DictEntry? dictEntry;
+
+  const _SavedWordTile({
+    super.key,
+    required this.savedWord,
+    this.dictEntry,
+  });
 
   @override
   ConsumerState<_SavedWordTile> createState() => _SavedWordTileState();
 }
 
 class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
-  DictEntry? _dictEntry;
-  bool _dictLoaded = false;
   bool _isPlaying = false;
   bool _isExpanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDict();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SavedWordTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.savedWord.word != widget.savedWord.word) {
-      _dictEntry = null;
-      _dictLoaded = false;
-      _loadDict();
-    }
-  }
-
-  Future<void> _loadDict() async {
-    final word = widget.savedWord.word;
-    final entry = await DictionaryService.instance.lookup(word);
-    if (!mounted) return;
-    // 防止异步完成时 widget 已切换到另一个单词
-    if (widget.savedWord.word != word) return;
-    setState(() {
-      _dictEntry = entry;
-      _dictLoaded = true;
-    });
-  }
 
   /// 播放来源句子的原声片段
   ///
@@ -912,9 +931,9 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
               letterSpacing: -0.2,
             ),
           ),
-          subtitle: !_isExpanded && _dictLoaded && _dictEntry != null
+          subtitle: !_isExpanded && widget.dictEntry != null
               ? Text(
-                  _buildSubtitle(_dictEntry!),
+                  _buildSubtitle(widget.dictEntry!),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -937,18 +956,18 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 音标 + 完整释义
-                    if (_dictEntry != null) ...[
-                      if (_dictEntry!.phonetic.isNotEmpty)
+                    if (widget.dictEntry != null) ...[
+                      if (widget.dictEntry!.phonetic.isNotEmpty)
                         Text(
-                          '/${_dictEntry!.phonetic}/',
+                          '/${widget.dictEntry!.phonetic}/',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      if (_dictEntry!.translation != null) ...[
+                      if (widget.dictEntry!.translation != null) ...[
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          _dictEntry!.translation!,
+                          widget.dictEntry!.translation!,
                           style: theme.textTheme.bodySmall?.copyWith(
                             height: 1.6,
                             color: theme.colorScheme.onSurface,
@@ -958,11 +977,11 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                     ],
 
                     // 柯林斯星级 + 考试标签
-                    if (_dictEntry != null &&
-                        (_dictEntry!.collins > 0 ||
-                            _dictEntry!.examTags.isNotEmpty)) ...[
+                    if (widget.dictEntry != null &&
+                        (widget.dictEntry!.collins > 0 ||
+                            widget.dictEntry!.examTags.isNotEmpty)) ...[
                       const SizedBox(height: AppSpacing.s),
-                      _buildMetaTags(theme, _dictEntry!),
+                      _buildMetaTags(theme, widget.dictEntry!),
                     ],
 
                     // 来源句子
@@ -996,7 +1015,6 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                                 word.sentenceText!,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
-                                  fontStyle: FontStyle.italic,
                                 ),
                               ),
                             ),

@@ -2,6 +2,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/app_database.dart';
 import '../database/providers.dart';
+import '../models/dict_entry.dart';
+import '../services/dictionary_service.dart';
 
 part 'saved_word_provider.g.dart';
 
@@ -44,6 +46,18 @@ class SavedWordList extends _$SavedWordList {
     final dao = ref.read(savedWordDaoProvider);
     await dao.removeWord(word);
   }
+}
+
+/// 收藏单词列表的批量字典条目
+///
+/// 监听 [savedWordListProvider]，当单词列表变化时批量查询所有字典释义。
+/// 避免每个列表项独立异步查询导致释义延迟闪烁。
+@riverpod
+Future<Map<String, DictEntry>> savedWordDictEntries(ref) async {
+  final wordsAsync = await ref.watch(savedWordListProvider.future);
+  if (wordsAsync.isEmpty) return {};
+  final wordStrings = wordsAsync.map((w) => w.word).toList();
+  return DictionaryService.instance.lookupAll(wordStrings);
 }
 
 /// 监听单个单词是否已收藏

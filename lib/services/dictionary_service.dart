@@ -71,6 +71,12 @@ class DictionaryService {
     r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$',
   );
 
+  /// 预热词典数据库
+  ///
+  /// 在 app 启动时调用，提前完成数据库初始化（复制 asset、打开连接），
+  /// 避免首次查询时的冷启动延迟。
+  Future<void> warmUp() => _ensureInitialized();
+
   /// 确保数据库已初始化
   Future<void> _ensureInitialized() async {
     if (_db != null) return;
@@ -187,6 +193,41 @@ class DictionaryService {
       collins: (row['collins'] as int?) ?? 0,
       tag: row['tag'] as String?,
     );
+  }
+
+  /// 批量查询多个单词的词典条目
+  ///
+  /// 返回 word → DictEntry 的映射，未找到的单词不包含在结果中。
+  /// 用于一次性预加载列表中所有单词的释义，避免逐个异步查询导致 UI 闪烁。
+  Future<Map<String, DictEntry>> lookupAll(List<String> words) async {
+    await _ensureInitialized();
+    final result = <String, DictEntry>{};
+    for (final word in words) {
+      final lower = _normalizeLookupWord(word);
+      if (lower.isEmpty) continue;
+
+      // 精确匹配
+      var entry = _queryWord(lower);
+      if (entry != null) {
+        result[word] = entry;
+        continue;
+      }
+
+      // 词形还原 fallback
+      final lemmas = _lemmatizer.lemmas(lower);
+      for (final lemma in lemmas) {
+        for (final form in lemma.lemmas) {
+          if (form == lower) continue;
+          entry = _queryWord(form);
+          if (entry != null) {
+            result[word] = entry;
+            break;
+          }
+        }
+        if (result.containsKey(word)) break;
+      }
+    }
+    return result;
   }
 
   /// 释放资源

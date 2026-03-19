@@ -6,6 +6,31 @@ part of 'saved_word_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+String _$savedWordDictEntriesHash() =>
+    r'b03f0c8cf56f1fea9824c349a06c1f8b1bd7b8b4';
+
+/// 收藏单词列表的批量字典条目
+///
+/// 监听 [savedWordListProvider]，当单词列表变化时批量查询所有字典释义。
+/// 避免每个列表项独立异步查询导致释义延迟闪烁。
+///
+/// Copied from [savedWordDictEntries].
+@ProviderFor(savedWordDictEntries)
+final savedWordDictEntriesProvider =
+    AutoDisposeFutureProvider<Map<String, DictEntry>>.internal(
+      savedWordDictEntries,
+      name: r'savedWordDictEntriesProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$savedWordDictEntriesHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef SavedWordDictEntriesRef =
+    AutoDisposeFutureProviderRef<Map<String, DictEntry>>;
 String _$isWordSavedHash() => r'5f235a069e004d1666dcd75cef56a1dbde8a9a97';
 
 /// Copied from Dart SDK
