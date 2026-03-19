@@ -63,6 +63,9 @@ class _ReviewDifficultPracticeScreenState
     with WakelockMixin {
   bool _isShowingDialog = false;
 
+  /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
+  bool _isExiting = false;
+
   /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
   bool _manualStoppedThisSentence = false;
 
@@ -253,6 +256,7 @@ class _ReviewDifficultPracticeScreenState
 
   /// 执行退出（保存断点、释放录音后退出）
   Future<void> _exit() async {
+    _isExiting = true;
     await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
 
     // 保存当前句子索引作为断点
@@ -334,7 +338,7 @@ class _ReviewDifficultPracticeScreenState
 
   /// 处理完成
   Future<void> _handleCompleted() async {
-    if (_isShowingDialog || !mounted) return;
+    if (_isShowingDialog || _isExiting || !mounted) return;
     _isShowingDialog = true;
 
     // 完成时释放录音
@@ -357,27 +361,23 @@ class _ReviewDifficultPracticeScreenState
         return;
       }
 
-      final result = await showFreePlayCompleteDialog(
+      await handleFreePlayComplete(
         context: context,
         title: l10n.reviewDifficultPracticeCompleteTitle,
         message: l10n.reviewDifficultPracticeCompleteMessage(
           playerState.totalSentences,
         ),
+        onStudyAgain: () async {
+          _manualStoppedThisSentence = false;
+          await ref
+              .read(reviewDifficultPracticeProvider.notifier)
+              .resetToStart();
+        },
+        onExit: () async {
+          await ref.read(learningSessionProvider.notifier).exitLearningMode();
+          if (mounted) context.pop();
+        },
       );
-
-      if (!mounted) { _isShowingDialog = false; return; }
-
-      if (result == null) { _isShowingDialog = false; return; }
-
-      if (result == false) {
-        // 再练一遍
-        _manualStoppedThisSentence = false;
-        await ref.read(reviewDifficultPracticeProvider.notifier).resetToStart();
-      } else {
-        // true（完成按钮）→ 退出
-        await ref.read(learningSessionProvider.notifier).exitLearningMode();
-        if (mounted) context.pop();
-      }
       _isShowingDialog = false;
       return;
     }

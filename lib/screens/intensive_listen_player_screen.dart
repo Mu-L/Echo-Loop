@@ -57,6 +57,9 @@ class _IntensiveListenPlayerScreenState
     with WakelockMixin {
   bool _isShowingDialog = false;
 
+  /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
+  bool _isExiting = false;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +74,7 @@ class _IntensiveListenPlayerScreenState
   /// 自由练习模式直接退出；正常学习模式弹出确认对话框，
   /// 确认后保存断点和难句，再退出。
   Future<void> _handleExit() async {
+    _isExiting = true;
     final player = ref.read(intensiveListenPlayerProvider.notifier);
     await player.pause();
     if (!mounted) return;
@@ -111,6 +115,7 @@ class _IntensiveListenPlayerScreenState
     );
 
     if (confirm != true || !mounted) {
+      _isExiting = false;
       // 用户取消退出 → 恢复播放（标注模式下不恢复，保持暂停状态）
       if (mounted) {
         final currentState = ref.read(intensiveListenPlayerProvider);
@@ -389,8 +394,10 @@ class _IntensiveListenPlayerScreenState
   ///
   /// 弹出完成对话框，支持双按钮："返回计划"和"继续下一步"。
   Future<void> _handleCompleted() async {
-    if (_isShowingDialog || !mounted) return;
+    debugPrint('[IntensiveListen] _handleCompleted called, _isShowingDialog=$_isShowingDialog, _isExiting=$_isExiting, mounted=$mounted');
+    if (_isShowingDialog || _isExiting || !mounted) return;
     _isShowingDialog = true;
+    debugPrint('[IntensiveListen] _isShowingDialog set to true');
 
     final session = ref.read(learningSessionProvider);
     final playerState = ref.read(intensiveListenPlayerProvider);
@@ -420,30 +427,29 @@ class _IntensiveListenPlayerScreenState
         return;
       }
 
-      final result = await showFreePlayCompleteDialog(
+      debugPrint('[IntensiveListen] about to call handleFreePlayComplete');
+      await handleFreePlayComplete(
         context: context,
         title: l10n.intensiveListenCompleteTitle,
         message: l10n.intensiveListenCompleteMessage(
           playerState.totalSentences,
           totalDifficultCount,
         ),
+        onStudyAgain: () async {
+          debugPrint('[IntensiveListen] onStudyAgain: calling resetToStart');
+          ref.read(intensiveListenPlayerProvider.notifier).resetToStart();
+          debugPrint('[IntensiveListen] onStudyAgain: resetToStart done');
+        },
+        onExit: () async {
+          debugPrint('[IntensiveListen] onExit called');
+          await ref
+              .read(learningProgressNotifierProvider.notifier)
+              .saveIntensiveListenSentenceIndex(widget.audioItemId, null);
+          await ref.read(learningSessionProvider.notifier).exitLearningMode();
+          if (mounted) context.pop();
+        },
       );
-
-      if (!mounted) { _isShowingDialog = false; return; }
-
-      if (result == null) { _isShowingDialog = false; return; }
-
-      if (result == false) {
-        // 再来一遍：resetToStart()，保留已标记难句
-        ref.read(intensiveListenPlayerProvider.notifier).resetToStart();
-      } else {
-        // true（完成按钮）→ 退出
-        await ref
-            .read(learningProgressNotifierProvider.notifier)
-            .saveIntensiveListenSentenceIndex(widget.audioItemId, null);
-        await ref.read(learningSessionProvider.notifier).exitLearningMode();
-        if (mounted) context.pop();
-      }
+      debugPrint('[IntensiveListen] handleFreePlayComplete returned');
       _isShowingDialog = false;
       return;
     }
@@ -522,7 +528,9 @@ class _IntensiveListenPlayerScreenState
       prev,
       next,
     ) {
+      debugPrint('[IntensiveListen] listener: prev.isCompleted=${prev?.isCompleted}, next.isCompleted=${next.isCompleted}, _isShowingDialog=$_isShowingDialog');
       if (next.isCompleted && !(prev?.isCompleted ?? false)) {
+        debugPrint('[IntensiveListen] listener: transition detected, calling _handleCompleted');
         _handleCompleted();
       }
     });

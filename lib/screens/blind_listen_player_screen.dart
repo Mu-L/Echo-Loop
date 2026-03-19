@@ -64,6 +64,9 @@ class _BlindListenPlayerScreenState
   /// 是否正在显示完成对话框
   bool _isShowingDialog = false;
 
+  /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
+  bool _isExiting = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,7 +80,7 @@ class _BlindListenPlayerScreenState
 
   /// 段落模式播放完成处理
   void _handleParagraphModeCompleted() {
-    if (_isShowingDialog) return;
+    if (_isShowingDialog || _isExiting) return;
     final session = ref.read(learningSessionProvider);
 
     if (session.isFreePlay) {
@@ -97,27 +100,17 @@ class _BlindListenPlayerScreenState
     _isShowingDialog = true;
     final l10n = AppLocalizations.of(context)!;
 
-    final result = await showFreePlayCompleteDialog(
+    await handleFreePlayComplete(
       context: context,
       title: l10n.blindListenComplete,
+      onStudyAgain: () async {
+        await ref.read(learningSessionProvider.notifier).replayBlindListen();
+      },
+      onExit: () async {
+        if (mounted) context.pop();
+        await ref.read(learningSessionProvider.notifier).exitLearningMode();
+      },
     );
-
-    if (!mounted) { _isShowingDialog = false; return; }
-
-    if (result == null) {
-      _isShowingDialog = false;
-      return;
-    }
-
-    // 保持 _isShowingDialog = true 阻止 listener 在处理期间重复触发
-    if (result == false) {
-      // 再听一遍
-      await ref.read(learningSessionProvider.notifier).replayBlindListen();
-    } else {
-      // true（完成按钮）→ 退出
-      if (mounted) context.pop();
-      await ref.read(learningSessionProvider.notifier).exitLearningMode();
-    }
     _isShowingDialog = false;
   }
 
@@ -441,6 +434,7 @@ class _BlindListenPlayerScreenState
   }
 
   Future<void> _exit() async {
+    _isExiting = true;
     if (mounted) context.pop();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
   }

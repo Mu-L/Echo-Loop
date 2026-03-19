@@ -67,6 +67,9 @@ class _ListenAndRepeatPlayerScreenState
     with WakelockMixin {
   bool _isShowingDialog = false;
 
+  /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
+  bool _isExiting = false;
+
   /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
   bool _manualStoppedThisSentence = false;
 
@@ -261,6 +264,7 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 执行退出
   Future<void> _exit() async {
+    _isExiting = true;
     await ref.read(shadowingRecordingControllerProvider.notifier).fullReset();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (mounted) context.pop();
@@ -388,7 +392,7 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 处理播放完成
   Future<void> _handleCompleted() async {
-    if (_isShowingDialog || !mounted) return;
+    if (_isShowingDialog || _isExiting || !mounted) return;
     _isShowingDialog = true;
 
     final session = ref.read(learningSessionProvider);
@@ -412,32 +416,26 @@ class _ListenAndRepeatPlayerScreenState
         return;
       }
 
-      final result = await showFreePlayCompleteDialog(
+      await handleFreePlayComplete(
         context: context,
         title: l10n.listenAndRepeatCompleteTitle,
         message: l10n.listenAndRepeatCompleteMessage(
           playerState.totalSentences,
         ),
+        onStudyAgain: () async {
+          await ref
+              .read(shadowingRecordingControllerProvider.notifier)
+              .fullReset();
+          _manualStoppedThisSentence = false;
+          ref.read(listenAndRepeatPlayerProvider.notifier).resetToStart();
+        },
+        onExit: () async {
+          await ref
+              .read(learningProgressNotifierProvider.notifier)
+              .saveShadowingSentenceIndex(widget.audioItemId, null);
+          await _exit();
+        },
       );
-
-      if (!mounted) { _isShowingDialog = false; return; }
-
-      if (result == null) { _isShowingDialog = false; return; }
-
-      if (result == false) {
-        // 再来一遍：重置到第一句重新开始
-        await ref
-            .read(shadowingRecordingControllerProvider.notifier)
-            .fullReset();
-        _manualStoppedThisSentence = false;
-        ref.read(listenAndRepeatPlayerProvider.notifier).resetToStart();
-      } else {
-        // true（完成按钮）→ 退出
-        await ref
-            .read(learningProgressNotifierProvider.notifier)
-            .saveShadowingSentenceIndex(widget.audioItemId, null);
-        await _exit();
-      }
       _isShowingDialog = false;
       return;
     }

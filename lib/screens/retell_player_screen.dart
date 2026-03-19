@@ -27,6 +27,7 @@ import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/wakelock_mixin.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
+import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/listen_and_repeat/speech_record_button.dart';
 import '../widgets/common/speech_rating_badge.dart';
@@ -58,6 +59,9 @@ class RetellPlayerScreen extends ConsumerStatefulWidget {
 class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     with WakelockMixin {
   bool _isShowingDialog = false;
+
+  /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
+  bool _isExiting = false;
 
   /// 用户在当前段手动停止过录音 → 本段不再自动录音/倒计时
   bool _manualStoppedThisParagraph = false;
@@ -256,6 +260,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
   /// 执行退出
   Future<void> _exit() async {
+    _isExiting = true;
     await ref.read(retellRecordingControllerProvider.notifier).fullReset();
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
     if (mounted) context.pop();
@@ -289,14 +294,45 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
 
   /// 处理完成
   Future<void> _handleComplete() async {
-    if (_isShowingDialog || !mounted) return;
+    if (_isShowingDialog || _isExiting || !mounted) return;
     _isShowingDialog = true;
 
     final l10n = AppLocalizations.of(context)!;
     final sessionState = ref.read(learningSessionProvider);
     final retellState = ref.read(retellPlayerProvider);
 
-    final stepCtx = sessionState.isFreePlay ? null : _getStepContext();
+    // 自由练习模式：使用公用弹窗
+    if (sessionState.isFreePlay) {
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .incrementRetellPassCount(widget.audioItemId);
+
+      if (!mounted) { _isShowingDialog = false; return; }
+
+      await handleFreePlayComplete(
+        context: context,
+        title: l10n.retellCompleteTitle,
+        message: l10n.retellCompleteMessage(retellState.totalParagraphs),
+        replayLabel: l10n.retellPracticeAgain,
+        onStudyAgain: () async {
+          await ref
+              .read(retellRecordingControllerProvider.notifier)
+              .fullReset();
+          await ref.read(retellPlayerProvider.notifier).restart();
+        },
+        onExit: () async {
+          await ref
+              .read(learningProgressNotifierProvider.notifier)
+              .saveRetellParagraphIndex(widget.audioItemId, null);
+          await _exit();
+        },
+      );
+      _isShowingDialog = false;
+      return;
+    }
+
+    // 正常学习模式：使用步骤完成弹窗
+    final stepCtx = _getStepContext();
 
     final result = await showStepCompleteDialog(
       context: context,
@@ -304,10 +340,10 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       contentBody: Text(
         l10n.retellCompleteMessage(retellState.totalParagraphs),
       ),
-      stepIndex: stepCtx?.stepIndex,
-      totalSteps: stepCtx?.totalSteps,
-      stageName: stepCtx?.stageName,
-      isLastStep: !sessionState.isFreePlay,
+      stepIndex: stepCtx.stepIndex,
+      totalSteps: stepCtx.totalSteps,
+      stageName: stepCtx.stageName,
+      isLastStep: true,
       replayLabel: l10n.retellPracticeAgain,
     );
 
@@ -322,12 +358,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .saveRetellParagraphIndex(widget.audioItemId, null);
-
-      if (!sessionState.isFreePlay) {
-        await ref
-            .read(learningProgressNotifierProvider.notifier)
-            .completeCurrentSubStage(widget.audioItemId);
-      }
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .completeCurrentSubStage(widget.audioItemId);
       await _exit();
     } else {
       // 再来一遍
