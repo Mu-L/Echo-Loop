@@ -2675,7 +2675,7 @@ abstract class AppLocalizations {
   /// No description provided for @firstStudySection.
   ///
   /// In en, this message translates to:
-  /// **'First Study ({count})'**
+  /// **'New Audio ({count})'**
   String firstStudySection(int count);
 
   /// No description provided for @completedSection.

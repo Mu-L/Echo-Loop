@@ -116,6 +116,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/collections',
                 builder: (context, state) => const LibraryScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':collectionId',
+                    builder: (context, state) {
+                      final collectionId =
+                          state.pathParameters['collectionId']!;
+                      return CollectionDetailScreen(
+                        collectionId: collectionId,
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -229,93 +241,83 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
-      // 详情页放在 shell 外部，全屏显示
+      // 合集内的子页面（全屏，无 tab bar）
       GoRoute(
-        path: '/collections/:collectionId',
+        path: '/collections/:collectionId/:audioId/plan',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final collectionId = state.pathParameters['collectionId']!;
-          return CollectionDetailScreen(collectionId: collectionId);
+          final audioId = state.pathParameters['audioId']!;
+          return LearningPlanScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
         },
-        routes: [
-          GoRoute(
-            path: ':audioId/plan',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return LearningPlanScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-          GoRoute(
-            path: ':audioId/player',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) => const PlayerScreen(),
-          ),
-          GoRoute(
-            path: ':audioId/blind-listen',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return BlindListenPlayerScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-          GoRoute(
-            path: ':audioId/intensive-listen',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return IntensiveListenPlayerScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-          GoRoute(
-            path: ':audioId/listen-and-repeat',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return ListenAndRepeatPlayerScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-          GoRoute(
-            path: ':audioId/retell',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return RetellPlayerScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-          GoRoute(
-            path: ':audioId/review-difficult-practice',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) {
-              final collectionId = state.pathParameters['collectionId']!;
-              final audioId = state.pathParameters['audioId']!;
-              return ReviewDifficultPracticeScreen(
-                collectionId: collectionId,
-                audioItemId: audioId,
-              );
-            },
-          ),
-        ],
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/player',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const PlayerScreen(),
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/blind-listen',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          final audioId = state.pathParameters['audioId']!;
+          return BlindListenPlayerScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/intensive-listen',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          final audioId = state.pathParameters['audioId']!;
+          return IntensiveListenPlayerScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/listen-and-repeat',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          final audioId = state.pathParameters['audioId']!;
+          return ListenAndRepeatPlayerScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/retell',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          final audioId = state.pathParameters['audioId']!;
+          return RetellPlayerScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/collections/:collectionId/:audioId/review-difficult-practice',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          final audioId = state.pathParameters['audioId']!;
+          return ReviewDifficultPracticeScreen(
+            collectionId: collectionId,
+            audioItemId: audioId,
+          );
+        },
       ),
     ],
   );

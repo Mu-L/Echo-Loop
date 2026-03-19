@@ -819,7 +819,7 @@
   "@upcomingReviewsSummary": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "firstStudySection": "First Study ({count})",
+  "firstStudySection": "New Audio ({count})",
   "@firstStudySection": {
     "placeholders": { "count": { "type": "int" } }
   },
