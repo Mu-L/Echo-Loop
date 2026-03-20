@@ -58,6 +58,9 @@ class _IntensiveListenPlayerScreenState
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
 
+  /// 是否正在显示完成弹窗，防止重复弹窗
+  bool _isShowingDialog = false;
+
   @override
   void initState() {
     super.initState();
@@ -114,13 +117,6 @@ class _IntensiveListenPlayerScreenState
 
     if (confirm != true || !mounted) {
       _isExiting = false;
-      // 用户取消退出 → 恢复播放（标注模式下不恢复，保持暂停状态）
-      if (mounted) {
-        final currentState = ref.read(intensiveListenPlayerProvider);
-        if (!currentState.isAnnotationMode) {
-          player.resume();
-        }
-      }
       return;
     }
 
@@ -392,7 +388,8 @@ class _IntensiveListenPlayerScreenState
   ///
   /// 弹出完成对话框，支持双按钮："返回计划"和"继续下一步"。
   Future<void> _handleCompleted() async {
-    if (_isExiting || !mounted) return;
+    if (_isShowingDialog || _isExiting || !mounted) return;
+    _isShowingDialog = true;
 
     final session = ref.read(learningSessionProvider);
     final playerState = ref.read(intensiveListenPlayerProvider);
@@ -434,6 +431,7 @@ class _IntensiveListenPlayerScreenState
           if (mounted) context.pop();
         },
       );
+      _isShowingDialog = false;
       return;
     }
 
@@ -471,7 +469,10 @@ class _IntensiveListenPlayerScreenState
       isLastStep: stepCtx.isLastStep,
     );
 
-    if (!mounted || result == null) return;
+    if (!mounted || result == null) {
+      _isShowingDialog = false;
+      return;
+    }
 
     // 用户确认后：清除断点 + 标记完成
     try {
@@ -505,6 +506,17 @@ class _IntensiveListenPlayerScreenState
 
     final playerState = ref.watch(intensiveListenPlayerProvider);
     final player = ref.read(intensiveListenPlayerProvider.notifier);
+
+    // 监听最后一句自动推进完成 → 触发完成弹窗
+    ref.listen(intensiveListenPlayerProvider, (prev, next) {
+      if (_isExiting || prev == null) return;
+      final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
+      final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
+      final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
+      if (isLast && wasActive && nowIdle && !next.isAnnotationMode) {
+        _handleCompleted();
+      }
+    });
 
     final currentSentence = player.currentSentence;
 

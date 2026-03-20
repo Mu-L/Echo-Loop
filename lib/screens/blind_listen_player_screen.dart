@@ -63,6 +63,9 @@ class _BlindListenPlayerScreenState
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
 
+  /// 是否正在显示完成弹窗，防止重复弹窗
+  bool _isShowingDialog = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +79,8 @@ class _BlindListenPlayerScreenState
 
   /// 播放完成处理
   void _handleCompleted() {
-    if (_isExiting) return;
+    if (_isShowingDialog || _isExiting) return;
+    _isShowingDialog = true;
     final session = ref.read(learningSessionProvider);
 
     if (session.isFreePlay) {
@@ -106,6 +110,7 @@ class _BlindListenPlayerScreenState
         await ref.read(learningSessionProvider.notifier).exitLearningMode();
       },
     );
+    _isShowingDialog = false;
   }
 
   /// 正常模式完成对话框
@@ -131,7 +136,10 @@ class _BlindListenPlayerScreenState
       showDifficultySelector: !isReview,
     );
 
-    if (!mounted || result == null) return;
+    if (!mounted || result == null) {
+      _isShowingDialog = false;
+      return;
+    }
 
     // 用户确认后：保存难度 + 标记完成
     try {

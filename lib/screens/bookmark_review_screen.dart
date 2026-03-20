@@ -286,6 +286,15 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
             .read(shadowingRecordingControllerProvider.notifier)
             .clearRecording();
       }
+      // 最后一句自动推进完成 → 触发完成弹窗
+      if (prev != null && !_isExiting) {
+        final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
+        final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
+        final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
+        if (isLast && wasActive && nowIdle) {
+          _handleCompleted();
+        }
+      }
       // 控制模式切换时同步到录音控制器
       if (prev?.settings.controlMode != next.settings.controlMode) {
         final controller = ref.read(

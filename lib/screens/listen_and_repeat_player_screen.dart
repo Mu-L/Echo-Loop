@@ -68,6 +68,9 @@ class _ListenAndRepeatPlayerScreenState
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
 
+  /// 是否正在显示完成弹窗，防止重复弹窗
+  bool _isShowingDialog = false;
+
   /// 用户在当前句手动停止过录音 → 本句不再自动录音/倒计时
   bool _manualStoppedThisSentence = false;
 
@@ -216,6 +219,7 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 处理退出（close 按钮 / 系统返回）
   Future<void> _handleExit() async {
+    _isExiting = true;
     await _cancelRecordingAndPlayback();
     final player = ref.read(listenAndRepeatPlayerProvider.notifier);
     await player.pause();
@@ -248,10 +252,7 @@ class _ListenAndRepeatPlayerScreenState
     );
 
     if (confirm != true || !mounted) {
-      // 用户取消退出 → 恢复播放
-      if (mounted) {
-        player.resume();
-      }
+      _isExiting = false;
       return;
     }
 
@@ -390,7 +391,8 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 处理播放完成
   Future<void> _handleCompleted() async {
-    if (_isExiting || !mounted) return;
+    if (_isShowingDialog || _isExiting || !mounted) return;
+    _isShowingDialog = true;
 
     final session = ref.read(learningSessionProvider);
     final playerState = ref.read(listenAndRepeatPlayerProvider);
@@ -427,6 +429,7 @@ class _ListenAndRepeatPlayerScreenState
           await _exit();
         },
       );
+      _isShowingDialog = false;
       return;
     }
 
@@ -457,7 +460,10 @@ class _ListenAndRepeatPlayerScreenState
       isLastStep: stepCtx.isLastStep,
     );
 
-    if (!mounted || result == null) return;
+    if (!mounted || result == null) {
+      _isShowingDialog = false;
+      return;
+    }
 
     // 用户确认后：清除断点 + 标记完成
     try {
@@ -543,6 +549,15 @@ class _ListenAndRepeatPlayerScreenState
         ref
             .read(shadowingRecordingControllerProvider.notifier)
             .clearRecording();
+      }
+      // 最后一句自动推进完成 → 触发完成弹窗
+      if (prev != null && !_isExiting) {
+        final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
+        final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
+        final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
+        if (isLast && wasActive && nowIdle) {
+          _handleCompleted();
+        }
       }
     });
 

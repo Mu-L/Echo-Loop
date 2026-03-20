@@ -629,17 +629,18 @@ class RetellPlayer extends _$RetellPlayer {
     session.addOutputWords(paragraphWordCount);
     session.stopOutputTimer();
 
-    state = state.copyWith(isRetellCountdown: false);
-
     // 检查遍数（手动模式视为单遍）
     final effectiveRepeatCount =
         state.settings.isManualMode ? 1 : state.settings.repeatCount;
     if (state.currentRepeatCount < effectiveRepeatCount) {
       // 还有遍数 → 回到 listening phase
-      state = state.copyWith(currentRepeatCount: state.currentRepeatCount + 1);
+      state = state.copyWith(
+        isRetellCountdown: false,
+        currentRepeatCount: state.currentRepeatCount + 1,
+      );
       await _playCurrentParagraph();
     } else {
-      // 推进下一段
+      // 推进下一段（goToNextParagraph 内部会设 isRetellCountdown: false）
       await goToNextParagraph();
     }
   }
