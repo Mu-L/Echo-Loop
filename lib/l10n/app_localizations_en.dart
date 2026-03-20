@@ -1485,7 +1485,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String firstStudySection(int count) {
-    return 'New Audio ($count)';
+    return 'First Study ($count)';
   }
 
   @override

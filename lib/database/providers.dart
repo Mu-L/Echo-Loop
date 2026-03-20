@@ -86,6 +86,8 @@ void switchAppDatabase(AppDatabase newDb, WidgetRef ref) {
   ref.invalidate(flashcardNotifierProvider);
   ref.invalidate(transcriptionTaskManagerProvider);
 
+  ref.invalidate(bookmarkListProvider);
+
   // 3. Invalidate 非 keepAlive 但依赖 DB 的提供者
   ref.invalidate(studyStatsNotifierProvider);
   ref.invalidate(studyTaskProvider);
@@ -156,6 +158,15 @@ final learnedWordFormDaoProvider = Provider<LearnedWordFormDao>((ref) {
 /// DailyStudyRecord DAO Provider
 final dailyStudyRecordDaoProvider = Provider<DailyStudyRecordDao>((ref) {
   return ref.watch(appDatabaseProvider).dailyStudyRecordDao;
+});
+
+/// 收藏句子列表 Provider（流式，keepAlive）
+///
+/// 监听所有收藏书签的变化（含音频名称），按音频分组。
+/// keepAlive 避免切换 tab 时重新订阅导致闪烁。
+final bookmarkListProvider = StreamProvider<List<BookmarkWithAudio>>((ref) {
+  final dao = ref.watch(bookmarkDaoProvider);
+  return dao.watchAllWithAudioName();
 });
 
 /// StudyTimeService Provider

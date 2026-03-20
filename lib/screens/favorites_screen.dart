@@ -47,9 +47,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final theme = Theme.of(context);
 
     // 获取收藏数量
-    final bookmarkDao = ref.watch(bookmarkDaoProvider);
-    final savedWordsAsync = ref.watch(savedWordListProvider);
-    final wordCount = savedWordsAsync.valueOrNull?.length;
+    final sentenceCount = ref.watch(bookmarkListProvider).valueOrNull?.length;
+    final wordCount = ref.watch(savedWordListProvider).valueOrNull?.length;
+
+    final sentenceLabel = sentenceCount != null && sentenceCount > 0
+        ? '${l10n.favoritesSentences} ($sentenceCount)'
+        : l10n.favoritesSentences;
+    final wordLabel = wordCount != null && wordCount > 0
+        ? '${l10n.favoritesWords} ($wordCount)'
+        : l10n.favoritesWords;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.favorites), centerTitle: true),
@@ -61,33 +67,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               horizontal: AppSpacing.l,
               vertical: AppSpacing.s,
             ),
-            child: StreamBuilder<List<BookmarkWithAudio>>(
-              stream: bookmarkDao.watchAllWithAudioName(),
-              builder: (context, snapshot) {
-                final sentenceCount = snapshot.data?.length;
-                final sentenceLabel = sentenceCount != null && sentenceCount > 0
-                    ? '${l10n.favoritesSentences} ($sentenceCount)'
-                    : l10n.favoritesSentences;
-                final wordLabel = wordCount != null && wordCount > 0
-                    ? '${l10n.favoritesWords} ($wordCount)'
-                    : l10n.favoritesWords;
-
-                return SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<_FavoritesView>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(
-                        value: _FavoritesView.sentences,
-                        label: Text(sentenceLabel),
-                        icon: const Icon(Icons.format_quote, size: 18),
-                      ),
-                      ButtonSegment(
-                        value: _FavoritesView.words,
-                        label: Text(wordLabel),
-                        icon: const Icon(Icons.abc, size: 18),
-                      ),
-                    ],
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<_FavoritesView>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: _FavoritesView.sentences,
+                    label: Text(sentenceLabel),
+                    icon: const Icon(Icons.format_quote, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: _FavoritesView.words,
+                    label: Text(wordLabel),
+                    icon: const Icon(Icons.abc, size: 18),
+                  ),
+                ],
                 selected: {_currentView},
                 onSelectionChanged: (selected) {
                   setState(() => _currentView = selected.first);
@@ -97,9 +92,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                  ),
-                );
-              },
+              ),
             ),
           ),
 
@@ -107,10 +100,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           Expanded(
             child: Stack(
               children: [
-                // 列表
-                _currentView == _FavoritesView.sentences
-                    ? const _SentencesView()
-                    : const _WordsView(),
+                // 列表（IndexedStack 保留两个 tab 的状态，切换不重建）
+                IndexedStack(
+                  index: _currentView == _FavoritesView.sentences ? 0 : 1,
+                  children: const [
+                    _SentencesView(),
+                    _WordsView(),
+                  ],
+                ),
 
                 // 底部悬浮复习按钮
                 if (_currentView == _FavoritesView.sentences)
@@ -136,16 +133,12 @@ class _SentencesView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarkDao = ref.watch(bookmarkDaoProvider);
+    final bookmarksAsync = ref.watch(bookmarkListProvider);
 
-    return StreamBuilder<List<BookmarkWithAudio>>(
-      stream: bookmarkDao.watchAllWithAudioName(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator.adaptive());
-        }
-
-        final allBookmarks = snapshot.data ?? [];
+    return bookmarksAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (allBookmarks) {
         if (allBookmarks.isEmpty) {
           return _buildEmptyState(context, isSentences: true);
         }
@@ -187,36 +180,29 @@ class _FloatingSentenceReviewButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarkDao = ref.watch(bookmarkDaoProvider);
+    final allBookmarks = ref.watch(bookmarkListProvider).valueOrNull ?? [];
+    if (allBookmarks.isEmpty) return const SizedBox.shrink();
 
-    return StreamBuilder<List<BookmarkWithAudio>>(
-      stream: bookmarkDao.watchAllWithAudioName(),
-      builder: (context, snapshot) {
-        final allBookmarks = snapshot.data ?? [];
-        if (allBookmarks.isEmpty) return const SizedBox.shrink();
+    // 过滤掉无效书签（迁移遗留的无时长条目）
+    final validBookmarks = allBookmarks.where((b) {
+      final duration = b.bookmark.endTime - b.bookmark.startTime;
+      return duration > 0 && b.bookmark.sentenceText.isNotEmpty;
+    }).toList();
+    if (validBookmarks.isEmpty) return const SizedBox.shrink();
 
-        // 过滤掉无效书签（迁移遗留的无时长条目）
-        final validBookmarks = allBookmarks.where((b) {
-          final duration = b.bookmark.endTime - b.bookmark.startTime;
-          return duration > 0 && b.bookmark.sentenceText.isNotEmpty;
-        }).toList();
-        if (validBookmarks.isEmpty) return const SizedBox.shrink();
-
-        return _FloatingReviewButton(
-          icon: Icons.headphones,
-          label: AppLocalizations.of(
-            context,
-          )!.bookmarkReviewStartCount(validBookmarks.length),
-          onPressed: () {
-            final provider = ref.read(bookmarkReviewProvider.notifier);
-            final audioItemDao = ref.read(audioItemDaoProvider);
-            provider.initialize(
-              allBookmarks,
-              getAudioItemById: (id) => audioItemDao.getById(id),
-            );
-            context.push(AppRoutes.bookmarkReview);
-          },
+    return _FloatingReviewButton(
+      icon: Icons.headphones,
+      label: AppLocalizations.of(
+        context,
+      )!.bookmarkReviewStartCount(validBookmarks.length),
+      onPressed: () {
+        final provider = ref.read(bookmarkReviewProvider.notifier);
+        final audioItemDao = ref.read(audioItemDaoProvider);
+        provider.initialize(
+          allBookmarks,
+          getAudioItemById: (id) => audioItemDao.getById(id),
         );
+        context.push(AppRoutes.bookmarkReview);
       },
     );
   }
