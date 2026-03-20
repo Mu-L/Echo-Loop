@@ -522,12 +522,14 @@ class _ListenAndRepeatPlayerScreenState
             .read(shadowingRecordingControllerProvider.notifier)
             .clearRecording();
       }
-      // 最后一句自动推进完成 → 触发完成弹窗
+      // 最后一句句间停顿结束 → 触发完成弹窗
+      // 只检测 isPauseBetweenSentences 从 true 变 false，
+      // 避免遍间停顿结束时误触发
       if (prev != null && !_isExiting) {
         final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
-        final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
-        final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
-        if (isLast && wasActive && nowIdle) {
+        final sentencePauseJustEnded =
+            prev.isPauseBetweenSentences && !next.isPauseBetweenSentences;
+        if (isLast && sentencePauseJustEnded && !next.isPlaying) {
           _handleCompleted();
         }
       }

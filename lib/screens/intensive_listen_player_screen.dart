@@ -435,9 +435,9 @@ class _IntensiveListenPlayerScreenState
     ref.listen(intensiveListenPlayerProvider, (prev, next) {
       if (_isExiting || prev == null) return;
       final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
-      final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
-      final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
-      if (isLast && wasActive && nowIdle && !next.isAnnotationMode) {
+      final sentencePauseJustEnded =
+          prev.isPauseBetweenSentences && !next.isPauseBetweenSentences;
+      if (isLast && sentencePauseJustEnded && !next.isPlaying && !next.isAnnotationMode) {
         _handleCompleted();
       }
     });

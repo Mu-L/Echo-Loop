@@ -289,9 +289,9 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
       // 最后一句自动推进完成 → 触发完成弹窗
       if (prev != null && !_isExiting) {
         final isLast = next.currentSentenceIndex >= next.totalSentences - 1;
-        final wasActive = prev.isPlaying || prev.isPauseBetweenPlays;
-        final nowIdle = !next.isPlaying && !next.isPauseBetweenPlays;
-        if (isLast && wasActive && nowIdle) {
+        final sentencePauseJustEnded =
+            prev.isPauseBetweenSentences && !next.isPauseBetweenSentences;
+        if (isLast && sentencePauseJustEnded && !next.isPlaying) {
           _handleCompleted();
         }
       }
