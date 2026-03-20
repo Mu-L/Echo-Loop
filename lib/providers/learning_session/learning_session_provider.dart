@@ -143,6 +143,9 @@ class LearningSession extends _$LearningSession {
   /// 音频播放状态监听（用于输入时间追踪）
   StreamSubscription<ja.PlayerState>? _inputTimePlayerStateSub;
 
+  /// 周期保存定时器（每 _maxSessionSeconds 自动保存并重置计时器）
+  Timer? _periodicSaveTimer;
+
   /// 学习计时器是否正在运行（仅用于测试验证）
   @visibleForTesting
   bool get isStudyTimerRunning => _studyStopwatch.isRunning;
@@ -162,68 +165,105 @@ class LearningSession extends _$LearningSession {
     ref.onDispose(() {
       _playerStateSub?.cancel();
       _inputTimePlayerStateSub?.cancel();
+      _periodicSaveTimer?.cancel();
       _saveStudyTime();
       _lifecycleListener.dispose();
     });
     return const LearningSessionState();
   }
 
-  /// App 生命周期变化时，根据音频播放状态决定是否暂停计时
+  /// App 生命周期变化时暂停/恢复计时
   ///
-  /// - 进入后台/非活跃：如果音频没在播放，暂停 Stopwatch（避免挂起时间被计入）
-  /// - 回到前台：如果当前在学习模式且 Stopwatch 未运行，恢复计时
+  /// - 进入后台：暂停所有计时器 + 取消周期保存（用户不在看，不计入学习时长）
+  /// - 回到前台：恢复计时 + 重新调度周期保存
   void _onAppLifecycleStateChanged(AppLifecycleState lifecycleState) {
     if (lifecycleState == AppLifecycleState.paused ||
         lifecycleState == AppLifecycleState.hidden) {
-      // 进入后台：如果音频没在播放，暂停计时
-      if (_studyStopwatch.isRunning) {
-        final isPlaying = ref.read(audioEngineProvider.notifier).isPlaying;
-        if (!isPlaying) {
-          _studyStopwatch.stop();
-          _inputStopwatch.stop();
-          _outputStopwatch.stop();
-        }
-      }
+      _studyStopwatch.stop();
+      _inputStopwatch.stop();
+      _outputStopwatch.stop();
+      _stopPeriodicSaveTimer();
     } else if (lifecycleState == AppLifecycleState.resumed) {
-      // 回到前台：如果在学习模式中，恢复计时
       if (state.isInLearningMode && !_studyStopwatch.isRunning) {
         _studyStopwatch.start();
+        _schedulePeriodicSave();
       }
     }
   }
 
+  /// 单次会话最大计入时长（防止用户睡着等异常场景）
+  static const _maxSessionSeconds = 5 * 60; // 5 分钟
+
   /// 停止计时并保存已记录的学习时长 + 输入/输出时间
   Future<void> _saveStudyTime() async {
-    if (!_studyStopwatch.isRunning &&
-        _studyStopwatch.elapsed == Duration.zero) {
-      // 即使总学习时长为 0，也要保存可能已累计的输入/输出时间
+    if (_isSaving) return;
+    _isSaving = true;
+    try {
+      if (!_studyStopwatch.isRunning &&
+          _studyStopwatch.elapsed == Duration.zero) {
+        await _saveInputOutputTime();
+        return;
+      }
+      _studyStopwatch.stop();
+      final seconds = _studyStopwatch.elapsed.inSeconds.clamp(0, _maxSessionSeconds);
+      _studyStopwatch.reset();
+      if (seconds > 0) {
+        await _studyTimeService.addStudyTime(seconds);
+      }
       await _saveInputOutputTime();
-      return;
+    } finally {
+      _isSaving = false;
     }
-    _studyStopwatch.stop();
-    final seconds = _studyStopwatch.elapsed.inSeconds;
-    _studyStopwatch.reset();
-    if (seconds > 0) {
-      await _studyTimeService.addStudyTime(seconds);
-    }
-    await _saveInputOutputTime();
   }
 
   /// 保存已累计的输入/输出时间
   Future<void> _saveInputOutputTime() async {
     _inputStopwatch.stop();
-    final inputSeconds = _inputStopwatch.elapsed.inSeconds;
+    final inputSeconds = _inputStopwatch.elapsed.inSeconds.clamp(0, _maxSessionSeconds);
     _inputStopwatch.reset();
     if (inputSeconds > 0) {
       await _studyTimeService.addInputTime(inputSeconds);
     }
 
     _outputStopwatch.stop();
-    final outputSeconds = _outputStopwatch.elapsed.inSeconds;
+    final outputSeconds = _outputStopwatch.elapsed.inSeconds.clamp(0, _maxSessionSeconds);
     _outputStopwatch.reset();
     if (outputSeconds > 0) {
       await _studyTimeService.addOutputTime(outputSeconds);
     }
+  }
+
+  /// 是否正在执行保存（防止 timer 回调与 exit 竞态）
+  bool _isSaving = false;
+
+  /// 启动学习计时（含周期保存定时器）
+  void _startStudyTimer() {
+    _studyStopwatch.reset();
+    _studyStopwatch.start();
+    _schedulePeriodicSave();
+  }
+
+  /// 调度下一次周期保存（one-shot Timer，避免 periodic 的 async 竞态）
+  void _schedulePeriodicSave() {
+    _periodicSaveTimer?.cancel();
+    _periodicSaveTimer = Timer(
+      const Duration(seconds: _maxSessionSeconds),
+      () async {
+        if (_isSaving || !state.isInLearningMode) return;
+        await _saveStudyTime();
+        // 保存后如果仍在学习模式，重新启动计时并调度下一次
+        if (state.isInLearningMode) {
+          _studyStopwatch.start();
+          _schedulePeriodicSave();
+        }
+      },
+    );
+  }
+
+  /// 停止周期保存定时器
+  void _stopPeriodicSaveTimer() {
+    _periodicSaveTimer?.cancel();
+    _periodicSaveTimer = null;
   }
 
   /// 开始监听 AudioEngine playerState，追踪输入时间
@@ -316,7 +356,7 @@ class LearningSession extends _$LearningSession {
     required List<List<Sentence>> paragraphs,
     BlindListenSettings? settings,
   }) async {
-    _studyStopwatch.start();
+    _startStudyTimer();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
@@ -367,7 +407,7 @@ class LearningSession extends _$LearningSession {
     List<Sentence> sentences, {
     bool isFreePlay = false,
   }) async {
-    _studyStopwatch.start();
+    _startStudyTimer();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
@@ -416,7 +456,7 @@ class LearningSession extends _$LearningSession {
       '🎯 enterListenAndRepeatMode: '
           'target=$audioItemId, engine=$engineAudioId',
     );
-    _studyStopwatch.start();
+    _startStudyTimer();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
@@ -471,7 +511,7 @@ class LearningSession extends _$LearningSession {
     Map<int, Set<int>> keywordsMap, {
     bool isFreePlay = false,
   }) async {
-    _studyStopwatch.start();
+    _startStudyTimer();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
@@ -519,7 +559,7 @@ class LearningSession extends _$LearningSession {
       '🎯 enterReviewDifficultPracticeMode: '
           'target=$audioItemId, engine=$engineAudioId',
     );
-    _studyStopwatch.start();
+    _startStudyTimer();
     _startInputTimeTracking();
     final practice = ref.read(listeningPracticeProvider.notifier);
     final currentSettings = ref.read(listeningPracticeProvider).settings;
@@ -561,6 +601,7 @@ class LearningSession extends _$LearningSession {
   ///
   /// 根据当前学习模式分支处理：停止播放、释放资源、恢复 LP 监听。
   Future<void> exitLearningMode() async {
+    _stopPeriodicSaveTimer();
     await _saveStudyTime();
     final mode = state.learningMode;
 
