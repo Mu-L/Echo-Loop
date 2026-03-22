@@ -433,30 +433,27 @@ class _BackContentState extends ConsumerState<_BackContent> {
     );
   }
 
-  /// 来源例句行 — 带播放按钮
+  /// 来源例句行 — 点击整行播放句子原声
   Widget _buildSentenceRow(ThemeData theme, dynamic word) {
     final canPlay =
         word.audioItemId != null &&
         (word.sentenceIndex != null ||
             (word.sentenceStartMs != null && word.sentenceEndMs != null));
 
-    return Row(
+    final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (canPlay)
-          GestureDetector(
-            onTap: _playSentence,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2, right: 8),
-              child: Icon(
-                _isPlaying
-                    ? Icons.stop_circle_outlined
-                    : Icons.play_circle_outline,
-                size: 22,
-                color: _isPlaying
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.primary,
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 8),
+            child: Icon(
+              _isPlaying
+                  ? Icons.stop_circle_outlined
+                  : Icons.play_circle_outline,
+              size: 22,
+              color: _isPlaying
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.primary,
             ),
           ),
         Expanded(
@@ -470,6 +467,16 @@ class _BackContentState extends ConsumerState<_BackContent> {
         ),
       ],
     );
+
+    // 可播放时，整行点击触发播放（同时阻止冒泡到卡片翻转）
+    if (canPlay) {
+      return GestureDetector(
+        onTap: _playSentence,
+        behavior: HitTestBehavior.opaque,
+        child: row,
+      );
+    }
+    return row;
   }
 
   /// 播放来源句子的原声片段
@@ -481,13 +488,17 @@ class _BackContentState extends ConsumerState<_BackContent> {
         word.sentenceStartMs != null && word.sentenceEndMs != null;
     if (!hasStoredTiming && word.sentenceIndex == null) return;
 
+    final notifier = ref.read(flashcardNotifierProvider.notifier);
+
     if (_isPlaying) {
       ref.read(audioEngineProvider.notifier).stop();
       setState(() => _isPlaying = false);
+      notifier.onSentencePlaybackEnded();
       return;
     }
 
     setState(() => _isPlaying = true);
+    notifier.onSentencePlaybackStarted();
 
     try {
       final engine = ref.read(audioEngineProvider.notifier);
@@ -496,7 +507,8 @@ class _BackContentState extends ConsumerState<_BackContent> {
       final dao = ref.read(audioItemDaoProvider);
       final row = await dao.getById(word.audioItemId!);
       if (row == null || !mounted) {
-        setState(() => _isPlaying = false);
+        if (mounted) setState(() => _isPlaying = false);
+        notifier.onSentencePlaybackEnded();
         return;
       }
 
@@ -530,12 +542,14 @@ class _BackContentState extends ConsumerState<_BackContent> {
         endTime = Duration(milliseconds: word.sentenceEndMs!);
       } else {
         if (row.transcriptPath == null) {
-          setState(() => _isPlaying = false);
+          if (mounted) setState(() => _isPlaying = false);
+          notifier.onSentencePlaybackEnded();
           return;
         }
         final sentences = await engine.loadTranscript(audioItem);
         if (!mounted || word.sentenceIndex! >= sentences.length) {
-          setState(() => _isPlaying = false);
+          if (mounted) setState(() => _isPlaying = false);
+          notifier.onSentencePlaybackEnded();
           return;
         }
         final sentence = sentences[word.sentenceIndex!];
@@ -557,6 +571,7 @@ class _BackContentState extends ConsumerState<_BackContent> {
     } finally {
       if (mounted) {
         setState(() => _isPlaying = false);
+        notifier.onSentencePlaybackEnded();
       }
     }
   }

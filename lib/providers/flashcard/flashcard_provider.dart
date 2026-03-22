@@ -387,6 +387,23 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     }
   }
 
+  /// 手动点击例句开始播放时隐藏倒计时
+  void onSentencePlaybackStarted() {
+    _countdown.cancel();
+    state = state.copyWith(
+      countdownRemaining: Duration.zero,
+      countdownTotal: Duration.zero,
+      isPaused: false,
+    );
+  }
+
+  /// 手动例句播放结束后重新启动倒计时
+  void onSentencePlaybackEnded() {
+    if (state.isShowingBack && !state.isCompleted) {
+      _startCountdown();
+    }
+  }
+
   /// TTS 朗读当前单词
   void speakCurrentWord() {
     _speakCurrentWord();
@@ -445,13 +462,18 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       state = state.copyWith(
         countdownRemaining: Duration.zero,
         countdownTotal: Duration.zero,
+        isPaused: false,
       );
       return;
     }
 
     final seconds = _getTimerSeconds();
     final total = Duration(seconds: seconds);
-    state = state.copyWith(countdownRemaining: total, countdownTotal: total);
+    state = state.copyWith(
+      countdownRemaining: total,
+      countdownTotal: total,
+      isPaused: false,
+    );
 
     _countdown.start(total, (remaining) {
       state = state.copyWith(countdownRemaining: remaining);
