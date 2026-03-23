@@ -43,6 +43,59 @@
 
 ---
 
+## 已完成：埋点分析系统（Firebase / 友盟 / LogOnly）
+
+### 架构
+- [x] 三通道架构：`AnalyticsChannel` 抽象接口 + `FirebaseChannel` / `UmengChannel` / `LogOnlyChannel`
+- [x] `AnalyticsService` Facade 入口（合规拦截 + 分发 + 异常静默）
+- [x] `ConsentManager` 用户同意管理（本期默认同意）
+- [x] `GeoInterceptor` Dio 拦截器（从 API 响应自动更新地区缓存，零额外请求）
+- [x] `AnalyticsObserver` GoRouter NavigatorObserver（自动采集 screen_view）
+- [x] 事件名/参数名常量集中管理（`Events` / `EventParams`）
+- [x] Riverpod Provider 注册（同步暴露，与 appDatabaseProvider 模式一致）
+
+### 平台配置
+- [x] Firebase iOS/macOS 配置（`flutterfire configure`）
+- [x] `firebase_core` + `firebase_analytics` + `umeng_common_sdk` 依赖
+- [x] 关闭 Firebase 自动 screen_view（Info.plist `FirebaseAutomaticScreenReportingEnabled = NO`）
+- [x] 友盟空 Key 防护（未配置时 fallback 到 Firebase）
+
+### 事件（17 个）
+- [x] `app_open`（冷启动 / 热启动）、`app_background`（前台时长）
+- [x] `screen_view`（页面名 + 上一页面）
+- [x] `learning_start` / `learning_end`（音频 ID + 学习模式 + 时长 + 自由练习标记）
+- [x] `blind_listen_start` / `blind_listen_complete`（遍数）
+- [x] `blind_listen_difficulty_set`（难度级别）
+- [x] `intensive_listen_start` / `intensive_listen_complete`（总句数 + 难句数）
+- [x] `shadowing_start` / `shadowing_complete`（总句数）
+- [x] `retell_start` / `retell_complete`（总段落数）
+- [x] `difficult_practice_start` / `difficult_practice_complete`（难句数）
+- [x] `first_learn_complete`（总学习时长）
+- [x] `stage_advance`（from_stage → to_stage）
+
+### 集成
+- [x] `main.dart` Firebase 初始化 + 生命周期事件
+- [x] GoRouter Observer 注册
+- [x] 各学习 Provider 埋入 start/complete 事件
+- [x] `LearningProgressProvider` 埋入 stage_advance + first_learn_complete
+- [x] `GeoInterceptor` 挂载到 AI API / 转录 API 的 Dio 实例
+- [x] 设置页开发者选项显示当前通道
+
+### 测试
+- [x] 39 个测试全部通过（service 10 + observer 9 + consent 4 + geo 6 + log_channel 6 + event_names 4）
+
+### Firebase DebugView 验证
+- [x] `app_open`、`screen_view`、`learning_start`、`learning_end` 在 DebugView 中确认出现
+
+  **完成时间**: 2026-03-23
+
+### 上线前待办
+- [ ] 友盟后台注册 App，填入 iOS/Android App Key（`umeng_channel.dart`）
+- [ ] `ConsentManager` 默认同意改为默认拒绝 + 隐私政策弹窗
+- [ ] `revokeConsent` 时清除 `anonymous_id`
+
+---
+
 ## 已完成：断点索引跨阶段未重置
 
 - [x] 正常学习模式进入精听/跟读/难句补练/复述时不再读取遗留断点，一律从头开始
