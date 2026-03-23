@@ -6,10 +6,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/flashcard/flashcard_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/wakelock_mixin.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/flashcard/flashcard_card.dart';
 import '../widgets/flashcard/flashcard_settings_sheet.dart';
@@ -22,7 +24,8 @@ class FlashcardScreen extends ConsumerStatefulWidget {
   ConsumerState<FlashcardScreen> createState() => _FlashcardScreenState();
 }
 
-class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
+class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
+    with WakelockMixin {
   late final AppLifecycleListener _lifecycleListener;
 
   @override
@@ -49,6 +52,19 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听完成状态变化，控制屏幕常亮：
+    // 完成 → 关闭常亮；「再来一遍」→ 恢复常亮
+    ref.listen(
+      flashcardNotifierProvider.select((s) => s.isCompleted),
+      (prev, next) {
+        if (next) {
+          WakelockPlus.disable();
+        } else if (prev == true && !next) {
+          WakelockPlus.enable();
+        }
+      },
+    );
+
     // 只监听影响卡片/AppBar 的字段，排除倒计时相关字段，
     // 避免倒计时每 100ms tick 导致整个页面（含 3D 变换卡片）重建
     final state = ref.watch(
