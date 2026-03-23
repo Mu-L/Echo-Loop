@@ -16,6 +16,8 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
@@ -686,6 +688,11 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
         isCurrentSentenceAutoMarked: false,
         stepFinished: true,
       );
+      ref.read(analyticsServiceProvider).track(Events.intensiveListenComplete, {
+        EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.totalSentences: state.totalSentences,
+        EventParams.difficultCount: state.difficultSentences.length,
+      });
     } else {
       // 非最后一句 → 推进到下一句
       state = state.copyWith(

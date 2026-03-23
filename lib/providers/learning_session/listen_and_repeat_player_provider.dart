@@ -13,6 +13,8 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../services/app_logger.dart';
 import '../../models/sentence.dart';
@@ -413,6 +415,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
       if (isLastSentence) {
         AppLogger.log('Player', '→ 完成（最后一句）');
         state = state.copyWith(isPlaying: false, stepFinished: true);
+        _trackShadowingComplete();
         return;
       }
 
@@ -520,6 +523,14 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
     _engine.cleanup();
     _sentences = [];
     state = const ListenAndRepeatPlayerState();
+  }
+
+  /// 上报跟读完成事件
+  void _trackShadowingComplete() {
+    ref.read(analyticsServiceProvider).track(Events.shadowingComplete, {
+      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      EventParams.totalSentences: state.totalSentences,
+    });
   }
 
   // ========== 内部方法 ==========
@@ -635,6 +646,7 @@ class ListenAndRepeatPlayer extends _$ListenAndRepeatPlayer {
             isPauseBetweenSentences: false,
             stepFinished: true,
           );
+          _trackShadowingComplete();
         } else {
           // 非最后一句 → 推进到下一句
           state = state.copyWith(

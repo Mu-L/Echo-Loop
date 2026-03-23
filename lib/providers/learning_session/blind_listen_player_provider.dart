@@ -12,6 +12,8 @@ library;
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
@@ -451,6 +453,10 @@ class BlindListenPlayer extends _$BlindListenPlayer {
         isPlaying: false,
         stepFinished: true,
       );
+      ref.read(analyticsServiceProvider).track(Events.blindListenComplete, {
+        EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.passNumber: state.currentRepeatCount,
+      });
     }
   }
 

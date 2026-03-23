@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
 import '../database/app_database.dart' as db;
@@ -222,6 +224,23 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     await _persistProgress(updated);
 
+    // 埋点：阶段推进（最后一个子步骤完成时触发）
+    if (currentIdx + 1 >= subStages.length) {
+      final analytics = ref.read(analyticsServiceProvider);
+      final nextStage = updated.currentStage;
+      analytics.track(Events.stageAdvance, {
+        EventParams.audioId: audioItemId,
+        EventParams.fromStage: stage.name,
+        EventParams.toStage: nextStage.name,
+      });
+      if (stage == LearningStage.firstLearn) {
+        analytics.track(Events.firstLearnComplete, {
+          EventParams.audioId: audioItemId,
+          EventParams.totalDurationMs: newTotalDuration,
+        });
+      }
+    }
+
     final newMap = Map<String, LearningProgress>.from(state.progressMap);
     newMap[audioItemId] = updated;
     state = state.copyWith(progressMap: newMap);
@@ -241,6 +260,11 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     );
 
     await _persistProgress(updated);
+
+    ref.read(analyticsServiceProvider).track(Events.blindListenDifficultySet, {
+      EventParams.audioId: audioItemId,
+      EventParams.difficulty: difficulty.name,
+    });
 
     final newMap = Map<String, LearningProgress>.from(state.progressMap);
     newMap[audioItemId] = updated;

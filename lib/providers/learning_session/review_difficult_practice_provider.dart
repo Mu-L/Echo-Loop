@@ -12,6 +12,8 @@ library;
 
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../models/difficult_practice_settings.dart';
 import '../../models/sentence.dart';
 import '../../utils/word_counter.dart';
@@ -498,6 +500,14 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = const ReviewDifficultPracticeState();
   }
 
+  /// 上报难句补练完成事件
+  void _trackDifficultPracticeComplete() {
+    ref.read(analyticsServiceProvider).track(Events.difficultPracticeComplete, {
+      EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+      EventParams.totalSentences: state.totalSentences,
+    });
+  }
+
   /// 重置到第一句并重新开始播放（自由练习"再来一遍"）
   Future<void> resetToStart() async {
     _engine.cleanup();
@@ -534,6 +544,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       );
       if (isLastSentence) {
         state = state.copyWith(isPlaying: false, stepFinished: true);
+        _trackDifficultPracticeComplete();
       } else {
         state = state.copyWith(
           currentSentenceIndex: state.currentSentenceIndex + 1,
@@ -749,6 +760,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
             isPauseBetweenSentences: false,
             stepFinished: true,
           );
+          _trackDifficultPracticeComplete();
         } else {
           // 推进到下一句
           state = state.copyWith(

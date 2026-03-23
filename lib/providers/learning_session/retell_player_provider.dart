@@ -12,6 +12,8 @@ library;
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../services/app_logger.dart';
@@ -382,6 +384,10 @@ class RetellPlayer extends _$RetellPlayer {
         isRetellCountdown: false,
         stepFinished: true,
       );
+      ref.read(analyticsServiceProvider).track(Events.retellComplete, {
+        EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.totalParagraphs: state.totalParagraphs,
+      });
       return;
     }
 
