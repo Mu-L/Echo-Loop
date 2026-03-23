@@ -51,18 +51,20 @@ void main() {
     test('track 转发事件到 channel', () async {
       await service.track(Events.appOpen, {
         EventParams.isFirstLaunch: true,
+        EventParams.launchType: 'cold',
       });
 
       expect(channel.events, hasLength(1));
       expect(channel.events.first.name, Events.appOpen);
       expect(channel.events.first.params?[EventParams.isFirstLaunch], true);
+      expect(channel.events.first.params?[EventParams.launchType], 'cold');
     });
 
     test('track 无参数时传 null', () async {
-      await service.track(Events.appOpen);
+      await service.track(Events.appBackground);
 
       expect(channel.events, hasLength(1));
-      expect(channel.events.first.name, Events.appOpen);
+      expect(channel.events.first.name, Events.appBackground);
       expect(channel.events.first.params, isNull);
     });
 
@@ -70,7 +72,7 @@ void main() {
       await consent.revokeConsent();
 
       await service.track(Events.appOpen);
-      await service.track(Events.learningStart, {EventParams.audioId: '123'});
+      await service.track(Events.sessionStart, {EventParams.audioId: '123'});
 
       expect(channel.events, isEmpty);
     });
@@ -98,12 +100,12 @@ void main() {
 
       // 撤回同意：事件丢弃
       await consent.revokeConsent();
-      await service.track(Events.learningStart);
+      await service.track(Events.sessionStart);
       expect(channel.events, hasLength(1)); // 没有新增
 
       // 重新同意：事件恢复
       await consent.grantConsent();
-      await service.track(Events.learningEnd);
+      await service.track(Events.sessionEnd);
       expect(channel.events, hasLength(2));
     });
 

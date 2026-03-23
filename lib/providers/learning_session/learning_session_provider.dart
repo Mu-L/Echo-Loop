@@ -286,10 +286,10 @@ class LearningSession extends _$LearningSession {
   /// 上报 session_start 事件
   void _trackSessionStart() {
     final analytics = ref.read(analyticsServiceProvider);
-    analytics.track(Events.learningStart, {
+    analytics.track(Events.sessionStart, {
       if (state.audioItemId != null) EventParams.audioId: state.audioItemId!,
       if (state.learningMode != null) EventParams.stage: state.learningMode!.name,
-      EventParams.isFreePractice: state.isFreePlay ? 1 : 0,
+      EventParams.isFreePractice: state.isFreePlay,
     });
   }
 
@@ -297,11 +297,11 @@ class LearningSession extends _$LearningSession {
   void _trackSessionEnd() {
     final analytics = ref.read(analyticsServiceProvider);
     final durationMs = _studyStopwatch.elapsedMilliseconds;
-    analytics.track(Events.learningEnd, {
+    analytics.track(Events.sessionEnd, {
       if (state.audioItemId != null) EventParams.audioId: state.audioItemId!,
       if (state.learningMode != null) EventParams.stage: state.learningMode!.name,
       EventParams.durationMs: durationMs,
-      EventParams.isFreePractice: state.isFreePlay ? 1 : 0,
+      EventParams.isFreePractice: state.isFreePlay,
     });
   }
 

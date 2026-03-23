@@ -6,9 +6,10 @@ void main() {
     test('所有事件名不为空', () {
       const events = [
         Events.appOpen,
+        Events.appBackground,
         Events.screenView,
-        Events.learningStart,
-        Events.learningEnd,
+        Events.sessionStart,
+        Events.sessionEnd,
         Events.blindListenStart,
         Events.blindListenComplete,
         Events.blindListenDifficultySet,
@@ -32,9 +33,10 @@ void main() {
     test('所有事件名不重复', () {
       const events = [
         Events.appOpen,
+        Events.appBackground,
         Events.screenView,
-        Events.learningStart,
-        Events.learningEnd,
+        Events.sessionStart,
+        Events.sessionEnd,
         Events.blindListenStart,
         Events.blindListenComplete,
         Events.blindListenDifficultySet,
@@ -57,9 +59,10 @@ void main() {
     test('事件名符合命名规范（小写下划线连接）', () {
       const events = [
         Events.appOpen,
+        Events.appBackground,
         Events.screenView,
-        Events.learningStart,
-        Events.learningEnd,
+        Events.sessionStart,
+        Events.sessionEnd,
         Events.blindListenStart,
         Events.blindListenComplete,
         Events.blindListenDifficultySet,
@@ -91,6 +94,8 @@ void main() {
         EventParams.durationMs,
         EventParams.completed,
         EventParams.isFirstLaunch,
+        EventParams.launchType,
+        EventParams.foregroundDurationMs,
         EventParams.screenName,
         EventParams.previousScreen,
         EventParams.isFreePractice,
@@ -117,6 +122,8 @@ void main() {
         EventParams.durationMs,
         EventParams.completed,
         EventParams.isFirstLaunch,
+        EventParams.launchType,
+        EventParams.foregroundDurationMs,
         EventParams.screenName,
         EventParams.previousScreen,
         EventParams.isFreePractice,

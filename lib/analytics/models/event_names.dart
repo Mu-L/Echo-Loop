@@ -10,18 +10,19 @@ abstract class Events {
   /// App 启动（冷启动/热启动）
   static const appOpen = 'app_open';
 
-  // app_background 已移除：macOS 生命周期回调不稳定，用户时长由 SDK 自动采集
+  /// App 进入后台
+  static const appBackground = 'app_background';
 
   // ── 页面浏览 ──
   /// 页面切换
   static const screenView = 'screen_view';
 
   // ── 学习会话 ──
-  /// 进入学习页面（避免 Firebase 保留名 session_start）
-  static const learningStart = 'learning_start';
+  /// 进入学习页面
+  static const sessionStart = 'session_start';
 
   /// 离开学习页面
-  static const learningEnd = 'learning_end';
+  static const sessionEnd = 'session_end';
 
   // ── 盲听 ──
   /// 开始全文盲听
@@ -79,6 +80,8 @@ abstract class EventParams {
 
   // ── 生命周期 ──
   static const isFirstLaunch = 'is_first_launch';
+  static const launchType = 'launch_type';
+  static const foregroundDurationMs = 'foreground_duration_ms';
 
   // ── 页面浏览 ──
   static const screenName = 'screen_name';
