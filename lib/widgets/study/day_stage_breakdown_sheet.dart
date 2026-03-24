@@ -180,8 +180,7 @@ class DayStageBreakdownSheet extends StatelessWidget {
     final totalStudy = total.studyTimeSeconds;
     // clamp 逻辑与今日卡片一致，防止脏数据导致不一致
     final clampedInput = total.inputTimeSeconds.clamp(0, totalStudy);
-    final clampedOutput =
-        total.outputTimeSeconds.clamp(0, totalStudy - clampedInput);
+    final clampedOutput = total.outputTimeSeconds.clamp(0, totalStudy);
 
     // 根据 mode 决定合计行显示的主数值
     final mainSeconds = switch (mode) {
@@ -296,8 +295,7 @@ class _StageRow extends StatelessWidget {
     // clamp 输入/输出，确保 听+说 ≤ 该阶段总时长
     final total = record.studyTimeSeconds;
     final clampedInput = record.inputTimeSeconds.clamp(0, total);
-    final clampedOutput =
-        record.outputTimeSeconds.clamp(0, total - clampedInput);
+    final clampedOutput = record.outputTimeSeconds.clamp(0, total);
 
     // 根据 mode 决定主数值
     final mainSeconds = switch (mode) {

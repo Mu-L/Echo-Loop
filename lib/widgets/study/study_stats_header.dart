@@ -129,7 +129,7 @@ class _TodayCard extends StatelessWidget {
               );
               final clampedOutput = math.min(
                 stats.todayOutputSeconds,
-                math.max(0, stats.todaySeconds - clampedInput),
+                stats.todaySeconds,
               );
               if (clampedInput != stats.todayInputSeconds ||
                   clampedOutput != stats.todayOutputSeconds) {
@@ -420,8 +420,7 @@ class _WeeklyBarChartState extends State<_WeeklyBarChart> {
                 final rawOutput =
                     hasBreakdown ? widget.dailyOutputSeconds[i] : 0;
                 final inputSec = math.min(rawInput, totalSec);
-                final outputSec =
-                    math.min(rawOutput, math.max(0, totalSec - inputSec));
+                final outputSec = math.min(rawOutput, totalSec);
                 if (rawInput != inputSec || rawOutput != outputSec) {
                   debugPrint(
                     '⚠️ 柱状图 clamp day$i: input $rawInput→$inputSec, '
