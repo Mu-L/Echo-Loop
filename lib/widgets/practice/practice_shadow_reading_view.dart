@@ -171,7 +171,10 @@ class PracticeShadowReadingView extends StatelessWidget {
               rec.currentAttempt != null &&
               rec.currentAttempt!.score != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              padding: const EdgeInsets.only(
+                top: AppSpacing.s,
+                bottom: AppSpacing.xs,
+              ),
               child: Center(
                 child: SpeechRatingBadge(
                   l10n: l10n,
