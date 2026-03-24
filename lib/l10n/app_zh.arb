@@ -821,5 +821,11 @@
   "savedReviewReminderDescription": "通勤或睡前复习收藏内容，效果更好",
   "audioReviewReminderSection": "音频复习提醒",
   "audioReviewReminderToggle": "音频到期提醒",
-  "audioReviewReminderDescription": "到复习时间时通知你，帮你保持复习节奏"
+  "audioReviewReminderDescription": "到复习时间时通知你，帮你保持复习节奏",
+
+  "recentCompletions": "最近完成 ({count})",
+  "recentCompletionsSummary": "过去24小时",
+  "timeAgoJustNow": "刚刚",
+  "timeAgoMinutes": "{minutes}分钟前",
+  "timeAgoHours": "{hours}小时前"
 }

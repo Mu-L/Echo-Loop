@@ -3613,6 +3613,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Get notified when it\'s time to review, helping you stay on track'**
   String get audioReviewReminderDescription;
+
+  /// No description provided for @recentCompletions.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently Completed ({count})'**
+  String recentCompletions(int count);
+
+  /// No description provided for @recentCompletionsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 24 hours'**
+  String get recentCompletionsSummary;
+
+  /// No description provided for @timeAgoJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get timeAgoJustNow;
+
+  /// No description provided for @timeAgoMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m ago'**
+  String timeAgoMinutes(int minutes);
+
+  /// No description provided for @timeAgoHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h ago'**
+  String timeAgoHours(int hours);
 }
 
 class _AppLocalizationsDelegate

@@ -1,14 +1,45 @@
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../tables/audio_items.dart';
 import '../tables/stage_completions.dart';
 
 part 'stage_completion_dao.g.dart';
 
+/// 最近完成记录（含音频 ID 和名称）
+class RecentCompletion {
+  /// 音频 ID（用于导航到学习计划页）
+  final String audioId;
+
+  /// 音频名称
+  final String audioName;
+
+  /// 完成的大阶段键
+  final String stage;
+
+  /// 完成的子步骤键
+  final String subStage;
+
+  /// 完成时间
+  final DateTime completedAt;
+
+  /// 该步骤耗时（毫秒）
+  final int durationMs;
+
+  const RecentCompletion({
+    required this.audioId,
+    required this.audioName,
+    required this.stage,
+    required this.subStage,
+    required this.completedAt,
+    required this.durationMs,
+  });
+}
+
 /// 步骤完成历史 DAO
 ///
 /// 提供步骤完成记录的插入、查询和删除操作。
-@DriftAccessor(tables: [StageCompletions])
+@DriftAccessor(tables: [StageCompletions, AudioItems])
 class StageCompletionDao extends DatabaseAccessor<AppDatabase>
     with _$StageCompletionDaoMixin {
   StageCompletionDao(super.db);
@@ -24,6 +55,34 @@ class StageCompletionDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.audioItemId.equals(audioItemId))
           ..orderBy([(t) => OrderingTerm.asc(t.completedAt)]))
         .get();
+  }
+
+  /// 查询指定时间之后的完成记录（含音频名称，按完成时间倒序）
+  ///
+  /// 用于"最近完成"区段，JOIN audio_items 获取音频名称。
+  Future<List<RecentCompletion>> getRecentCompletions(DateTime since) async {
+    final query = select(stageCompletions).join([
+      innerJoin(
+        audioItems,
+        audioItems.id.equalsExp(stageCompletions.audioItemId),
+      ),
+    ])
+      ..where(stageCompletions.completedAt.isBiggerOrEqualValue(since))
+      ..orderBy([OrderingTerm.desc(stageCompletions.completedAt)]);
+
+    final rows = await query.get();
+    return rows.map((row) {
+      final audio = row.readTable(audioItems);
+      final completion = row.readTable(stageCompletions);
+      return RecentCompletion(
+        audioId: audio.id,
+        audioName: audio.name,
+        stage: completion.stage,
+        subStage: completion.subStage,
+        completedAt: completion.completedAt,
+        durationMs: completion.durationMs,
+      );
+    }).toList();
   }
 
   /// 删除指定音频的所有完成记录

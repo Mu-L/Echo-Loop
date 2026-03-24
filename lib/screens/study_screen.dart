@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
@@ -32,6 +33,8 @@ class StudyScreen extends ConsumerWidget {
     final completedAudios = ref.watch(completedAudioProvider);
     final now = ref.watch(nowProvider)();
     final statsAsync = ref.watch(studyStatsNotifierProvider);
+
+    final recentCompletionsAsync = ref.watch(recentCompletionsProvider);
 
     final readyReviews = tasks
         .where((t) => t.type == StudyTaskType.reviewReady)
@@ -146,6 +149,21 @@ class StudyScreen extends ConsumerWidget {
                   _CompletedSection(completedAudios: completedAudios),
                   const SizedBox(height: AppSpacing.m),
                 ],
+
+                // 最近完成（过去24小时，默认折叠）
+                ...recentCompletionsAsync.whenOrNull(
+                      data: (completions) => completions.isNotEmpty
+                          ? [
+                              _RecentCompletionsSection(
+                                completions: completions,
+                                l10n: l10n,
+                                now: now,
+                              ),
+                              const SizedBox(height: AppSpacing.m),
+                            ]
+                          : null,
+                    ) ??
+                    [],
               ],
             ),
     );
@@ -455,6 +473,154 @@ class _CompletedSection extends StatelessWidget {
       ),
     );
   }
+}
+
+// ============================================================
+// Recent Completions Section
+// ============================================================
+
+/// 最近完成折叠区（过去 24 小时的子步骤完成记录）
+class _RecentCompletionsSection extends StatelessWidget {
+  final List<RecentCompletion> completions;
+  final AppLocalizations l10n;
+  final DateTime now;
+
+  const _RecentCompletionsSection({
+    required this.completions,
+    required this.l10n,
+    required this.now,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: ExpansionTile(
+        title: Text(
+          l10n.recentCompletions(completions.length),
+          style: theme.textTheme.titleSmall,
+        ),
+        subtitle: Text(
+          l10n.recentCompletionsSummary,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        initiallyExpanded: false,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        childrenPadding: const EdgeInsets.only(
+          left: AppSpacing.m,
+          right: AppSpacing.m,
+          bottom: AppSpacing.s,
+        ),
+        children: completions
+            .map((c) => _RecentCompletionTile(
+                  completion: c,
+                  l10n: l10n,
+                  now: now,
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+/// 单条最近完成记录卡片（样式参考待解锁任务卡片，不可点击）
+class _RecentCompletionTile extends StatelessWidget {
+  final RecentCompletion completion;
+  final AppLocalizations l10n;
+  final DateTime now;
+
+  const _RecentCompletionTile({
+    required this.completion,
+    required this.l10n,
+    required this.now,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final stage = LearningStage.fromKey(completion.stage);
+    final subStage = SubStageType.fromKey(completion.subStage);
+    final stageLabel = _stageSubStageLabel(l10n, stage, subStage);
+    final timeAgo = _timeAgo(l10n, now, completion.completedAt);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.s),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () =>
+            context.push(AppRoutes.audioLearningPlan(completion.audioId)),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // 左侧色条（使用 outline 色表示已完成）
+              Container(
+                width: 4,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              // 内容区
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, AppSpacing.m, 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: theme.colorScheme.outlineVariant,
+                        size: 36,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              completion.audioName,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              stageLabel,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.s),
+                      _StatusBadge(
+                        text: timeAgo,
+                        isOverdue: false,
+                        isInProgress: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 相对时间文案（刚刚 / X分钟前 / X小时前）
+String _timeAgo(AppLocalizations l10n, DateTime now, DateTime completedAt) {
+  final diff = now.difference(completedAt);
+  if (diff.inMinutes < 1) return l10n.timeAgoJustNow;
+  if (diff.inHours < 1) return l10n.timeAgoMinutes(diff.inMinutes);
+  return l10n.timeAgoHours(diff.inHours);
 }
 
 // ============================================================

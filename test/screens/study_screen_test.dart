@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluency/database/daos/stage_completion_dao.dart';
 import 'package:fluency/database/enums.dart';
 import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/models/audio_item.dart';
 import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/providers/audio_library_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
+import 'package:fluency/providers/study_task_provider.dart';
 import 'package:fluency/screens/study_screen.dart';
 import 'package:fluency/widgets/learning_progress_icon.dart';
 import 'package:fluency/providers/time_provider.dart';
@@ -25,6 +27,7 @@ void main() {
     required List<AudioItem> audioItems,
     required LearningProgressState progressState,
     DateTime? fixedNow,
+    List<RecentCompletion>? recentCompletions,
   }) {
     final router = GoRouter(
       initialLocation: '/study',
@@ -87,6 +90,10 @@ void main() {
           () => TestLearningProgressNotifier(progressState),
         ),
         if (fixedNow != null) nowProvider.overrideWithValue(() => fixedNow),
+        if (recentCompletions != null)
+          recentCompletionsProvider.overrideWith(
+            (ref) => Future.value(recentCompletions),
+          ),
       ],
       child: MaterialApp.router(
         supportedLocales: const [Locale('en'), Locale('zh')],
@@ -445,5 +452,87 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Library'), findsOneWidget);
+  });
+
+  testWidgets('最近完成区段显示记录并默认折叠', (tester) async {
+    final now = DateTime(2026, 3, 25, 12, 0);
+    final audioItems = [
+      AudioItem(
+        id: 'audio-1',
+        name: 'Test Audio',
+        audioPath: 'audios/test.mp3',
+        addedDate: now,
+      ),
+    ];
+
+    final completions = [
+      RecentCompletion(
+        audioId: 'audio-1',
+        audioName: 'Test Audio',
+        stage: 'firstLearn',
+        subStage: 'blindListen',
+        completedAt: now.subtract(const Duration(hours: 2)),
+        durationMs: 5000,
+      ),
+      RecentCompletion(
+        audioId: 'audio-1',
+        audioName: 'Test Audio',
+        stage: 'firstLearn',
+        subStage: 'intensiveListen',
+        completedAt: now.subtract(const Duration(minutes: 30)),
+        durationMs: 8000,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      createTestWidget(
+        audioItems: audioItems,
+        progressState: const LearningProgressState(),
+        fixedNow: now,
+        recentCompletions: completions,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 折叠区标题可见
+    expect(find.textContaining('Recently Completed (2)'), findsOneWidget);
+    // 摘要文案可见
+    expect(find.text('Past 24 hours'), findsOneWidget);
+
+    // 默认折叠 —— 子项不可见
+    expect(find.text('Blind Listening'), findsNothing);
+
+    // 展开后子项可见
+    await tester.tap(find.textContaining('Recently Completed (2)'));
+    await tester.pumpAndSettle();
+    // 相对时间出现在最近完成区段中
+    expect(find.text('2h ago'), findsOneWidget);
+    expect(find.text('30m ago'), findsOneWidget);
+    // 完成图标出现在卡片中
+    expect(find.byIcon(Icons.check_circle), findsAtLeast(2));
+  });
+
+  testWidgets('无最近完成记录时不显示折叠区', (tester) async {
+    final now = DateTime(2026, 3, 25, 12, 0);
+    final audioItems = [
+      AudioItem(
+        id: 'audio-1',
+        name: 'Test Audio',
+        audioPath: 'audios/test.mp3',
+        addedDate: now,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      createTestWidget(
+        audioItems: audioItems,
+        progressState: const LearningProgressState(),
+        fixedNow: now,
+        recentCompletions: const [],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Recently Completed'), findsNothing);
   });
 }

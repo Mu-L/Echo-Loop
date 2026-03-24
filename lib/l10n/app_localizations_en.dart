@@ -2017,4 +2017,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get audioReviewReminderDescription =>
       'Get notified when it\'s time to review, helping you stay on track';
+
+  @override
+  String recentCompletions(int count) {
+    return 'Recently Completed ($count)';
+  }
+
+  @override
+  String get recentCompletionsSummary => 'Past 24 hours';
+
+  @override
+  String get timeAgoJustNow => 'Just now';
+
+  @override
+  String timeAgoMinutes(int minutes) {
+    return '${minutes}m ago';
+  }
+
+  @override
+  String timeAgoHours(int hours) {
+    return '${hours}h ago';
+  }
 }

@@ -1,7 +1,9 @@
 import '../models/audio_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
+import '../database/providers.dart';
 import '../models/learning_progress.dart';
 import 'audio_library_provider.dart';
 import 'learning_progress_provider.dart';
@@ -301,3 +303,19 @@ int _typeRank(StudyTaskType type) {
 extension on AudioItem {
   String get audioNameForSort => name.toLowerCase();
 }
+
+/// 最近 24 小时完成的子步骤记录
+///
+/// 用于学习页底部"最近完成"折叠区展示。
+/// 按完成时间倒序排列，无记录时返回空列表。
+/// 依赖 [learningProgressNotifierProvider] 实现自动刷新：
+/// 完成子步骤时 progressMap 变化 → 触发重新查询。
+final recentCompletionsProvider =
+    FutureProvider<List<RecentCompletion>>((ref) {
+  // 监听进度变化，确保完成子步骤后自动刷新
+  ref.watch(learningProgressNotifierProvider.select((s) => s.progressMap));
+  final dao = ref.watch(stageCompletionDaoProvider);
+  final now = ref.watch(nowProvider)();
+  final since = now.subtract(const Duration(hours: 24));
+  return dao.getRecentCompletions(since);
+});

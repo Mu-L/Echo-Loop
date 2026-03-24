@@ -1961,4 +1961,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get audioReviewReminderDescription => '到复习时间时通知你，帮你保持复习节奏';
+
+  @override
+  String recentCompletions(int count) {
+    return '最近完成 ($count)';
+  }
+
+  @override
+  String get recentCompletionsSummary => '过去24小时';
+
+  @override
+  String get timeAgoJustNow => '刚刚';
+
+  @override
+  String timeAgoMinutes(int minutes) {
+    return '$minutes分钟前';
+  }
+
+  @override
+  String timeAgoHours(int hours) {
+    return '$hours小时前';
+  }
 }
