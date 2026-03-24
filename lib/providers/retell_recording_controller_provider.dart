@@ -29,6 +29,7 @@ import '../services/embedding_similarity.dart';
 import '../services/recording_service.dart';
 import '../services/speech_completion_detector.dart';
 import '../services/speech_practice_platform.dart';
+import '../services/study_event_recorder.dart';
 import '../services/text_embedding_platform.dart';
 import '../widgets/common/speech_rating_badge.dart';
 import 'speech_practice_session_provider.dart';
@@ -186,6 +187,13 @@ class RetellRecordingController extends Notifier<RetellRecordingState> {
   }
 
   // ========== 配置方法 ==========
+
+  /// 设置学习事件记录器（Provider 进入模式时注入，退出时传 null 清除）
+  ///
+  /// 录音完成后自动通过 recorder 记录说的时长。
+  void setRecorder(StudyEventRecorder? recorder) {
+    _recordingService.recorder = recorder;
+  }
 
   /// 设置手动控制模式
   void setManualMode(bool value) {

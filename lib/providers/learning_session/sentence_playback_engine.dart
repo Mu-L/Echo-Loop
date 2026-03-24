@@ -13,6 +13,7 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 import '../../models/sentence.dart';
+import '../../services/study_event_recorder.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import 'countdown_controller.dart';
 
@@ -26,9 +27,17 @@ typedef PauseCalculator = Duration Function(Duration sentenceDuration);
 /// 封装 N 遍播放循环 + 遍间/句间停顿 + 倒计时 UI 更新。
 /// 通过构造参数注入 AudioEngine 的获取方式，
 /// 状态更新通过回调参数传回给宿主。
+///
+/// 可选注入 [StudyEventRecorder]，每次 playClipOnce 成功后
+/// 自动调用 [StudyEventRecorder.onSentencePlayed] 记录听力统计。
 class SentencePlaybackEngine {
   /// 获取 AudioEngine 实例的工厂函数
   final AudioEngine Function() _getEngine;
+
+  /// 学习事件记录器（可选）
+  ///
+  /// 注入后，[playSentenceLoop] 和 [playOnce] 每播完一遍自动记录听力时长和词数。
+  final StudyEventRecorder? _recorder;
 
   /// 可控倒计时控制器
   final CountdownController _countdown = CountdownController();
@@ -36,8 +45,11 @@ class SentencePlaybackEngine {
   /// 当前播放循环的 sessionId
   int _currentSessionId = -1;
 
-  SentencePlaybackEngine({required AudioEngine Function() getEngine})
-    : _getEngine = getEngine;
+  SentencePlaybackEngine({
+    required AudioEngine Function() getEngine,
+    StudyEventRecorder? recorder,
+  })  : _getEngine = getEngine,
+        _recorder = recorder;
 
   /// 当前 sessionId（供外部查询）
   int get currentSessionId => _currentSessionId;
@@ -81,6 +93,9 @@ class SentencePlaybackEngine {
       await engine.playClipOnce(sentence, sessionId);
 
       if (!engine.isActiveSession(sessionId)) return;
+
+      // 播完一遍，自动记录听力统计
+      _recorder?.onSentencePlayed(sentence);
 
       // 遍间停顿（最后一遍不停顿）
       if (playCount < repeatCount) {
@@ -157,6 +172,9 @@ class SentencePlaybackEngine {
     _currentSessionId = engine.newSession();
     final sessionId = _currentSessionId;
     await engine.playClipOnce(sentence, sessionId);
+    if (engine.isActiveSession(sessionId)) {
+      _recorder?.onSentencePlayed(sentence);
+    }
   }
 
   /// 清理资源

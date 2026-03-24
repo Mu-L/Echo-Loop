@@ -9,6 +9,7 @@ import 'dart:async';
 
 import '../models/speech_practice_models.dart';
 import '../services/speech_practice_platform.dart';
+import 'study_event_recorder.dart';
 
 /// 录音结果。
 class RecordingResult {
@@ -61,6 +62,17 @@ class RecordingService {
 
   /// 当前录音文件路径。
   String? _currentFilePath;
+
+  /// 录音开始时间（用于计算录音时长）
+  DateTime? _recordingStartTime;
+
+  /// 学习事件记录器（外部设置，用于自动记录说的时长）
+  ///
+  /// 录音控制器通过 [setRecorder] 设置，Provider 进入模式时注入、退出时清除。
+  StudyEventRecorder? _recorder;
+
+  /// 设置学习事件记录器
+  set recorder(StudyEventRecorder? value) => _recorder = value;
 
   RecordingService(this._backend);
 
@@ -127,18 +139,29 @@ class RecordingService {
     final filePath = await _backend.startSession(promptId: promptId);
     _recordingPromptId = promptId;
     _currentFilePath = filePath;
+    _recordingStartTime = DateTime.now();
     return filePath;
   }
 
   /// 停止录音并等待 final transcript。
   ///
   /// 内部在拿到 final transcript 后自动 shutdown 释放麦克风。
+  /// 录音时长在方法入口处计算（不含等待 transcript 的时间）。
   Future<RecordingResult> stopRecording({required String promptId}) async {
     if (_recordingPromptId != promptId) {
       return const RecordingResult(
         errorCode: 'invalidState',
         errorMessage: 'Not recording this prompt.',
       );
+    }
+
+    // 立即计算录音时长（在等待 final transcript 之前）
+    final rec = _recorder;
+    final startTime = _recordingStartTime;
+    _recordingStartTime = null;
+    if (startTime != null) {
+      final secs = DateTime.now().difference(startTime).inSeconds;
+      rec?.onRecordingCompleted(secs);
     }
 
     try {
@@ -199,11 +222,14 @@ class RecordingService {
   }
 
   /// 取消当前录音，删除录音文件，释放麦克风。
+  ///
+  /// 取消的录音不计入说的时长。
   Future<void> cancelRecording() async {
     final promptId = _recordingPromptId;
     if (promptId == null) return;
 
     _recordingPromptId = null;
+    _recordingStartTime = null;
     _clearFinalCompleter();
 
     try {
