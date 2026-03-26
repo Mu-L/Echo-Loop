@@ -2126,4 +2126,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importingPreferences => 'Restoring preferences...';
+
+  @override
+  String get activityCalendar => 'Activity Calendar';
+
+  @override
+  String get noActivityThisMonth => 'No learning activity this month';
+
+  @override
+  String get monthlyTotal => 'Total';
+
+  @override
+  String get monthlyActiveDays => 'Active days';
+
+  @override
+  String get monthlyAvgPerDay => 'Avg/day';
+
+  @override
+  String get monthlyBestStreak => 'Best streak';
+
+  @override
+  String daysSuffix(int days) {
+    return '${days}d';
+  }
+
+  @override
+  String activeDaysFraction(int active, int total) {
+    return '$active/$total days';
+  }
 }

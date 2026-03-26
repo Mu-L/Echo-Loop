@@ -1,0 +1,54 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../database/providers.dart';
+
+part 'monthly_study_records_provider.g.dart';
+
+/// 月度某天的学习摘要
+class MonthDayRecord {
+  /// 当日学习时长（秒）
+  final int studyTimeSeconds;
+
+  /// 当日输入时间（秒）
+  final int inputTimeSeconds;
+
+  /// 当日输出时间（秒）
+  final int outputTimeSeconds;
+
+  const MonthDayRecord({
+    required this.studyTimeSeconds,
+    required this.inputTimeSeconds,
+    required this.outputTimeSeconds,
+  });
+
+  /// 当日是否有学习活动
+  bool get hasActivity => studyTimeSeconds > 0;
+}
+
+/// 查询指定月份的每日学习记录
+///
+/// 返回 `Map<int, MonthDayRecord>`，key 为日期（1~31），
+/// 无记录的日期不在 map 中。
+@riverpod
+Future<Map<int, MonthDayRecord>> monthlyStudyRecords(
+  MonthlyStudyRecordsRef ref,
+  int year,
+  int month,
+) async {
+  final dao = ref.read(dailyStudyRecordDaoProvider);
+  final firstDay = DateTime(year, month, 1);
+  final lastDay = DateTime(year, month + 1, 0); // 月末最后一天
+  final records = await dao.getBetween(firstDay, lastDay);
+
+  final map = <int, MonthDayRecord>{};
+  for (final r in records) {
+    if (r.studyTimeSeconds > 0) {
+      map[r.date.day] = MonthDayRecord(
+        studyTimeSeconds: r.studyTimeSeconds,
+        inputTimeSeconds: r.inputTimeSeconds,
+        outputTimeSeconds: r.outputTimeSeconds,
+      );
+    }
+  }
+  return map;
+}

@@ -2066,4 +2066,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importingPreferences => '正在恢复设置...';
+
+  @override
+  String get activityCalendar => '学习日历';
+
+  @override
+  String get noActivityThisMonth => '本月暂无学习记录';
+
+  @override
+  String get monthlyTotal => '总计';
+
+  @override
+  String get monthlyActiveDays => '学习天数';
+
+  @override
+  String get monthlyAvgPerDay => '日均';
+
+  @override
+  String get monthlyBestStreak => '最长连续';
+
+  @override
+  String daysSuffix(int days) {
+    return '$days天';
+  }
+
+  @override
+  String activeDaysFraction(int active, int total) {
+    return '$active/$total天';
+  }
 }

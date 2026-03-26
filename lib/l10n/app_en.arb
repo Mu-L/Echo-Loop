@@ -1149,5 +1149,31 @@
   "importingExtracting": "Extracting backup...",
   "importingMedia": "Restoring media files...",
   "importingDatabase": "Restoring database...",
-  "importingPreferences": "Restoring preferences..."
+  "importingPreferences": "Restoring preferences...",
+
+  "activityCalendar": "Activity Calendar",
+  "noActivityThisMonth": "No learning activity this month",
+  "monthlyTotal": "Total",
+  "monthlyActiveDays": "Active days",
+  "monthlyAvgPerDay": "Avg/day",
+  "monthlyBestStreak": "Best streak",
+  "daysSuffix": "{days}d",
+  "@daysSuffix": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "activeDaysFraction": "{active}/{total} days",
+  "@activeDaysFraction": {
+    "placeholders": {
+      "active": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }

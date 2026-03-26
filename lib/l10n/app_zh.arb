@@ -856,5 +856,14 @@
   "importingExtracting": "正在解压备份...",
   "importingMedia": "正在恢复媒体文件...",
   "importingDatabase": "正在恢复数据库...",
-  "importingPreferences": "正在恢复设置..."
+  "importingPreferences": "正在恢复设置...",
+
+  "activityCalendar": "学习日历",
+  "noActivityThisMonth": "本月暂无学习记录",
+  "monthlyTotal": "总计",
+  "monthlyActiveDays": "学习天数",
+  "monthlyAvgPerDay": "日均",
+  "monthlyBestStreak": "最长连续",
+  "daysSuffix": "{days}天",
+  "activeDaysFraction": "{active}/{total}天"
 }

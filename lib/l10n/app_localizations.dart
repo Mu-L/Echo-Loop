@@ -3811,6 +3811,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restoring preferences...'**
   String get importingPreferences;
+
+  /// No description provided for @activityCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity Calendar'**
+  String get activityCalendar;
+
+  /// No description provided for @noActivityThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'No learning activity this month'**
+  String get noActivityThisMonth;
+
+  /// No description provided for @monthlyTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get monthlyTotal;
+
+  /// No description provided for @monthlyActiveDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Active days'**
+  String get monthlyActiveDays;
+
+  /// No description provided for @monthlyAvgPerDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg/day'**
+  String get monthlyAvgPerDay;
+
+  /// No description provided for @monthlyBestStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Best streak'**
+  String get monthlyBestStreak;
+
+  /// No description provided for @daysSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d'**
+  String daysSuffix(int days);
+
+  /// No description provided for @activeDaysFraction.
+  ///
+  /// In en, this message translates to:
+  /// **'{active}/{total} days'**
+  String activeDaysFraction(int active, int total);
 }
 
 class _AppLocalizationsDelegate
