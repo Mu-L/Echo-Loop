@@ -55,8 +55,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ? '${l10n.favoritesSentences} ($sentenceCount)'
         : l10n.favoritesSentences;
     final wordLabel = wordCount != null && wordCount > 0
-        ? '${l10n.favoritesWords} ($wordCount)'
-        : l10n.favoritesWords;
+        ? '${l10n.favoritesVocabulary} ($wordCount)'
+        : l10n.favoritesVocabulary;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.favorites), centerTitle: true),
@@ -704,7 +704,6 @@ class _WordsViewState extends ConsumerState<_WordsView> {
   /// 上次触发查询的单词列表，用于去重
   List<String> _lastWordKeys = [];
 
-
   /// 当单词列表变化时，批量查询字典释义
   void _loadDictEntries(List<SavedWord> words) {
     final wordStrings = words.map((w) => w.word).toList();
@@ -1183,7 +1182,9 @@ Widget _buildEmptyState(BuildContext context, {required bool isSentences}) {
           ),
           const SizedBox(height: AppSpacing.m),
           Text(
-            isSentences ? l10n.favoritesNoSentences : l10n.favoritesNoWords,
+            isSentences
+                ? l10n.favoritesNoSentences
+                : l10n.favoritesNoVocabulary,
             style: theme.textTheme.titleMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1192,7 +1193,7 @@ Widget _buildEmptyState(BuildContext context, {required bool isSentences}) {
           Text(
             isSentences
                 ? l10n.favoritesNoSentencesHint
-                : l10n.favoritesNoWordsHint,
+                : l10n.favoritesNoVocabularyHint,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.outline,

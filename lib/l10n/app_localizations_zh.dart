@@ -1510,7 +1510,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesSentences => '句子';
 
   @override
-  String get favoritesWords => '单词';
+  String get favoritesVocabulary => '词汇';
 
   @override
   String get favoritesNoSentences => '暂无收藏句子';
@@ -1519,10 +1519,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesNoSentencesHint => '在精听或跟读中标记难句';
 
   @override
-  String get favoritesNoWords => '暂无收藏单词';
+  String get favoritesNoVocabulary => '暂无收藏词汇';
 
   @override
-  String get favoritesNoWordsHint => '在学习中点击单词查词并收藏';
+  String get favoritesNoVocabularyHint => '在学习中点击单词查词并收藏';
 
   @override
   String favoritesBookmarkCount(int count) {
@@ -1530,10 +1530,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get favoritesWordSaved => '已收藏';
+  String get favoritesVocabularySaved => '已收藏';
 
   @override
-  String get favoritesWordRemoved => '已取消收藏';
+  String get favoritesVocabularyRemoved => '已取消收藏';
 
   @override
   String get favoritesBookmarkRemoved => '已取消收藏';
@@ -1542,10 +1542,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get undo => '撤销';
 
   @override
-  String get favoritesSaveWord => '收藏单词';
+  String get favoritesSaveVocabulary => '收藏';
 
   @override
-  String get favoritesUnsaveWord => '取消收藏';
+  String get favoritesUnsaveVocabulary => '取消收藏';
 
   @override
   String get bookmarkReviewTitle => '收藏复习';

@@ -929,7 +929,9 @@ class _UnsaveButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          isUnsaved ? l10n.favoritesWordRemoved : l10n.flashcardUnsaveHint,
+          isUnsaved
+              ? l10n.favoritesVocabularyRemoved
+              : l10n.flashcardUnsaveHint,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.outline.withValues(alpha: 0.6),
           ),
@@ -942,7 +944,7 @@ class _UnsaveButton extends StatelessWidget {
           ),
           color: isUnsaved ? Colors.grey : Colors.amber,
           tooltip: isUnsaved
-              ? l10n.favoritesSaveWord
+              ? l10n.favoritesSaveVocabulary
               : l10n.flashcardUnsaveHint,
         ),
       ],

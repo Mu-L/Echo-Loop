@@ -865,21 +865,21 @@
   },
 
   "favoritesSentences": "Sentences",
-  "favoritesWords": "Words",
+  "favoritesVocabulary": "Vocabulary",
   "favoritesNoSentences": "No saved sentences yet",
   "favoritesNoSentencesHint": "Mark difficult sentences during intensive listening or shadowing",
-  "favoritesNoWords": "No saved words yet",
-  "favoritesNoWordsHint": "Tap a word during learning to look it up and save it",
+  "favoritesNoVocabulary": "No saved vocabulary yet",
+  "favoritesNoVocabularyHint": "Tap a word during learning to look it up and save it",
   "favoritesBookmarkCount": "{count} sentences",
   "@favoritesBookmarkCount": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "favoritesWordSaved": "Word saved",
-  "favoritesWordRemoved": "Word removed",
+  "favoritesVocabularySaved": "Saved",
+  "favoritesVocabularyRemoved": "Removed",
   "favoritesBookmarkRemoved": "Bookmark removed",
   "undo": "Undo",
-  "favoritesSaveWord": "Save Word",
-  "favoritesUnsaveWord": "Remove Saved Word",
+  "favoritesSaveVocabulary": "Save",
+  "favoritesUnsaveVocabulary": "Remove",
 
   "bookmarkReviewTitle": "Bookmark Review",
   "bookmarkReviewStart": "Start Review",

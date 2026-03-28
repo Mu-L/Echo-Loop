@@ -2780,11 +2780,11 @@ abstract class AppLocalizations {
   /// **'Sentences'**
   String get favoritesSentences;
 
-  /// No description provided for @favoritesWords.
+  /// No description provided for @favoritesVocabulary.
   ///
   /// In en, this message translates to:
-  /// **'Words'**
-  String get favoritesWords;
+  /// **'Vocabulary'**
+  String get favoritesVocabulary;
 
   /// No description provided for @favoritesNoSentences.
   ///
@@ -2798,17 +2798,17 @@ abstract class AppLocalizations {
   /// **'Mark difficult sentences during intensive listening or shadowing'**
   String get favoritesNoSentencesHint;
 
-  /// No description provided for @favoritesNoWords.
+  /// No description provided for @favoritesNoVocabulary.
   ///
   /// In en, this message translates to:
-  /// **'No saved words yet'**
-  String get favoritesNoWords;
+  /// **'No saved vocabulary yet'**
+  String get favoritesNoVocabulary;
 
-  /// No description provided for @favoritesNoWordsHint.
+  /// No description provided for @favoritesNoVocabularyHint.
   ///
   /// In en, this message translates to:
   /// **'Tap a word during learning to look it up and save it'**
-  String get favoritesNoWordsHint;
+  String get favoritesNoVocabularyHint;
 
   /// No description provided for @favoritesBookmarkCount.
   ///
@@ -2816,17 +2816,17 @@ abstract class AppLocalizations {
   /// **'{count} sentences'**
   String favoritesBookmarkCount(int count);
 
-  /// No description provided for @favoritesWordSaved.
+  /// No description provided for @favoritesVocabularySaved.
   ///
   /// In en, this message translates to:
-  /// **'Word saved'**
-  String get favoritesWordSaved;
+  /// **'Saved'**
+  String get favoritesVocabularySaved;
 
-  /// No description provided for @favoritesWordRemoved.
+  /// No description provided for @favoritesVocabularyRemoved.
   ///
   /// In en, this message translates to:
-  /// **'Word removed'**
-  String get favoritesWordRemoved;
+  /// **'Removed'**
+  String get favoritesVocabularyRemoved;
 
   /// No description provided for @favoritesBookmarkRemoved.
   ///
@@ -2840,17 +2840,17 @@ abstract class AppLocalizations {
   /// **'Undo'**
   String get undo;
 
-  /// No description provided for @favoritesSaveWord.
+  /// No description provided for @favoritesSaveVocabulary.
   ///
   /// In en, this message translates to:
-  /// **'Save Word'**
-  String get favoritesSaveWord;
+  /// **'Save'**
+  String get favoritesSaveVocabulary;
 
-  /// No description provided for @favoritesUnsaveWord.
+  /// No description provided for @favoritesUnsaveVocabulary.
   ///
   /// In en, this message translates to:
-  /// **'Remove Saved Word'**
-  String get favoritesUnsaveWord;
+  /// **'Remove'**
+  String get favoritesUnsaveVocabulary;
 
   /// No description provided for @bookmarkReviewTitle.
   ///

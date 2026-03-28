@@ -307,7 +307,9 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         AnimatedBookmarkIcon(
           isSaved: isSaved,
           onPressed: () => _toggleSave(isSaved),
-          tooltip: isSaved ? l10n.favoritesUnsaveWord : l10n.favoritesSaveWord,
+          tooltip: isSaved
+              ? l10n.favoritesUnsaveVocabulary
+              : l10n.favoritesSaveVocabulary,
         ),
       ],
     );

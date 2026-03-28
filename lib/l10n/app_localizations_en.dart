@@ -1553,7 +1553,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoritesSentences => 'Sentences';
 
   @override
-  String get favoritesWords => 'Words';
+  String get favoritesVocabulary => 'Vocabulary';
 
   @override
   String get favoritesNoSentences => 'No saved sentences yet';
@@ -1563,10 +1563,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Mark difficult sentences during intensive listening or shadowing';
 
   @override
-  String get favoritesNoWords => 'No saved words yet';
+  String get favoritesNoVocabulary => 'No saved vocabulary yet';
 
   @override
-  String get favoritesNoWordsHint =>
+  String get favoritesNoVocabularyHint =>
       'Tap a word during learning to look it up and save it';
 
   @override
@@ -1575,10 +1575,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get favoritesWordSaved => 'Word saved';
+  String get favoritesVocabularySaved => 'Saved';
 
   @override
-  String get favoritesWordRemoved => 'Word removed';
+  String get favoritesVocabularyRemoved => 'Removed';
 
   @override
   String get favoritesBookmarkRemoved => 'Bookmark removed';
@@ -1587,10 +1587,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo => 'Undo';
 
   @override
-  String get favoritesSaveWord => 'Save Word';
+  String get favoritesSaveVocabulary => 'Save';
 
   @override
-  String get favoritesUnsaveWord => 'Remove Saved Word';
+  String get favoritesUnsaveVocabulary => 'Remove';
 
   @override
   String get bookmarkReviewTitle => 'Bookmark Review';
