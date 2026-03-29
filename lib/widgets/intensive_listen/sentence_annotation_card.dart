@@ -610,16 +610,6 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
             playedGroupIndices: widget.playedSenseGroupIndices,
             onTapGroup: widget.onTapSenseGroup ?? (_) {},
           ),
-          // 单意群提示
-          if (_activeSenseGroups!.length == 1) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              l10n.senseGroupSingleGroup,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ] else
           GestureDetector(
             onLongPressStart: (details) => TextContextMenu.show(
