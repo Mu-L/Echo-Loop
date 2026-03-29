@@ -2981,7 +2981,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookmarkReviewProgress.
   ///
   /// In en, this message translates to:
-  /// **'{current}/{total} sentences'**
+  /// **'Sentence {current}/{total}'**
   String bookmarkReviewProgress(int current, int total);
 
   /// No description provided for @flashcardTitle.
