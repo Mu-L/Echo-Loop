@@ -16,8 +16,8 @@ import '../../utils/sense_group_timing.dart';
 import '../common/async_toggle_button.dart';
 import '../common/shimmer_placeholder.dart';
 import '../common/text_context_menu.dart';
-import '../practice/sense_group_text.dart';
-import 'word_dictionary_sheet.dart';
+import '../intensive_listen/word_dictionary_sheet.dart';
+import 'sense_group_text.dart';
 
 /// 内容加载状态
 enum ContentLoadState { idle, loading, loaded, error }
@@ -248,11 +248,14 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
   /// - 两种结果相同：off → medium → off
   /// - 两种结果不同：off → medium（大意群）→ fine（小意群）→ off
   Future<void> _onTapSenseGroup() async {
-    widget.onToolbarButtonTapped?.call();
     final result = widget.senseGroupResult;
 
     if (result != null && result.medium.isNotEmpty) {
       // 已有有效数据，切换显示模式
+      // 仅从 off 进入 medium 时触发手动模式（首次激活）
+      if (_senseGroupMode == SenseGroupMode.off) {
+        widget.onToolbarButtonTapped?.call();
+      }
       final bothEqual = result.areBothEqual;
       final prevMode = _senseGroupMode;
       setState(() {
@@ -277,6 +280,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     } else if (widget.onRequestSenseGroups != null) {
       // 无数据时 await 异步请求，按钮自动显示 loading
       // （空结果不会被父组件缓存，因此可重复点击重试）
+      widget.onToolbarButtonTapped?.call();
       AppLogger.log('SenseGroup', '无数据，发起 API 请求...');
       await widget.onRequestSenseGroups!();
       // 请求完成后，父组件已通过 setState 将 senseGroupResult 传入。
@@ -294,7 +298,10 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 
   /// 翻译按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
   Future<void> _onTapTranslation() async {
-    widget.onToolbarButtonTapped?.call();
+    // 仅首次请求时触发手动模式（已有内容时切换展开/折叠不触发）
+    if (_translationContent == null) {
+      widget.onToolbarButtonTapped?.call();
+    }
     if (_translationContent != null) {
       setState(() {
         _translationExpanded = !_translationExpanded;
@@ -324,7 +331,10 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 
   /// 解析按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
   Future<void> _onTapAnalysis() async {
-    widget.onToolbarButtonTapped?.call();
+    // 仅首次请求时触发手动模式
+    if (_analysisContent == null) {
+      widget.onToolbarButtonTapped?.call();
+    }
     if (_analysisContent != null) {
       setState(() {
         _analysisExpanded = !_analysisExpanded;

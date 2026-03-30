@@ -21,7 +21,7 @@ import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/providers.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
-import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
+import 'package:fluency/widgets/practice/sentence_annotation_card.dart';
 
 import '../helpers/mock_providers.dart';
 

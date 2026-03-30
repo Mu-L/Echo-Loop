@@ -14,7 +14,7 @@ import 'package:fluency/providers/learning_session/listen_and_repeat_player_prov
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/router/app_router.dart';
 import 'package:fluency/screens/listen_and_repeat_player_screen.dart';
-import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
+import 'package:fluency/widgets/practice/sentence_annotation_card.dart';
 
 import '../helpers/test_notifiers.dart';
 

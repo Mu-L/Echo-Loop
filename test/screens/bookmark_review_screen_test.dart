@@ -23,7 +23,7 @@ import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
-import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
+import 'package:fluency/widgets/practice/sentence_annotation_card.dart';
 import 'package:fluency/widgets/listen_and_repeat/speech_practice_turn_panel.dart';
 import 'package:fluency/widgets/listen_and_repeat/speech_record_button.dart';
 

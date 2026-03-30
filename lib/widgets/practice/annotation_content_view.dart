@@ -25,7 +25,7 @@ import '../../services/transcription_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing.dart';
-import '../intensive_listen/sentence_annotation_card.dart';
+import 'sentence_annotation_card.dart';
 import 'sense_group_action_bar.dart';
 import 'sense_group_text.dart';
 

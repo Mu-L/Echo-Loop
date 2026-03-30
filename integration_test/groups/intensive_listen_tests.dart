@@ -15,7 +15,7 @@ import 'package:fluency/providers/learning_session/intensive_listen_player_provi
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/router/app_router.dart';
 import 'package:fluency/screens/intensive_listen_player_screen.dart';
-import 'package:fluency/widgets/intensive_listen/sentence_annotation_card.dart';
+import 'package:fluency/widgets/practice/sentence_annotation_card.dart';
 
 import '../helpers/test_notifiers.dart';
 
