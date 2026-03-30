@@ -510,6 +510,7 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                   : p.pausePostEvalCountdown();
                             },
                             onToolbarButtonTapped: () {
+                              if (playerState.isManualMode) return;
                               ref
                                   .read(bookmarkReviewProvider.notifier)
                                   .enterManualForSentence();

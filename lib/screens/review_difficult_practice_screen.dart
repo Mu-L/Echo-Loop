@@ -708,6 +708,7 @@ class _ReviewDifficultPracticeScreenState
                                   : p.pausePostEvalCountdown();
                             },
                             onToolbarButtonTapped: () {
+                              if (playerState.isManualMode) return;
                               ref
                                   .read(
                                     reviewDifficultPracticeProvider.notifier,
