@@ -505,9 +505,6 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                                 currentSentence?.endTime.inMilliseconds,
                             onStopMainPlayer: () {
                               ref
-                                  .read(bookmarkReviewProvider.notifier)
-                                  .pause();
-                              ref
                                   .read(
                                     shadowingRecordingControllerProvider
                                         .notifier,

@@ -756,11 +756,6 @@ class _ListenAndRepeatPlayerScreenState
                                   onStopMainPlayer: () {
                                     ref
                                         .read(
-                                          listenAndRepeatPlayerProvider.notifier,
-                                        )
-                                        .pause();
-                                    ref
-                                        .read(
                                           shadowingRecordingControllerProvider
                                               .notifier,
                                         )

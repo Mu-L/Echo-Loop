@@ -702,11 +702,6 @@ class _ReviewDifficultPracticeScreenState
                             onStopMainPlayer: () {
                               ref
                                   .read(
-                                    reviewDifficultPracticeProvider.notifier,
-                                  )
-                                  .pause();
-                              ref
-                                  .read(
                                     shadowingRecordingControllerProvider
                                         .notifier,
                                   )

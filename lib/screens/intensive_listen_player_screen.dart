@@ -577,7 +577,8 @@ class _IntensiveListenPlayerScreenState
                                 currentSentence?.startTime.inMilliseconds,
                             sentenceEndMs:
                                 currentSentence?.endTime.inMilliseconds,
-                            onStopMainPlayer: () => player.pause(),
+                            // engine.newSession() 在 AnnotationContentView
+                            // 内部调用，会使主播放 session 失效并自动停止。
                             onTimingsChanged: (timings) {
                               setState(
                                 () => _senseGroupTimings = timings,
