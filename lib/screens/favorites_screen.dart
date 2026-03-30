@@ -839,9 +839,9 @@ class _SavedPhraseTileState extends ConsumerState<_SavedPhraseTile> {
     final phrase = widget.savedPhrase;
     if (phrase.audioItemId == null) return;
 
-    // 优先意群时间，回退句子时间
-    final startMs = phrase.groupStartMs ?? phrase.sentenceStartMs;
-    final endMs = phrase.groupEndMs ?? phrase.sentenceEndMs;
+    // 播放来源句子（非意群片段）
+    final startMs = phrase.sentenceStartMs;
+    final endMs = phrase.sentenceEndMs;
     if (startMs == null || endMs == null) return;
 
     if (_isPlaying) {
