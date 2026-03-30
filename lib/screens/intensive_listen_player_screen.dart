@@ -19,7 +19,6 @@ import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../theme/app_theme.dart';
-import '../utils/sense_group_timing.dart';
 import '../widgets/intensive_listen/intensive_listen_settings_sheet.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../services/app_logger.dart';
@@ -61,9 +60,6 @@ class _IntensiveListenPlayerScreenState
 
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
-
-  /// 意群时间范围（由 AnnotationContentView 通过回调更新，播放按钮使用）
-  List<SenseGroupTiming>? _senseGroupTimings;
 
   @override
   void initState() {
@@ -506,7 +502,7 @@ class _IntensiveListenPlayerScreenState
     return wakelockBody(
       child: LearningHotkeyScope(
         onPlayPause: () {
-          AppLogger.log('PlayPause', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgTimingsAvailable=${_senseGroupTimings != null}');
+          AppLogger.log('PlayPause', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode}');
           if (playerState.isPlaying) {
             player.pause();
           } else if (playerState.isAnnotationReplay) {
@@ -514,13 +510,7 @@ class _IntensiveListenPlayerScreenState
           } else if (playerState.isPauseBetweenPlays) {
             player.replayDuringCountdown();
           } else if (playerState.isAnnotationMode) {
-            if (_senseGroupTimings != null) {
-              AppLogger.log('PlayPause', '→ playAllSenseGroups (${_senseGroupTimings!.length}组)');
-              player.playAllSenseGroups(_senseGroupTimings!);
-            } else {
-              AppLogger.log('PlayPause', '→ replayInAnnotationMode');
-              player.replayInAnnotationMode();
-            }
+            player.replayInAnnotationMode();
           } else {
             player.resume();
           }
@@ -579,11 +569,6 @@ class _IntensiveListenPlayerScreenState
                                 currentSentence?.endTime.inMilliseconds,
                             // engine.newSession() 在 AnnotationContentView
                             // 内部调用，会使主播放 session 失效并自动停止。
-                            onTimingsChanged: (timings) {
-                              setState(
-                                () => _senseGroupTimings = timings,
-                              );
-                            },
                           ),
                         )
                       : PracticeNormalModeView(
@@ -716,7 +701,7 @@ class _IntensiveListenPlayerScreenState
                           }
                         },
                         onPlayPause: () {
-                          AppLogger.log('PlayPause2', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode} sgTimings=${_senseGroupTimings?.length} sgTimingsAvailable=${_senseGroupTimings != null}');
+                          AppLogger.log('PlayPause2', 'isPlaying=${playerState.isPlaying} isAnnotationReplay=${playerState.isAnnotationReplay} isPauseBetweenPlays=${playerState.isPauseBetweenPlays} isAnnotationMode=${playerState.isAnnotationMode}');
                           if (playerState.isPlaying) {
                             player.pause();
                           } else if (playerState.isAnnotationReplay) {
@@ -724,13 +709,7 @@ class _IntensiveListenPlayerScreenState
                           } else if (playerState.isPauseBetweenPlays) {
                             player.replayDuringCountdown();
                           } else if (playerState.isAnnotationMode) {
-                            if (_senseGroupTimings != null) {
-                              AppLogger.log('PlayPause2', '→ playAllSenseGroups (${_senseGroupTimings!.length}组)');
-                              player.playAllSenseGroups(_senseGroupTimings!);
-                            } else {
-                              AppLogger.log('PlayPause2', '→ replayInAnnotationMode');
-                              player.replayInAnnotationMode();
-                            }
+                            player.replayInAnnotationMode();
                           } else {
                             player.resume();
                           }
