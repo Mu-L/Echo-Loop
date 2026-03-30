@@ -754,6 +754,7 @@ class _ListenAndRepeatPlayerScreenState
                                   highlightedSegments:
                                       currentAttempt?.referenceSegments,
                                   onStopMainPlayer: () {
+                                    _manualStoppedThisSentence = true;
                                     ref
                                         .read(
                                           shadowingRecordingControllerProvider

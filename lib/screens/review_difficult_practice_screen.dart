@@ -700,6 +700,7 @@ class _ReviewDifficultPracticeScreenState
                             sentenceEndMs:
                                 currentSentence?.endTime.inMilliseconds,
                             onStopMainPlayer: () {
+                              _manualStoppedThisSentence = true;
                               ref
                                   .read(
                                     shadowingRecordingControllerProvider
