@@ -1,6 +1,8 @@
 {
   "@@locale": "zh",
   "appTitle": "Fluency",
+  "practiceControlModeAuto": "自动",
+  "practiceControlModeManual": "手动",
   "player": "播放器",
   "account": "账户",
   "settings": "设置",
@@ -837,6 +839,11 @@
   "timeAgoJustNow": "刚刚",
   "timeAgoMinutes": "{minutes}分钟前",
   "timeAgoHours": "{hours}小时前",
+
+  "exportAudio": "导出",
+  "exportAudioFile": "音频",
+  "exportSubtitleFile": "字幕",
+  "exportSelectFiles": "选择要导出的文件",
 
   "exportData": "导出数据",
   "exportDataSubtitle": "导出全部数据到 ZIP 文件",

@@ -21,6 +21,11 @@ import '../router/app_router.dart';
 import '../theme/app_theme.dart';
 import 'learning_progress_icon.dart';
 import '../providers/transcription_task_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path/path.dart' as p;
+import '../services/audio_export_service.dart';
+import 'dialogs/export_audio_dialog.dart';
 import 'dialogs/text_input_dialog.dart';
 import 'manage_subtitles_sheet.dart';
 
@@ -402,6 +407,16 @@ class AudioListTile extends ConsumerWidget {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: 'export',
+          child: Row(
+            children: [
+              const Icon(Icons.ios_share, size: 20),
+              const SizedBox(width: 8),
+              Text(l10n.exportAudio),
+            ],
+          ),
+        ),
         // 仅在有学习进度时显示重置选项
         if (hasProgress)
           PopupMenuItem(
@@ -438,6 +453,8 @@ class AudioListTile extends ConsumerWidget {
           onManageCollections?.call();
         } else if (value == 'manageTags') {
           onManageTags?.call();
+        } else if (value == 'export') {
+          _handleExport(context, ref);
         } else if (value == 'resetProgress') {
           _showResetProgressDialog(context, ref);
         } else if (value == 'delete') {
@@ -537,6 +554,73 @@ class AudioListTile extends ConsumerWidget {
   }
 
   /// 重命名音频对话框
+  /// 处理导出操作
+  Future<void> _handleExport(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
+
+    // 1. 弹出导出选项对话框
+    final selection = await showExportAudioDialog(
+      context: context,
+      hasTranscript: audioItem.hasTranscript,
+    );
+    if (selection == null || !context.mounted) return;
+
+    try {
+      // 2. 解析文件绝对路径
+      final audioPath = await audioItem.getFullAudioPath();
+      final transcriptPath = await audioItem.getFullTranscriptPath();
+
+      // 3. 调用导出服务生成临时文件
+      final service = AudioExportService();
+      final exportPath = await service.exportAudioItem(
+        displayName: audioItem.name,
+        audioPath: audioPath,
+        transcriptPath: transcriptPath,
+        includeAudio: selection.includeAudio,
+        includeTranscript: selection.includeTranscript,
+      );
+
+      if (!context.mounted) return;
+
+      // 4. 平台分发保存
+      if (Platform.isIOS || Platform.isAndroid) {
+        await Share.shareXFiles([XFile(exportPath)]);
+      } else {
+        final ext = p.extension(exportPath).replaceFirst('.', '');
+        final fileName = p.basename(exportPath);
+        final home = Platform.environment['HOME'];
+        final downloadsDir = home != null ? '$home/Downloads' : null;
+
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.exportAudio,
+          fileName: fileName,
+          initialDirectory: downloadsDir,
+          type: FileType.custom,
+          allowedExtensions: [ext],
+        );
+        if (savePath != null) {
+          await File(exportPath).copy(savePath);
+          if (context.mounted) {
+            final savedName = p.basename(savePath);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${l10n.exportSuccess}: $savedName')),
+            );
+          }
+        }
+      }
+
+      // 5. 清理临时文件
+      try {
+        await File(exportPath).delete();
+      } catch (_) {}
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n.exportAudio}: $e')),
+      );
+    }
+  }
+
   Future<void> _showRenameDialog(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
     final name = await showTextInputDialog(

@@ -104,6 +104,18 @@ abstract class AppLocalizations {
   /// **'Fluency'**
   String get appTitle;
 
+  /// No description provided for @practiceControlModeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get practiceControlModeAuto;
+
+  /// No description provided for @practiceControlModeManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get practiceControlModeManual;
+
   /// No description provided for @player.
   ///
   /// In en, this message translates to:
@@ -3697,6 +3709,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{hours}h ago'**
   String timeAgoHours(int hours);
+
+  /// No description provided for @exportAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get exportAudio;
+
+  /// No description provided for @exportAudioFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get exportAudioFile;
+
+  /// No description provided for @exportSubtitleFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle'**
+  String get exportSubtitleFile;
+
+  /// No description provided for @exportSelectFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Select files to export'**
+  String get exportSelectFiles;
 
   /// No description provided for @exportData.
   ///

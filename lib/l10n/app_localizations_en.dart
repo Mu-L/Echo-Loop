@@ -12,6 +12,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Fluency';
 
   @override
+  String get practiceControlModeAuto => 'Auto';
+
+  @override
+  String get practiceControlModeManual => 'Manual';
+
+  @override
   String get player => 'Player';
 
   @override
@@ -2067,6 +2073,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String timeAgoHours(int hours) {
     return '${hours}h ago';
   }
+
+  @override
+  String get exportAudio => 'Export';
+
+  @override
+  String get exportAudioFile => 'Audio';
+
+  @override
+  String get exportSubtitleFile => 'Subtitle';
+
+  @override
+  String get exportSelectFiles => 'Select files to export';
 
   @override
   String get exportData => 'Export Data';

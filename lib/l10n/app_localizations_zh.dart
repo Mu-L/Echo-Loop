@@ -12,6 +12,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Fluency';
 
   @override
+  String get practiceControlModeAuto => '自动';
+
+  @override
+  String get practiceControlModeManual => '手动';
+
+  @override
   String get player => '播放器';
 
   @override
@@ -2009,6 +2015,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String timeAgoHours(int hours) {
     return '$hours小时前';
   }
+
+  @override
+  String get exportAudio => '导出';
+
+  @override
+  String get exportAudioFile => '音频';
+
+  @override
+  String get exportSubtitleFile => '字幕';
+
+  @override
+  String get exportSelectFiles => '选择要导出的文件';
 
   @override
   String get exportData => '导出数据';

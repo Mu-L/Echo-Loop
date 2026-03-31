@@ -1,6 +1,8 @@
 {
   "@@locale": "en",
   "appTitle": "Fluency",
+  "practiceControlModeAuto": "Auto",
+  "practiceControlModeManual": "Manual",
   "player": "Player",
   "account": "Account",
   "settings": "Settings",
@@ -1130,6 +1132,11 @@
       "hours": { "type": "int" }
     }
   },
+
+  "exportAudio": "Export",
+  "exportAudioFile": "Audio",
+  "exportSubtitleFile": "Subtitle",
+  "exportSelectFiles": "Select files to export",
 
   "exportData": "Export Data",
   "exportDataSubtitle": "Export all data to a ZIP file",
