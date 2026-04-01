@@ -252,7 +252,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     _stopAllResources();
     state = state.copyWith(phase: const WaitingForUser());
-    AppLogger.log('Shadowing', '→ WaitingForUser (从 ${phase.runtimeType})');
+    AppLogger.log('L&R', '→ WaitingForUser (从 ${phase.runtimeType})');
   }
 
   /// 下一句（原子重置）
@@ -274,7 +274,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     final phase = state.phase;
     if (phase is! WaitingInterval && phase is! WaitingForUser) {
       AppLogger.log(
-        'Shadowing',
+        'L&R',
         'startManualRecording 跳过: phase=${phase.runtimeType}',
       );
       return;
@@ -298,13 +298,13 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     if (!recState.hasDetectedSpeech) {
       // 没检测到语音 → 取消录音，回到等待状态
-      AppLogger.log('Shadowing', '手动停止录音: 无语音 → 取消');
+      AppLogger.log('L&R', '手动停止录音: 无语音 → 取消');
       await recController.cancelActiveRecording();
       state = state.copyWith(phase: const WaitingForUser());
       return;
     }
 
-    AppLogger.log('Shadowing', '手动停止录音: 有语音 → 评估');
+    AppLogger.log('L&R', '手动停止录音: 有语音 → 评估');
     await recController.stopAndEvaluate(referenceText: sentence.text);
     // 评估完成后 _onRecordingStateChanged 回调推进流程
   }
@@ -325,7 +325,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     }
 
     state = state.copyWith(phase: const ReviewingRecording());
-    AppLogger.log('Shadowing', '播放录音回放');
+    AppLogger.log('L&R', '播放录音回放');
     await _playbackService.play(path);
     // 播放结束由 _playbackSub 监听触发 _onReviewPlaybackFinished
   }
@@ -352,7 +352,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 快进倒计时（10 倍速）
   void fastForwardInterval() {
     AppLogger.log(
-      'Shadowing',
+      'L&R',
       'fastForward: phase=${state.phase.runtimeType}, '
           'countdownActive=${_countdown.isActive}, '
           'countdownPaused=${_countdown.isPaused}, '
@@ -361,13 +361,13 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (state.phase is! WaitingInterval) return;
     if (!_countdown.isActive) return;
     _countdown.setSpeed(10.0);
-    AppLogger.log('Shadowing', '倒计时快进 10x → speed=${_countdown.speed}');
+    AppLogger.log('L&R', '倒计时快进 10x → speed=${_countdown.speed}');
   }
 
   /// 暂停倒计时（WaitingInterval 中用户点击倒计时圆环）
   void pauseInterval() {
     AppLogger.log(
-      'Shadowing',
+      'L&R',
       'pauseInterval: phase=${state.phase.runtimeType}, '
           'countdownActive=${_countdown.isActive}, '
           'countdownPaused=${_countdown.isPaused}',
@@ -376,13 +376,13 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (_countdown.isPaused) return;
     _countdown.pause();
     state = state.copyWith(isIntervalPaused: true);
-    AppLogger.log('Shadowing', '倒计时暂停 ✓');
+    AppLogger.log('L&R', '倒计时暂停 ✓');
   }
 
   /// 恢复倒计时
   void resumeInterval() {
     AppLogger.log(
-      'Shadowing',
+      'L&R',
       'resumeInterval: phase=${state.phase.runtimeType}, '
           'countdownActive=${_countdown.isActive}, '
           'countdownPaused=${_countdown.isPaused}, '
@@ -392,7 +392,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (!_countdown.isPaused) return;
     _countdown.resume();
     state = state.copyWith(isIntervalPaused: false);
-    AppLogger.log('Shadowing', '倒计时恢复 ✓');
+    AppLogger.log('L&R', '倒计时恢复 ✓');
   }
 
   /// 停止会话
@@ -530,7 +530,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (state.phase is Recording &&
         next.phase == SpeechRecordingPhase.idle &&
         next.currentAttempt == null) {
-      AppLogger.log('Shadowing', '录音取消/超时 → WaitingForUser');
+      AppLogger.log('L&R', '录音取消/超时 → WaitingForUser');
       state = state.copyWith(phase: const WaitingForUser());
     }
   }
@@ -542,7 +542,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (token != state.flowToken) return;
     if (state.phase is! PlayingPrompt) return;
 
-    AppLogger.log('Shadowing', '原句播放完成');
+    AppLogger.log('L&R', '原句播放完成');
     _config.onSentencePlayed?.call(_currentSentence!);
 
     if (_config.isManualMode()) {
@@ -561,14 +561,14 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     if (state.phase is! Recording) return;
 
     AppLogger.log(
-      'Shadowing',
+      'L&R',
       score != null ? '录音评估完成: score=$score' : '录音评估失败: 无有效识别结果',
     );
     state = state.copyWith(recordingPath: filePath, recordingScore: score);
 
     // 识别失败（score 为 null）：回到等待状态，清掉失败的 attempt
     if (score == null) {
-      AppLogger.log('Shadowing', '→ 识别失败，等待用户重试');
+      AppLogger.log('L&R', '→ 识别失败，等待用户重试');
       // 先改 phase，再 clear，避免 clearRecording 触发 _onRecordingStateChanged 时
       // state.phase 还是 Recording 导致二次触发
       state = state.copyWith(
@@ -582,7 +582,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     // 手动模式：等用户操作
     if (_config.isManualMode()) {
-      AppLogger.log('Shadowing', '→ 手动模式，等待用户操作');
+      AppLogger.log('L&R', '→ 手动模式，等待用户操作');
       state = state.copyWith(phase: const WaitingForUser());
       return;
     }
@@ -595,7 +595,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   void _onReviewPlaybackFinished() {
     if (state.phase is! ReviewingRecording) return;
 
-    AppLogger.log('Shadowing', '回放结束 → WaitingInterval');
+    AppLogger.log('L&R', '回放结束 → WaitingInterval');
 
     if (_config.isManualMode()) {
       state = state.copyWith(phase: const WaitingForUser());
@@ -638,7 +638,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     final token = state.flowToken;
 
     AppLogger.log(
-      'Shadowing',
+      'L&R',
       '播放句子 ${state.sentenceIndex + 1}/${state.totalSentences} '
           '第 ${state.repeatIndex + 1}/${state.totalRepeats} 遍',
     );
@@ -668,7 +668,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     final controller = ref.read(speechRecordingControllerProvider.notifier);
     controller.setMaxRecordingDuration(maxDuration);
 
-    AppLogger.log('Shadowing', '开始录音: $promptId');
+    AppLogger.log('L&R', '开始录音: $promptId');
     unawaited(
       controller.startRecording(
         promptId: promptId,
@@ -705,16 +705,16 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   void _advanceToNextRepeatOrSentence() {
     if (state.isLastRepeat) {
       if (state.isLastSentence) {
-        AppLogger.log('Shadowing', '全部完成');
+        AppLogger.log('L&R', '全部完成');
         state = state.copyWith(phase: const SessionCompleted());
       } else {
-        AppLogger.log('Shadowing', '当前句完成 → 下一句');
+        AppLogger.log('L&R', '当前句完成 → 下一句');
         _jumpToSentence(state.sentenceIndex + 1);
       }
     } else {
       final nextRepeat = state.repeatIndex + 1;
       AppLogger.log(
-        'Shadowing',
+        'L&R',
         '下一遍: ${nextRepeat + 1}/${state.totalRepeats}',
       );
       ref.read(speechRecordingControllerProvider.notifier).clearRecording();

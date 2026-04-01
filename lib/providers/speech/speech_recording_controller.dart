@@ -281,7 +281,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     required String referenceText,
   }) async {
     if (state.promptId == promptId && state.isActive) {
-      AppLogger.log('ShadowRec', '⏭ startRecording 跳过: 已在录音中 ($promptId)');
+      AppLogger.log('SpeechRec', '⏭ startRecording 跳过: 已在录音中 ($promptId)');
       return;
     }
 
@@ -292,8 +292,8 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     _lastSilenceLogDesc = null;
     _cachedReferenceText = referenceText;
 
-    AppLogger.log('ShadowRec', '┌ startRecording (manual=$_isManualMode)');
-    AppLogger.log('ShadowRec', '│ promptId=$promptId');
+    AppLogger.log('SpeechRec', '┌ startRecording (manual=$_isManualMode)');
+    AppLogger.log('SpeechRec', '│ promptId=$promptId');
 
     state = SpeechRecordingState(
       phase: SpeechRecordingPhase.awaitingSpeech,
@@ -309,7 +309,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
 
       state = state.copyWith(permissions: _recordingService.permissions);
     } on SpeechPracticePlatformException catch (error) {
-      AppLogger.log('ShadowRec', '└ 录音启动失败: ${error.code} → idle');
+      AppLogger.log('SpeechRec', '└ 录音启动失败: ${error.code} → idle');
       state = state.copyWith(
         phase: SpeechRecordingPhase.idle,
         currentAttempt: SpeechPracticeAttempt(promptId: promptId).copyWith(
@@ -324,7 +324,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     if (_isManualMode) {
       // 手动模式：立即启动兜底计时器（用户点击停止前的安全上限）
       AppLogger.log(
-        'ShadowRec',
+        'SpeechRec',
         '│ 手动模式兜底 ${_manualModeInitialMax.inSeconds}s',
       );
       _scheduleMaxDurationTimer(
@@ -334,13 +334,13 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     } else {
       // 自动模式：启动 60s 等待开口计时器
       AppLogger.log(
-        'ShadowRec',
+        'SpeechRec',
         '│ 启动 ${_awaitingSpeechTimeout.inSeconds}s 等待开口计时器',
       );
       _scheduleAwaitingSpeechTimer(promptId);
     }
 
-    AppLogger.log('ShadowRec', '└ 录音已开始，等待用户开口...');
+    AppLogger.log('SpeechRec', '└ 录音已开始，等待用户开口...');
   }
 
   /// 手动停止录音并评估
@@ -348,7 +348,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     final promptId = state.promptId;
     if (promptId == null) return;
 
-    AppLogger.log('ShadowRec', '● 手动停止录音');
+    AppLogger.log('SpeechRec', '● 手动停止录音');
     _isStopping = true;
     _enterProcessing(promptId);
     await _doStopAndEvaluate(promptId: promptId, referenceText: referenceText);
@@ -375,7 +375,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
 
   /// 清除当前回合状态（保留配置），并删除已完成录音的临时文件。
   Future<void> clearRecording() async {
-    AppLogger.log('ShadowRec', '● clearRecording → idle');
+    AppLogger.log('SpeechRec', '● clearRecording → idle');
     _cancelAllTimers();
     _isStopping = false;
     _hasDetectedSpeech = false;
@@ -418,7 +418,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
 
     final result = await _recordingService.stopRecording(promptId: promptId);
     AppLogger.log(
-      'ShadowRec',
+      'SpeechRec',
       '📋 final: "${result.finalTranscript ?? '(null)'}"',
     );
 
@@ -428,7 +428,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
         status: _statusFromError(result.errorCode),
         errorMessage: result.errorMessage,
       );
-      AppLogger.log('ShadowRec', '✗ 录音失败: ${result.errorCode}');
+      AppLogger.log('SpeechRec', '✗ 录音失败: ${result.errorCode}');
       state = state.copyWith(
         phase: SpeechRecordingPhase.idle,
         currentAttempt: attempt,
@@ -458,7 +458,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     );
 
     AppLogger.log(
-      'ShadowRec',
+      'SpeechRec',
       '✓ 评估完成: '
           'status=${attempt.status.name}, '
           'score=${attempt.score?.toStringAsFixed(2)}, '
@@ -508,7 +508,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     final text = (event.transcript ?? '').trim();
     final prevText = state.liveTranscript?.trim() ?? '';
     if (text.isNotEmpty && text != prevText) {
-      AppLogger.log('ShadowRec', '📝 live: "$text"');
+      AppLogger.log('SpeechRec', '📝 live: "$text"');
     }
     state = state.copyWith(
       liveTranscript: text,
@@ -581,7 +581,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
       if (detailed.description != _lastSilenceLogDesc) {
         _lastSilenceLogDesc = detailed.description;
         AppLogger.log(
-          'ShadowRec',
+          'SpeechRec',
           '静音阈值 ${required.inMilliseconds}ms | '
               '${detailed.description}',
         );
@@ -615,7 +615,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
         return;
       }
       AppLogger.log(
-        'ShadowRec',
+        'SpeechRec',
         '⏰ ${_awaitingSpeechTimeout.inSeconds}s 未检测到语音 → idle',
       );
       await cancelActiveRecording();
@@ -630,7 +630,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
 
     // awaitingSpeech → speaking
     if (state.phase == SpeechRecordingPhase.awaitingSpeech) {
-      AppLogger.log('ShadowRec', '🎤 检测到语音 → speaking');
+      AppLogger.log('SpeechRec', '🎤 检测到语音 → speaking');
       state = state.copyWith(phase: SpeechRecordingPhase.speaking);
     }
 
@@ -639,7 +639,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
         : _maxRecordingDuration;
 
     AppLogger.log(
-      'ShadowRec',
+      'SpeechRec',
       '│ 启动最大录音时长计时器: ${effectiveMaxDuration.inSeconds}s',
     );
     _scheduleMaxDurationTimer(
@@ -663,7 +663,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     );
     final threshold = detailed.threshold!;
     AppLogger.log(
-      'ShadowRec',
+      'SpeechRec',
       '转录停滞阈值 ${threshold.inMilliseconds}ms | '
           '${detailed.description}',
     );
@@ -694,7 +694,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
       if (state.promptId != promptId) return;
       if (state.phase == SpeechRecordingPhase.awaitingSpeech ||
           state.phase == SpeechRecordingPhase.speaking) {
-        AppLogger.log('ShadowRec', '⏰ 最大录音时长 ${maxDuration.inSeconds}s');
+        AppLogger.log('SpeechRec', '⏰ 最大录音时长 ${maxDuration.inSeconds}s');
         _stopForEvaluation(promptId: promptId, reason: '最大录音时长');
       }
     });
@@ -703,13 +703,13 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   // ── 自动停止 ──
 
   void _stopForEvaluation({required String promptId, String reason = ''}) {
-    AppLogger.log('ShadowRec', '⏹ 自动停止录音 ($reason)');
+    AppLogger.log('SpeechRec', '⏹ 自动停止录音 ($reason)');
     _isStopping = true;
     _enterProcessing(promptId);
 
     final referenceText = _cachedReferenceText;
     if (referenceText == null) {
-      AppLogger.log('ShadowRec', '⚠ 无法获取 referenceText');
+      AppLogger.log('SpeechRec', '⚠ 无法获取 referenceText');
       return;
     }
 
@@ -723,7 +723,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   void _handleAppLifecycleChange(AppLifecycleState appState) {
     if (appState == AppLifecycleState.paused ||
         appState == AppLifecycleState.hidden) {
-      AppLogger.log('ShadowRec', 'App 进入后台 → idle');
+      AppLogger.log('SpeechRec', 'App 进入后台 → idle');
       _cancelAllTimers();
       _isStopping = false;
       _hasDetectedSpeech = false;

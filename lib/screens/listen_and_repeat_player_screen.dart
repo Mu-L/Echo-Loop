@@ -113,7 +113,7 @@ class _ListenAndRepeatPlayerScreenState
 
     final promptId = _currentPromptId(ctrlState);
     if (recState.isRecordingPrompt(promptId)) {
-      AppLogger.log('ShadowScreen', '手动停止录音 → 评估');
+      AppLogger.log('L&R Screen', '手动停止录音 → 评估');
       await ctrl.stopRecording();
       return;
     }
@@ -121,7 +121,7 @@ class _ListenAndRepeatPlayerScreenState
     // 停止录音回放（如果正在播放）
     await ctrl.stopPlayback();
 
-    AppLogger.log('ShadowScreen', '手动开始录音: 句子${ctrlState.sentenceIndex + 1}');
+    AppLogger.log('L&R Screen', '手动开始录音: 句子${ctrlState.sentenceIndex + 1}');
     ctrl.startManualRecording();
   }
 
@@ -421,7 +421,7 @@ class _ListenAndRepeatPlayerScreenState
       child: LearningHotkeyScope(
         onPlayPause: () {
           AppLogger.log(
-            'ShadowScreen',
+            'L&R Screen',
             '播放按钮: phase=${ctrlState.phase.runtimeType}',
           );
 
@@ -519,7 +519,7 @@ class _ListenAndRepeatPlayerScreenState
                                   },
                                   onToolbarButtonTapped: () {
                                     AppLogger.log(
-                                      'ShadowScreen',
+                                      'L&R Screen',
                                       '工具栏点击: 打断流程',
                                     );
                                     ctrl.onUserInteraction();
