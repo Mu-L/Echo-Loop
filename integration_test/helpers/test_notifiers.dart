@@ -43,8 +43,6 @@ import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/blind_listen_player_provider.dart';
 import 'package:fluency/providers/learning_session/intensive_listen_player_provider.dart';
-import 'package:fluency/providers/learning_session/listen_and_repeat_player_provider.dart';
-import 'package:fluency/providers/learning_session/playback_phase.dart';
 import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:fluency/providers/speech_practice_session_provider.dart';
@@ -1095,229 +1093,6 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
   }
 }
 
-/// 测试用 ListenAndRepeatPlayer — 不依赖音频引擎
-class TestListenAndRepeatPlayer extends ListenAndRepeatPlayer {
-  List<Sentence> _testSentences = [];
-
-  @override
-  ListenAndRepeatPlayerState build() => const ListenAndRepeatPlayerState();
-
-  @override
-  Sentence? get currentSentence =>
-      _testSentences.isNotEmpty &&
-          state.currentSentenceIndex < _testSentences.length
-      ? _testSentences[state.currentSentenceIndex]
-      : null;
-
-  @override
-  List<Sentence> get sentences => List.unmodifiable(_testSentences);
-
-  @override
-  int get currentIndex => state.currentSentenceIndex;
-
-  @override
-  Future<void> initialize(
-    List<Sentence> sentences, {
-    int startIndex = 0,
-    int targetPlayCount = 3,
-  }) async {
-    _testSentences = List.of(sentences);
-    state = ListenAndRepeatPlayerState(
-      currentSentenceIndex: startIndex.clamp(0, sentences.length - 1),
-      totalSentences: sentences.length,
-      targetPlayCount: targetPlayCount,
-    );
-  }
-
-  @override
-  Future<void> startPlaying() async {
-    state = state.copyWith(
-      phase: PlayingPhase(playCount: state.currentPlayCount),
-    );
-  }
-
-  @override
-  Future<void> pause() async {
-    state = state.copyWith(phase: const IdlePhase());
-  }
-
-  @override
-  Future<void> resume() async {
-    state = state.copyWith(
-      phase: PlayingPhase(playCount: state.currentPlayCount),
-    );
-  }
-
-  @override
-  void updateSettings(IntensiveListenSettings newSettings) {
-    state = state.copyWith(settings: newSettings);
-  }
-
-  @override
-  Future<void> goToNext() async {
-    if (state.currentSentenceIndex < state.totalSentences - 1) {
-      state = state.copyWith(
-        currentSentenceIndex: state.currentSentenceIndex + 1,
-        currentPlayCount: 1,
-        phase: const IdlePhase(),
-      );
-    }
-  }
-
-  @override
-  Future<void> goToPrevious() async {
-    if (state.currentSentenceIndex > 0) {
-      state = state.copyWith(
-        currentSentenceIndex: state.currentSentenceIndex - 1,
-        currentPlayCount: 1,
-        phase: const IdlePhase(),
-      );
-    }
-  }
-
-  @override
-  void pauseCountdown() {
-    final phase = state.phase;
-    if (phase is RepeatPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: true),
-        ),
-      );
-    } else if (phase is AdvancePausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: true),
-        ),
-      );
-    } else if (phase is PostEvalPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: true),
-        ),
-      );
-    }
-  }
-
-  @override
-  void resumeCountdown() {
-    final phase = state.phase;
-    if (phase is RepeatPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: false),
-        ),
-      );
-    } else if (phase is AdvancePausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: false),
-        ),
-      );
-    } else if (phase is PostEvalPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(isPaused: false),
-        ),
-      );
-    }
-  }
-
-  @override
-  void toggleCountdownFastForward() {
-    final phase = state.phase;
-    final newFf = !state.isCountdownFastForward;
-    if (phase is RepeatPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(
-            isFastForward: newFf,
-            isPaused: false,
-          ),
-        ),
-      );
-    } else if (phase is AdvancePausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(
-            isFastForward: newFf,
-            isPaused: false,
-          ),
-        ),
-      );
-    } else if (phase is PostEvalPausePhase) {
-      state = state.copyWith(
-        phase: phase.copyWith(
-          countdown: phase.countdown.copyWith(
-            isFastForward: newFf,
-            isPaused: false,
-          ),
-        ),
-      );
-    }
-  }
-
-  @override
-  Sentence? removeDifficultMark() {
-    if (_testSentences.isEmpty) return null;
-
-    final removedIndex = state.currentSentenceIndex;
-    final removed = _testSentences[removedIndex];
-    _testSentences = List.from(_testSentences)..removeAt(removedIndex);
-
-    if (_testSentences.isEmpty) {
-      state = state.copyWith(
-        phase: const IdlePhase(),
-        totalSentences: 0,
-      );
-      return removed;
-    }
-
-    final newIndex = removedIndex >= _testSentences.length
-        ? _testSentences.length - 1
-        : removedIndex;
-
-    state = state.copyWith(
-      currentSentenceIndex: newIndex,
-      totalSentences: _testSentences.length,
-      currentPlayCount: 1,
-      phase: const IdlePhase(),
-    );
-
-    return removed;
-  }
-
-  @override
-  void stopPlayback() {
-    state = state.copyWith(phase: const IdlePhase());
-  }
-
-  @override
-  Future<void> resetToStart() async {
-    state = state.copyWith(
-      currentSentenceIndex: 0,
-      currentPlayCount: 1,
-      phase: const IdlePhase(),
-    );
-  }
-
-  @override
-  void disposePlayer() {
-    _testSentences = [];
-    state = const ListenAndRepeatPlayerState();
-  }
-
-  /// 直接设置 state（测试辅助方法）
-  void setState(ListenAndRepeatPlayerState newState) {
-    state = newState;
-  }
-
-  /// 设置测试句子（测试辅助方法）
-  void setTestSentences(List<Sentence> sentences) {
-    _testSentences = List.of(sentences);
-  }
-}
-
 /// 测试用 RetellPlayer — 不依赖音频引擎
 class TestRetellPlayer extends RetellPlayer {
   List<List<Sentence>> _testParagraphs = [];
@@ -1955,9 +1730,6 @@ Widget createTestApp() {
       intensiveListenPlayerProvider.overrideWith(
         () => TestIntensiveListenPlayer(),
       ),
-      listenAndRepeatPlayerProvider.overrideWith(
-        () => TestListenAndRepeatPlayer(),
-      ),
       retellPlayerProvider.overrideWith(() => TestRetellPlayer()),
       reviewDifficultPracticeProvider.overrideWith(
         () => TestReviewDifficultPractice(),
@@ -2027,9 +1799,6 @@ Widget createTestAppWithAudio({
       blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
       intensiveListenPlayerProvider.overrideWith(
         () => TestIntensiveListenPlayer(),
-      ),
-      listenAndRepeatPlayerProvider.overrideWith(
-        () => TestListenAndRepeatPlayer(),
       ),
       retellPlayerProvider.overrideWith(() => TestRetellPlayer()),
       reviewDifficultPracticeProvider.overrideWith(

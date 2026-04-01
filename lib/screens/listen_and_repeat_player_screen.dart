@@ -25,6 +25,8 @@ import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/listen_and_repeat_turn_controller_provider.dart';
 import '../providers/shadowing/shadowing_controller.dart';
 import '../providers/shadowing/shadowing_phase.dart';
+import '../providers/shadowing/shadowing_settings_provider.dart';
+import '../models/intensive_listen_settings.dart';
 import '../providers/shadowing/shadowing_session_state.dart';
 import '../services/app_logger.dart';
 import '../theme/app_theme.dart';
@@ -88,13 +90,36 @@ class _ListenAndRepeatPlayerScreenState
       final sentences = session.shadowingSentences ?? [];
       final ctrl = ref.read(shadowingControllerProvider.notifier);
 
+      // 用 learningSession 的目标遍数初始化设置
+      ref
+          .read(shadowingSettingsProvider.notifier)
+          .initialize(repeatCount: session.shadowingTargetPlayCount);
+
       _config = ShadowingConfig(
         audioItemId: widget.audioItemId,
-        getRepeatCount: (_) => session.shadowingTargetPlayCount,
-        getIntervalDuration: (s) => Duration(
-          milliseconds: math.max(s.duration.inMilliseconds * 2, 2000),
-        ),
-        isManualMode: () => false, // TODO: 设置面板控制
+        getRepeatCount: (_) =>
+            ref.read(shadowingSettingsProvider).repeatCount,
+        getIntervalDuration: (s) {
+          final settings = ref.read(shadowingSettingsProvider);
+          return switch (settings.pauseMode) {
+            PauseMode.smart => Duration(
+                milliseconds:
+                    math.max(s.duration.inMilliseconds * 2, 2000),
+              ),
+            PauseMode.fixed => Duration(
+                seconds: settings.fixedPauseSeconds,
+              ),
+            PauseMode.multiplier => Duration(
+                milliseconds: math.max(
+                  (s.duration.inMilliseconds * settings.pauseMultiplier)
+                      .round(),
+                  1000,
+                ),
+              ),
+          };
+        },
+        isManualMode: () =>
+            ref.read(shadowingSettingsProvider).isManualMode,
       );
       ctrl.startSession(
         sentences: sentences,
