@@ -1,9 +1,9 @@
 /// 倒计时控制按钮（共享组件）
 ///
 /// 56×56 圆形按钮，外围带进度环，内部显示倒计时秒数，
-/// 右下角显示暂停/恢复小徽章。点击可暂停/恢复倒计时。
+/// 右下角显示暂停/恢复小徽章。点击自动切换暂停/恢复。
 ///
-/// 可选 [onFastForward]：传入后在右侧显示快进按钮。
+/// **纯展示组件**：只负责倒计时圆环，快进按钮由调用方控制。
 library;
 
 import 'package:flutter/material.dart';
@@ -11,8 +11,7 @@ import 'tappable_wrapper.dart';
 
 /// 倒计时控制按钮
 ///
-/// 圆形按钮，外围带进度环，内部显示倒计时秒数，点击可暂停/恢复。
-/// 传入 [onFastForward] 时右侧显示快进按钮。
+/// 点击自动切换暂停/恢复。
 class CountdownChip extends StatelessWidget {
   /// 倒计时剩余时间
   final Duration remaining;
@@ -23,19 +22,19 @@ class CountdownChip extends StatelessWidget {
   /// 是否已暂停
   final bool isPaused;
 
-  /// 点击倒计时圆环回调（暂停/恢复）
-  final VoidCallback onTap;
+  /// 暂停回调
+  final VoidCallback onPause;
 
-  /// 快进回调（可选，传入后显示快进按钮）
-  final VoidCallback? onFastForward;
+  /// 恢复回调
+  final VoidCallback onResume;
 
   const CountdownChip({
     super.key,
     required this.remaining,
     required this.total,
     required this.isPaused,
-    required this.onTap,
-    this.onFastForward,
+    required this.onPause,
+    required this.onResume,
   });
 
   @override
@@ -46,8 +45,8 @@ class CountdownChip extends StatelessWidget {
     final progress = totalMs > 0 ? 1.0 - (remainingMs / totalMs) : 1.0;
     final seconds = (remainingMs / 1000).ceil();
 
-    final chip = TappableWrapper(
-      onTap: onTap,
+    return TappableWrapper(
+      onTap: isPaused ? onResume : onPause,
       feedbackType: TapFeedback.scale,
       scaleDown: 0.90,
       child: SizedBox(
@@ -71,7 +70,6 @@ class CountdownChip extends StatelessWidget {
                 ),
               ),
             ),
-            // 倒计时数字始终居中显示
             Text(
               '$seconds',
               style: theme.textTheme.titleMedium?.copyWith(
@@ -101,28 +99,6 @@ class CountdownChip extends StatelessWidget {
           ],
         ),
       ),
-    );
-
-    if (onFastForward == null || isPaused) return chip;
-
-    // 倒计时居中，快进按钮在右侧
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        chip,
-        Positioned(
-          right: -80,
-          child: GestureDetector(
-            onTap: onFastForward,
-            child: Icon(
-              Icons.fast_forward_rounded,
-              size: 32,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
