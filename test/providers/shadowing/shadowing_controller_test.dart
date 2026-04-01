@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/audio_engine_state.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/listen_and_repeat_turn_controller_provider.dart';
 import 'package:fluency/providers/shadowing/shadowing_controller.dart';
 import 'package:fluency/providers/shadowing/shadowing_phase.dart';
 import 'package:fluency/providers/shadowing/shadowing_session_state.dart';
@@ -51,6 +52,7 @@ ShadowingConfig _testConfig({
   bool isManualMode = false,
 }) {
   return ShadowingConfig(
+    audioItemId: 'test-audio',
     getRepeatCount: (_) => repeatCount,
     getIntervalDuration: (_) => interval,
     isManualMode: () => isManualMode,
@@ -65,6 +67,9 @@ void main() {
     container = ProviderContainer(
       overrides: [
         audioEngineProvider.overrideWith(() => _InstantAudioEngine()),
+        shadowingRecordingControllerProvider.overrideWith(
+          TestShadowingRecordingController.new,
+        ),
       ],
     );
     controller = container.read(shadowingControllerProvider.notifier);
@@ -252,14 +257,14 @@ void main() {
   });
 
   group('手动模式', () {
-    test('手动模式下播放完成后进入 Idle（不自动录音）', () async {
+    test('手动模式下播放完成后进入 WaitingInterval（不自动录音）', () async {
       await controller.startSession(
         sentences: createTestSentences(count: 3),
         config: _testConfig(isManualMode: true),
       );
 
-      // 手动模式：播放完成后进入 Idle，不自动录音
-      expect(readState().phase, isA<Idle>());
+      // 手动模式：播放完成后进入 WaitingInterval，等用户手动操作
+      expect(readState().phase, isA<WaitingInterval>());
     });
   });
 
