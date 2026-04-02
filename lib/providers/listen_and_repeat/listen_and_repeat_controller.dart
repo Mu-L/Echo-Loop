@@ -801,6 +801,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 跳转到指定句子（原子重置）
   Future<void> _jumpToSentence(int index) async {
     _atomicReset();
+    ref.read(speechRecordingControllerProvider.notifier).clearRecording();
 
     final sentence = _sentences[index];
     state = state.copyWith(
