@@ -195,11 +195,6 @@ class _ReviewDifficultPracticeScreenState
       ref.read(reviewDifficultPracticeProvider.notifier).pause();
     }
 
-    // 取消评估后倒计时（不推进到下一句）
-    ref
-        .read(reviewDifficultPracticeProvider.notifier)
-        .cancelPostEvalCountdown();
-
     ref.read(reviewDifficultPracticeProvider.notifier).enterManualForSentence();
 
     final recState = ref.read(speechRecordingControllerProvider);
@@ -221,7 +216,6 @@ class _ReviewDifficultPracticeScreenState
 
     final session = ref.read(learningSessionProvider);
     final l10n = AppLocalizations.of(context)!;
-    final playerState = ref.read(reviewDifficultPracticeProvider);
 
     // 自由练习模式直接退出
     if (session.isFreePlay) {
@@ -507,25 +501,8 @@ class _ReviewDifficultPracticeScreenState
       }
     });
 
-    // 评估完成 → 启动 review countdown（仅跟读模式）
-    ref.listen<SpeechRecordingState>(speechRecordingControllerProvider, (
-      prev,
-      next,
-    ) {
-      if (prev?.phase == SpeechRecordingPhase.processing &&
-          next.phase == SpeechRecordingPhase.idle &&
-          next.currentAttempt != null) {
-        final latestState = ref.read(reviewDifficultPracticeProvider);
-        if (latestState.isPauseBetweenPlays &&
-            latestState.isAnnotationMode &&
-            !latestState.isManualMode) {
-          AppLogger.log('DifficultScreen', '评估完成 → 启动 review countdown');
-          ref
-              .read(reviewDifficultPracticeProvider.notifier)
-              .startPostEvaluationPause();
-        }
-      }
-    });
+    // 跟读模式下录音状态变化由 RepeatFlowEngine 内部处理，无需 Screen 层桥接。
+    // 盲听模式下不涉及录音。
 
     final currentSentence = player.currentSentence;
     final currentPromptId = _currentPromptId();
@@ -544,41 +521,7 @@ class _ReviewDifficultPracticeScreenState
       });
     }
 
-    // 自动模式 + 跟读停顿中 + recording idle + 非倒计时中 → 自动录音
-    if (playerState.isAnnotationMode &&
-        playerState.isPauseBetweenPlays &&
-        currentSentence != null &&
-        !playerState.isManualMode &&
-        turnState.phase == SpeechRecordingPhase.idle &&
-        !playerState.isPostEvalCountdown) {
-      final promptId = currentPromptId;
-      final referenceText = currentSentence.text;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final latestRecState = ref.read(speechRecordingControllerProvider);
-        if (latestRecState.phase != SpeechRecordingPhase.idle) return;
-        final latestPlayer = ref.read(reviewDifficultPracticeProvider);
-        if (!latestPlayer.isAnnotationMode ||
-            !latestPlayer.isPauseBetweenPlays ||
-            latestPlayer.isManualMode) {
-          return;
-        }
-
-        // 暂停 provider 层倒计时（录音由 SpeechRecordingController 接管）
-        if (!latestPlayer.isCountdownPaused) {
-          ref.read(reviewDifficultPracticeProvider.notifier).pauseCountdown();
-        }
-
-        AppLogger.log('DifficultScreen', '自动开始录音');
-        _updateRecordingThresholds();
-        unawaited(
-          ref
-              .read(speechRecordingControllerProvider.notifier)
-              .startRecording(promptId: promptId, referenceText: referenceText),
-        );
-      });
-    }
+    // 跟读模式下自动录音由 RepeatFlowEngine 内部驱动，无需 Screen 触发。
 
     // 句子时长和时间戳
     final hasDuration =
@@ -693,19 +636,19 @@ class _ReviewDifficultPracticeScreenState
                                 _playingPromptId == currentPromptId,
                             onRecordTap: _handleRecordTap,
                             onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                            onFastForward: () => ref
-                                .read(reviewDifficultPracticeProvider.notifier)
-                                .completePausedTurn(),
-                            onCountdownPause: () => ref
-                                .read(
-                                  reviewDifficultPracticeProvider.notifier,
-                                )
-                                .pausePostEvalCountdown(),
-                            onCountdownResume: () => ref
-                                .read(
-                                  reviewDifficultPracticeProvider.notifier,
-                                )
-                                .resumePostEvalCountdown(),
+                            onFastForward: () {
+                              // 跟读模式下快进由 engine 处理
+                              final engine = ref.read(reviewDifficultPracticeProvider.notifier);
+                              engine.repeatEngine?.fastForwardInterval();
+                            },
+                            onCountdownPause: () {
+                              ref.read(reviewDifficultPracticeProvider.notifier)
+                                  .repeatEngine?.pauseInterval();
+                            },
+                            onCountdownResume: () {
+                              ref.read(reviewDifficultPracticeProvider.notifier)
+                                  .repeatEngine?.resumeInterval();
+                            },
                             onToolbarButtonTapped: () {
                               if (playerState.isManualMode) return;
                               ref
