@@ -300,9 +300,9 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 
   /// 翻译按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
   Future<void> _onTapTranslation() async {
+    widget.onToolbarButtonTapped?.call();
     if (!_translationActivated) {
       _translationActivated = true;
-      widget.onToolbarButtonTapped?.call();
     }
     if (_translationContent != null) {
       setState(() {
@@ -333,9 +333,9 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 
   /// 解析按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
   Future<void> _onTapAnalysis() async {
+    widget.onToolbarButtonTapped?.call();
     if (!_analysisActivated) {
       _analysisActivated = true;
-      widget.onToolbarButtonTapped?.call();
     }
     if (_analysisContent != null) {
       setState(() {
@@ -403,6 +403,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         ..onTap = () {
           if (cleanWord.isNotEmpty) {
             _flashWord(wordIndex);
+            widget.onToolbarButtonTapped?.call();
             showWordDictionarySheet(
               context: context,
               word: cleanWord,
@@ -462,6 +463,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
           ..onTap = () {
             if (cleanWord.isNotEmpty) {
               _flashWord(currentIndex);
+              widget.onToolbarButtonTapped?.call();
               showWordDictionarySheet(
                 context: context,
                 word: cleanWord,
