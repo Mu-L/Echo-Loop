@@ -65,15 +65,11 @@ class RecordingService {
   String? _currentFilePath;
 
   /// 录音开始时间（用于计算录音时长）
-  DateTime? _recordingStartTime;
 
-  /// 学习事件记录器（外部设置，用于自动记录说的时长）
+  /// 学习事件记录器（外部设置，用于记录说的时长）
   ///
-  /// 录音控制器通过 [setRecorder] 设置，Provider 进入模式时注入、退出时清除。
-  StudyEventRecorder? _recorder;
-
-  /// 设置学习事件记录器
-  set recorder(StudyEventRecorder? value) => _recorder = value;
+  /// Provider 进入学习模式时注入、退出时置 null。
+  StudyEventRecorder? recorder;
 
   RecordingService(this._backend);
 
@@ -140,7 +136,7 @@ class RecordingService {
     final filePath = await _backend.startSession(promptId: promptId);
     _recordingPromptId = promptId;
     _currentFilePath = filePath;
-    _recordingStartTime = DateTime.now();
+
     return filePath;
   }
 
@@ -156,14 +152,7 @@ class RecordingService {
       );
     }
 
-    // 立即计算录音时长（在等待 final transcript 之前）
-    final rec = _recorder;
-    final startTime = _recordingStartTime;
-    _recordingStartTime = null;
-    if (startTime != null) {
-      final ms = DateTime.now().difference(startTime).inMilliseconds;
-      rec?.onRecordingCompleted(ms);
-    }
+    // 说的时长由 SpeechRecordingController 统一记录（精确到有声音的部分）
 
     try {
       _finalEventPromptId = promptId;
@@ -230,7 +219,7 @@ class RecordingService {
     if (promptId == null) return;
 
     _recordingPromptId = null;
-    _recordingStartTime = null;
+
     _clearFinalCompleter();
 
     try {

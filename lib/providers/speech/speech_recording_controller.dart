@@ -18,6 +18,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,12 +47,7 @@ const _manualModeInitialMax = Duration(seconds: 300);
 const _manualModeMultiplier = 5;
 
 /// 跟读回合阶段
-enum SpeechRecordingPhase {
-  idle,
-  awaitingSpeech,
-  speaking,
-  processing,
-}
+enum SpeechRecordingPhase { idle, awaitingSpeech, speaking, processing }
 
 /// 跟读回合状态
 class SpeechRecordingState {
@@ -223,6 +219,9 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   bool _isStopping = false;
   bool _hasDetectedSpeech = false;
   String? _lastKnownTranscript;
+
+  /// 首次检测到语音的时间（用于计算有效说话时长）
+  DateTime? _speechStartTime;
   String? _cachedReferenceText;
   String? _lastSilenceLogDesc;
 
@@ -358,6 +357,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     if (!_recordingService.isRecording) return;
 
     _cancelAllTimers();
+    _speechStartTime = null;
     await _eventSub?.cancel();
     _eventSub = null;
     await _recordingService.cancelRecording();
@@ -414,6 +414,16 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
     _cancelAllTimers();
     await _eventSub?.cancel();
     _eventSub = null;
+
+    // 记录有效说话时长（开口 → 停止 - 尾部静音）
+    final speechStart = _speechStartTime;
+    _speechStartTime = null;
+    if (speechStart != null) {
+      final totalMs = DateTime.now().difference(speechStart).inMilliseconds;
+      final silenceMs = state.silenceDuration.inMilliseconds;
+      final effectiveMs = math.max(0, totalMs - silenceMs);
+      _recordingService.recorder?.onRecordingCompleted(effectiveMs);
+    }
 
     final result = await _recordingService.stopRecording(promptId: promptId);
     AppLogger.log(
@@ -518,6 +528,7 @@ class SpeechRecordingController extends Notifier<SpeechRecordingState> {
   }
 
   void _handleSpeechStarted(SpeechPracticeEvent event) {
+    _speechStartTime ??= DateTime.now();
     state = state.copyWith(
       hasDetectedSpeech: true,
       silenceDuration: Duration.zero,
