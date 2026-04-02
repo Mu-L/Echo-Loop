@@ -28,8 +28,6 @@ import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
 import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/speech/speech_recording_controller.dart';
-import '../services/app_logger.dart';
-import '../services/audio_playback_service.dart';
 import '../utils/wakelock_mixin.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../theme/app_theme.dart';
@@ -39,11 +37,21 @@ import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/difficult_practice/difficult_practice_settings_sheet.dart';
 import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
+import '../models/speech_practice_models.dart';
+import '../providers/repeat_flow/repeat_flow_engine.dart';
+import '../providers/repeat_flow/repeat_flow_phase.dart';
 import '../widgets/common/countdown_chip.dart';
+import '../widgets/common/recording_button.dart'
+    show RecordingButton, RecordingButtonMode;
+import '../widgets/common/processing_indicator.dart';
+import '../widgets/common/speech_rating_badge.dart';
+import '../widgets/common/status_label.dart';
+import '../widgets/common/repeat_practice_panel.dart';
 import '../widgets/practice/practice_normal_mode_view.dart';
 import '../widgets/practice/practice_play_count_label.dart';
 import '../widgets/common/playback_controls.dart';
-import '../widgets/practice/annotation_with_recording.dart';
+import '../widgets/practice/annotation_content_view.dart';
+import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
 /// 复习难句补练页面
@@ -74,26 +82,10 @@ class _ReviewDifficultPracticeScreenState
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
 
-  /// 录音回放服务
-  final AudioPlaybackService _playbackService = AudioPlaybackService();
-
-  /// 当前正在播放的 promptId（null = 未播放）
-  String? _playingPromptId;
-
-  /// 播放状态监听
-  StreamSubscription<bool>? _playbackSub;
-
   @override
   void initState() {
     super.initState();
-    // TODO: 迁移到新架构后改用 play() 返回的 Future，删除 isPlayingStream
-    _playbackSub = _playbackService.isPlayingStream.listen((isPlaying) {
-      if (!isPlaying && mounted) {
-        setState(() => _playingPromptId = null);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 同步初始控制模式到录音控制器
       final playerState = ref.read(reviewDifficultPracticeProvider);
       ref
           .read(speechRecordingControllerProvider.notifier)
@@ -102,108 +94,11 @@ class _ReviewDifficultPracticeScreenState
     });
   }
 
-  @override
-  void dispose() {
-    _playbackSub?.cancel();
-    _playbackService.dispose();
-    super.dispose();
-  }
-
-  /// 当前句子的 promptId
-  String _currentPromptId() {
-    final player = ref.read(reviewDifficultPracticeProvider.notifier);
-    final sentence = player.currentSentence;
-    final sentenceIndex = sentence?.index ?? player.currentIndex;
-    return 'difficult:${widget.audioItemId}:$sentenceIndex';
-  }
-
-  /// 更新录音相关阈值
-  void _updateRecordingThresholds() {
-    final player = ref.read(reviewDifficultPracticeProvider.notifier);
-    final currentSentence = player.currentSentence;
-    if (currentSentence == null) return;
-
-    final controller = ref.read(speechRecordingControllerProvider.notifier);
-    final sentenceDuration = currentSentence.duration;
-
-    // 跟读场景最大录音时长：max(2.5 × sentenceDuration + 5s, 10s)
-    final computed = sentenceDuration * 2.5 + const Duration(seconds: 5);
-    final maxRecording = computed < const Duration(seconds: 10)
-        ? const Duration(seconds: 10)
-        : computed;
-
-    controller.setMaxRecordingDuration(maxRecording);
-  }
-
-  /// 取消录音和回放
+  /// 取消录音
   Future<void> _cancelRecordingAndPlayback() async {
-    final controller = ref.read(speechRecordingControllerProvider.notifier);
-    await controller.cancelActiveRecording();
-    await _stopPlayback();
-  }
-
-  /// 停止录音回放
-  Future<void> _stopPlayback() async {
-    await _playbackService.stop();
-    if (mounted) {
-      setState(() => _playingPromptId = null);
-    }
-  }
-
-  /// 处理录音按钮点击
-  Future<void> _handleRecordTap() async {
-    final playerState = ref.read(reviewDifficultPracticeProvider);
-    if (!playerState.isPauseBetweenPlays || !playerState.isAnnotationMode) {
-      return;
-    }
-
-    final player = ref.read(reviewDifficultPracticeProvider.notifier);
-    final controller = ref.read(speechRecordingControllerProvider.notifier);
-    final recState = ref.read(speechRecordingControllerProvider);
-    final currentSentence = player.currentSentence;
-    if (currentSentence == null) return;
-
-    final promptId = _currentPromptId();
-    if (recState.isRecordingPrompt(promptId)) {
-      AppLogger.log('DifficultScreen', '手动停止录音');
-      player.enterManualForSentence();
-      await controller.stopAndEvaluate(referenceText: currentSentence.text);
-      return;
-    }
-
-    await _stopPlayback();
-
-    if (!playerState.isCountdownPaused) {
-      player.pauseCountdown();
-    }
-    _updateRecordingThresholds();
-    await controller.startRecording(
-      promptId: promptId,
-      referenceText: currentSentence.text,
-    );
-  }
-
-  /// 处理录音回放点击
-  Future<void> _handleAttemptPlaybackTap(String promptId) async {
-    if (_playingPromptId == promptId) {
-      await _stopPlayback();
-      return;
-    }
-
-    final playerState = ref.read(reviewDifficultPracticeProvider);
-    if (playerState.isPlaying) {
-      ref.read(reviewDifficultPracticeProvider.notifier).pause();
-    }
-
-    ref.read(reviewDifficultPracticeProvider.notifier).enterManualForSentence();
-
-    final recState = ref.read(speechRecordingControllerProvider);
-    final attempt = recState.currentAttempt;
-    final filePath = attempt?.filePath;
-    if (filePath == null || filePath.isEmpty) return;
-
-    setState(() => _playingPromptId = promptId);
-    await _playbackService.play(filePath);
+    await ref
+        .read(speechRecordingControllerProvider.notifier)
+        .cancelActiveRecording();
   }
 
   /// 处理退出
@@ -505,8 +400,11 @@ class _ReviewDifficultPracticeScreenState
     // 盲听模式下不涉及录音。
 
     final currentSentence = player.currentSentence;
-    final currentPromptId = _currentPromptId();
     final currentAttempt = turnState.currentAttempt;
+    // 跟读模式用 engine 的 promptId，盲听模式无录音
+    final currentPromptId = playerState.isAnnotationMode
+        ? (player.repeatEngine?.currentPromptId ?? '')
+        : '';
     final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
 
     // 手动模式 + 停顿中 → 暂停倒计时（盲听和跟读均适用）
@@ -604,66 +502,35 @@ class _ReviewDifficultPracticeScreenState
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.l,
                           ),
-                          child: AnnotationWithRecording(
-                            text: currentSentence?.text ?? '',
-                            playerState: playerState,
-                            l10n: l10n,
-                            isDifficult: currentSentence?.isBookmarked ?? true,
-                            onToggleMark: _handleToggleDifficult,
-                            aiNotifier: ref.read(sentenceAiNotifierProvider),
-                            audioItemId: widget.audioItemId,
-                            sentenceIndex: player.currentIndex,
-                            sentenceStartMs:
-                                currentSentence?.startTime.inMilliseconds,
-                            sentenceEndMs:
-                                currentSentence?.endTime.inMilliseconds,
-                            onStopMainPlayer: () {
-                              ref.read(reviewDifficultPracticeProvider.notifier)
-                                ..enterManualForSentence()
-                                ..notifyExternalStop();
-                              ref
-                                  .read(
-                                    speechRecordingControllerProvider
-                                        .notifier,
-                                  )
-                                  .cancelActiveRecording();
-                            },
-                            turnState: turnState,
-                            currentPromptId: currentPromptId,
-                            currentAttempt: currentAttempt,
-                            isRecordingCurrent: isRecordingCurrent,
-                            isPlayingAttempt:
-                                _playingPromptId == currentPromptId,
-                            onRecordTap: _handleRecordTap,
-                            onAttemptPlaybackTap: _handleAttemptPlaybackTap,
-                            onFastForward: () {
-                              // 跟读模式下快进由 engine 处理
-                              final engine = ref.read(reviewDifficultPracticeProvider.notifier);
-                              engine.repeatEngine?.fastForwardInterval();
-                            },
-                            onCountdownPause: () {
-                              ref.read(reviewDifficultPracticeProvider.notifier)
-                                  .repeatEngine?.pauseInterval();
-                            },
-                            onCountdownResume: () {
-                              ref.read(reviewDifficultPracticeProvider.notifier)
-                                  .repeatEngine?.resumeInterval();
-                            },
-                            onToolbarButtonTapped: () {
-                              if (playerState.isManualMode) return;
-                              ref
-                                  .read(
-                                    reviewDifficultPracticeProvider.notifier,
-                                  )
-                                  .enterManualForSentence();
-                              ref
-                                  .read(
-                                    speechRecordingControllerProvider
-                                        .notifier,
-                                  )
-                                  .cancelActiveRecording();
-                            },
-                          ),
+                          child: currentSentence != null
+                              ? Column(
+                                  children: [
+                                    const SizedBox(height: AppSpacing.s),
+                                    BookmarkToggleRow(
+                                      isDifficult: currentSentence.isBookmarked,
+                                      onTap: _handleToggleDifficult,
+                                    ),
+                                    const SizedBox(height: AppSpacing.m),
+                                    Expanded(
+                                      child: AnnotationContentView(
+                                        text: currentSentence.text,
+                                        aiNotifier: ref.read(sentenceAiNotifierProvider),
+                                        audioItemId: widget.audioItemId,
+                                        sentenceIndex: player.currentIndex,
+                                        sentenceStartMs: currentSentence.startTime.inMilliseconds,
+                                        sentenceEndMs: currentSentence.endTime.inMilliseconds,
+                                        highlightedSegments: currentAttempt?.referenceSegments,
+                                        onStopMainPlayer: () {
+                                          player.repeatEngine?.enterWaitingForUser();
+                                        },
+                                        onToolbarButtonTapped: () {
+                                          player.repeatEngine?.onUserInteraction();
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const SizedBox.shrink(),
                         )
                       : PracticeNormalModeView(
                           l10n: l10n,
@@ -716,74 +583,270 @@ class _ReviewDifficultPracticeScreenState
                         ),
                 ),
 
-                // 底部播放控制
-                PlaybackControls(
-                  canGoPrev: playerState.currentSentenceIndex > 0,
-                  isLast:
-                      playerState.currentSentenceIndex >=
-                      playerState.totalSentences - 1,
-                  centerIcon: playerState.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  onPrevious: () {
-                    unawaited(_cancelRecordingAndPlayback());
-                    ref
-                        .read(speechRecordingControllerProvider.notifier)
-                        .clearRecording();
-                    player.goToPrevious();
-                  },
-                  onNext: () {
-                    unawaited(_cancelRecordingAndPlayback());
-                    ref
-                        .read(speechRecordingControllerProvider.notifier)
-                        .clearRecording();
-                    final isLast =
+                // 底部区域：跟读模式用 RepeatPracticePanel，盲听模式用 PlaybackControls
+                if (playerState.isAnnotationMode)
+                  _buildAnnotationBottomPanel(
+                    playerState: playerState,
+                    turnState: turnState,
+                    currentAttempt: currentAttempt,
+                    isRecordingCurrent: isRecordingCurrent,
+                    l10n: l10n,
+                    theme: theme,
+                  )
+                else ...[
+                  PlaybackControls(
+                    canGoPrev: playerState.currentSentenceIndex > 0,
+                    isLast:
                         playerState.currentSentenceIndex >=
-                        playerState.totalSentences - 1;
-                    if (isLast) {
-                      player.stopPlayback();
-                      _handleCompleted();
-                    } else {
-                      unawaited(player.goToNext());
-                    }
-                  },
-                  onCenter: () {
-                    unawaited(_cancelRecordingAndPlayback());
-                    if (playerState.isPauseBetweenPlays) {
+                        playerState.totalSentences - 1,
+                    centerIcon: playerState.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    onPrevious: () {
+                      unawaited(_cancelRecordingAndPlayback());
                       ref
                           .read(speechRecordingControllerProvider.notifier)
                           .clearRecording();
-                      player.replayDuringCountdown();
-                    } else if (playerState.isPlaying) {
-                      player.pause();
-                    } else {
-                      player.resume();
-                    }
-                  },
-                ),
-
-                // 遍数 + 模式指示器
-                PracticePlayCountLabel(
-                  isManualMode: playerState.isManualMode,
-                  playCountText: l10n.listenAndRepeatPlayCount(
-                    playerState.currentPlayCount,
-                    playerState.isAnnotationMode
-                        ? playerState.targetRepeatCount
-                        : (playerState.isManualMode
-                              ? 1
-                              : playerState
-                                    .settings
-                                    .blindListenRepeatCount),
+                      player.goToPrevious();
+                    },
+                    onNext: () {
+                      unawaited(_cancelRecordingAndPlayback());
+                      ref
+                          .read(speechRecordingControllerProvider.notifier)
+                          .clearRecording();
+                      final isLast =
+                          playerState.currentSentenceIndex >=
+                          playerState.totalSentences - 1;
+                      if (isLast) {
+                        player.stopPlayback();
+                        _handleCompleted();
+                      } else {
+                        unawaited(player.goToNext());
+                      }
+                    },
+                    onCenter: () {
+                      unawaited(_cancelRecordingAndPlayback());
+                      if (playerState.isPauseBetweenPlays) {
+                        ref
+                            .read(speechRecordingControllerProvider.notifier)
+                            .clearRecording();
+                        player.replayDuringCountdown();
+                      } else if (playerState.isPlaying) {
+                        player.pause();
+                      } else {
+                        player.resume();
+                      }
+                    },
                   ),
-                  l10n: l10n,
-                  theme: theme,
-                ),
+                  PracticePlayCountLabel(
+                    isManualMode: playerState.isManualMode,
+                    playCountText: l10n.listenAndRepeatPlayCount(
+                      playerState.currentPlayCount,
+                      playerState.isManualMode
+                          ? 1
+                          : playerState.settings.blindListenRepeatCount,
+                    ),
+                    l10n: l10n,
+                    theme: theme,
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  /// 跟读模式底部面板（与跟读页面架构一致）
+  Widget _buildAnnotationBottomPanel({
+    required ReviewDifficultPracticeState playerState,
+    required SpeechRecordingState turnState,
+    required SpeechPracticeAttempt? currentAttempt,
+    required bool isRecordingCurrent,
+    required AppLocalizations l10n,
+    required ThemeData theme,
+  }) {
+    final engine = ref.read(reviewDifficultPracticeProvider.notifier).repeatEngine;
+    if (engine == null) return const SizedBox.shrink();
+
+    final flowState = playerState.repeatFlowState;
+    if (flowState == null) return const SizedBox.shrink();
+
+    final isPlaying = flowState.phase is PlayingPrompt;
+    final isInPause = flowState.isInPause;
+    final showCountdown = flowState.isCountingDown;
+
+    return RepeatPracticePanel(
+      l10n: l10n,
+      theme: theme,
+      hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
+      ratingBadge: (currentAttempt != null && currentAttempt.score != null)
+          ? SpeechRatingBadge(
+              l10n: l10n,
+              attempt: currentAttempt,
+              isPlaying: flowState.phase is ReviewingRecording,
+              onTap: currentAttempt.hasRecording
+                  ? () => engine.togglePlayback()
+                  : null,
+            )
+          : null,
+      centerContent: _buildRepeatCenterContent(
+        showCountdown: showCountdown,
+        isInPause: isInPause,
+        turnState: turnState,
+        engine: engine,
+        isRecordingCurrent: isRecordingCurrent,
+        currentAttempt: currentAttempt,
+        l10n: l10n,
+      ),
+      fastForwardButton: showCountdown
+          ? Consumer(
+              builder: (context, ref, _) {
+                final fs = ref.watch(
+                  reviewDifficultPracticeProvider.select(
+                    (s) => s.repeatFlowState?.phase,
+                  ),
+                );
+                if (fs is! WaitingInterval || fs.isPaused) {
+                  return const SizedBox.shrink();
+                }
+                return GestureDetector(
+                  onTap: engine.fastForwardInterval,
+                  child: Icon(
+                    Icons.fast_forward_rounded,
+                    size: 32,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                );
+              },
+            )
+          : null,
+      canGoPrev: playerState.currentSentenceIndex > 0,
+      isLast: playerState.currentSentenceIndex >= playerState.totalSentences - 1,
+      centerIcon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+      onPrevious: () {
+        ref.read(speechRecordingControllerProvider.notifier).clearRecording();
+        final player = ref.read(reviewDifficultPracticeProvider.notifier);
+        unawaited(player.goToPrevious());
+      },
+      onNext: () {
+        ref.read(speechRecordingControllerProvider.notifier).clearRecording();
+        final player = ref.read(reviewDifficultPracticeProvider.notifier);
+        final isLast = playerState.currentSentenceIndex >= playerState.totalSentences - 1;
+        if (isLast) {
+          player.stopPlayback();
+          _handleCompleted();
+        } else {
+          unawaited(player.goToNext());
+        }
+      },
+      onCenter: () {
+        if (isInPause) {
+          ref.read(speechRecordingControllerProvider.notifier).clearRecording();
+          engine.replayCurrentSentence();
+        } else if (isPlaying) {
+          engine.enterWaitingForUser();
+        } else {
+          engine.replayCurrentSentence();
+        }
+      },
+      isManualMode: playerState.isManualMode,
+      playCountText: l10n.listenAndRepeatPlayCount(
+        flowState.repeatIndex + 1,
+        playerState.targetRepeatCount,
+      ),
+    );
+  }
+
+  /// 跟读模式中间区域（倒计时 / 录音按钮 / 加载动画）
+  Widget _buildRepeatCenterContent({
+    required bool showCountdown,
+    required bool isInPause,
+    required SpeechRecordingState turnState,
+    required RepeatFlowEngine engine,
+    required bool isRecordingCurrent,
+    required SpeechPracticeAttempt? currentAttempt,
+    required AppLocalizations l10n,
+  }) {
+    if (showCountdown) {
+      return Center(
+        child: Consumer(
+          builder: (context, ref, _) {
+            final phase = ref.watch(
+              reviewDifficultPracticeProvider.select(
+                (s) => s.repeatFlowState?.phase,
+              ),
+            );
+            if (phase is! WaitingInterval) {
+              return const SizedBox.shrink();
+            }
+            return CountdownChip(
+              remaining: phase.remaining,
+              total: phase.total,
+              isPaused: phase.isPaused,
+              onPause: engine.pauseInterval,
+              onResume: engine.resumeInterval,
+            );
+          },
+        ),
+      );
+    }
+
+    if (isInPause) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.m),
+        child: Builder(
+          builder: (context) {
+            final currentPromptId = engine.currentPromptId;
+            final isProcessing =
+                turnState.promptId == currentPromptId &&
+                turnState.phase == SpeechRecordingPhase.processing;
+
+            if (isProcessing) {
+              return ProcessingIndicator(text: l10n.listenAndRepeatAnalyzing);
+            }
+
+            final mode = isRecordingCurrent
+                ? switch (turnState.phase) {
+                    SpeechRecordingPhase.awaitingSpeech ||
+                    SpeechRecordingPhase.speaking =>
+                      RecordingButtonMode.recording,
+                    _ => RecordingButtonMode.idle,
+                  }
+                : RecordingButtonMode.idle;
+
+            final hasError = currentAttempt?.errorMessage != null;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StatusLabel(
+                  text: hasError
+                      ? currentAttempt!.errorMessage
+                      : switch (mode) {
+                          RecordingButtonMode.idle =>
+                            l10n.listenAndRepeatTapToRecord,
+                          RecordingButtonMode.recording =>
+                            l10n.listenAndRepeatRecordingInProgress,
+                          RecordingButtonMode.disabled => null,
+                        },
+                  color: hasError ? Theme.of(context).colorScheme.error : null,
+                  bold: hasError,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                RecordingButton(
+                  mode: mode,
+                  onTap: () => engine.onRecordButtonTapped(),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
 
