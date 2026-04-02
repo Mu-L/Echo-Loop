@@ -569,21 +569,15 @@ class _ListenAndRepeatPlayerScreenState
                             ? Center(
                                 child: Consumer(
                                   builder: (context, ref, _) {
-                                    final s = ref.watch(
+                                    // phase 是 WaitingInterval（showCountdown 已保证）
+                                    final interval = ref.watch(
                                       listenAndRepeatControllerProvider.select(
-                                        (s) => (
-                                          s.intervalRemaining,
-                                          s.intervalTotal,
-                                        ),
+                                        (s) => s.phase as WaitingInterval,
                                       ),
                                     );
-                                    final remaining = s.$1;
-                                    final total = s.$2;
-                                    final isPaused = ref.watch(
-                                      listenAndRepeatControllerProvider.select(
-                                        (s) => s.isIntervalPaused,
-                                      ),
-                                    );
+                                    final remaining = interval.remaining;
+                                    final total = interval.total;
+                                    final isPaused = interval.isPaused;
                                     final ctrl = ref.read(
                                       listenAndRepeatControllerProvider.notifier,
                                     );

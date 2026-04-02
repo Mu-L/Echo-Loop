@@ -3,10 +3,7 @@
 /// 表达跟读流程的顶层阶段，每个阶段互斥。
 /// 流程：PlayingPrompt → Recording → (ReviewingRecording) → WaitingInterval → 下一遍/句
 ///
-/// 关键设计：
-/// - **倒计时只在 WaitingInterval**：播放/录音/回放时没有倒计时
-/// - **Interrupted 统一处理打断**：区分 manualPause（恢复剩余时间）和其他打断（恢复后重置 T）
-/// - **flowToken 防异步竞态**：所有异步回调校验 token，过期直接丢弃
+/// **每个阶段携带该阶段特有的数据**，编译期保证不会在错误阶段访问错误数据。
 library;
 
 /// 跟读流程阶段
@@ -26,26 +23,71 @@ class PlayingPrompt extends ListenAndRepeatPhase {
 
 /// 录音中（用户跟读）
 class Recording extends ListenAndRepeatPhase {
-  const Recording();
+  /// 当前录音的 promptId
+  final String promptId;
+
+  const Recording({required this.promptId});
 }
 
 /// 播放录音回放中
 class ReviewingRecording extends ListenAndRepeatPhase {
-  const ReviewingRecording();
+  /// 录音文件路径
+  final String recordingPath;
+
+  const ReviewingRecording({required this.recordingPath});
 }
 
 /// 遍间等待（倒计时 T 秒，唯一可以有倒计时的阶段）
 class WaitingInterval extends ListenAndRepeatPhase {
-  const WaitingInterval();
+  /// 倒计时剩余时间
+  final Duration remaining;
+
+  /// 倒计时总时长
+  final Duration total;
+
+  /// 是否暂停
+  final bool isPaused;
+
+  const WaitingInterval({
+    required this.remaining,
+    required this.total,
+    this.isPaused = false,
+  });
+
+  WaitingInterval copyWith({
+    Duration? remaining,
+    Duration? total,
+    bool? isPaused,
+  }) {
+    return WaitingInterval(
+      remaining: remaining ?? this.remaining,
+      total: total ?? this.total,
+      isPaused: isPaused ?? this.isPaused,
+    );
+  }
 }
 
 /// 等待用户操作
 ///
-/// 录音失败/超时需要重试、用户点了翻译/解析/查词、打开设置弹窗等场景。
-/// 不自动推进，等用户主动操作（录音/播放/切句）后恢复自动流程。
-/// 与 [WaitingInterval] 的区别：没有倒计时。
+/// 录音失败/超时、用户点了翻译/解析/查词、打开设置弹窗等场景。
+/// 不自动推进，等用户主动操作后恢复自动流程。
 class WaitingForUser extends ListenAndRepeatPhase {
-  const WaitingForUser();
+  /// 等待原因
+  final WaitingReason reason;
+
+  const WaitingForUser(this.reason);
+}
+
+/// 等待用户的原因
+enum WaitingReason {
+  /// 录音失败或超时，需要重试
+  recordingFailed,
+
+  /// 用户手动干预（查词典/翻译/设置/暂停播放等）
+  userInteraction,
+
+  /// 手动模式，等用户主动操作
+  manualMode,
 }
 
 /// 当前句子所有遍数完成（短暂过渡，自动推进到下一句或完成）

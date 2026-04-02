@@ -2,13 +2,16 @@
 ///
 /// UI 只读这一个状态对象，Controller 是唯一写入者。
 /// 包含所有 UI 渲染需要的信息，不包含业务逻辑。
+///
+/// 阶段特有数据在 [ListenAndRepeatPhase] 的各子类中，
+/// 会话级数据在此 State 中。
 library;
 
 import 'listen_and_repeat_phase.dart';
 
 /// 跟读会话状态
 class ListenAndRepeatSessionState {
-  /// 当前阶段
+  /// 当前阶段（携带阶段特有数据）
   final ListenAndRepeatPhase phase;
 
   /// 当前句子索引（0-based）
@@ -23,19 +26,13 @@ class ListenAndRepeatSessionState {
   /// 总遍数
   final int totalRepeats;
 
-  /// 遍间倒计时总时长
-  final Duration intervalTotal;
+  /// 遍间倒计时总时长（配置值，用于创建 WaitingInterval）
+  final Duration intervalDuration;
 
-  /// 遍间倒计时剩余时间（仅 WaitingInterval 阶段有意义）
-  final Duration intervalRemaining;
-
-  /// 倒计时是否暂停（用户点击倒计时圆环暂停）
-  final bool isIntervalPaused;
-
-  /// 最新录音文件路径（null = 本遍未录音）
+  /// 最新录音文件路径（跨阶段保留，用于评分 badge 和回放）
   final String? recordingPath;
 
-  /// 最新录音评分（null = 未评估）
+  /// 最新录音评分（跨阶段保留，用于评分 badge 和倒计时触发判断）
   final double? recordingScore;
 
   /// 流程令牌（每次切句/重置递增，异步回调校验用）
@@ -50,9 +47,7 @@ class ListenAndRepeatSessionState {
     this.totalSentences = 0,
     this.repeatIndex = 0,
     this.totalRepeats = 3,
-    this.intervalTotal = Duration.zero,
-    this.intervalRemaining = Duration.zero,
-    this.isIntervalPaused = false,
+    this.intervalDuration = Duration.zero,
     this.recordingPath,
     this.recordingScore,
     this.flowToken = 0,
@@ -65,9 +60,7 @@ class ListenAndRepeatSessionState {
     int? totalSentences,
     int? repeatIndex,
     int? totalRepeats,
-    Duration? intervalTotal,
-    Duration? intervalRemaining,
-    bool? isIntervalPaused,
+    Duration? intervalDuration,
     Object? recordingPath = _noChange,
     Object? recordingScore = _noChange,
     int? flowToken,
@@ -79,9 +72,7 @@ class ListenAndRepeatSessionState {
       totalSentences: totalSentences ?? this.totalSentences,
       repeatIndex: repeatIndex ?? this.repeatIndex,
       totalRepeats: totalRepeats ?? this.totalRepeats,
-      intervalTotal: intervalTotal ?? this.intervalTotal,
-      intervalRemaining: intervalRemaining ?? this.intervalRemaining,
-      isIntervalPaused: isIntervalPaused ?? this.isIntervalPaused,
+      intervalDuration: intervalDuration ?? this.intervalDuration,
       recordingPath: identical(recordingPath, _noChange)
           ? this.recordingPath
           : recordingPath as String?,

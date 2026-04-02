@@ -223,7 +223,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       sentenceIndex: safeIndex,
       totalSentences: _sentences.length,
       totalRepeats: config.getRepeatCount(sentence),
-      intervalTotal: config.getIntervalDuration(sentence),
+      intervalDuration: config.getIntervalDuration(sentence),
       flowToken: 1,
       isFreePlay: isFreePlay,
     );
@@ -251,7 +251,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     }
 
     _stopAllResources();
-    state = state.copyWith(phase: const WaitingForUser());
+    state = state.copyWith(
+      phase: const WaitingForUser(WaitingReason.userInteraction),
+    );
     AppLogger.log('L&R', '→ WaitingForUser (从 ${phase.runtimeType})');
   }
 
@@ -300,7 +302,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       // 没检测到语音 → 取消录音，回到等待状态
       AppLogger.log('L&R', '手动停止录音: 无语音 → 取消');
       await recController.cancelActiveRecording();
-      state = state.copyWith(phase: const WaitingForUser());
+      state = state.copyWith(
+        phase: const WaitingForUser(WaitingReason.recordingFailed),
+      );
       return;
     }
 
@@ -324,7 +328,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       _countdown.cancel();
     }
 
-    state = state.copyWith(phase: const ReviewingRecording());
+    state = state.copyWith(
+      phase: ReviewingRecording(recordingPath: path),
+    );
     AppLogger.log('L&R', '播放录音回放');
     await _playbackService.play(path);
     // 播放结束由 _playbackSub 监听触发 _onReviewPlaybackFinished
@@ -366,32 +372,34 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
   /// 暂停倒计时（WaitingInterval 中用户点击倒计时圆环）
   void pauseInterval() {
+    final phase = state.phase;
     AppLogger.log(
       'L&R',
-      'pauseInterval: phase=${state.phase.runtimeType}, '
+      'pauseInterval: phase=${phase.runtimeType}, '
           'countdownActive=${_countdown.isActive}, '
           'countdownPaused=${_countdown.isPaused}',
     );
-    if (state.phase is! WaitingInterval) return;
+    if (phase is! WaitingInterval) return;
     if (_countdown.isPaused) return;
     _countdown.pause();
-    state = state.copyWith(isIntervalPaused: true);
+    state = state.copyWith(phase: phase.copyWith(isPaused: true));
     AppLogger.log('L&R', '倒计时暂停 ✓');
   }
 
   /// 恢复倒计时
   void resumeInterval() {
+    final phase = state.phase;
     AppLogger.log(
       'L&R',
-      'resumeInterval: phase=${state.phase.runtimeType}, '
+      'resumeInterval: phase=${phase.runtimeType}, '
           'countdownActive=${_countdown.isActive}, '
           'countdownPaused=${_countdown.isPaused}, '
-          'isIntervalPaused=${state.isIntervalPaused}',
+          'isPaused=${phase is WaitingInterval ? phase.isPaused : 'N/A'}',
     );
-    if (state.phase is! WaitingInterval) return;
+    if (phase is! WaitingInterval) return;
     if (!_countdown.isPaused) return;
     _countdown.resume();
-    state = state.copyWith(isIntervalPaused: false);
+    state = state.copyWith(phase: phase.copyWith(isPaused: false));
     AppLogger.log('L&R', '倒计时恢复 ✓');
   }
 
@@ -531,7 +539,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         next.phase == SpeechRecordingPhase.idle &&
         next.currentAttempt == null) {
       AppLogger.log('L&R', '录音取消/超时 → WaitingForUser');
-      state = state.copyWith(phase: const WaitingForUser());
+      state = state.copyWith(
+        phase: const WaitingForUser(WaitingReason.recordingFailed),
+      );
     }
   }
 
@@ -547,7 +557,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
     if (_config.isManualMode()) {
       // 手动模式：不自动录音，等用户手动操作
-      state = state.copyWith(phase: const WaitingForUser());
+      state = state.copyWith(
+        phase: const WaitingForUser(WaitingReason.manualMode),
+      );
       return;
     }
 
@@ -572,7 +584,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       // 先改 phase，再 clear，避免 clearRecording 触发 _onRecordingStateChanged 时
       // state.phase 还是 Recording 导致二次触发
       state = state.copyWith(
-        phase: const WaitingForUser(),
+        phase: const WaitingForUser(WaitingReason.recordingFailed),
         recordingPath: null,
         recordingScore: null,
       );
@@ -583,7 +595,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     // 手动模式：等用户操作
     if (_config.isManualMode()) {
       AppLogger.log('L&R', '→ 手动模式，等待用户操作');
-      state = state.copyWith(phase: const WaitingForUser());
+      state = state.copyWith(
+        phase: const WaitingForUser(WaitingReason.manualMode),
+      );
       return;
     }
 
@@ -598,7 +612,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     AppLogger.log('L&R', '回放结束 → WaitingInterval');
 
     if (_config.isManualMode()) {
-      state = state.copyWith(phase: const WaitingForUser());
+      state = state.copyWith(
+        phase: const WaitingForUser(WaitingReason.manualMode),
+      );
       return;
     }
 
@@ -609,8 +625,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 倒计时 tick 回调
   void _onIntervalTick(int token, Duration remaining) {
     if (token != state.flowToken) return;
-    if (state.phase is! WaitingInterval) return;
-    state = state.copyWith(intervalRemaining: remaining);
+    final phase = state.phase;
+    if (phase is! WaitingInterval) return;
+    state = state.copyWith(phase: phase.copyWith(remaining: remaining));
   }
 
   /// 倒计时结束回调
@@ -655,9 +672,8 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     final sentence = _currentSentence;
     if (sentence == null) return;
 
-    state = state.copyWith(phase: const Recording());
-
     final promptId = 'shadowing:${_config.audioItemId}:${sentence.index}';
+    state = state.copyWith(phase: Recording(promptId: promptId));
 
     // 设置录音阈值：max(2.5 × sentenceDuration + 5s, 10s)
     final computed = sentence.duration * 2.5 + const Duration(seconds: 5);
@@ -679,13 +695,14 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
   /// 启动遍间倒计时
   Future<void> _startInterval({required bool resetFull}) async {
-    final total = state.intervalTotal;
-    final remaining = resetFull ? total : state.intervalRemaining;
+    final total = state.intervalDuration;
+    final currentPhase = state.phase;
+    final remaining = resetFull || currentPhase is! WaitingInterval
+        ? total
+        : currentPhase.remaining;
 
     state = state.copyWith(
-      phase: const WaitingInterval(),
-      intervalRemaining: remaining,
-      isIntervalPaused: false,
+      phase: WaitingInterval(remaining: remaining, total: total),
     );
 
     if (_config.isManualMode()) return;
@@ -737,8 +754,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       sentenceIndex: index,
       repeatIndex: 0,
       totalRepeats: _config.getRepeatCount(sentence),
-      intervalTotal: _config.getIntervalDuration(sentence),
-      intervalRemaining: Duration.zero,
+      intervalDuration: _config.getIntervalDuration(sentence),
       recordingPath: null,
       recordingScore: null,
       flowToken: state.flowToken + 1,
