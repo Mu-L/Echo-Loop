@@ -34,6 +34,7 @@ import '../widgets/common/recording_button.dart'
     show RecordingButton, RecordingButtonMode;
 import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/common/countdown_chip.dart';
+import '../widgets/common/playback_controls.dart' show PlaybackControls;
 import '../widgets/common/paragraph_practice_scaffold.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/common/paragraph_visibility_controls.dart';
@@ -629,6 +630,101 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     );
   }
 
+  /// 固定槽位练习控制区。
+  ///
+  /// 上层：状态文字（居中，固定 20px 槽位）
+  /// 下层：badge + 按钮 Row（与 PlaybackControls 同结构，badge 在 prev 位置）
+  /// 总高度固定 20 + 8 + 56 = 84px。
+  static const _kStatusSlotHeight = 20.0;
+  static const _kSlotGap = 8.0;
+  static const _kButtonHeight = 56.0;
+  static const _kPracticeControlsHeight =
+      _kStatusSlotHeight + _kSlotGap + _kButtonHeight; // 84
+
+  /// scaffold 给 practiceControls 的水平 padding 是 AppSpacing.m(16)，
+  /// footer 内部的水平 padding 是 AppSpacing.l(24)，
+  /// 差值 8 用于对齐 badge 和 prev 按钮的 x 位置。
+  static const _kExtraPadding = AppSpacing.l - AppSpacing.m; // 8
+
+  Widget _buildFixedPracticeControls({
+    required RetellPlayerState state,
+    required SpeechRecordingState turnState,
+    required SpeechPracticeAttempt? currentAttempt,
+    required AppLocalizations l10n,
+    required ThemeData theme,
+  }) {
+    final hasBadge = currentAttempt != null && currentAttempt.score != null;
+    final statusText = _buildStatusText(
+      state,
+      turnState,
+      currentAttempt,
+      l10n,
+      theme,
+    );
+    final hasStatus = statusText != null;
+
+    return SizedBox(
+      height: _kPracticeControlsHeight,
+      child: Column(
+        children: [
+          // 上层：状态文字居中（固定高度槽位）
+          SizedBox(
+            height: _kStatusSlotHeight,
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: hasStatus ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: statusText ?? const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          const SizedBox(height: _kSlotGap),
+          // 下层：badge(prev 位) + 按钮(center 位) + 空(next 位)
+          // 与 PlaybackControls 同 Row 结构，保证 x 对齐
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _kExtraPadding),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // badge 槽位（布局宽度与 prev 按钮一致，内容可溢出）
+                SizedBox(
+                  width: PlaybackControls.controlButtonSize,
+                  height: _kButtonHeight,
+                  child: OverflowBox(
+                    maxWidth: 160,
+                    minHeight: 0,
+                    alignment: Alignment.center,
+                    child: AnimatedOpacity(
+                      opacity: hasBadge ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: IgnorePointer(
+                        ignoring: !hasBadge,
+                        child: hasBadge
+                            ? SpeechRatingBadge(
+                                l10n: l10n,
+                                attempt: currentAttempt,
+                                onBeforePlayback: _prepareAttemptPlayback,
+                                thresholds: RatingThresholds.retell,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 48),
+                // 按钮槽位（与 play 按钮同位）
+                _buildCenterButton(state, turnState, l10n),
+                const SizedBox(width: 48),
+                // 空槽位（与 next 按钮同宽）
+                SizedBox(width: PlaybackControls.controlButtonSize),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 中间按钮：录音按钮 或 段间停顿倒计时环。
   Widget _buildCenterButton(
     RetellPlayerState state,
@@ -876,33 +972,12 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                       onChanged: player.setDisplayMode,
                     )
                   : null,
-              practiceControls: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (currentAttempt != null && currentAttempt.score != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.m),
-                      child: SpeechRatingBadge(
-                        l10n: l10n,
-                        attempt: currentAttempt,
-                        onBeforePlayback: _prepareAttemptPlayback,
-                        thresholds: RatingThresholds.retell,
-                      ),
-                    ),
-                  if (_buildStatusText(
-                        state,
-                        turnState,
-                        currentAttempt,
-                        l10n,
-                        theme,
-                      )
-                      case final statusText?)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: Center(child: statusText),
-                    ),
-                  _buildCenterButton(state, turnState, l10n),
-                ],
+              practiceControls: _buildFixedPracticeControls(
+                state: state,
+                turnState: turnState,
+                currentAttempt: currentAttempt,
+                l10n: l10n,
+                theme: theme,
               ),
               canGoPrev: state.currentParagraphIndex > 0,
               isLast:

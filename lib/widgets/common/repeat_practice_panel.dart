@@ -1,8 +1,10 @@
 /// 跟读/复述页面共享的中间操作区
 ///
-/// 布局从上到下：
-/// 1. 评分 badge（可选，点击播放录音）
-/// 2. 中间区域（固定高度）：提示文本 / 倒计时+快进 / 录音按钮+状态标签 / 加载动画（互斥）
+/// 固定槽位布局，避免状态切换时布局跳动：
+/// 1. 状态文字槽位（居中，20px）
+/// 2. 间距（8px）
+/// 3. 按钮行（56px）：badge(左) + 中间内容(居中) + 快进(右)
+///    与 PlaybackControls 同 Row 结构，badge 对齐 prev，快进对齐 next。
 ///
 /// 底部播放控制和遍数标签由外部 footer 组件统一负责。
 library;
@@ -13,24 +15,31 @@ import '../../l10n/app_localizations.dart';
 import '../../models/speech_practice_models.dart';
 import '../../providers/speech/speech_recording_controller.dart';
 import '../../theme/app_theme.dart';
+import 'playback_controls.dart' show PlaybackControls;
 import 'processing_indicator.dart';
 import 'recording_button.dart' show RecordingButton, RecordingButtonMode;
 import 'status_label.dart';
 
-/// 录音/倒计时区域固定高度（录音面板最高：24 状态 + 4 间距 + 56 按钮 + 16 底部 = 100）
-const double kTurnAreaHeight = 100;
+/// 状态文字槽位高度
+const double _kStatusSlotHeight = 20;
 
-/// PlaybackControls 内部间距常量（prev 32 + gap 48 + center 56 + gap 48 = 184）
-const double _kPlaybackLeftSpacing = 32 + 48 + 56 + 48;
+/// 槽位间距
+const double _kSlotGap = 8;
 
-/// next 按钮宽度
-const double _kNavButtonSize = 32;
+/// 按钮行高度
+const double _kButtonRowHeight = 56;
+
+/// 按钮行到底部 footer 的间距
+const double _kBottomGap = 16;
+
+/// 固定总高度：状态文字(20) + 间距(8) + 按钮行(56) + 底部间距(16) = 100
+const double kTurnAreaHeight = _kStatusSlotHeight + _kSlotGap + _kButtonRowHeight + _kBottomGap;
 
 /// 跟读/复述页面共享的中间操作区
 class RepeatPracticePanel extends StatelessWidget {
   // ========== 评分 badge ==========
 
-  /// 评分 badge（可选，显示在中间区域上方）
+  /// 评分 badge（可选，显示在按钮左侧、prev 按钮上方）
   final Widget? ratingBadge;
 
   // ========== 中间区域数据 ==========
@@ -84,85 +93,147 @@ class RepeatPracticePanel extends StatelessWidget {
     required this.theme,
   });
 
+  /// 是否处于评估加载中
+  bool get _isProcessing =>
+      isInPause &&
+      turnState.promptId == currentPromptId &&
+      turnState.phase == SpeechRecordingPhase.processing;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 评分 badge
-          if (ratingBadge != null)
-            Padding(
-              padding: const EdgeInsets.only(
-                top: AppSpacing.s,
-                bottom: AppSpacing.xs,
-              ),
-              child: Center(child: ratingBadge),
-            ),
-
-          // 中间区域（固定高度，避免布局跳动）
-          SizedBox(height: kTurnAreaHeight, child: _buildCenterArea(context)),
-        ],
-      ),
-    );
-  }
-
-  /// 构建中间区域内容（优先级：hintText > countdown > recording/processing > empty）
-  Widget _buildCenterArea(BuildContext context) {
-    // 播放中：显示提示文本
-    if (hintText != null) {
-      return Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.headphones_rounded,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              hintText!,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+    // processing 状态：加载动画独占整个区域（自然高度 > 56px）
+    if (_isProcessing) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+        child: SizedBox(
+          height: kTurnAreaHeight,
+          child: Center(
+            child: ProcessingIndicator(text: l10n.listenAndRepeatAnalyzing),
+          ),
         ),
       );
     }
 
-    // 倒计时中
+    final statusWidget = _buildStatusText(context);
+    final hasStatus = statusWidget != null;
+    final hasBadge = ratingBadge != null;
+    final hasFF = showCountdown && fastForwardButton != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+      child: SizedBox(
+        height: kTurnAreaHeight,
+        child: Column(
+          children: [
+            // 状态文字槽位（固定高度，AnimatedOpacity 控制显隐）
+            SizedBox(
+              height: _kStatusSlotHeight,
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: hasStatus ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: statusWidget ?? const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            const SizedBox(height: _kSlotGap),
+            // 按钮行：badge(左) + 中间内容(居中) + 快进(右)
+            // 与 PlaybackControls 同 Row 结构
+            SizedBox(
+              height: _kButtonRowHeight,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 左槽位：badge（与 prev 按钮同宽同位）
+                  SizedBox(
+                    width: PlaybackControls.controlButtonSize,
+                    height: _kButtonRowHeight,
+                    child: OverflowBox(
+                      maxWidth: 160,
+                      minHeight: 0,
+                      alignment: Alignment.center,
+                      child: AnimatedOpacity(
+                        opacity: hasBadge ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: IgnorePointer(
+                          ignoring: !hasBadge,
+                          child: ratingBadge ?? const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                  // 中间槽位：主内容
+                  _buildCenterContent(context),
+                  const SizedBox(width: 48),
+                  // 右槽位：快进按钮（与 next 按钮同宽同位）
+                  SizedBox(
+                    width: PlaybackControls.controlButtonSize,
+                    height: _kButtonRowHeight,
+                    child: Center(
+                      child: AnimatedOpacity(
+                        opacity: hasFF ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: IgnorePointer(
+                          ignoring: !hasFF,
+                          child: hasFF
+                              ? fastForwardButton!
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 底部间距（与 footer 之间的间距）
+            const SizedBox(height: _kBottomGap),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 中间内容（优先级：hintText > countdown > recording/processing > empty）
+  Widget _buildCenterContent(BuildContext context) {
+    // 播放中：提示文本
+    if (hintText != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.headphones_rounded,
+            size: 20,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            hintText!,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 倒计时
     if (showCountdown && countdownWidget != null) {
-      if (fastForwardButton != null) {
-        return _buildCenterWithFastForward(countdownWidget!);
-      }
       return countdownWidget!;
     }
 
     // 停顿中：录音按钮 / 加载动画
     if (isInPause) {
-      return _buildRecordingArea(context);
+      return _buildRecordingButton(context);
     }
 
     return const SizedBox.shrink();
   }
 
-  /// 录音区域（录音按钮+状态标签 / 评估加载动画）
-  Widget _buildRecordingArea(BuildContext context) {
+  /// 录音按钮（processing 已在 build 中拦截）
+  Widget _buildRecordingButton(BuildContext context) {
     final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
-    final isProcessing =
-        turnState.promptId == currentPromptId &&
-        turnState.phase == SpeechRecordingPhase.processing;
-
-    if (isProcessing) {
-      return Center(
-        child: ProcessingIndicator(text: l10n.listenAndRepeatAnalyzing),
-      );
-    }
-
     final mode = isRecordingCurrent
         ? switch (turnState.phase) {
             SpeechRecordingPhase.awaitingSpeech ||
@@ -170,53 +241,42 @@ class RepeatPracticePanel extends StatelessWidget {
             _ => RecordingButtonMode.idle,
           }
         : RecordingButtonMode.idle;
-    final hasError = currentAttempt?.errorMessage != null;
-    final statusText = hasError
-        ? currentAttempt!.errorMessage
-        : switch (mode) {
-            RecordingButtonMode.idle => null,
-            RecordingButtonMode.recording =>
-              l10n.listenAndRepeatRecordingInProgress,
-            RecordingButtonMode.disabled => null,
-          };
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.m),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (statusText != null) ...[
-            StatusLabel(
-              text: statusText,
-              color: hasError ? Theme.of(context).colorScheme.error : null,
-              bold: hasError,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-          RecordingButton(mode: mode, onTap: onRecordTap),
-        ],
-      ),
-    );
+    return RecordingButton(mode: mode, onTap: onRecordTap);
   }
 
-  /// 倒计时居中 + 快进按钮与 PlaybackControls 的 next 按钮垂直对齐
-  Widget _buildCenterWithFastForward(Widget countdown) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        countdown,
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(width: _kPlaybackLeftSpacing),
-            SizedBox(
-              width: _kNavButtonSize,
-              height: _kNavButtonSize,
-              child: fastForwardButton,
-            ),
-          ],
-        ),
-      ],
-    );
+  /// 状态文字（录音提示 / 错误信息）
+  Widget? _buildStatusText(BuildContext context) {
+    // 非停顿状态无状态文字
+    if (!isInPause) return null;
+
+    final isProcessing =
+        turnState.promptId == currentPromptId &&
+        turnState.phase == SpeechRecordingPhase.processing;
+    if (isProcessing) return null;
+
+    final hasError = currentAttempt?.errorMessage != null;
+    if (hasError) {
+      return StatusLabel(
+        text: currentAttempt!.errorMessage,
+        color: Theme.of(context).colorScheme.error,
+        bold: true,
+      );
+    }
+
+    final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
+    final mode = isRecordingCurrent
+        ? switch (turnState.phase) {
+            SpeechRecordingPhase.awaitingSpeech ||
+            SpeechRecordingPhase.speaking => RecordingButtonMode.recording,
+            _ => RecordingButtonMode.idle,
+          }
+        : RecordingButtonMode.idle;
+
+    if (mode == RecordingButtonMode.recording) {
+      return StatusLabel(text: l10n.listenAndRepeatRecordingInProgress);
+    }
+
+    return null;
   }
 }
