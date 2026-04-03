@@ -6,6 +6,8 @@ import 'package:just_audio/just_audio.dart' as ja;
 
 import 'package:fluency/database/enums.dart';
 import 'package:fluency/models/audio_engine_state.dart';
+import 'package:fluency/models/intensive_listen_settings.dart'
+    show ShadowingControlMode;
 import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/sentence.dart';
@@ -185,6 +187,47 @@ class CountdownNavigationTestAudioEngine extends AudioEngine {
   }
 }
 
+class DelayedRetellTestAudioEngine extends AudioEngine {
+  int _sessionId = 0;
+
+  @override
+  AudioEngineState build() => const AudioEngineState();
+
+  @override
+  Stream<Duration> get absolutePositionStream => const Stream.empty();
+
+  @override
+  Stream<ja.PlayerState> get playerStateStream => const Stream.empty();
+
+  @override
+  bool get isPlaying => false;
+
+  @override
+  Duration get currentPosition => Duration.zero;
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playRangeOnce(
+    Duration start,
+    Duration end,
+    int sessionId,
+  ) async {
+    if (!isActiveSession(sessionId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+
+  @override
+  Future<void> stopPlayback() async {}
+}
+
 void main() {
   group('RetellPlayerState', () {
     test('stepFinished — 默认为 false，copyWith 可设置和保留', () {
@@ -257,6 +300,43 @@ void main() {
       expect(engine.playRangeOnceCallCount, 1);
       expect(engine.playCalledBeforeStopCompleted, false);
       expect(container.read(retellPlayerProvider).currentParagraphIndex, 1);
+    });
+
+    test('等待态挂起时，当前段播完后进入 waiting for user', () async {
+      final delayedContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => DelayedRetellTestAudioEngine()),
+          learningSessionProvider.overrideWith(TestLearningSession.new),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(delayedContainer.dispose);
+
+      final delayedNotifier = delayedContainer.read(retellPlayerProvider.notifier);
+      delayedNotifier.initialize([
+        [
+          Sentence(
+            index: 0,
+            text: 'Paragraph one',
+            startTime: Duration.zero,
+            endTime: const Duration(seconds: 3),
+          ),
+        ],
+      ], const {});
+
+      final pending = delayedNotifier.startPlaying();
+      delayedNotifier.enterWaitingForUser(afterCurrentParagraph: true);
+      delayedNotifier.updateSettings(
+        const RetellSettings(controlMode: ShadowingControlMode.manual),
+      );
+      await pending;
+
+      final state = delayedContainer.read(retellPlayerProvider);
+      expect(state.phase, RetellPhase.retelling);
+      expect(state.isWaitingForUser, true);
+      expect(state.isPlaying, false);
+      expect(state.isRetellCountdown, false);
     });
 
     test('startPlaying 会异步保存当前段首句索引', () async {

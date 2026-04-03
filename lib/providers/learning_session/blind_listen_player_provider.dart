@@ -53,6 +53,9 @@ class BlindListenPlayerState {
   /// 当前遍数（1-based）
   final int currentRepeatCount;
 
+  /// 当前段是否已完整播放结束过一次
+  final bool hasCompletedCurrentParagraphPlayback;
+
   /// 是否正在播放
   final bool isPlaying;
 
@@ -71,6 +74,9 @@ class BlindListenPlayerState {
   /// 文本显示模式
   final BlindListenDisplayMode displayMode;
 
+  /// 是否正在等待用户继续操作
+  final bool isWaitingForUser;
+
   /// 盲听设置
   final BlindListenSettings settings;
 
@@ -82,12 +88,14 @@ class BlindListenPlayerState {
     this.totalParagraphs = 0,
     this.playingSentenceIndex = -1,
     this.currentRepeatCount = 1,
+    this.hasCompletedCurrentParagraphPlayback = false,
     this.isPlaying = false,
     this.isPauseCountdown = false,
     this.pauseRemaining = Duration.zero,
     this.pauseDuration = Duration.zero,
     this.isCountdownPaused = false,
     this.displayMode = BlindListenDisplayMode.hideAll,
+    this.isWaitingForUser = false,
     this.settings = const BlindListenSettings(),
     this.stepFinished = false,
   });
@@ -97,12 +105,14 @@ class BlindListenPlayerState {
     int? totalParagraphs,
     int? playingSentenceIndex,
     int? currentRepeatCount,
+    bool? hasCompletedCurrentParagraphPlayback,
     bool? isPlaying,
     bool? isPauseCountdown,
     Duration? pauseRemaining,
     Duration? pauseDuration,
     bool? isCountdownPaused,
     BlindListenDisplayMode? displayMode,
+    bool? isWaitingForUser,
     BlindListenSettings? settings,
     bool? stepFinished,
   }) {
@@ -112,12 +122,16 @@ class BlindListenPlayerState {
       totalParagraphs: totalParagraphs ?? this.totalParagraphs,
       playingSentenceIndex: playingSentenceIndex ?? this.playingSentenceIndex,
       currentRepeatCount: currentRepeatCount ?? this.currentRepeatCount,
+      hasCompletedCurrentParagraphPlayback:
+          hasCompletedCurrentParagraphPlayback ??
+          this.hasCompletedCurrentParagraphPlayback,
       isPlaying: isPlaying ?? this.isPlaying,
       isPauseCountdown: isPauseCountdown ?? this.isPauseCountdown,
       pauseRemaining: pauseRemaining ?? this.pauseRemaining,
       pauseDuration: pauseDuration ?? this.pauseDuration,
       isCountdownPaused: isCountdownPaused ?? this.isCountdownPaused,
       displayMode: displayMode ?? this.displayMode,
+      isWaitingForUser: isWaitingForUser ?? this.isWaitingForUser,
       settings: settings ?? this.settings,
       stepFinished: stepFinished ?? this.stepFinished,
     );
@@ -144,6 +158,9 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
   /// 倒计时运行版本号
   int _countdownRunId = 0;
+
+  /// 当前段落播完后进入等待态
+  bool _waitAfterCurrentParagraph = false;
 
   @override
   BlindListenPlayerState build() {
@@ -261,6 +278,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex + 1,
       currentRepeatCount: 1,
+      hasCompletedCurrentParagraphPlayback: false,
       playingSentenceIndex: -1,
       isPauseCountdown: false,
       isCountdownPaused: false,
@@ -278,6 +296,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     state = state.copyWith(
       currentParagraphIndex: state.currentParagraphIndex - 1,
       currentRepeatCount: 1,
+      hasCompletedCurrentParagraphPlayback: false,
       playingSentenceIndex: -1,
       isPauseCountdown: false,
       isCountdownPaused: false,
@@ -304,25 +323,65 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     state = state.copyWith(displayMode: mode);
   }
 
+  /// 进入等待用户状态。
+  ///
+  /// 如果当前段落正在播放且 [afterCurrentParagraph] 为 true，
+  /// 则允许当前段自然播完后再停在等待态。
+  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
+    if (state.isWaitingForUser || state.stepFinished) return;
+
+    if (state.isPlaying && afterCurrentParagraph) {
+      _waitAfterCurrentParagraph = true;
+      AppLogger.log(
+        'BlindListenPlayer',
+        '-> WaitingForUser (after current paragraph)',
+      );
+      return;
+    }
+
+    _waitAfterCurrentParagraph = false;
+    final engine = ref.read(audioEngineProvider.notifier);
+    _sessionId = engine.newSession();
+    _positionSub?.cancel();
+    _invalidateCountdown();
+    unawaited(engine.stopPlayback());
+    state = state.copyWith(
+      isPlaying: false,
+      isPauseCountdown: false,
+      isCountdownPaused: false,
+      playingSentenceIndex: -1,
+      isWaitingForUser: true,
+    );
+    AppLogger.log('BlindListenPlayer', '-> WaitingForUser');
+  }
+
   /// 更新设置
   ///
   /// 切换到手动模式时，停在当前段落，取消一切异步操作。
   void updateSettings(BlindListenSettings newSettings) {
     final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
+    final shouldKeepWaiting =
+        state.isWaitingForUser || _waitAfterCurrentParagraph;
 
     state = state.copyWith(settings: newSettings);
 
-    // 自动↔手动切换时，停在当前段落，取消一切异步操作
+    if (shouldKeepWaiting) {
+      return;
+    }
+
+    // 自动↔手动切换时，停在当前段落，取消一切异步操作并进入等待态。
     if (modeChanged) {
       final engine = ref.read(audioEngineProvider.notifier);
       _sessionId = engine.newSession();
       _positionSub?.cancel();
       _invalidateCountdown();
-      engine.stopPlayback();
+      unawaited(engine.stopPlayback());
       state = state.copyWith(
         isPlaying: false,
         isPauseCountdown: false,
         isCountdownPaused: false,
+        playingSentenceIndex: -1,
+        isWaitingForUser: true,
       );
     }
   }
@@ -382,9 +441,11 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     final sid = _sessionId;
 
     state = state.copyWith(
+      hasCompletedCurrentParagraphPlayback: false,
       isPlaying: true,
       playingSentenceIndex: 0,
       isPauseCountdown: false,
+      isWaitingForUser: false,
       stepFinished: false,
     );
 
@@ -410,13 +471,28 @@ class BlindListenPlayer extends _$BlindListenPlayer {
 
     _positionSub?.cancel();
 
+    if (_waitAfterCurrentParagraph) {
+      _waitAfterCurrentParagraph = false;
+      state = state.copyWith(
+        hasCompletedCurrentParagraphPlayback: true,
+        isPlaying: false,
+        isPauseCountdown: false,
+        isCountdownPaused: false,
+        playingSentenceIndex: -1,
+        isWaitingForUser: true,
+      );
+      return;
+    }
+
     // 手动模式：播放完直接停止，等待用户操作
     if (state.settings.isManualMode) {
       final isLastParagraph =
           state.currentParagraphIndex >= state.totalParagraphs - 1;
       state = state.copyWith(
+        hasCompletedCurrentParagraphPlayback: true,
         isPlaying: false,
         playingSentenceIndex: -1,
+        isWaitingForUser: false,
         stepFinished: isLastParagraph,
       );
       return;
@@ -473,6 +549,8 @@ class BlindListenPlayer extends _$BlindListenPlayer {
       pauseRemaining: duration,
       isCountdownPaused: false,
       playingSentenceIndex: -1,
+      hasCompletedCurrentParagraphPlayback: true,
+      isWaitingForUser: false,
     );
 
     _countdown
@@ -501,6 +579,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
       state = state.copyWith(
         isPauseCountdown: false,
         isPlaying: false,
+        isWaitingForUser: false,
         stepFinished: true,
       );
       ref.read(analyticsServiceProvider).track(Events.blindListenComplete, {
@@ -517,6 +596,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateCountdown();
+    _waitAfterCurrentParagraph = false;
     await engine.stopPlayback();
   }
 
@@ -530,6 +610,7 @@ class BlindListenPlayer extends _$BlindListenPlayer {
   void _cleanup() {
     _positionSub?.cancel();
     _invalidateCountdown();
+    _waitAfterCurrentParagraph = false;
     _positionSub = null;
   }
 }

@@ -37,6 +37,7 @@ import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../models/speech_practice_models.dart';
 import '../providers/repeat_flow/repeat_flow_phase.dart';
+import '../providers/repeat_flow/repeat_flow_state.dart';
 import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/speech_rating_badge.dart';
 import '../widgets/common/repeat_practice_panel.dart';
@@ -628,11 +629,10 @@ class _ReviewDifficultPracticeScreenState
           ? SpeechRatingBadge(
               l10n: l10n,
               attempt: currentAttempt,
-              isPlaying: flowState.phase is ReviewingRecording,
-              onTap: currentAttempt.hasRecording
+              onBeforePlayback: currentAttempt.hasRecording
                   ? () {
                       if (engine == null) return;
-                      unawaited(engine.togglePlayback());
+                      engine.prepareForPlayback();
                     }
                   : null,
             )
@@ -697,13 +697,26 @@ class _ReviewDifficultPracticeScreenState
   IconData _buildFooterCenterIcon(ReviewDifficultPracticeState playerState) {
     final flowState = playerState.repeatFlowState;
     if (playerState.isAnnotationMode && flowState != null) {
-      return flowState.phase is PlayingPrompt
+      return _isRepeatPromptPlaybackActive(flowState)
           ? Icons.pause_rounded
           : Icons.play_arrow_rounded;
     }
-    return playerState.isPlaying
+    return _isBlindSentencePlaybackActive(playerState)
         ? Icons.pause_rounded
         : Icons.play_arrow_rounded;
+  }
+
+  bool _isRepeatPromptPlaybackActive(RepeatFlowState flowState) {
+    return flowState.phase is PlayingPrompt &&
+        !flowState.isWaitingForUser &&
+        !flowState.isCountingDown;
+  }
+
+  bool _isBlindSentencePlaybackActive(ReviewDifficultPracticeState state) {
+    return state.isPlaying &&
+        !state.isPauseBetweenPlays &&
+        !state.isPauseBetweenSentences &&
+        !state.isCountdownPaused;
   }
 
   String _buildPlayCountText(

@@ -1,4 +1,4 @@
-/// 盲听播放器手动模式测试
+// 盲听播放器手动模式测试
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +41,18 @@ class _TestAudioEngine extends TestAudioEngine {
 
   @override
   Stream<Duration> get absolutePositionStream => const Stream.empty();
+}
+
+class _DelayedAudioEngine extends _TestAudioEngine {
+  @override
+  Future<void> playRangeOnce(
+    Duration start,
+    Duration end,
+    int sessionId,
+  ) async {
+    if (!isActiveSession(sessionId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
 
 void main() {
@@ -144,6 +156,41 @@ void main() {
       final state = container.read(blindListenPlayerProvider);
       // 自动模式下应进入倒计时
       expect(state.isPauseCountdown, true);
+    });
+
+    test('等待态挂起时，当前段播完后进入 waiting for user', () async {
+      final delayedContainer = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _DelayedAudioEngine()),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(delayedContainer.dispose);
+
+      final delayedNotifier =
+          delayedContainer.read(blindListenPlayerProvider.notifier);
+      delayedNotifier.initializeParagraphs(
+        paragraphs,
+        const BlindListenSettings(
+          controlMode: ShadowingControlMode.auto,
+        ),
+      );
+
+      final pending = delayedNotifier.startPlaying();
+      delayedNotifier.enterWaitingForUser(afterCurrentParagraph: true);
+      delayedNotifier.updateSettings(
+        const BlindListenSettings(
+          controlMode: ShadowingControlMode.manual,
+        ),
+      );
+      await pending;
+
+      final state = delayedContainer.read(blindListenPlayerProvider);
+      expect(state.isWaitingForUser, true);
+      expect(state.isPlaying, false);
+      expect(state.isPauseCountdown, false);
     });
   });
 }

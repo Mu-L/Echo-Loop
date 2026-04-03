@@ -1595,12 +1595,68 @@ class TestSpeechRecordingController extends SpeechRecordingController {
 
 /// 测试用 RetellRecordingController — 不依赖平台通道
 class TestRetellRecordingController extends RetellRecordingController {
+  TestRetellRecordingController([
+    this._initialState = const RetellRecordingState(),
+  ]);
+
+  final RetellRecordingState _initialState;
+
   @override
-  RetellRecordingState build() => const RetellRecordingState();
+  RetellRecordingState build() => _initialState;
 
   @override
   void setRecorder(StudyEventRecorder? recorder) {
     // 测试环境中无实际录音服务，忽略 recorder 设置。
+  }
+
+  @override
+  Future<void> startRecording({
+    required String promptId,
+    required String referenceText,
+  }) async {
+    state = state.copyWith(
+      phase: RetellRecordingPhase.recording,
+      promptId: promptId,
+      awaitingSpeechTimedOut: false,
+    );
+  }
+
+  @override
+  Future<void> stopAndEvaluate({required String referenceText}) async {
+    state = state.copyWith(phase: RetellRecordingPhase.processing);
+    state = state.copyWith(
+      phase: RetellRecordingPhase.idle,
+      currentAttempt: SpeechPracticeAttempt(
+        promptId: state.promptId ?? '',
+        status: SpeechPracticeAttemptStatus.passed,
+        score: 0.8,
+      ),
+      clearPromptId: true,
+    );
+  }
+
+  @override
+  Future<void> cancelActiveRecording() async {
+    state = state.copyWith(
+      phase: RetellRecordingPhase.idle,
+      clearPromptId: true,
+    );
+  }
+
+  @override
+  Future<void> clearRecording() async {
+    state = state.copyWith(
+      clearCurrentAttempt: true,
+      clearLiveTranscript: true,
+      clearPromptId: true,
+      phase: RetellRecordingPhase.idle,
+      awaitingSpeechTimedOut: false,
+    );
+  }
+
+  @override
+  Future<void> fullReset() async {
+    state = const RetellRecordingState();
   }
 }
 

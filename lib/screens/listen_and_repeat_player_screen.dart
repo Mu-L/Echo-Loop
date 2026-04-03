@@ -507,14 +507,13 @@ class _ListenAndRepeatPlayerScreenState
                       ? SpeechRatingBadge(
                           l10n: l10n,
                           attempt: currentAttempt,
-                          isPlaying: ctrlState.phase is ReviewingRecording,
-                          onTap: currentAttempt.hasRecording
+                          onBeforePlayback: currentAttempt.hasRecording
                               ? () => ref
                                     .read(
                                       listenAndRepeatControllerProvider
                                           .notifier,
                                     )
-                                    .togglePlayback()
+                                    .prepareForPlayback()
                               : null,
                         )
                       : null,

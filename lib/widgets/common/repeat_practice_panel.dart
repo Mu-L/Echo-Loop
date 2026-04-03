@@ -163,8 +163,6 @@ class RepeatPracticePanel extends StatelessWidget {
       );
     }
 
-    final hasError = currentAttempt?.errorMessage != null;
-
     final mode = isRecordingCurrent
         ? switch (turnState.phase) {
             SpeechRecordingPhase.awaitingSpeech ||
@@ -172,25 +170,29 @@ class RepeatPracticePanel extends StatelessWidget {
             _ => RecordingButtonMode.idle,
           }
         : RecordingButtonMode.idle;
+    final hasError = currentAttempt?.errorMessage != null;
+    final statusText = hasError
+        ? currentAttempt!.errorMessage
+        : switch (mode) {
+            RecordingButtonMode.idle => null,
+            RecordingButtonMode.recording =>
+              l10n.listenAndRepeatRecordingInProgress,
+            RecordingButtonMode.disabled => null,
+          };
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.m),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          StatusLabel(
-            text: hasError
-                ? currentAttempt!.errorMessage
-                : switch (mode) {
-                    RecordingButtonMode.idle => l10n.listenAndRepeatTapToRecord,
-                    RecordingButtonMode.recording =>
-                      l10n.listenAndRepeatRecordingInProgress,
-                    RecordingButtonMode.disabled => null,
-                  },
-            color: hasError ? Theme.of(context).colorScheme.error : null,
-            bold: hasError,
-          ),
-          const SizedBox(height: AppSpacing.xs),
+          if (statusText != null) ...[
+            StatusLabel(
+              text: statusText,
+              color: hasError ? Theme.of(context).colorScheme.error : null,
+              bold: hasError,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           RecordingButton(mode: mode, onTap: onRecordTap),
         ],
       ),

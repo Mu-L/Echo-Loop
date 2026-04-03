@@ -478,7 +478,9 @@
       "duration": { "type": "String" }
     }
   },
+  "retellPreListenHint": "先听再复述",
   "retellListeningPhase": "认真听...",
+  "retellPromptToRetell": "用自己的话复述",
   "retellRetellingCountdown": "请复述 {seconds}s",
   "@retellRetellingCountdown": {
     "placeholders": {
@@ -773,6 +775,7 @@
   "blindListenSegmentProgress": "段落 {current}/{total}",
   "blindListenSegmentDuration": "段落时长 {duration}s",
   "blindListenListeningHint": "认真听...",
+  "blindListenPreListenHint": "先听再回忆",
   "blindListenRepeatInfo": "第 {current}/{total} 遍",
   "blindListenSettingsTitle": "盲听设置",
   "blindListenPauseBetween": "段间停顿",

@@ -10,6 +10,86 @@
 
 ---
 
+## 已完成：录音按钮 idle 态隐藏提示文案
+
+- [x] 跟读共享中间区 `RepeatPracticePanel` 在 `idle` 态不再显示 `Tap to record`，同时移除对应占位间距
+- [x] 段落复述页录音区在 `idle` 态不再渲染上方状态文案，也不再保留固定高度占位
+- [x] 更新跟读/复述 screen 回归测试，覆盖 `idle` 态无状态文案
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：评估结果 badge 回放态图标修复
+
+- [x] `RepeatFlowState` 新增显式 `isReviewPlaybackActive`，录音回放不再占用独立流程 phase
+- [x] `RepeatFlowEngine` 在开始/停止录音回放时仅切换真实回放状态，并保持 `WaitingForUser` 语义；切句、重播、重置时统一清理
+- [x] 跟读、难句补练、收藏复习页面的 `SpeechRatingBadge` 改为读取真实回放状态
+- [x] 补充跟读主页面回归测试，覆盖“回放进行中时 badge 显示停止图标”
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：全文盲听/段落复述调试日志补齐
+
+- [x] 全文盲听页面新增播放器状态变化日志，覆盖段落索引、句子高亮、播放/倒计时/等待态切换
+- [x] 段落复述页面新增播放器状态变化日志，覆盖 listening/retelling、倒计时、等待态和显示模式变化
+- [x] 段落复述页面新增录音状态变化日志，覆盖录音 phase、attempt 状态、score 和 live transcript 变化
+- [x] 段落复述页面新增录音回放日志，覆盖 badge 回放开始/停止和当前是否在播放
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：播放按钮 idle 态图标兜底修复
+
+- [x] 全文盲听、段落复述、逐句精听、难句补练、收藏复习统一为“只有主音频确实在播放中才显示暂停图标”
+- [x] `WaitingForUser`、倒计时、暂停态即使 `isPlaying` 等字段暂未收口，也统一显示播放三角图标
+- [x] 补充全文盲听和段落复述 screen 回归测试，覆盖不一致状态下仍显示播放图标
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：评估结果 badge 改为自管理录音回放
+
+- [x] `SpeechRatingBadge` 改为自管理录音回放和图标切换，不再依赖页面层传入 `isPlaying`
+- [x] 页面层改为仅提供 `onBeforePlayback` 回调，在播放前执行取消倒计时、切换等待态、暂停主音频等清理动作
+- [x] 复述、跟读、难句补练、收藏复习统一切到新的 badge 接口
+- [x] 新增 `speech_rating_badge_test.dart`，覆盖 badge 自己切换喇叭/停止图标
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：全文盲听/段落复述设置弹窗等待态修复
+
+- [x] 全文盲听 `BlindListenPlayerState` 新增显式 `isWaitingForUser`，不再靠停止播放的布尔组合隐式表达等待态
+- [x] 段落复述 `RetellPlayerState` 新增显式 `isWaitingForUser`，区分“可录音/可继续”与“设置接管流程”的等待态
+- [x] 两页设置入口统一在打开弹窗前调用 `enterWaitingForUser()`，播放中允许当前段自然播完，再落入等待态
+- [x] 设置修改发生在挂起等待态时，不再打断当前段，也不再重播或自动进入下一步
+- [x] 段落复述自动录音与评估后倒计时改为尊重 `isWaitingForUser`，避免 provider 已等待而 screen 又重新推进流程
+- [x] 补充 blind listen / retell provider 回归测试，覆盖“播完后等待”和“设置变更保持等待”两条状态流
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：全文盲听 + 段落复述共享骨架重构
+
+- [x] 新增 `ParagraphPracticeScaffold`，统一顶部进度区、句子列表、中部插槽和底部播放控制
+- [x] 新增 `ParagraphSentenceListCard`，让全文盲听与段落复述共用段落句子卡片
+- [x] 新增 `ParagraphVisibilityControls`，将复述可见性菜单上移到句子列表下方、练习控制区上方
+- [x] `BlindListenPlayerScreen` 改为共享 scaffold 结构，`build()` 内完成监听下沉到 `initState` 的 `listenManual`
+- [x] `RetellPlayerScreen` 改为共享 scaffold 结构，自动录音与完成监听从 `build()` 下沉到显式 listener
+- [x] `RetellSentenceTile` 去掉对 `RetellPhase` 的直接依赖，收敛为纯展示组件
+- [x] 补充全文盲听与段落复述 screen/widget 回归测试，覆盖共享 footer、可见性菜单位置与录音控制区布局
+
+  **完成时间**: 2026-04-03
+
+---
+
 ## 已完成：逐句精听页面按难句补练模式重构
 
 - [x] 逐句精听盲听流程接入 `BlindPracticeFlowEngine`，不再由 Screen/Provider 手工拼装播放与倒计时布尔状态

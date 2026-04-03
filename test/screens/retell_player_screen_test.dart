@@ -8,6 +8,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:fluency/l10n/app_localizations.dart';
+import 'package:fluency/models/intensive_listen_settings.dart'
+    show ShadowingControlMode;
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/screens/retell_player_screen.dart';
@@ -20,9 +22,13 @@ import 'package:fluency/database/daos/bookmark_dao.dart';
 import 'package:fluency/database/daos/sentence_ai_cache_dao.dart';
 import 'package:fluency/database/app_database.dart' show Bookmark;
 import 'package:fluency/database/providers.dart';
+import 'package:fluency/providers/retell_recording_controller_provider.dart';
 import 'package:fluency/providers/sentence_ai_provider.dart';
 import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
+import 'package:fluency/widgets/common/playback_controls.dart';
+import 'package:fluency/widgets/common/recording_button.dart';
+import 'package:fluency/widgets/retell/retell_sentence_tile.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -45,6 +51,27 @@ class _TestBookmarkDao implements BookmarkDao {
   }
 }
 
+class _StaticRetellPlayer extends TestRetellPlayer {
+  _StaticRetellPlayer(super.initialState, super.paragraphs, super.keywords);
+
+  @override
+  Future<void> startPlaying() async {}
+}
+
+class _TrackingRetellPlayer extends _StaticRetellPlayer {
+  _TrackingRetellPlayer(super.initialState, super.paragraphs, super.keywords);
+
+  int waitingCalls = 0;
+  bool? lastAfterCurrentParagraph;
+
+  @override
+  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
+    waitingCalls += 1;
+    lastAfterCurrentParagraph = afterCurrentParagraph;
+    super.enterWaitingForUser(afterCurrentParagraph: afterCurrentParagraph);
+  }
+}
+
 void main() {
   /// 创建测试段落
   List<List<Sentence>> createTestParagraphs() {
@@ -54,8 +81,15 @@ void main() {
   Widget createTestWidget({
     Locale locale = const Locale('en'),
     RetellPlayerState? playerState,
+    RetellRecordingState? recordingState,
     List<List<Sentence>>? paragraphs,
     Map<int, Set<int>>? keywords,
+    TestRetellPlayer Function(
+      RetellPlayerState initialState,
+      List<List<Sentence>> paragraphs,
+      Map<int, Set<int>> keywords,
+    )?
+    playerFactory,
   }) {
     final testParagraphs = paragraphs ?? createTestParagraphs();
     final testKeywords = keywords ?? {};
@@ -102,7 +136,17 @@ void main() {
         ),
         learningSessionProvider.overrideWith(() => TestLearningSession()),
         retellPlayerProvider.overrideWith(
-          () => TestRetellPlayer(initialState, testParagraphs, testKeywords),
+          () => (playerFactory ?? TestRetellPlayer.new)(
+            initialState,
+            testParagraphs,
+            testKeywords,
+          ),
+        ),
+        ...studyTimeOverrides(),
+        retellRecordingControllerProvider.overrideWith(
+          () => TestRetellRecordingController(
+            recordingState ?? const RetellRecordingState(),
+          ),
         ),
         bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
         sentenceAiNotifierProvider.overrideWithValue(
@@ -132,20 +176,18 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pumpAndSettle();
 
-      // SegmentedButton 应该存在
       final segmentedButton = find.byType(SegmentedButton<RetellDisplayMode>);
       expect(segmentedButton, findsOneWidget);
+      expect(find.byType(PlaybackControls), findsOneWidget);
 
-      // 句子列表在 Expanded > Card 中，SegmentedButton 应在其后
-      // 验证 SegmentedButton 在 Expanded widget 之后（通过 Y 坐标）
-      final expandedFinder = find.byType(Expanded).first;
-      final expandedBox = tester.getRect(expandedFinder);
+      final sentenceCard = find.byType(Card).first;
+      final sentenceCardBox = tester.getRect(sentenceCard);
       final segmentedBox = tester.getRect(segmentedButton);
 
       expect(
         segmentedBox.top,
-        greaterThanOrEqualTo(expandedBox.bottom - 1),
-        reason: 'SegmentedButton 应位于句子列表（Expanded）下方',
+        greaterThanOrEqualTo(sentenceCardBox.bottom - 1),
+        reason: 'SegmentedButton 应位于句子列表卡片下方',
       );
     });
 
@@ -201,6 +243,167 @@ void main() {
 
       expect(showAllWidth, equals(keywordsOnlyWidth));
       expect(hideAllWidth, equals(keywordsOnlyWidth));
+    });
+
+    testWidgets('录音和评估控制区位于可见性菜单下方', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: RetellPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 1,
+            phase: RetellPhase.retelling,
+            isPlaying: false,
+            settings: const RetellSettings(
+              keywordMethod: KeywordMethod.random,
+            ),
+          ),
+          playerFactory: _StaticRetellPlayer.new,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final segmentedButton = find.byType(SegmentedButton<RetellDisplayMode>);
+      final recordingButton = find.byType(RecordingButton);
+
+      expect(segmentedButton, findsOneWidget);
+      expect(recordingButton, findsOneWidget);
+      expect(
+        tester.getRect(recordingButton).top,
+        greaterThan(tester.getRect(segmentedButton).bottom),
+      );
+    });
+
+    testWidgets('播放前显示先听再复述提示', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: RetellPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 1,
+            phase: RetellPhase.listening,
+            isPlaying: false,
+            settings: const RetellSettings(
+              keywordMethod: KeywordMethod.random,
+            ),
+          ),
+          playerFactory: _StaticRetellPlayer.new,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Listen first, then retell'), findsOneWidget);
+      expect(find.text('Listening...'), findsNothing);
+    });
+
+    testWidgets('WaitingForUser 态即使 isPlaying 为 true 也显示播放图标', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: RetellPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 1,
+            phase: RetellPhase.listening,
+            isPlaying: true,
+            isWaitingForUser: true,
+            settings: const RetellSettings(
+              keywordMethod: KeywordMethod.random,
+            ),
+          ),
+          playerFactory: _StaticRetellPlayer.new,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.pause_rounded), findsNothing);
+    });
+
+    testWidgets('播放完成后空闲态不显示复述提示', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: RetellPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 1,
+            phase: RetellPhase.retelling,
+            isPlaying: false,
+            settings: const RetellSettings(
+              controlMode: ShadowingControlMode.manual,
+              keywordMethod: KeywordMethod.random,
+            ),
+          ),
+          playerFactory: _StaticRetellPlayer.new,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Retell it in your own words'), findsNothing);
+      expect(find.text('Listening...'), findsNothing);
+    });
+
+    testWidgets('录音中仍显示复述提示', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: RetellPlayerState(
+            currentParagraphIndex: 0,
+            totalParagraphs: 1,
+            phase: RetellPhase.retelling,
+            isPlaying: false,
+            settings: const RetellSettings(
+              controlMode: ShadowingControlMode.manual,
+              keywordMethod: KeywordMethod.random,
+            ),
+          ),
+          recordingState: const RetellRecordingState(
+            phase: RetellRecordingPhase.recording,
+          ),
+          playerFactory: _StaticRetellPlayer.new,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Retell it in your own words'), findsOneWidget);
+      expect(find.text('Recording...'), findsNothing);
+    });
+
+    testWidgets('点词查词前会进入 waiting for user', (tester) async {
+      final testParagraphs = createTestParagraphs();
+      final initialState = RetellPlayerState(
+        currentParagraphIndex: 0,
+        totalParagraphs: testParagraphs.length,
+        phase: RetellPhase.listening,
+        isPlaying: true,
+        playingSentenceIndex: 0,
+        displayMode: RetellDisplayMode.showAll,
+        settings: const RetellSettings(
+          keywordMethod: KeywordMethod.random,
+        ),
+      );
+      final trackingPlayer = _TrackingRetellPlayer(
+        initialState,
+        testParagraphs,
+        const {},
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: initialState,
+          paragraphs: testParagraphs,
+          playerFactory: (_, __, ___) => trackingPlayer,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final firstWord = find.descendant(
+        of: find.byType(RetellSentenceTile).first,
+        matching: find.byType(GestureDetector),
+      ).first;
+      await tester.tap(firstWord);
+      await tester.pump();
+
+      expect(trackingPlayer.waitingCalls, 1);
+      expect(trackingPlayer.lastAfterCurrentParagraph, true);
     });
   });
 }

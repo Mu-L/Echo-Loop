@@ -241,6 +241,7 @@ void main() {
     int totalSentences = 5,
     int repeatIndex = 0,
     int totalRepeats = 3,
+    bool isReviewPlaybackActive = false,
   }) {
     return ListenAndRepeatSessionState(
       phase: phase,
@@ -248,6 +249,7 @@ void main() {
       totalSentences: totalSentences,
       repeatIndex: repeatIndex,
       totalRepeats: totalRepeats,
+      isReviewPlaybackActive: isReviewPlaybackActive,
       flowToken: 1,
       currentSentenceBookmarked: true,
     );
@@ -318,7 +320,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.byType(RecordingButton), findsOneWidget);
-      expect(find.text('Tap to record'), findsOneWidget);
+      expect(find.text('Tap to record'), findsNothing);
       expect(find.text('Recording...'), findsNothing);
     });
 
@@ -346,7 +348,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('Tap to record'), findsOneWidget);
+      expect(find.text('Tap to record'), findsNothing);
       expect(find.text('Recording...'), findsNothing);
     });
 
@@ -425,7 +427,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('Tap to record'), findsOneWidget);
+      expect(find.text('Tap to record'), findsNothing);
 
       final container = ProviderScope.containerOf(
         tester.element(find.byType(ListenAndRepeatPlayerScreen)),
@@ -438,7 +440,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(controller.applySettingsChangeCallCount, 1);
-      expect(find.text('Tap to record'), findsOneWidget);
+      expect(find.text('Tap to record'), findsNothing);
       expect(find.text('Listen then repeat'), findsNothing);
       expect(find.text('Auto · Play 1/5'), findsOneWidget);
     });

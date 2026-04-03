@@ -85,6 +85,9 @@ class RetellPlayerState {
   /// 用户是否在当前段落中手动更改过显示模式
   final bool userOverrodeDisplayMode;
 
+  /// 是否正在等待用户继续操作
+  final bool isWaitingForUser;
+
   /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
 
@@ -103,6 +106,7 @@ class RetellPlayerState {
     this.isCountdownPaused = false,
     this.isCountdownFastForward = false,
     this.userOverrodeDisplayMode = false,
+    this.isWaitingForUser = false,
     this.stepFinished = false,
   });
 
@@ -121,6 +125,7 @@ class RetellPlayerState {
     bool? isCountdownPaused,
     bool? isCountdownFastForward,
     bool? userOverrodeDisplayMode,
+    bool? isWaitingForUser,
     bool? stepFinished,
   }) {
     return RetellPlayerState(
@@ -141,6 +146,7 @@ class RetellPlayerState {
           isCountdownFastForward ?? this.isCountdownFastForward,
       userOverrodeDisplayMode:
           userOverrodeDisplayMode ?? this.userOverrodeDisplayMode,
+      isWaitingForUser: isWaitingForUser ?? this.isWaitingForUser,
       stepFinished: stepFinished ?? this.stepFinished,
     );
   }
@@ -174,6 +180,9 @@ class RetellPlayer extends _$RetellPlayer {
   ///
   /// 每次启动或取消复述倒计时都递增，用于屏蔽已取消倒计时的过期回调。
   int _retellCountdownRunId = 0;
+
+  /// 当前段落播完后进入等待态
+  bool _waitAfterCurrentParagraph = false;
 
   @override
   RetellPlayerState build() {
@@ -226,7 +235,11 @@ class RetellPlayer extends _$RetellPlayer {
       // 回到 retelling 阶段等待用户操作
       if (state.phase == RetellPhase.listening) {
         AppLogger.log('RetellPlayer', 'listening → retelling (等待用户操作)');
-        state = state.copyWith(phase: RetellPhase.retelling, isPlaying: false);
+        state = state.copyWith(
+          phase: RetellPhase.retelling,
+          isPlaying: false,
+          isWaitingForUser: true,
+        );
       }
     }
   }
@@ -491,8 +504,45 @@ class RetellPlayer extends _$RetellPlayer {
       isRetellCountdown: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
+      isWaitingForUser: false,
     );
     await _playCurrentParagraph();
+  }
+
+  /// 进入等待用户状态。
+  ///
+  /// 如果当前段落正在播放且 [afterCurrentParagraph] 为 true，
+  /// 则允许当前段自然播完后再停在等待态。
+  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
+    if (state.isWaitingForUser || state.stepFinished) return;
+
+    if (state.phase == RetellPhase.listening &&
+        state.isPlaying &&
+        afterCurrentParagraph) {
+      _waitAfterCurrentParagraph = true;
+      AppLogger.log(
+        'RetellPlayer',
+        '-> WaitingForUser (after current paragraph)',
+      );
+      return;
+    }
+
+    _waitAfterCurrentParagraph = false;
+    final engine = ref.read(audioEngineProvider.notifier);
+    _sessionId = engine.newSession();
+    _positionSub?.cancel();
+    _invalidateRetellCountdown();
+    unawaited(engine.stopPlayback());
+    state = state.copyWith(
+      phase: RetellPhase.retelling,
+      isPlaying: false,
+      isRetellCountdown: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      playingSentenceIndex: -1,
+      isWaitingForUser: true,
+    );
+    AppLogger.log('RetellPlayer', '-> WaitingForUser');
   }
 
   /// 设置显示模式（用户手动切换）
@@ -512,20 +562,31 @@ class RetellPlayer extends _$RetellPlayer {
     final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
     final ratioChanged =
         newSettings.keywordRatio != state.settings.keywordRatio;
+    final shouldKeepWaiting =
+        state.isWaitingForUser || _waitAfterCurrentParagraph;
 
     state = state.copyWith(settings: newSettings);
+
+    if (shouldKeepWaiting) {
+      if (ratioChanged) {
+        regenerateKeywords();
+      }
+      return;
+    }
 
     // 自动↔手动切换时，停在当前段落，取消一切异步操作
     if (modeChanged) {
       _invalidateRetellCountdown();
       final engine = ref.read(audioEngineProvider.notifier);
       _sessionId = engine.newSession();
-      engine.stopPlayback();
+      unawaited(engine.stopPlayback());
       state = state.copyWith(
         isPlaying: false,
         isRetellCountdown: false,
         isCountdownPaused: false,
         isCountdownFastForward: false,
+        playingSentenceIndex: -1,
+        isWaitingForUser: true,
       );
       if (ratioChanged) regenerateKeywords();
       return;
@@ -576,6 +637,7 @@ class RetellPlayer extends _$RetellPlayer {
       isPlaying: true,
       playingSentenceIndex: 0,
       isRetellCountdown: false,
+      isWaitingForUser: false,
       stepFinished: false,
       displayMode: state.userOverrodeDisplayMode
           ? null
@@ -605,6 +667,24 @@ class RetellPlayer extends _$RetellPlayer {
     );
 
     _positionSub?.cancel();
+
+    if (_waitAfterCurrentParagraph) {
+      _waitAfterCurrentParagraph = false;
+      state = state.copyWith(
+        phase: RetellPhase.retelling,
+        isPlaying: false,
+        playingSentenceIndex: -1,
+        isRetellCountdown: false,
+        isCountdownPaused: false,
+        isCountdownFastForward: false,
+        isWaitingForUser: true,
+        displayMode: state.userOverrodeDisplayMode
+            ? null
+            : RetellDisplayMode.keywordsOnly,
+      );
+      return;
+    }
+
     _enterRetellingPhase();
   }
 
@@ -653,6 +733,7 @@ class RetellPlayer extends _$RetellPlayer {
       phase: RetellPhase.retelling,
       isPlaying: false,
       playingSentenceIndex: -1,
+      isWaitingForUser: false,
       displayMode: state.userOverrodeDisplayMode
           ? null
           : RetellDisplayMode.keywordsOnly,
@@ -666,6 +747,7 @@ class RetellPlayer extends _$RetellPlayer {
   void startPostEvaluationPause({double? score}) {
     if (state.phase != RetellPhase.retelling) return;
     if (state.isRetellCountdown) return;
+    if (state.isWaitingForUser) return;
     if (state.settings.isManualMode) return;
 
     final pauseDuration = state.settings.calculatePauseDuration(
@@ -684,6 +766,7 @@ class RetellPlayer extends _$RetellPlayer {
       pauseRemaining: duration,
       isCountdownPaused: false,
       isCountdownFastForward: false,
+      isWaitingForUser: false,
     );
 
     _countdown
@@ -728,6 +811,7 @@ class RetellPlayer extends _$RetellPlayer {
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateRetellCountdown();
+    _waitAfterCurrentParagraph = false;
     await engine.stopPlayback();
   }
 
@@ -743,6 +827,7 @@ class RetellPlayer extends _$RetellPlayer {
   void _cleanup() {
     _positionSub?.cancel();
     _invalidateRetellCountdown();
+    _waitAfterCurrentParagraph = false;
     _positionSub = null;
   }
 }

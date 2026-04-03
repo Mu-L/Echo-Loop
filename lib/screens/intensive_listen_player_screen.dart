@@ -802,9 +802,15 @@ bool _showAnnotationCountdown(IntensiveListenState playerState) {
 }
 
 IconData _buildFooterCenterIcon(IntensiveListenState playerState) {
-  return playerState.isPlaying
+  return _isIntensiveMainPlaybackActive(playerState)
       ? Icons.pause_rounded
       : Icons.play_arrow_rounded;
+}
+
+bool _isIntensiveMainPlaybackActive(IntensiveListenState state) {
+  return state.isPlaying &&
+      !state.isPauseBetweenPlays &&
+      !state.isPauseBetweenSentences;
 }
 
 extension on _IntensiveListenPlayerScreenState {

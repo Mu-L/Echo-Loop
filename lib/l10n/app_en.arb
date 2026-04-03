@@ -635,7 +635,9 @@
       "duration": { "type": "String" }
     }
   },
+  "retellPreListenHint": "Listen first, then retell",
   "retellListeningPhase": "Listening...",
+  "retellPromptToRetell": "Retell it in your own words",
   "retellRetellingCountdown": "Retell {seconds}s",
   "@retellRetellingCountdown": {
     "placeholders": {
@@ -1035,6 +1037,7 @@
     }
   },
   "blindListenListeningHint": "Listen carefully...",
+  "blindListenPreListenHint": "Listen first, then recall",
   "blindListenRepeatInfo": "Round {current}/{total}",
   "@blindListenRepeatInfo": {
     "placeholders": {

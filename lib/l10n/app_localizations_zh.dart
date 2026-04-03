@@ -1125,7 +1125,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get retellPreListenHint => '先听再复述';
+
+  @override
   String get retellListeningPhase => '认真听...';
+
+  @override
+  String get retellPromptToRetell => '用自己的话复述';
 
   @override
   String retellRetellingCountdown(int seconds) {
@@ -1852,6 +1858,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get blindListenListeningHint => '认真听...';
+
+  @override
+  String get blindListenPreListenHint => '先听再回忆';
 
   @override
   String blindListenRepeatInfo(int current, int total) {

@@ -1,7 +1,7 @@
 /// 跟读流程阶段状态机
 ///
 /// 表达跟读流程的顶层阶段，每个阶段互斥。
-/// 流程：PlayingPrompt → Recording → (ReviewingRecording) → WaitingInterval → 下一遍/句
+/// 流程：PlayingPrompt → Recording → WaitingInterval / WaitingForUser → 下一遍/句
 ///
 /// **每个阶段携带该阶段特有的数据**，编译期保证不会在错误阶段访问错误数据。
 /// 用于跟读、难句补练（跟读模式）、收藏复习（跟读模式）。
@@ -28,14 +28,6 @@ class Recording extends RepeatFlowPhase {
   final String promptId;
 
   const Recording({required this.promptId});
-}
-
-/// 播放录音回放中
-class ReviewingRecording extends RepeatFlowPhase {
-  /// 录音文件路径
-  final String recordingPath;
-
-  const ReviewingRecording({required this.recordingPath});
 }
 
 /// 遍间等待（倒计时 T 秒，唯一可以有倒计时的阶段）

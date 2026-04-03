@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/sentence.dart';
-import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/widgets/retell/retell_sentence_tile.dart';
 
 import '../helpers/test_app.dart';
@@ -22,13 +21,11 @@ Widget _buildTile({
   required Sentence sentence,
   RetellDisplayMode displayMode = RetellDisplayMode.keywordsOnly,
   Set<int> keywordIndices = const {},
-  RetellPhase phase = RetellPhase.retelling,
   bool isPlayingSentence = false,
 }) {
   return createTestApp(
     RetellSentenceTile(
       sentence: sentence,
-      phase: phase,
       displayMode: displayMode,
       keywordIndices: keywordIndices,
       isPlayingSentence: isPlayingSentence,

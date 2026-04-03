@@ -214,6 +214,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 录音回放按钮点击
   Future<void> togglePlayback() async => _engine.togglePlayback();
 
+  /// 为播放录音回放做准备。
+  void prepareForPlayback() => _engine.prepareForPlayback();
+
   /// 手动开始录音
   void startManualRecording() => _engine.startManualRecording();
 

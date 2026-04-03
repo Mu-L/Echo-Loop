@@ -32,6 +32,11 @@ class RepeatFlowState {
   /// 录音评分
   final double? recordingScore;
 
+  /// 录音回放是否正在播放。
+  ///
+  /// 与 [phase] 分离，避免 UI 把“处于回放阶段”和“正在播放回放”混为一谈。
+  final bool isReviewPlaybackActive;
+
   /// 流程令牌（异步回调校验用）
   final int flowToken;
 
@@ -44,6 +49,7 @@ class RepeatFlowState {
     this.intervalDuration = Duration.zero,
     this.recordingPath,
     this.recordingScore,
+    this.isReviewPlaybackActive = false,
     this.flowToken = 0,
   });
 
@@ -56,6 +62,7 @@ class RepeatFlowState {
     Duration? intervalDuration,
     Object? recordingPath = _noChange,
     Object? recordingScore = _noChange,
+    bool? isReviewPlaybackActive,
     int? flowToken,
   }) {
     return RepeatFlowState(
@@ -71,6 +78,8 @@ class RepeatFlowState {
       recordingScore: identical(recordingScore, _noChange)
           ? this.recordingScore
           : recordingScore as double?,
+      isReviewPlaybackActive:
+          isReviewPlaybackActive ?? this.isReviewPlaybackActive,
       flowToken: flowToken ?? this.flowToken,
     );
   }

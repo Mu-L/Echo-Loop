@@ -11,7 +11,6 @@ library;
 import 'package:flutter/material.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
-import '../../providers/learning_session/retell_player_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/keyword_extraction.dart';
 
@@ -22,9 +21,6 @@ const _wordSpacing = 4.0;
 class RetellSentenceTile extends StatelessWidget {
   /// 句子数据
   final Sentence sentence;
-
-  /// 当前阶段
-  final RetellPhase phase;
 
   /// 文本显示模式
   final RetellDisplayMode displayMode;
@@ -41,7 +37,6 @@ class RetellSentenceTile extends StatelessWidget {
   const RetellSentenceTile({
     super.key,
     required this.sentence,
-    required this.phase,
     required this.displayMode,
     required this.keywordIndices,
     required this.isPlayingSentence,

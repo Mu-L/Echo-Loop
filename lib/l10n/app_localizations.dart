@@ -2114,11 +2114,23 @@ abstract class AppLocalizations {
   /// **'Duration {duration}'**
   String retellParagraphDuration(String duration);
 
+  /// No description provided for @retellPreListenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen first, then retell'**
+  String get retellPreListenHint;
+
   /// No description provided for @retellListeningPhase.
   ///
   /// In en, this message translates to:
   /// **'Listening...'**
   String get retellListeningPhase;
+
+  /// No description provided for @retellPromptToRetell.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell it in your own words'**
+  String get retellPromptToRetell;
 
   /// No description provided for @retellRetellingCountdown.
   ///
@@ -3415,6 +3427,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Listen carefully...'**
   String get blindListenListeningHint;
+
+  /// No description provided for @blindListenPreListenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen first, then recall'**
+  String get blindListenPreListenHint;
 
   /// No description provided for @blindListenRepeatInfo.
   ///

@@ -1158,7 +1158,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get retellPreListenHint => 'Listen first, then retell';
+
+  @override
   String get retellListeningPhase => 'Listening...';
+
+  @override
+  String get retellPromptToRetell => 'Retell it in your own words';
 
   @override
   String retellRetellingCountdown(int seconds) {
@@ -1906,6 +1912,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get blindListenListeningHint => 'Listen carefully...';
+
+  @override
+  String get blindListenPreListenHint => 'Listen first, then recall';
 
   @override
   String blindListenRepeatInfo(int current, int total) {

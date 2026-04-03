@@ -204,6 +204,7 @@ class RepeatFlowEngine {
         intervalDuration: sentence != null
             ? config.getIntervalDuration(sentence)
             : Duration.zero,
+        isReviewPlaybackActive: false,
         flowToken: 1,
       ),
     );
@@ -265,7 +266,7 @@ class RepeatFlowEngine {
       await stopRecording();
       return;
     }
-    if (phase is ReviewingRecording) {
+    if (_state.isReviewPlaybackActive) {
       await stopPlayback();
     }
     startManualRecording();
@@ -273,11 +274,28 @@ class RepeatFlowEngine {
 
   /// 录音回放按钮点击
   Future<void> togglePlayback() async {
-    if (_state.phase is ReviewingRecording) {
+    if (_state.isReviewPlaybackActive) {
       await stopPlayback();
     } else {
       await playRecording();
     }
+  }
+
+  /// 为播放录音回放做准备。
+  ///
+  /// Badge 组件会自行管理录音回放和图标切换；
+  /// 这里仅负责清理流程状态，例如取消倒计时并进入 WaitingForUser。
+  void prepareForPlayback() {
+    final phase = _state.phase;
+    if (phase is WaitingInterval) {
+      _countdown.cancel();
+    }
+    _updateState(
+      _state.copyWith(
+        phase: const WaitingForUser(WaitingReason.userInteraction),
+        isReviewPlaybackActive: false,
+      ),
+    );
   }
 
   /// 手动开始录音
@@ -331,7 +349,10 @@ class RepeatFlowEngine {
     }
 
     _updateState(
-      _state.copyWith(phase: ReviewingRecording(recordingPath: path)),
+      _state.copyWith(
+        phase: const WaitingForUser(WaitingReason.userInteraction),
+        isReviewPlaybackActive: true,
+      ),
     );
     final token = _state.flowToken;
     AppLogger.log(logTag, '播放录音回放: $path');
@@ -339,13 +360,13 @@ class RepeatFlowEngine {
     await _playbackService.play(path);
 
     if (token != _state.flowToken) return;
-    if (_state.phase is! ReviewingRecording) return;
+    if (!_state.isReviewPlaybackActive) return;
     _onReviewPlaybackFinished();
   }
 
   /// 停止录音回放
   Future<void> stopPlayback() async {
-    if (_state.phase is! ReviewingRecording) return;
+    if (!_state.isReviewPlaybackActive) return;
     await _playbackService.stop();
     _onReviewPlaybackFinished();
   }
@@ -385,6 +406,7 @@ class RepeatFlowEngine {
       _state.copyWith(
         recordingPath: null,
         recordingScore: null,
+        isReviewPlaybackActive: false,
         flowToken: _state.flowToken + 1,
       ),
     );
@@ -415,6 +437,7 @@ class RepeatFlowEngine {
         intervalDuration: _config.getIntervalDuration(sentence),
         recordingPath: null,
         recordingScore: null,
+        isReviewPlaybackActive: false,
         flowToken: _state.flowToken + 1,
       ),
     );
@@ -428,7 +451,9 @@ class RepeatFlowEngine {
   void stopSession() {
     _waitAfterCurrentPrompt = false;
     _atomicReset();
-    _updateState(_state.copyWith(phase: const Idle()));
+    _updateState(
+      _state.copyWith(phase: const Idle(), isReviewPlaybackActive: false),
+    );
   }
 
   /// 录音完成回调（由外部 Provider 的 ref.listen 桥接调用）
@@ -440,7 +465,11 @@ class RepeatFlowEngine {
       score != null ? '录音评估完成: score=$score' : '录音评估失败: 无有效识别结果',
     );
     _updateState(
-      _state.copyWith(recordingPath: filePath, recordingScore: score),
+      _state.copyWith(
+        recordingPath: filePath,
+        recordingScore: score,
+        isReviewPlaybackActive: false,
+      ),
     );
 
     if (score == null) {
@@ -450,6 +479,7 @@ class RepeatFlowEngine {
           phase: const WaitingForUser(WaitingReason.recordingFailed),
           recordingPath: null,
           recordingScore: null,
+          isReviewPlaybackActive: false,
         ),
       );
       callbacks.clearRecording();
@@ -539,6 +569,7 @@ class RepeatFlowEngine {
           intervalDuration: _config.getIntervalDuration(sentence),
           recordingPath: null,
           recordingScore: null,
+          isReviewPlaybackActive: false,
           phase: const WaitingForUser(WaitingReason.userInteraction),
         ),
       );
@@ -585,11 +616,12 @@ class RepeatFlowEngine {
 
   /// 录音回放完成
   void _onReviewPlaybackFinished() {
-    if (_state.phase is! ReviewingRecording) return;
+    if (!_state.isReviewPlaybackActive) return;
     AppLogger.log(logTag, '回放结束 → WaitingForUser');
     _updateState(
       _state.copyWith(
         phase: const WaitingForUser(WaitingReason.userInteraction),
+        isReviewPlaybackActive: false,
       ),
     );
   }
@@ -651,6 +683,7 @@ class RepeatFlowEngine {
           repeatIndex: nextRepeat,
           recordingPath: null,
           recordingScore: null,
+          isReviewPlaybackActive: false,
         ),
       );
       _playCurrentSentence();
@@ -673,6 +706,7 @@ class RepeatFlowEngine {
         intervalDuration: _config.getIntervalDuration(sentence),
         recordingPath: null,
         recordingScore: null,
+        isReviewPlaybackActive: false,
         flowToken: _state.flowToken + 1,
       ),
     );
@@ -683,7 +717,10 @@ class RepeatFlowEngine {
   void _atomicReset() {
     _stopActiveResources();
     _waitAfterCurrentPrompt = false;
-    _state = _state.copyWith(flowToken: _state.flowToken + 1);
+    _state = _state.copyWith(
+      flowToken: _state.flowToken + 1,
+      isReviewPlaybackActive: false,
+    );
   }
 
   void _stopActiveResources() {

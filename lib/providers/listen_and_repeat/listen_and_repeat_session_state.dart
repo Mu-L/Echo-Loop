@@ -27,6 +27,7 @@ class ListenAndRepeatSessionState extends RepeatFlowState {
     super.intervalDuration,
     super.recordingPath,
     super.recordingScore,
+    super.isReviewPlaybackActive,
     super.flowToken,
     this.isFreePlay = false,
     this.currentSentenceBookmarked = false,
@@ -47,6 +48,7 @@ class ListenAndRepeatSessionState extends RepeatFlowState {
       intervalDuration: flow.intervalDuration,
       recordingPath: flow.recordingPath,
       recordingScore: flow.recordingScore,
+      isReviewPlaybackActive: flow.isReviewPlaybackActive,
       flowToken: flow.flowToken,
       isFreePlay: isFreePlay,
       currentSentenceBookmarked: currentSentenceBookmarked,
@@ -63,6 +65,7 @@ class ListenAndRepeatSessionState extends RepeatFlowState {
     Duration? intervalDuration,
     Object? recordingPath = _noChange,
     Object? recordingScore = _noChange,
+    bool? isReviewPlaybackActive,
     int? flowToken,
     bool? isFreePlay,
     bool? currentSentenceBookmarked,
@@ -80,6 +83,8 @@ class ListenAndRepeatSessionState extends RepeatFlowState {
       recordingScore: identical(recordingScore, _noChange)
           ? this.recordingScore
           : recordingScore as double?,
+      isReviewPlaybackActive:
+          isReviewPlaybackActive ?? this.isReviewPlaybackActive,
       flowToken: flowToken ?? this.flowToken,
       isFreePlay: isFreePlay ?? this.isFreePlay,
       currentSentenceBookmarked:

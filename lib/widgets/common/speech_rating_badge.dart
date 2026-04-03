@@ -4,41 +4,90 @@
 /// 跟读、复述、难句补练页面共用，各自控制外部布局位置。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../l10n/app_localizations.dart';
 import '../../models/rating_thresholds.dart';
-import 'tappable_wrapper.dart';
 import '../../models/speech_practice_models.dart';
+import '../../services/audio_playback_service.dart';
+import 'tappable_wrapper.dart';
 
 // 重导出 RatingThresholds，保持现有 import 兼容
 export '../../models/rating_thresholds.dart';
 
 /// 语音练习评级 Badge。
 ///
-/// 融合评级文字和播放图标，点击整个 badge 播放/停止录音回放。
-/// 无 transcript 时降级为纯文字反馈。
-class SpeechRatingBadge extends StatelessWidget {
+/// Badge 自己管理录音回放和图标切换：
+/// - 未播放：喇叭图标
+/// - 播放中：停止图标
+///
+/// 页面层只需通过 [onBeforePlayback] 在播放前执行必要的流程清理，
+/// 例如取消倒计时、切到 WaitingForUser、暂停主音频等。
+class SpeechRatingBadge extends StatefulWidget {
   final AppLocalizations l10n;
   final SpeechPracticeAttempt attempt;
-  final bool isPlaying;
-  final VoidCallback? onTap;
+
+  /// 播放前回调。
+  ///
+  /// 用于让调用方先清理页面级状态，再开始播放录音。
+  final FutureOr<void> Function()? onBeforePlayback;
 
   /// 评分阈值，默认跟读阈值。
   final RatingThresholds thresholds;
+
+  /// 音频播放服务工厂。
+  ///
+  /// 默认使用真实播放服务，测试中可注入替身。
+  final AudioPlaybackService Function()? playbackServiceFactory;
 
   const SpeechRatingBadge({
     super.key,
     required this.l10n,
     required this.attempt,
-    required this.isPlaying,
-    this.onTap,
+    this.onBeforePlayback,
     this.thresholds = RatingThresholds.listenAndRepeat,
+    this.playbackServiceFactory,
   });
+
+  @override
+  State<SpeechRatingBadge> createState() => _SpeechRatingBadgeState();
+}
+
+class _SpeechRatingBadgeState extends State<SpeechRatingBadge> {
+  late final AudioPlaybackService _playbackService;
+  int _playbackToken = 0;
+  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _playbackService =
+        widget.playbackServiceFactory?.call() ?? AudioPlaybackService();
+  }
+
+  @override
+  void didUpdateWidget(covariant SpeechRatingBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldPath = oldWidget.attempt.filePath;
+    final newPath = widget.attempt.filePath;
+    if (oldPath != newPath && _isPlaying) {
+      unawaited(_stopPlayback());
+    }
+  }
+
+  @override
+  void dispose() {
+    _playbackToken += 1;
+    unawaited(_playbackService.dispose());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasTranscript = (attempt.finalTranscript ?? '').isNotEmpty;
+    final hasTranscript = (widget.attempt.finalTranscript ?? '').isNotEmpty;
 
     // 无识别结果时降级为纯文字反馈
     if (!hasTranscript) {
@@ -54,7 +103,7 @@ class SpeechRatingBadge extends StatelessWidget {
     final style = _ratingStyle(theme);
 
     return TappableWrapper(
-      onTap: onTap,
+      onTap: widget.attempt.hasRecording ? _handleTap : null,
       feedbackType: TapFeedback.opacity,
       pressedOpacity: 0.6,
       child: Container(
@@ -77,10 +126,10 @@ class SpeechRatingBadge extends StatelessWidget {
                 letterSpacing: 0.2,
               ),
             ),
-            if (attempt.hasRecording) ...[
+            if (widget.attempt.hasRecording) ...[
               const SizedBox(width: 6),
               Icon(
-                isPlaying ? Icons.stop_rounded : Icons.volume_up_outlined,
+                _isPlaying ? Icons.stop_rounded : Icons.volume_up_outlined,
                 size: 16,
                 color: style.textColor.withValues(alpha: 0.7),
               ),
@@ -91,32 +140,64 @@ class SpeechRatingBadge extends StatelessWidget {
     );
   }
 
+  Future<void> _handleTap() async {
+    if (_isPlaying) {
+      await _stopPlayback();
+      return;
+    }
+
+    final filePath = widget.attempt.filePath;
+    if (filePath == null || filePath.isEmpty) return;
+
+    await widget.onBeforePlayback?.call();
+    if (!mounted) return;
+
+    final token = ++_playbackToken;
+    setState(() => _isPlaying = true);
+
+    try {
+      await _playbackService.play(filePath);
+    } finally {
+      if (mounted && token == _playbackToken) {
+        setState(() => _isPlaying = false);
+      }
+    }
+  }
+
+  Future<void> _stopPlayback() async {
+    _playbackToken += 1;
+    await _playbackService.stop();
+    if (!mounted) return;
+    setState(() => _isPlaying = false);
+  }
+
   String _ratingLabel() {
-    final score = attempt.score ?? 0;
-    if (score >= thresholds.perfect) {
-      return l10n.listenAndRepeatRatingPerfect;
+    final score = widget.attempt.score ?? 0;
+    if (score >= widget.thresholds.perfect) {
+      return widget.l10n.listenAndRepeatRatingPerfect;
     }
-    if (score >= thresholds.excellent) {
-      return l10n.listenAndRepeatRatingExcellent;
+    if (score >= widget.thresholds.excellent) {
+      return widget.l10n.listenAndRepeatRatingExcellent;
     }
-    if (score >= thresholds.good) {
-      return l10n.listenAndRepeatRatingGood;
+    if (score >= widget.thresholds.good) {
+      return widget.l10n.listenAndRepeatRatingGood;
     }
-    if (score >= thresholds.fair) {
-      return l10n.listenAndRepeatRatingFair;
+    if (score >= widget.thresholds.fair) {
+      return widget.l10n.listenAndRepeatRatingFair;
     }
-    return l10n.listenAndRepeatRatingKeepGoing;
+    return widget.l10n.listenAndRepeatRatingKeepGoing;
   }
 
   String _feedbackText() {
-    return switch (attempt.status) {
+    return switch (widget.attempt.status) {
       SpeechPracticeAttemptStatus.noEnglishDetected =>
-        l10n.listenAndRepeatRecognitionNoEnglish,
+        widget.l10n.listenAndRepeatRecognitionNoEnglish,
       SpeechPracticeAttemptStatus.permissionDenied =>
-        l10n.listenAndRepeatRecognitionPermissionDenied,
+        widget.l10n.listenAndRepeatRecognitionPermissionDenied,
       SpeechPracticeAttemptStatus.unavailable =>
-        l10n.listenAndRepeatRecognitionUnavailable,
-      SpeechPracticeAttemptStatus.error => l10n.listenAndRepeatRecognitionError,
+        widget.l10n.listenAndRepeatRecognitionUnavailable,
+      SpeechPracticeAttemptStatus.error =>
+        widget.l10n.listenAndRepeatRecognitionError,
       SpeechPracticeAttemptStatus.awaitingFinal ||
       SpeechPracticeAttemptStatus.passed ||
       SpeechPracticeAttemptStatus.belowThreshold ||
@@ -126,7 +207,7 @@ class SpeechRatingBadge extends StatelessWidget {
   }
 
   Color _statusColor(ThemeData theme) {
-    return switch (attempt.status) {
+    return switch (widget.attempt.status) {
       SpeechPracticeAttemptStatus.passed => const Color(0xFF2E9B51),
       SpeechPracticeAttemptStatus.awaitingFinal => theme.colorScheme.primary,
       SpeechPracticeAttemptStatus.belowThreshold ||
@@ -140,9 +221,9 @@ class SpeechRatingBadge extends StatelessWidget {
 
   _RatingBadgeStyle _ratingStyle(ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
-    final score = attempt.score ?? 0;
+    final score = widget.attempt.score ?? 0;
 
-    if (score >= thresholds.perfect) {
+    if (score >= widget.thresholds.perfect) {
       return isDark
           ? const _RatingBadgeStyle(
               textColor: Color(0xFFFFE082),
@@ -157,7 +238,7 @@ class SpeechRatingBadge extends StatelessWidget {
               borderColor: Color(0xFFE0C068),
             );
     }
-    if (score >= thresholds.excellent) {
+    if (score >= widget.thresholds.excellent) {
       return isDark
           ? const _RatingBadgeStyle(
               textColor: Color(0xFFB9F5C8),
@@ -172,7 +253,7 @@ class SpeechRatingBadge extends StatelessWidget {
               borderColor: Color(0xFFA8D6B6),
             );
     }
-    if (score >= thresholds.good) {
+    if (score >= widget.thresholds.good) {
       return isDark
           ? const _RatingBadgeStyle(
               textColor: Color(0xFFE4F3B2),
@@ -187,7 +268,7 @@ class SpeechRatingBadge extends StatelessWidget {
               borderColor: Color(0xFFD6DD9A),
             );
     }
-    if (score >= thresholds.fair) {
+    if (score >= widget.thresholds.fair) {
       return isDark
           ? const _RatingBadgeStyle(
               textColor: Color(0xFFF7D79B),
