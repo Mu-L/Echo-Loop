@@ -1,12 +1,62 @@
 // BookmarkReview 单元测试。
 // 测试 BookmarkSentence 数据类和 ReviewDifficultPracticeState 在收藏复习场景下的行为。
 // Provider 的播放逻辑依赖 AudioEngine，集成测试在 integration_test 中覆盖。
+import 'dart:async';
+
+import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluency/database/app_database.dart' as db;
+import 'package:fluency/database/providers.dart';
+import 'package:fluency/database/daos/bookmark_dao.dart';
 import 'package:fluency/models/bookmark_sentence.dart';
+import 'package:fluency/models/audio_engine_state.dart';
 import 'package:fluency/models/sentence.dart';
+import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/blind_flow/blind_practice_flow_phase.dart';
+import 'package:fluency/providers/learned_vocabulary_tracker_provider.dart';
+import 'package:fluency/providers/learning_session/bookmark_review_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/study_stats_provider.dart';
+import 'package:fluency/services/learned_vocabulary_tracker.dart';
+
+import '../../helpers/mock_providers.dart';
+
+class _ReplayBookmarkAudioEngine extends TestAudioEngine {
+  int _sessionId = 0;
+
+  _ReplayBookmarkAudioEngine()
+    : super(
+        initialState: const AudioEngineState(
+          sessionId: 0,
+          currentAudioId: 'audio-1',
+        ),
+      );
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playClipOnce(Sentence sentence, int sessionId) async {
+    if (!isActiveSession(sessionId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+  }
+}
+
+class _TestStudyStatsNotifier extends StudyStatsNotifier {
+  @override
+  Future<StudyStats> build() async => const StudyStats();
+}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('BookmarkSentence', () {
     test('从 BookmarkWithAudio 正确转换', () {
       // 模拟 BookmarkWithAudio → BookmarkSentence 转换逻辑
@@ -214,6 +264,80 @@ void main() {
         );
         lastIndex = s.originalSentenceIndex;
       }
+    });
+  });
+
+  group('BookmarkReview provider', () {
+    test('dispose 后重新 initialize，盲听仍可再次播放', () async {
+      final testDb = db.AppDatabase(
+        NativeDatabase.memory(
+          setup: (database) => database.execute('PRAGMA foreign_keys = ON'),
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(testDb),
+          audioEngineProvider.overrideWith(() => _ReplayBookmarkAudioEngine()),
+          learnedVocabularyTrackerProvider.overrideWithValue(
+            LearnedVocabularyTracker(
+              persistWordForms: (_) async {},
+              onStatsUpdated: () {},
+            ),
+          ),
+          studyStatsNotifierProvider.overrideWith(_TestStudyStatsNotifier.new),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(testDb.close);
+      addTearDown(container.dispose);
+
+      container.read(bookmarkReviewProvider);
+      final notifier = container.read(bookmarkReviewProvider.notifier);
+      final bookmarks = [
+        BookmarkWithAudio(
+          bookmark: db.Bookmark(
+            id: 1,
+            audioItemId: 'audio-1',
+            sentenceIndex: 0,
+            sentenceText: 'First sentence',
+            startTime: 0,
+            endTime: 1,
+            createdAt: DateTime(2026, 4, 3, 9),
+            updatedAt: DateTime(2026, 4, 3, 9),
+            syncStatus: 0,
+          ),
+          audioName: 'Audio 1',
+        ),
+      ];
+
+      notifier.initialize(
+        bookmarks,
+        getAudioItemById: (_) async => null,
+      );
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(
+        container.read(bookmarkReviewProvider).blindFlowState?.phase,
+        isA<BlindPlayingPrompt>(),
+      );
+
+      notifier.disposePlayer();
+
+      notifier.initialize(
+        bookmarks,
+        getAudioItemById: (_) async => null,
+      );
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final state = container.read(bookmarkReviewProvider);
+      expect(state.totalSentences, 1);
+      expect(state.blindFlowState?.phase, isA<BlindPlayingPrompt>());
+      expect(state.isPlaying, isTrue);
+
+      notifier.disposePlayer();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     });
   });
 }

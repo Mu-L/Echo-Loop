@@ -37,6 +37,7 @@ import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
+import '../widgets/common/practice_playback_footer.dart';
 import '../widgets/common/repeat_practice_panel.dart';
 import '../widgets/practice/practice_progress_section.dart';
 
@@ -393,7 +394,7 @@ class _ListenAndRepeatPlayerScreenState
                 .clearRecording();
             ctrl.replayCurrentSentence();
           } else if (isPlaying) {
-            ctrl.enterWaitingForUser();
+            ctrl.enterWaitingForUserAfterCurrentPrompt();
           } else {
             ctrl.replayCurrentSentence();
           }
@@ -426,7 +427,7 @@ class _ListenAndRepeatPlayerScreenState
                   onPressed: () {
                     ref
                         .read(listenAndRepeatControllerProvider.notifier)
-                        .enterWaitingForUser();
+                        .enterWaitingForUserAfterCurrentPrompt();
                     showListenAndRepeatSettingsSheet(context: context);
                   },
                 ),
@@ -443,6 +444,7 @@ class _ListenAndRepeatPlayerScreenState
                     ctrlState.totalSentences,
                   ),
                   durationText: durationText,
+                  showAudioSource: false,
                 ),
 
                 // 主体内容：书签行 + 标注内容
@@ -573,6 +575,8 @@ class _ListenAndRepeatPlayerScreenState
                           },
                         )
                       : null,
+                ),
+                PracticePlaybackFooter(
                   canGoPrev: !ctrlState.isFirstSentence,
                   isLast: ctrlState.isLastSentence,
                   centerIcon: isPlaying
@@ -602,7 +606,7 @@ class _ListenAndRepeatPlayerScreenState
                           .clearRecording();
                       ctrl.replayCurrentSentence();
                     } else if (isPlaying) {
-                      ctrl.enterWaitingForUser();
+                      ctrl.enterWaitingForUserAfterCurrentPrompt();
                     } else {
                       ctrl.replayCurrentSentence();
                     }
@@ -612,6 +616,8 @@ class _ListenAndRepeatPlayerScreenState
                     ctrlState.repeatIndex + 1,
                     ctrlState.totalRepeats,
                   ),
+                  l10n: l10n,
+                  theme: theme,
                 ),
               ],
             ),

@@ -1,15 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fluency/database/enums.dart';
 import 'package:fluency/models/audio_engine_state.dart';
+import 'package:fluency/models/intensive_listen_settings.dart';
 import 'package:fluency/models/learning_progress.dart';
 import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
+import 'package:fluency/providers/blind_flow/blind_practice_flow_phase.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/learning_session_provider.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/repeat_flow/repeat_flow_phase.dart';
+import 'package:fluency/providers/speech/speech_recording_controller.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -33,6 +39,28 @@ class _ReplayTestAudioEngine extends TestAudioEngine {
     if (!isActiveSession(sessionId)) return;
     await Future<void>.delayed(const Duration(milliseconds: 10));
     _sessionId += 1;
+  }
+}
+
+class _SlowBlindAudioEngine extends TestAudioEngine {
+  int _sessionId = 0;
+
+  _SlowBlindAudioEngine()
+    : super(initialState: const AudioEngineState(sessionId: 0));
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> playClipOnce(Sentence sentence, int sessionId) async {
+    if (!isActiveSession(sessionId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
   }
 }
 
@@ -113,29 +141,375 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(reviewDifficultPracticeProvider.notifier);
-      notifier.initialize(
-        [
-          Sentence(
-            index: 0,
-            text: 'First sentence',
-            startTime: Duration.zero,
-            endTime: const Duration(seconds: 1),
-          ),
-          Sentence(
-            index: 1,
-            text: 'Second sentence',
-            startTime: const Duration(seconds: 2),
-            endTime: const Duration(seconds: 3),
-          ),
-        ],
-        startIndex: 1,
-      );
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+        Sentence(
+          index: 1,
+          text: 'Second sentence',
+          startTime: const Duration(seconds: 2),
+          endTime: const Duration(seconds: 3),
+        ),
+      ], startIndex: 1);
 
       await notifier.startPlaying();
       await Future<void>.delayed(const Duration(milliseconds: 1));
 
       expect(progressNotifier.savedIndices, contains(1));
       expect(progressNotifier.savedIndices.first, 1);
+    });
+
+    test('跟读模式 WaitingForUser 态修改设置后保持等待', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(
+            () => _RecordingLearningProgressNotifier(
+              const LearningProgressState(),
+            ),
+          ),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          speechRecordingControllerProvider.overrideWith(
+            TestSpeechRecordingController.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+      ]);
+
+      notifier.enterAnnotationMode();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.repeatEngine?.enterWaitingForUser();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(
+        container.read(reviewDifficultPracticeProvider).repeatFlowState?.phase,
+        isA<WaitingForUser>(),
+      );
+
+      await notifier.updateSettings(
+        container
+            .read(reviewDifficultPracticeProvider)
+            .settings
+            .copyWith(shadowReadingRepeatCount: 5),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      final state = container.read(reviewDifficultPracticeProvider);
+      expect(state.repeatFlowState?.phase, isA<WaitingForUser>());
+      expect(state.isPlaying, isFalse);
+    });
+
+    test('盲听模式进入 WaitingForUser 后修改设置保持等待', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(
+            () => _RecordingLearningProgressNotifier(
+              const LearningProgressState(),
+            ),
+          ),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+      ]);
+
+      await notifier.startPlaying();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.enterWaitingForUserInBlindMode();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(
+        container.read(reviewDifficultPracticeProvider).blindFlowState?.phase,
+        isA<BlindWaitingForUser>(),
+      );
+
+      await notifier.updateSettings(
+        container
+            .read(reviewDifficultPracticeProvider)
+            .settings
+            .copyWith(blindListenRepeatCount: 5),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      final state = container.read(reviewDifficultPracticeProvider);
+      expect(state.blindFlowState?.phase, isA<BlindWaitingForUser>());
+      expect(state.isPlaying, isFalse);
+    });
+
+    test('盲听播放中进入 WaitingForUser 时，允许当前句自然播完', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _SlowBlindAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(
+            () => _RecordingLearningProgressNotifier(
+              const LearningProgressState(),
+            ),
+          ),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+      ]);
+
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      notifier.enterWaitingForUserInBlindMode();
+
+      final duringPlayback = container.read(reviewDifficultPracticeProvider);
+      expect(duringPlayback.isPlaying, isTrue);
+      expect(duringPlayback.blindFlowState?.phase, isA<BlindPlayingPrompt>());
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final afterPrompt = container.read(reviewDifficultPracticeProvider);
+      expect(afterPrompt.blindFlowState?.phase, isA<BlindWaitingForUser>());
+      expect(afterPrompt.isPlaying, isFalse);
+      expect(afterPrompt.isPauseBetweenPlays, isFalse);
+    });
+
+    test('dispose 后重新 initialize，盲听仍可再次播放', () async {
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _SlowBlindAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(
+            () => _RecordingLearningProgressNotifier(
+              const LearningProgressState(),
+            ),
+          ),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      final sentences = [
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+      ];
+
+      notifier.initialize(sentences);
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(
+        container.read(reviewDifficultPracticeProvider).blindFlowState?.phase,
+        isA<BlindPlayingPrompt>(),
+      );
+
+      notifier.disposePlayer();
+
+      notifier.initialize(sentences);
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final state = container.read(reviewDifficultPracticeProvider);
+      expect(state.totalSentences, 1);
+      expect(state.blindFlowState?.phase, isA<BlindPlayingPrompt>());
+      expect(state.isPlaying, isTrue);
+    });
+
+    test('跟读完成后直接进入下一句，不回到当前句倒计时', () async {
+      final progressNotifier = _RecordingLearningProgressNotifier(
+        LearningProgressState(
+          progressMap: {
+            'audio-1': LearningProgress(
+              audioItemId: 'audio-1',
+              currentStage: LearningStage.review1,
+              currentSubStage: SubStageType.reviewDifficultPractice,
+              updatedAt: DateTime(2026, 3, 11),
+            ),
+          },
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => _ReplayTestAudioEngine()),
+          learningProgressNotifierProvider.overrideWith(() => progressNotifier),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          speechRecordingControllerProvider.overrideWith(
+            TestSpeechRecordingController.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+        Sentence(
+          index: 1,
+          text: 'Second sentence',
+          startTime: const Duration(seconds: 2),
+          endTime: const Duration(seconds: 3),
+        ),
+      ]);
+
+      await notifier.updateSettings(
+        container
+            .read(reviewDifficultPracticeProvider)
+            .settings
+            .copyWith(blindListenRepeatCount: 1, shadowReadingRepeatCount: 1),
+      );
+      notifier.enterAnnotationMode();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      notifier.repeatEngine?.onRecordingFinished('recording.m4a', 92);
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+
+      final state = container.read(reviewDifficultPracticeProvider);
+      expect(state.currentSentenceIndex, 1);
+      expect(state.isAnnotationMode, isFalse);
+      expect(state.stepFinished, isFalse);
+    });
+
+    test('跟读播放中修改设置不打断也不重播，播完后进入等待', () async {
+      final audioEngine = _SlowBlindAudioEngine();
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          learningProgressNotifierProvider.overrideWith(
+            () => _RecordingLearningProgressNotifier(
+              const LearningProgressState(),
+            ),
+          ),
+          learningSessionProvider.overrideWith(
+            () => _PassiveLearningSession(
+              const LearningSessionState(
+                learningMode: LearningMode.reviewDifficultPractice,
+                audioItemId: 'audio-1',
+              ),
+            ),
+          ),
+          speechRecordingControllerProvider.overrideWith(
+            TestSpeechRecordingController.new,
+          ),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(reviewDifficultPracticeProvider.notifier);
+      notifier.initialize([
+        Sentence(
+          index: 0,
+          text: 'First sentence',
+          startTime: Duration.zero,
+          endTime: const Duration(seconds: 1),
+        ),
+      ]);
+
+      notifier.enterAnnotationMode();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      notifier.repeatEngine?.onUserInteraction();
+      await notifier.updateSettings(
+        container
+            .read(reviewDifficultPracticeProvider)
+            .settings
+            .copyWith(
+              shadowReadingRepeatCount: 5,
+              controlMode: ShadowingControlMode.manual,
+            ),
+      );
+
+      expect(
+        container.read(reviewDifficultPracticeProvider).repeatFlowState?.phase,
+        isA<PlayingPrompt>(),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final state = container.read(reviewDifficultPracticeProvider);
+      expect(state.repeatFlowState?.phase, isA<WaitingForUser>());
+      expect(state.currentPlayCount, 1);
     });
   });
 }

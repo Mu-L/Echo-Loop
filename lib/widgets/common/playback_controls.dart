@@ -116,13 +116,19 @@ class PlaybackNavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) {
-      return AnimatedOpacity(
-        opacity: 0.15,
-        duration: const Duration(milliseconds: 150),
-        child: Icon(
-          icon,
-          size: 32,
-          color: Theme.of(context).colorScheme.onSurface,
+      return SizedBox(
+        width: PlaybackControls.controlButtonSize,
+        height: PlaybackControls.controlButtonSize,
+        child: Center(
+          child: AnimatedOpacity(
+            opacity: 0.15,
+            duration: const Duration(milliseconds: 150),
+            child: Icon(
+              icon,
+              size: 32,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
         ),
       );
     }

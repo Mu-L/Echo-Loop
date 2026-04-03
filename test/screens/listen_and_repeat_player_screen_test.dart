@@ -75,6 +75,13 @@ class _TestListenAndRepeatController extends ListenAndRepeatController {
   }
 
   @override
+  void enterWaitingForUserAfterCurrentPrompt() {
+    state = state.copyWith(
+      phase: const WaitingForUser(WaitingReason.userInteraction),
+    );
+  }
+
+  @override
   Future<void> replayCurrentSentence() async {
     state = state.copyWith(phase: const PlayingPrompt());
   }
@@ -296,7 +303,7 @@ void main() {
             widget.height == PlaybackControls.controlButtonSize,
       );
 
-      expect(controlSizedBoxes, findsNWidgets(2));
+      expect(controlSizedBoxes, findsNWidgets(3));
     });
 
     testWidgets('停顿态显示录音按钮', (tester) async {

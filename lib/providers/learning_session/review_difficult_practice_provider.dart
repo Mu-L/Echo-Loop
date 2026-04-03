@@ -20,8 +20,12 @@ import '../../services/learned_vocabulary_tracker.dart';
 import '../../services/study_event_recorder.dart';
 import '../../services/app_logger.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../blind_flow/blind_practice_flow_engine.dart';
+import '../blind_flow/blind_practice_flow_phase.dart';
+import '../blind_flow/blind_practice_flow_state.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../learning_progress_provider.dart';
+import '../listening_practice/bookmark_manager.dart';
 import '../repeat_flow/repeat_flow_engine.dart';
 import '../repeat_flow/repeat_flow_phase.dart';
 import '../repeat_flow/repeat_flow_state.dart';
@@ -33,7 +37,7 @@ part 'review_difficult_practice_provider.g.dart';
 
 /// 难句补练状态
 ///
-/// 盲听模式使用布尔标志位，跟读模式使用 [RepeatFlowState]。
+/// 盲听模式使用 [BlindPracticeFlowState]，跟读模式使用 [RepeatFlowState]。
 class ReviewDifficultPracticeState {
   /// 当前句子索引
   final int currentSentenceIndex;
@@ -93,6 +97,9 @@ class ReviewDifficultPracticeState {
   /// 跟读模式下的流程状态（annotation mode 时有值）
   final RepeatFlowState? repeatFlowState;
 
+  /// 盲听模式下的流程状态（blind mode 时有值）
+  final BlindPracticeFlowState? blindFlowState;
+
   /// 是否处于手动模式
   bool get isManualMode => settings.isManualMode || isManualForSentence;
 
@@ -115,6 +122,7 @@ class ReviewDifficultPracticeState {
     this.bookmarkVersion = 0,
     this.isManualForSentence = false,
     this.repeatFlowState,
+    this.blindFlowState,
   });
 
   ReviewDifficultPracticeState copyWith({
@@ -136,7 +144,9 @@ class ReviewDifficultPracticeState {
     int? bookmarkVersion,
     bool? isManualForSentence,
     RepeatFlowState? repeatFlowState,
+    BlindPracticeFlowState? blindFlowState,
     bool clearRepeatFlowState = false,
+    bool clearBlindFlowState = false,
   }) {
     return ReviewDifficultPracticeState(
       currentSentenceIndex: currentSentenceIndex ?? this.currentSentenceIndex,
@@ -161,6 +171,9 @@ class ReviewDifficultPracticeState {
       repeatFlowState: clearRepeatFlowState
           ? null
           : (repeatFlowState ?? this.repeatFlowState),
+      blindFlowState: clearBlindFlowState
+          ? null
+          : (blindFlowState ?? this.blindFlowState),
     );
   }
 }
@@ -180,6 +193,20 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 跟读流程引擎（跟读模式时创建，退出时销毁）
   RepeatFlowEngine? _repeatEngine;
 
+  /// 盲听流程引擎
+  late BlindPracticeFlowEngine _blindEngine;
+
+  BlindPracticeFlowEngine _createBlindEngine() {
+    return BlindPracticeFlowEngine(
+      onStateChanged: _onBlindFlowStateChanged,
+      callbacks: BlindPracticeFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
+        playSentence: _playSentenceForBlind,
+      ),
+      logTag: 'RDP-Blind',
+    );
+  }
+
   @override
   ReviewDifficultPracticeState build() {
     LearnedVocabularyTracker? vocabTracker;
@@ -198,12 +225,14 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       getEngine: () => ref.read(audioEngineProvider.notifier),
       recorder: _recorder,
     );
+    _blindEngine = _createBlindEngine();
 
     // 监听录音状态变化 → 桥接到跟读引擎
     ref.listen(speechRecordingControllerProvider, _onRecordingStateChanged);
 
     ref.onDispose(() {
       _engine.cleanup();
+      _blindEngine.dispose();
       _repeatEngine?.dispose();
     });
     return const ReviewDifficultPracticeState();
@@ -212,6 +241,10 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 初始化
   void initialize(List<Sentence> sentences, {int startIndex = 0}) {
     _engine.cleanup();
+    _blindEngine.dispose();
+    _blindEngine = _createBlindEngine();
+    _repeatEngine?.dispose();
+    _repeatEngine = null;
     _sentences = sentences.map((s) => s.copyWith()).toList();
 
     final validIndex = _sentences.isEmpty
@@ -222,15 +255,14 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       currentSentenceIndex: validIndex,
       totalSentences: _sentences.length,
     );
+    _prepareBlindFlow(startIndex: validIndex);
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeStart, {
       EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
       EventParams.difficultCount: _sentences.length,
     });
 
     // 注入 recorder
-    ref
-        .read(speechRecordingControllerProvider.notifier)
-        .setRecorder(_recorder);
+    ref.read(speechRecordingControllerProvider.notifier).setRecorder(_recorder);
     // 也注入到 AudioEngine（跟读模式通过 engine 直接播放时需要）
     ref.read(audioEngineProvider.notifier).setRecorder(_recorder);
   }
@@ -238,7 +270,23 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 更新设置并重新开始当前句
   Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
     final wasAnnotation = state.isAnnotationMode;
+    final annotationWaitingForUser =
+        state.repeatFlowState?.phase is WaitingForUser ||
+        (_repeatEngine?.willEnterWaitingAfterCurrentPrompt ?? false);
+    final blindWaitingForUser =
+        state.blindFlowState?.phase is BlindWaitingForUser ||
+        _blindEngine.willEnterWaitingAfterCurrentPrompt;
+    if (wasAnnotation &&
+        _repeatEngine?.willEnterWaitingAfterCurrentPrompt == true) {
+      state = state.copyWith(settings: newSettings);
+      return;
+    }
+    if (!wasAnnotation && _blindEngine.willEnterWaitingAfterCurrentPrompt) {
+      state = state.copyWith(settings: newSettings);
+      return;
+    }
     _engine.invalidateSession();
+    _blindEngine.stopSession();
     _exitAnnotationMode();
     state = state.copyWith(
       settings: newSettings,
@@ -249,12 +297,13 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isCountdownPaused: false,
       isCountdownFastForward: false,
       clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
     // 重新开始当前句（跟读模式→重新进入跟读，盲听模式→重新盲听）
     if (wasAnnotation) {
-      _startRepeatFlow();
+      _startRepeatFlow(autoplay: !annotationWaitingForUser);
     } else {
-      await _startSentence();
+      await _startBlindFlow(autoplay: !blindWaitingForUser);
     }
   }
 
@@ -265,7 +314,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (state.isAnnotationMode) {
       _repeatEngine?.enterWaitingForUser();
     } else {
-      _engine.pauseCountdown();
+      unawaited(_blindEngine.restartCurrentSentence(autoplay: false));
     }
   }
 
@@ -275,8 +324,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 获取当前句子
   Sentence? get currentSentence =>
       _sentences.isNotEmpty && state.currentSentenceIndex < _sentences.length
-          ? _sentences[state.currentSentenceIndex]
-          : null;
+      ? _sentences[state.currentSentenceIndex]
+      : null;
 
   /// 句子列表（只读）
   List<Sentence> get sentences => List.unmodifiable(_sentences);
@@ -287,7 +336,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 开始播放
   Future<void> startPlaying() async {
     if (_sentences.isEmpty) return;
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 外部中断通知
@@ -302,10 +351,13 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     _engine.invalidateSession();
     if (state.isAnnotationMode) {
       _repeatEngine?.enterWaitingForUser();
+    } else {
+      _blindEngine.enterWaitingForUser();
     }
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
     );
@@ -317,7 +369,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       _repeatEngine?.replayCurrentSentence();
       return;
     }
-    await _startSentence(startPlayCount: state.currentPlayCount);
+    await _blindEngine.replayCurrentSentence();
   }
 
   /// 进入跟读模式（听不懂）
@@ -325,6 +377,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (state.isAnnotationMode) return;
 
     _engine.invalidateSession();
+    _blindEngine.stopSession();
     _startRepeatFlow();
   }
 
@@ -336,7 +389,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isPlaying: false,
       isPauseBetweenPlays: false,
     );
-    await _autoAdvance();
+    await _advanceAfterAnnotationCompleted();
   }
 
   /// 偷看字幕
@@ -344,11 +397,18 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = state.copyWith(isTextRevealed: revealed);
   }
 
+  /// 盲听模式下，用户显式接管流程（设置/偷看/查词）。
+  void enterWaitingForUserInBlindMode() {
+    if (state.isAnnotationMode) return;
+    _blindEngine.enterWaitingForUser(afterCurrentPrompt: true);
+  }
+
   /// 取消难句标记
   Sentence? removeDifficultMark() {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
+    _blindEngine.stopSession();
     _exitAnnotationMode();
 
     final removedIndex = state.currentSentenceIndex;
@@ -374,18 +434,42 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isPauseBetweenSentences: false,
       currentPlayCount: 1,
       clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
 
     return removed;
   }
 
   /// 切换收藏标记
-  void toggleCurrentBookmark() {
+  Future<void> toggleCurrentBookmark(String audioItemId) async {
     if (_sentences.isEmpty) return;
     final idx = state.currentSentenceIndex;
     final s = _sentences[idx];
+    final wasBookmarked = s.isBookmarked;
     _sentences[idx] = s.copyWith(isBookmarked: !s.isBookmarked);
     state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
+
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (wasBookmarked) {
+      await bookmarkDao.removeBookmark(audioItemId, s.index);
+      return;
+    }
+
+    await BookmarkManager.addBookmarkToDb(audioItemId, s, dao: bookmarkDao);
+  }
+
+  /// 同步录音控制器模式，并在切到手动模式时取消活跃录音。
+  void syncRecordingMode() {
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
+    controller.setManualMode(state.isManualMode);
+
+    if (!state.isManualMode) return;
+
+    final recState = ref.read(speechRecordingControllerProvider);
+    if (recState.phase == SpeechRecordingPhase.awaitingSpeech ||
+        recState.phase == SpeechRecordingPhase.speaking) {
+      unawaited(controller.cancelActiveRecording());
+    }
   }
 
   /// 下一句
@@ -393,6 +477,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
     _engine.invalidateSession();
     _exitAnnotationMode();
+    _blindEngine.stopSession();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex + 1,
       currentPlayCount: 1,
@@ -404,8 +489,9 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isCountdownFastForward: false,
       isManualForSentence: false,
       clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 上一句
@@ -413,6 +499,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (state.currentSentenceIndex <= 0) return;
     _engine.invalidateSession();
     _exitAnnotationMode();
+    _blindEngine.stopSession();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex - 1,
       currentPlayCount: 1,
@@ -424,29 +511,26 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isCountdownFastForward: false,
       isManualForSentence: false,
       clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 暂停盲听倒计时
   void pauseCountdown() {
-    _engine.pauseCountdown();
-    state = state.copyWith(isCountdownPaused: true);
+    _blindEngine.pauseInterval();
   }
 
   /// 恢复盲听倒计时
   void resumeCountdown() {
-    _engine.resumeCountdown();
-    state = state.copyWith(isCountdownPaused: false);
+    _blindEngine.resumeInterval();
   }
 
   /// 盲听倒计时快进
   void toggleCountdownFastForward() {
     final isFF = !state.isCountdownFastForward;
-    _engine.setCountdownSpeed(isFF ? 10.0 : 1.0);
-    if (state.isCountdownPaused) {
-      _engine.resumeCountdown();
-    }
+    _blindEngine.setIntervalSpeed(isFF ? kBlindFastForwardSpeed : 1.0);
+    if (state.isCountdownPaused) _blindEngine.resumeInterval();
     state = state.copyWith(
       isCountdownFastForward: isFF,
       isCountdownPaused: false,
@@ -459,24 +543,20 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     if (state.isAnnotationMode) {
       _repeatEngine?.replayCurrentSentence();
     } else {
-      state = state.copyWith(
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-      );
-      await _startSentence(startPlayCount: state.currentPlayCount);
+      await _blindEngine.replayCurrentSentence();
     }
   }
 
   /// 停止播放
   void stopPlayback() {
     _engine.invalidateSession();
+    _blindEngine.stopSession();
     _exitAnnotationMode();
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      clearBlindFlowState: true,
     );
   }
 
@@ -485,6 +565,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     ref.read(speechRecordingControllerProvider.notifier).setRecorder(null);
     ref.read(audioEngineProvider.notifier).setRecorder(null);
     _engine.cleanup();
+    _blindEngine.stopSession();
     _repeatEngine?.dispose();
     _repeatEngine = null;
     _sentences = [];
@@ -494,18 +575,20 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   /// 重置到第一句
   Future<void> resetToStart() async {
     _engine.cleanup();
+    _blindEngine.stopSession();
     _exitAnnotationMode();
     state = ReviewDifficultPracticeState(
       currentSentenceIndex: 0,
       totalSentences: _sentences.length,
     );
+    _prepareBlindFlow();
     await startPlaying();
   }
 
   // ========== 跟读模式（RepeatFlowEngine） ==========
 
   /// 启动跟读流程引擎
-  void _startRepeatFlow() {
+  void _startRepeatFlow({bool autoplay = true}) {
     final sentence = currentSentence;
     if (sentence == null || sentence.duration <= Duration.zero) return;
 
@@ -540,7 +623,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
     state = state.copyWith(
       isAnnotationMode: true,
-      isPlaying: true,
+      isPlaying: autoplay,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
       isTextRevealed: false,
@@ -549,7 +632,11 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       stepFinished: false,
     );
 
-    _repeatEngine!.startPlaying();
+    if (autoplay) {
+      unawaited(_repeatEngine!.startPlaying());
+    } else {
+      unawaited(_repeatEngine!.restartCurrentSentence(autoplay: false));
+    }
   }
 
   /// 跟读引擎状态变化回调
@@ -561,7 +648,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
       isPauseBetweenPlays: flowState.isInPause,
     );
 
-    // 会话完成 → 退出跟读模式 → 自动推进
+    // 会话完成 → 退出跟读模式 → 直接进入下一句
     if (flowState.phase is SessionCompleted) {
       _exitAnnotationMode();
       state = state.copyWith(
@@ -570,8 +657,8 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
         isPauseBetweenPlays: false,
         clearRepeatFlowState: true,
       );
-      AppLogger.log('RDP', '跟读完成 → autoAdvance');
-      unawaited(_autoAdvance());
+      AppLogger.log('RDP', '跟读完成 → 直接进入下一句');
+      unawaited(_advanceAfterAnnotationCompleted());
     }
   }
 
@@ -634,8 +721,9 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
         .cancelActiveRecording();
   }
 
-  Future<void> _stopAndEvaluateForRepeat(
-      {required String referenceText}) async {
+  Future<void> _stopAndEvaluateForRepeat({
+    required String referenceText,
+  }) async {
     await ref
         .read(speechRecordingControllerProvider.notifier)
         .stopAndEvaluate(referenceText: referenceText);
@@ -655,7 +743,79 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     return ref.read(speechRecordingControllerProvider).hasDetectedSpeech;
   }
 
-  // ========== 盲听模式（SentencePlaybackEngine） ==========
+  // ========== 盲听模式（BlindPracticeFlowEngine） ==========
+
+  /// 准备盲听引擎当前句数据。
+  void _prepareBlindFlow({int? startIndex}) {
+    _blindEngine.prepare(
+      sentences: _sentences,
+      startIndex: startIndex ?? state.currentSentenceIndex,
+      config: BlindPracticeFlowConfig(
+        getRepeatCount: (_) =>
+            state.isManualMode ? 1 : state.settings.blindListenRepeatCount,
+        getRepeatIntervalDuration: (sentence) =>
+            listenAndRepeatPauseCalculator(sentence.duration),
+        getSentenceIntervalDuration: (sentence) =>
+            state.settings.calculateInterSentencePause(sentence.duration),
+        onSentencePlayed: _recorder.onSentencePlayed,
+      ),
+    );
+  }
+
+  /// 启动盲听流程。
+  Future<void> _startBlindFlow({bool autoplay = true}) async {
+    if (_sentences.isEmpty) return;
+    _prepareBlindFlow();
+    _persistCurrentSentenceIndexAsync();
+    if (autoplay) {
+      await _blindEngine.startPlaying();
+      return;
+    }
+    await _blindEngine.restartCurrentSentence(autoplay: false);
+  }
+
+  /// 盲听引擎状态变化回调。
+  void _onBlindFlowStateChanged(BlindPracticeFlowState flowState) {
+    final previousIndex = state.currentSentenceIndex;
+    final phase = flowState.phase;
+    final interval = phase is BlindWaitingInterval ? phase : null;
+    final sentenceChanged = previousIndex != flowState.sentenceIndex;
+
+    state = state.copyWith(
+      blindFlowState: flowState,
+      currentSentenceIndex: flowState.sentenceIndex,
+      currentPlayCount: flowState.repeatIndex + 1,
+      isPlaying: phase is BlindPlayingPrompt,
+      isPauseBetweenPlays: interval != null,
+      isPauseBetweenSentences: interval?.isBetweenSentences ?? false,
+      pauseDuration: interval?.total ?? Duration.zero,
+      pauseRemaining: interval?.remaining ?? Duration.zero,
+      isCountdownPaused: interval?.isPaused ?? false,
+      isCountdownFastForward: interval == null
+          ? false
+          : state.isCountdownFastForward,
+      isAnnotationMode: false,
+      stepFinished: phase is BlindSessionCompleted,
+      isTextRevealed: sentenceChanged ? false : state.isTextRevealed,
+      isManualForSentence: sentenceChanged ? false : state.isManualForSentence,
+    );
+
+    if (phase is BlindSessionCompleted) {
+      _trackDifficultPracticeComplete();
+    }
+
+    if (sentenceChanged) {
+      _persistCurrentSentenceIndexAsync();
+    }
+  }
+
+  /// 播放一遍盲听原句。
+  Future<bool> _playSentenceForBlind(Sentence sentence, int flowToken) async {
+    final engine = ref.read(audioEngineProvider.notifier);
+    final sessionId = engine.newSession();
+    await engine.playClipOnce(sentence, sessionId);
+    return true;
+  }
 
   /// 异步保存断点
   void _persistCurrentSentenceIndexAsync() {
@@ -674,118 +834,35 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     );
   }
 
-  /// 盲听播放当前句子
-  Future<void> _startSentence({int startPlayCount = 1}) async {
-    final sentence = currentSentence;
-    if (sentence == null) return;
-
-    if (sentence.duration <= Duration.zero) {
-      await _autoAdvance();
+  /// 跟读完成后直接进入下一句，不回到当前句的盲听倒计时。
+  Future<void> _advanceAfterAnnotationCompleted() async {
+    final isLastSentence =
+        state.currentSentenceIndex >= state.totalSentences - 1;
+    if (isLastSentence) {
+      state = state.copyWith(
+        isPlaying: false,
+        isPauseBetweenPlays: false,
+        isPauseBetweenSentences: false,
+        stepFinished: true,
+      );
+      _trackDifficultPracticeComplete();
       return;
     }
 
-    final repeatCount = state.isManualMode
-        ? 1
-        : state.settings.blindListenRepeatCount;
-
     state = state.copyWith(
-      isPlaying: true,
-      currentPlayCount: startPlayCount,
+      currentSentenceIndex: state.currentSentenceIndex + 1,
+      currentPlayCount: 1,
+      isTextRevealed: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
-      stepFinished: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      isAnnotationMode: false,
+      isManualForSentence: false,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-    _persistCurrentSentenceIndexAsync();
-
-    await _engine.playSentenceLoop(
-      sentence: sentence,
-      repeatCount: repeatCount,
-      startPlayCount: startPlayCount,
-      pauseCalculator: repeatCount > 1
-          ? listenAndRepeatPauseCalculator
-          : (_) => Duration.zero,
-      onPlayCountChanged: repeatCount > 1
-          ? (count) {
-              state = state.copyWith(currentPlayCount: count, isPlaying: true);
-            }
-          : (_) {},
-      onPauseStarted: repeatCount > 1
-          ? (dur) {
-              state = state.copyWith(
-                isPauseBetweenPlays: true,
-                isPlaying: false,
-                isCountdownPaused: false,
-                isCountdownFastForward: false,
-                pauseDuration: dur,
-                pauseRemaining: dur,
-              );
-            }
-          : (_) {},
-      onPauseEnded: repeatCount > 1
-          ? () {
-              state = state.copyWith(isPauseBetweenPlays: false);
-            }
-          : () {},
-      onTick: repeatCount > 1
-          ? (remaining) {
-              state = state.copyWith(pauseRemaining: remaining);
-            }
-          : (_) {},
-      onAllPlaysCompleted: () async {
-        await _autoAdvance();
-      },
-    );
-  }
-
-  /// 自动推进到下一句
-  Future<void> _autoAdvance() async {
-    final isLastSentence =
-        state.currentSentenceIndex >= state.totalSentences - 1;
-
-    final sentence = currentSentence;
-    final pauseDur = sentence != null
-        ? state.settings.calculateInterSentencePause(sentence.duration)
-        : const Duration(seconds: 1);
-
-    await _engine.autoAdvance(
-      pauseDuration: pauseDur,
-      onPauseStarted: (dur) {
-        state = state.copyWith(
-          isPlaying: false,
-          isPauseBetweenPlays: true,
-          isPauseBetweenSentences: true,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: dur,
-          pauseRemaining: dur,
-        );
-      },
-      onTick: (remaining) {
-        state = state.copyWith(pauseRemaining: remaining);
-      },
-      onAdvance: () async {
-        if (isLastSentence) {
-          state = state.copyWith(
-            isPlaying: false,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
-            stepFinished: true,
-          );
-          _trackDifficultPracticeComplete();
-        } else {
-          state = state.copyWith(
-            currentSentenceIndex: state.currentSentenceIndex + 1,
-            currentPlayCount: 1,
-            isTextRevealed: false,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
-            isAnnotationMode: false,
-            isManualForSentence: false,
-          );
-          await _startSentence();
-        }
-      },
-    );
+    await _startBlindFlow();
   }
 
   /// 上报完成事件

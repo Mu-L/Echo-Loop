@@ -32,6 +32,7 @@ import 'package:fluency/providers/learning_session/intensive_listen_player_provi
 import 'package:fluency/providers/learning_session/retell_player_provider.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:fluency/providers/repeat_flow/repeat_flow_engine.dart';
 import 'package:fluency/providers/daily_study_time_provider.dart';
 import 'package:fluency/providers/speech_practice_session_provider.dart';
 import 'package:fluency/providers/speech/speech_recording_controller.dart';
@@ -612,9 +613,7 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
   }
 
   @override
-  Future<LearningProgress> getLatestOrEnsureProgress(
-    String audioItemId,
-  ) async {
+  Future<LearningProgress> getLatestOrEnsureProgress(String audioItemId) async {
     final existing = state.progressMap[audioItemId];
     if (existing != null) return existing;
     return ensureProgress(audioItemId);
@@ -971,6 +970,7 @@ class TestIntensiveListenPlayer extends IntensiveListenPlayer {
 class TestReviewDifficultPractice extends ReviewDifficultPractice {
   final ReviewDifficultPracticeState _initialState;
   List<Sentence> _testSentences;
+  RepeatFlowEngine? _testRepeatEngine;
 
   TestReviewDifficultPractice([
     this._initialState = const ReviewDifficultPracticeState(),
@@ -989,6 +989,42 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
 
   @override
   List<Sentence> get sentences => List.unmodifiable(_testSentences);
+
+  @override
+  RepeatFlowEngine? get repeatEngine {
+    if (!state.isAnnotationMode) return null;
+    final sentence = currentSentence;
+    if (sentence == null) return null;
+
+    _testRepeatEngine ??= RepeatFlowEngine(
+      onStateChanged: (_) {},
+      callbacks: RepeatFlowCallbacks(
+        pauseAudio: () {},
+        playSentence: (_, _) async {},
+        startRecording:
+            ({
+              required String promptId,
+              required String referenceText,
+              required Duration maxDuration,
+            }) {},
+        cancelRecording: () async {},
+        stopAndEvaluate: ({required String referenceText}) async {},
+        clearRecording: () {},
+        setMaxRecordingDuration: (_) {},
+        hasDetectedSpeech: () => false,
+      ),
+    );
+    _testRepeatEngine!.prepare(
+      sentences: [sentence],
+      config: RepeatFlowConfig(
+        audioItemId: 'test-audio',
+        getRepeatCount: (_) => 3,
+        getIntervalDuration: (_) => const Duration(seconds: 3),
+        isManualMode: () => state.isManualMode,
+      ),
+    );
+    return _testRepeatEngine;
+  }
 
   @override
   int get currentIndex => state.currentSentenceIndex;
@@ -1066,7 +1102,16 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
   }
 
   @override
-  void updateSettings(DifficultPracticeSettings newSettings) {
+  void enterWaitingForUserInBlindMode() {
+    state = state.copyWith(
+      isPlaying: false,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+    );
+  }
+
+  @override
+  Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
     state = state.copyWith(settings: newSettings, isPlaying: false);
   }
 
@@ -1079,10 +1124,7 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
     _testSentences = List.from(_testSentences)..removeAt(removedIndex);
 
     if (_testSentences.isEmpty) {
-      state = state.copyWith(
-        isPlaying: false,
-        totalSentences: 0,
-      );
+      state = state.copyWith(isPlaying: false, totalSentences: 0);
       return removed;
     }
 
@@ -1100,6 +1142,16 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
     );
 
     return removed;
+  }
+
+  @override
+  Future<void> toggleCurrentBookmark(String audioItemId) async {
+    final sentence = currentSentence;
+    if (sentence == null) return;
+    _testSentences[state.currentSentenceIndex] = sentence.copyWith(
+      isBookmarked: !sentence.isBookmarked,
+    );
+    state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
   }
 
   @override
@@ -1145,7 +1197,6 @@ class TestReviewDifficultPractice extends ReviewDifficultPractice {
     }
   }
 
-  @override
   Future<void> completePausedTurn() async {
     // 测试用：不执行实际逻辑
   }
@@ -1483,8 +1534,7 @@ class TestSpeechRecordingController extends SpeechRecordingController {
   });
 
   @override
-  SpeechRecordingState build() =>
-      SpeechRecordingState(phase: initialPhase);
+  SpeechRecordingState build() => SpeechRecordingState(phase: initialPhase);
 
   @override
   Future<void> startRecording({
@@ -1556,11 +1606,16 @@ class _NoOpStudyTimeService implements StudyTimeService {
   @override
   Future<int> getTodayStudyTime() async => 0;
   @override
-  Future<void> addStudyTime(int seconds, {DateTime? date, StudyStage? stage}) async {}
+  Future<void> addStudyTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {}
   @override
   Future<int> getStudyStreak({DateTime? now}) async => 0;
   @override
-  Future<List<int>> getWeeklyStudyTimes({DateTime? now}) async => List.filled(7, 0);
+  Future<List<int>> getWeeklyStudyTimes({DateTime? now}) async =>
+      List.filled(7, 0);
   @override
   Future<int> getWeekTotalStudyTime({DateTime? now}) async => 0;
   @override
@@ -1580,19 +1635,31 @@ class _NoOpStudyTimeService implements StudyTimeService {
   @override
   Future<int> getTodayInputTime() async => 0;
   @override
-  Future<void> addInputTime(int seconds, {DateTime? date, StudyStage? stage}) async {}
+  Future<void> addInputTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {}
   @override
-  Future<List<int>> getWeeklyInputTimes({DateTime? now}) async => List.filled(7, 0);
+  Future<List<int>> getWeeklyInputTimes({DateTime? now}) async =>
+      List.filled(7, 0);
   @override
   Future<int> getOutputTime(DateTime date) async => 0;
   @override
   Future<int> getTodayOutputTime() async => 0;
   @override
-  Future<void> addOutputTime(int seconds, {DateTime? date, StudyStage? stage}) async {}
+  Future<void> addOutputTime(
+    int seconds, {
+    DateTime? date,
+    StudyStage? stage,
+  }) async {}
   @override
-  Future<List<int>> getWeeklyOutputTimes({DateTime? now}) async => List.filled(7, 0);
+  Future<List<int>> getWeeklyOutputTimes({DateTime? now}) async =>
+      List.filled(7, 0);
   @override
-  Future<List<DailyStageStudyRecordData>> getStageBreakdown(DateTime date) async => [];
+  Future<List<DailyStageStudyRecordData>> getStageBreakdown(
+    DateTime date,
+  ) async => [];
   @override
   Future<DailyTotalData?> getDayTotal(DateTime date) async => null;
 }

@@ -15,11 +15,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import '../../database/app_database.dart' as db;
 import '../../services/app_logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../database/daos/bookmark_dao.dart';
-import '../../models/audio_item.dart';
+import '../../models/audio_item.dart' as model;
 import '../../models/bookmark_sentence.dart';
 import '../../models/difficult_practice_settings.dart';
 import '../../models/sentence.dart';
@@ -30,15 +31,23 @@ import '../../services/study_event_recorder.dart';
 import '../../services/study_time_service.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../blind_flow/blind_practice_flow_engine.dart';
+import '../blind_flow/blind_practice_flow_phase.dart';
+import '../blind_flow/blind_practice_flow_state.dart';
 import '../daily_study_time_provider.dart';
 import '../learned_vocabulary_tracker_provider.dart';
+import '../listening_practice/bookmark_manager.dart';
+import '../repeat_flow/repeat_flow_engine.dart';
+import '../repeat_flow/repeat_flow_phase.dart';
+import '../repeat_flow/repeat_flow_state.dart';
 import '../study_stats_provider.dart';
-import 'countdown_controller.dart';
 import 'review_difficult_practice_provider.dart';
 import 'sentence_playback_engine.dart';
 import '../speech/speech_recording_controller.dart';
 
 part 'bookmark_review_provider.g.dart';
+
+typedef BookmarkReviewAudioLoader = Future<db.AudioItem?> Function(String);
 
 /// 收藏复习 Provider
 ///
@@ -56,19 +65,13 @@ class BookmarkReview extends _$BookmarkReview {
   late StudyEventRecorder _recorder;
 
   /// 获取 AudioItemDao 的回调（通过 ref 注入）
-  late dynamic Function(String) _getAudioItemById;
+  late BookmarkReviewAudioLoader _getAudioItemById;
 
   /// 学习时长存储服务
   late StudyTimeService _studyTimeService;
 
   /// 学习计时器
   final Stopwatch _studyStopwatch = Stopwatch();
-
-  /// 评估后倒计时控制器
-  final CountdownController _countdown = CountdownController();
-
-  /// 倒计时运行 ID（用于使过期倒计时失效）
-  int _countdownRunId = 0;
 
   /// 周期保存定时器（每 _maxSessionSeconds 自动保存并重置计时器）
   Timer? _periodicSaveTimer;
@@ -81,6 +84,23 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// App 生命周期监听器，用于在后台暂停计时
   late AppLifecycleListener _lifecycleListener;
+
+  /// 跟读流程引擎（跟读模式时创建，退出时销毁）
+  RepeatFlowEngine? _repeatEngine;
+
+  /// 盲听流程引擎
+  late BlindPracticeFlowEngine _blindEngine;
+
+  BlindPracticeFlowEngine _createBlindEngine() {
+    return BlindPracticeFlowEngine(
+      onStateChanged: _onBlindFlowStateChanged,
+      callbacks: BlindPracticeFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
+        playSentence: _playSentenceForBlind,
+      ),
+      logTag: 'BookmarkBlind',
+    );
+  }
 
   @override
   ReviewDifficultPracticeState build() {
@@ -102,12 +122,15 @@ class BookmarkReview extends _$BookmarkReview {
       getEngine: () => ref.read(audioEngineProvider.notifier),
       recorder: _recorder,
     );
+    _blindEngine = _createBlindEngine();
     _lifecycleListener = AppLifecycleListener(
       onStateChange: _onAppLifecycleStateChanged,
     );
+    ref.listen(speechRecordingControllerProvider, _onRecordingStateChanged);
     ref.onDispose(() {
       _engine.cleanup();
-      _countdown.cancel();
+      _blindEngine.dispose();
+      _repeatEngine?.dispose();
       _periodicSaveTimer?.cancel();
       _saveAndRefreshStudyTime();
       _lifecycleListener.dispose();
@@ -163,9 +186,13 @@ class BookmarkReview extends _$BookmarkReview {
   /// [getAudioItemById] 根据 audioItemId 获取 AudioItem 行数据
   void initialize(
     List<BookmarkWithAudio> bookmarks, {
-    required Future<dynamic> Function(String) getAudioItemById,
+    required BookmarkReviewAudioLoader getAudioItemById,
   }) {
     _engine.cleanup();
+    _blindEngine.dispose();
+    _blindEngine = _createBlindEngine();
+    _repeatEngine?.dispose();
+    _repeatEngine = null;
     _getAudioItemById = getAudioItemById;
 
     // 过滤掉无效书签（迁移遗留的 startTime==endTime==0 条目）
@@ -213,6 +240,7 @@ class BookmarkReview extends _$BookmarkReview {
       currentSentenceIndex: 0,
       totalSentences: _sentences.length,
     );
+    _prepareBlindFlow();
 
     // 启动学习计时 + 周期保存
     _studyStopwatch.reset();
@@ -220,26 +248,51 @@ class BookmarkReview extends _$BookmarkReview {
     _schedulePeriodicSave();
 
     // 注入 recorder 到录音控制器
-    ref
-        .read(speechRecordingControllerProvider.notifier)
-        .setRecorder(_recorder);
+    ref.read(speechRecordingControllerProvider.notifier).setRecorder(_recorder);
   }
 
   /// 更新练习设置（仅会话内生效）
   ///
-  /// 更新后中断当前播放，以新设置重新开始当前句子。
-  void updateSettings(DifficultPracticeSettings newSettings) {
+  /// 设置更新后立即应用到当前句。
+  Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
+    final wasAnnotation = state.isAnnotationMode;
+    final annotationWaitingForUser =
+        state.repeatFlowState?.phase is WaitingForUser ||
+        (_repeatEngine?.willEnterWaitingAfterCurrentPrompt ?? false);
+    final blindWaitingForUser =
+        state.blindFlowState?.phase is BlindWaitingForUser ||
+        _blindEngine.willEnterWaitingAfterCurrentPrompt;
+    if (wasAnnotation &&
+        _repeatEngine?.willEnterWaitingAfterCurrentPrompt == true) {
+      state = state.copyWith(settings: newSettings);
+      return;
+    }
+    if (!wasAnnotation && _blindEngine.willEnterWaitingAfterCurrentPrompt) {
+      state = state.copyWith(settings: newSettings);
+      return;
+    }
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    _blindEngine.stopSession();
+    _exitAnnotationMode();
+
     state = state.copyWith(
       settings: newSettings,
+      currentPlayCount: 1,
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
-      isPostEvalCountdown: false,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
+
+    if (wasAnnotation) {
+      _startRepeatFlow(autoplay: !annotationWaitingForUser);
+      return;
+    }
+
+    await _startBlindFlow(autoplay: !blindWaitingForUser);
   }
 
   /// 当前句进入手动模式（工具栏点击、手动停止播放等触发）
@@ -248,9 +301,11 @@ class BookmarkReview extends _$BookmarkReview {
   void enterManualForSentence() {
     if (state.isManualForSentence) return;
     state = state.copyWith(isManualForSentence: true);
-    _engine.pauseCountdown();
-    // 取消评估后倒计时，防止手动模式下自动推进
-    _invalidatePostEvalCountdown();
+    if (state.isAnnotationMode) {
+      _repeatEngine?.enterWaitingForUser();
+    } else {
+      unawaited(_blindEngine.restartCurrentSentence(autoplay: false));
+    }
   }
 
   /// 获取当前句子索引
@@ -268,10 +323,13 @@ class BookmarkReview extends _$BookmarkReview {
       ? _sentences[state.currentSentenceIndex]
       : null;
 
+  /// 跟读流程引擎（跟读模式时有值，供 Screen 读取 engine API）
+  RepeatFlowEngine? get repeatEngine => _repeatEngine;
+
   /// 开始播放
   Future<void> startPlaying() async {
     if (_sentences.isEmpty) return;
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 外部中断播放通知（如意群播放）
@@ -284,11 +342,16 @@ class BookmarkReview extends _$BookmarkReview {
   /// 暂停播放
   void pause() {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    if (state.isAnnotationMode) {
+      _repeatEngine?.enterWaitingForUser();
+    } else {
+      _blindEngine.enterWaitingForUser();
+    }
     _studyStopwatch.stop();
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
       isCountdownPaused: false,
       isCountdownFastForward: false,
     );
@@ -301,22 +364,29 @@ class BookmarkReview extends _$BookmarkReview {
   Future<void> resume() async {
     _studyStopwatch.start();
     if (state.isAnnotationMode) {
-      _startShadowReading(startPlayCount: state.currentPlayCount);
+      _repeatEngine?.replayCurrentSentence();
       return;
     }
-    await _startSentence(startPlayCount: state.currentPlayCount);
+    await _blindEngine.replayCurrentSentence();
   }
 
   /// 进入跟读模式（听不懂）
   void enterAnnotationMode() {
     if (state.isAnnotationMode) return;
     _engine.invalidateSession();
-    _startShadowReading();
+    _blindEngine.stopSession();
+    _startRepeatFlow();
   }
 
   /// 设置偷看字幕状态
   void setTextRevealed(bool revealed) {
     state = state.copyWith(isTextRevealed: revealed);
+  }
+
+  /// 盲听模式下，用户显式接管流程（设置/偷看/查词）。
+  void enterWaitingForUserInBlindMode() {
+    if (state.isAnnotationMode) return;
+    _blindEngine.enterWaitingForUser(afterCurrentPrompt: true);
   }
 
   /// 取消当前句子的收藏
@@ -326,7 +396,8 @@ class BookmarkReview extends _$BookmarkReview {
     if (_sentences.isEmpty) return null;
 
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    _blindEngine.stopSession();
+    _exitAnnotationMode();
 
     final removedIndex = state.currentSentenceIndex;
     final removed = _sentences[removedIndex];
@@ -349,29 +420,58 @@ class BookmarkReview extends _$BookmarkReview {
       isTextRevealed: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
       currentPlayCount: 1,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
 
     return removed;
   }
 
   /// 切换当前句子的收藏标记（不从列表移除）
-  ///
-  /// 仅更新内存中的 isBookmarked 状态并触发 UI 重建，
-  /// DB 操作由 Screen 层负责。
-  void toggleCurrentBookmark() {
+  Future<void> toggleCurrentBookmark() async {
     if (_sentences.isEmpty) return;
     final idx = state.currentSentenceIndex;
     final s = _sentences[idx];
+    final wasBookmarked = s.sentence.isBookmarked;
     _sentences[idx] = s.copyWithBookmark(!s.sentence.isBookmarked);
-    state = state.copyWith(bookmarkVersion: state.bookmarkVersion + 1);
+    state = state.copyWith();
+
+    final bookmarkDao = ref.read(bookmarkDaoProvider);
+    if (wasBookmarked) {
+      await bookmarkDao.removeBookmark(s.audioItemId, s.originalSentenceIndex);
+      return;
+    }
+
+    await BookmarkManager.addBookmarkToDb(
+      s.audioItemId,
+      s.sentence,
+      dao: bookmarkDao,
+    );
+  }
+
+  /// 同步录音控制器模式，并在切到手动模式时取消活跃录音。
+  void syncRecordingMode() {
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
+    controller.setManualMode(state.isManualMode);
+
+    if (!state.isManualMode) return;
+
+    final recState = ref.read(speechRecordingControllerProvider);
+    if (recState.phase == SpeechRecordingPhase.awaitingSpeech ||
+        recState.phase == SpeechRecordingPhase.speaking) {
+      unawaited(controller.cancelActiveRecording());
+    }
   }
 
   /// 跳到下一句
   Future<void> goToNext() async {
     if (state.currentSentenceIndex >= state.totalSentences - 1) return;
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    _exitAnnotationMode();
+    _blindEngine.stopSession();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex + 1,
       currentPlayCount: 1,
@@ -382,15 +482,18 @@ class BookmarkReview extends _$BookmarkReview {
       isCountdownPaused: false,
       isCountdownFastForward: false,
       isManualForSentence: false,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 跳到上一句
   Future<void> goToPrevious() async {
     if (state.currentSentenceIndex <= 0) return;
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    _exitAnnotationMode();
+    _blindEngine.stopSession();
     state = state.copyWith(
       currentSentenceIndex: state.currentSentenceIndex - 1,
       currentPlayCount: 1,
@@ -401,189 +504,77 @@ class BookmarkReview extends _$BookmarkReview {
       isCountdownPaused: false,
       isCountdownFastForward: false,
       isManualForSentence: false,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-    await _startSentence();
+    await _startBlindFlow();
   }
 
   /// 暂停倒计时
   void pauseCountdown() {
-    _engine.pauseCountdown();
-    state = state.copyWith(isCountdownPaused: true);
+    if (state.isAnnotationMode) {
+      _repeatEngine?.pauseInterval();
+      return;
+    }
+    _blindEngine.pauseInterval();
   }
 
   /// 恢复倒计时
   void resumeCountdown() {
-    _engine.resumeCountdown();
-    state = state.copyWith(isCountdownPaused: false);
+    if (state.isAnnotationMode) {
+      _repeatEngine?.resumeInterval();
+      return;
+    }
+    _blindEngine.resumeInterval();
+  }
+
+  /// 盲听倒计时快进。
+  void toggleCountdownFastForward() {
+    if (state.isAnnotationMode) return;
+    final isFF = !state.isCountdownFastForward;
+    _blindEngine.setIntervalSpeed(isFF ? kBlindFastForwardSpeed : 1.0);
+    if (state.isCountdownPaused) {
+      _blindEngine.resumeInterval();
+    }
+    state = state.copyWith(
+      isCountdownFastForward: isFF,
+      isCountdownPaused: false,
+    );
   }
 
   /// 倒计时期间重播当前句子
   Future<void> replayDuringCountdown() async {
-    _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
     if (state.isAnnotationMode) {
-      _startShadowReading(startPlayCount: state.currentPlayCount);
-    } else {
-      state = state.copyWith(
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-      );
-      await _startSentence(startPlayCount: state.currentPlayCount);
+      await _repeatEngine?.replayCurrentSentence();
+      return;
     }
-  }
-
-  /// 录音评估完成后启动 review 倒计时（5s）。
-  ///
-  /// 仅在跟读模式（annotationMode）下生效。
-  void startPostEvaluationPause() {
-    if (!state.isPauseBetweenPlays) return;
-    if (!state.isAnnotationMode) return;
-    if (state.totalSentences == 0) return;
-    if (state.isManualMode) return;
-
-    const pauseDuration = Duration(seconds: 5);
-    final runId = ++_countdownRunId;
-
-    state = state.copyWith(
-      isPostEvalCountdown: true,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      pauseDuration: pauseDuration,
-      pauseRemaining: pauseDuration,
-    );
-
-    _countdown
-        .start(pauseDuration, (remaining) {
-          state = state.copyWith(pauseRemaining: remaining);
-        })
-        .then((_) {
-          if (runId == _countdownRunId &&
-              state.isPauseBetweenPlays &&
-              state.isAnnotationMode) {
-            completePausedTurn();
-          }
-        });
-  }
-
-  /// 暂停评估后倒计时
-  void pausePostEvalCountdown() {
-    if (!_countdown.isActive || _countdown.isPaused) return;
-    _countdown.pause();
-    state = state.copyWith(isCountdownPaused: true);
-  }
-
-  /// 恢复评估后倒计时
-  void resumePostEvalCountdown() {
-    if (!_countdown.isActive || !_countdown.isPaused) return;
-    _countdown.resume();
-    state = state.copyWith(isCountdownPaused: false);
-  }
-
-  /// 取消评估后倒计时（不推进到下一句）
-  void cancelPostEvalCountdown() {
-    _invalidatePostEvalCountdown();
-    state = state.copyWith(
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      pauseRemaining: Duration.zero,
-    );
-  }
-
-  /// 使当前评估后倒计时失效，同时清除 state 中的倒计时标志
-  ///
-  /// 将 timer 取消和 state 清除合并在一起，避免调用点遗漏 copyWith。
-  void _invalidatePostEvalCountdown() {
-    _countdownRunId += 1;
-    _countdown.cancel();
-    if (state.isPostEvalCountdown) {
-      state = state.copyWith(
-        isPostEvalCountdown: false,
-        isCountdownPaused: false,
-      );
-    }
+    _engine.invalidateSession();
+    await _blindEngine.replayCurrentSentence();
   }
 
   /// 强制完成（用户在最后一句主动点击完成按钮）
   void forceComplete() {
     _engine.invalidateSession();
-    _invalidatePostEvalCountdown();
+    _blindEngine.stopSession();
+    _exitAnnotationMode();
     _studyStopwatch.stop();
     _stopPeriodicSaveTimer();
     state = state.copyWith(
       isPlaying: false,
       isPauseBetweenPlays: false,
       isPauseBetweenSentences: false,
+      clearRepeatFlowState: true,
+      clearBlindFlowState: true,
     );
-  }
-
-  /// 立即完成当前停顿回合，继续后续播放流程。
-  ///
-  /// 由录音评估完成后的倒计时或 screen 层直接调用。
-  Future<void> completePausedTurn() async {
-    _invalidatePostEvalCountdown();
-    if (!state.isPauseBetweenPlays || !state.isAnnotationMode) return;
-
-    // 句间停顿 → 走 autoAdvance 逻辑
-    if (state.isPauseBetweenSentences) {
-      final isLastSentence =
-          state.currentSentenceIndex >= state.totalSentences - 1;
-      _engine.invalidateSession();
-      state = state.copyWith(
-        isPauseBetweenPlays: false,
-        isPauseBetweenSentences: false,
-        isPostEvalCountdown: false,
-        isCountdownPaused: false,
-        isCountdownFastForward: false,
-        pauseRemaining: Duration.zero,
-        isAnnotationMode: false,
-      );
-      if (isLastSentence) {
-        // 复习完成，停止计时
-        _studyStopwatch.stop();
-        _stopPeriodicSaveTimer();
-        state = state.copyWith(isPlaying: false, stepFinished: true);
-      } else {
-        state = state.copyWith(
-          currentSentenceIndex: state.currentSentenceIndex + 1,
-          currentPlayCount: 1,
-          isTextRevealed: false,
-        );
-        await _startSentence();
-      }
-      return;
-    }
-
-    // 遍间停顿：递增遍数
-    _engine.invalidateSession();
-    state = state.copyWith(
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isPostEvalCountdown: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      pauseRemaining: Duration.zero,
-    );
-
-    final nextPlayCount = state.currentPlayCount + 1;
-    if (nextPlayCount > state.targetRepeatCount) {
-      // 跟读遍数用完 → 退出跟读模式 → autoAdvance
-      state = state.copyWith(isAnnotationMode: false, isPlaying: false);
-      await _autoAdvance();
-      return;
-    }
-
-    // 还有遍数 → 继续下一遍
-    _startShadowReading(startPlayCount: nextPlayCount);
   }
 
   /// 重置到第一句并重新乱序播放（"再来一遍"）
   Future<void> resetToStart() async {
-    _invalidatePostEvalCountdown();
+    _exitAnnotationMode();
     // 先保存已累计时间
     _saveAndRefreshStudyTime();
     _engine.cleanup();
+    _blindEngine.stopSession();
 
     // 重新按音频分组乱序
     final grouped = <String, List<BookmarkSentence>>{};
@@ -600,6 +591,7 @@ class BookmarkReview extends _$BookmarkReview {
       currentSentenceIndex: 0,
       totalSentences: _sentences.length,
     );
+    _prepareBlindFlow();
 
     // 重新启动计时 + 周期保存
     _studyStopwatch.reset();
@@ -615,8 +607,116 @@ class BookmarkReview extends _$BookmarkReview {
     _stopPeriodicSaveTimer();
     _saveAndRefreshStudyTime();
     _engine.cleanup();
+    _blindEngine.stopSession();
+    _repeatEngine?.dispose();
+    _repeatEngine = null;
     _sentences = [];
     state = const ReviewDifficultPracticeState();
+  }
+
+  // ========== 跟读模式（RepeatFlowEngine） ==========
+
+  /// 启动跟读流程引擎
+  void _startRepeatFlow({bool autoplay = true}) {
+    final sentence = currentSentence;
+    final bookmarkSentence = currentBookmarkSentence;
+    if (sentence == null ||
+        bookmarkSentence == null ||
+        sentence.duration <= Duration.zero) {
+      return;
+    }
+
+    _repeatEngine ??= RepeatFlowEngine(
+      onStateChanged: _onRepeatFlowStateChanged,
+      callbacks: RepeatFlowCallbacks(
+        pauseAudio: () => ref.read(audioEngineProvider.notifier).pause(),
+        playSentence: _playSentenceForRepeat,
+        startRecording: _startRecordingForRepeat,
+        cancelRecording: _cancelRecordingForRepeat,
+        stopAndEvaluate: _stopAndEvaluateForRepeat,
+        clearRecording: _clearRecordingForRepeat,
+        setMaxRecordingDuration: _setMaxRecordingDuration,
+        hasDetectedSpeech: _hasDetectedSpeech,
+      ),
+      logTag: 'BookmarkRepeat',
+    );
+
+    _repeatEngine!.prepare(
+      sentences: [sentence],
+      config: RepeatFlowConfig(
+        audioItemId: bookmarkSentence.audioItemId,
+        promptIdPrefix: 'bookmark',
+        getRepeatCount: (_) => state.targetRepeatCount,
+        getIntervalDuration: (s) => listenAndRepeatPauseCalculator(s.duration),
+        isManualMode: () => state.isManualMode,
+      ),
+    );
+
+    state = state.copyWith(
+      isAnnotationMode: true,
+      isPlaying: autoplay,
+      isPauseBetweenPlays: false,
+      isPauseBetweenSentences: false,
+      isTextRevealed: false,
+      isCountdownPaused: false,
+      isCountdownFastForward: false,
+      stepFinished: false,
+    );
+
+    if (autoplay) {
+      unawaited(_repeatEngine!.startPlaying());
+    } else {
+      unawaited(_repeatEngine!.restartCurrentSentence(autoplay: false));
+    }
+  }
+
+  /// 跟读引擎状态变化回调
+  void _onRepeatFlowStateChanged(RepeatFlowState flowState) {
+    state = state.copyWith(
+      repeatFlowState: flowState,
+      currentPlayCount: flowState.repeatIndex + 1,
+      isPlaying: flowState.phase is PlayingPrompt,
+      isPauseBetweenPlays: flowState.isInPause,
+    );
+
+    if (flowState.phase is SessionCompleted) {
+      _exitAnnotationMode();
+      state = state.copyWith(
+        isAnnotationMode: false,
+        isPlaying: false,
+        isPauseBetweenPlays: false,
+        clearRepeatFlowState: true,
+      );
+      unawaited(_blindEngine.startPlaying());
+    }
+  }
+
+  /// 退出跟读模式（停止引擎）
+  void _exitAnnotationMode() {
+    _repeatEngine?.stopSession();
+  }
+
+  /// 录音状态变化 → 桥接到跟读引擎
+  void _onRecordingStateChanged(
+    SpeechRecordingState? prev,
+    SpeechRecordingState next,
+  ) {
+    if (prev == null || !state.isAnnotationMode || _repeatEngine == null) {
+      return;
+    }
+
+    if (prev.phase == SpeechRecordingPhase.processing &&
+        next.phase == SpeechRecordingPhase.idle &&
+        next.currentAttempt != null) {
+      final attempt = next.currentAttempt!;
+      _repeatEngine!.onRecordingFinished(attempt.filePath, attempt.score);
+    }
+
+    if (_repeatEngine!.state.phase is Recording &&
+        next.phase == SpeechRecordingPhase.idle &&
+        next.currentAttempt == null) {
+      _repeatEngine!.onRecordingCancelled();
+    }
   }
 
   // ========== 内部方法 ==========
@@ -635,7 +735,7 @@ class BookmarkReview extends _$BookmarkReview {
       final row = await _getAudioItemById(bookmarkSentence.audioItemId);
       if (row == null) return false;
 
-      final audioItem = AudioItem(
+      final audioItem = model.AudioItem(
         id: row.id,
         name: row.name,
         audioPath: row.audioPath,
@@ -645,7 +745,9 @@ class BookmarkReview extends _$BookmarkReview {
         sentenceCount: row.sentenceCount,
         wordCount: row.wordCount,
         isStarred: row.isStarred,
-        transcriptSource: TranscriptSource.fromIndex(row.transcriptSource),
+        transcriptSource: model.TranscriptSource.fromIndex(
+          row.transcriptSource,
+        ),
         audioSha256: row.audioSha256,
         transcriptLanguage: row.transcriptLanguage,
       );
@@ -659,138 +761,79 @@ class BookmarkReview extends _$BookmarkReview {
     }
   }
 
-  /// 开始播放当前句子（盲听 N 遍）
-  Future<void> _startSentence({int startPlayCount = 1}) async {
-    final bookmarkSentence = currentBookmarkSentence;
-    if (bookmarkSentence == null) return;
-
-    final sentence = bookmarkSentence.sentence;
-
-    // 跳过零时长句子
-    if (sentence.duration <= Duration.zero) {
-      await _autoAdvance();
-      return;
-    }
-
-    // 确保音频已加载（跨音频切换）
-    final loaded = await _ensureAudioLoaded(bookmarkSentence);
-    if (!loaded) {
-      // 音频加载失败，跳过该句
-      AppLogger.log(
-        'Player',
-        '⚠ 收藏复习跳过句子（音频不可用）: ${bookmarkSentence.audioName}',
-      );
-      await _autoAdvance();
-      return;
-    }
-
-    // 手动模式下盲听只播 1 遍
-    final repeatCount = state.isManualMode
-        ? 1
-        : state.settings.blindListenRepeatCount;
-
-    state = state.copyWith(
-      isPlaying: true,
-      currentPlayCount: startPlayCount,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      stepFinished: false,
-    );
-
-    // 盲听循环：1 遍时无遍间停顿，多遍时使用跟读停顿策略
-    await _engine.playSentenceLoop(
-      sentence: sentence,
-      repeatCount: repeatCount,
-      startPlayCount: startPlayCount,
-      pauseCalculator: repeatCount > 1
-          ? listenAndRepeatPauseCalculator
-          : (_) => Duration.zero,
-      onPlayCountChanged: repeatCount > 1
-          ? (count) {
-              state = state.copyWith(currentPlayCount: count, isPlaying: true);
-            }
-          : (_) {},
-      onPauseStarted: repeatCount > 1
-          ? (dur) {
-              state = state.copyWith(
-                isPauseBetweenPlays: true,
-                isPlaying: false,
-                isCountdownPaused: false,
-                isCountdownFastForward: false,
-                pauseDuration: dur,
-                pauseRemaining: dur,
-              );
-            }
-          : (_) {},
-      onPauseEnded: repeatCount > 1
-          ? () {
-              state = state.copyWith(isPauseBetweenPlays: false);
-            }
-          : () {},
-      onTick: repeatCount > 1
-          ? (remaining) {
-              state = state.copyWith(pauseRemaining: remaining);
-            }
-          : (_) {},
-      onAllPlaysCompleted: () async {
-        await _autoAdvance();
-      },
+  /// 准备盲听引擎。
+  void _prepareBlindFlow({int? startIndex}) {
+    _blindEngine.prepare(
+      sentences: _sentences.map((item) => item.sentence).toList(),
+      startIndex: startIndex ?? state.currentSentenceIndex,
+      config: BlindPracticeFlowConfig(
+        getRepeatCount: (_) =>
+            state.isManualMode ? 1 : state.settings.blindListenRepeatCount,
+        getRepeatIntervalDuration: (sentence) =>
+            listenAndRepeatPauseCalculator(sentence.duration),
+        getSentenceIntervalDuration: (sentence) =>
+            state.settings.calculateInterSentencePause(sentence.duration),
+        onBeforeSentenceStart: _ensureBlindSentenceReady,
+        onSentencePlayed: _recorder.onSentencePlayed,
+      ),
     );
   }
 
-  /// 开始跟读循环（显示字幕，播放 N 遍 + 跟读留白）
-  ///
-  /// [startPlayCount] 从第几遍开始（默认第 1 遍）。
-  void _startShadowReading({int startPlayCount = 1}) {
-    final sentence = currentSentence;
-    if (sentence == null || sentence.duration <= Duration.zero) return;
+  /// 启动盲听流程。
+  Future<void> _startBlindFlow({bool autoplay = true}) async {
+    if (_sentences.isEmpty) return;
+    _prepareBlindFlow();
+    if (autoplay) {
+      await _blindEngine.startPlaying();
+      return;
+    }
+    await _blindEngine.restartCurrentSentence(autoplay: false);
+  }
 
-    final wordCount = countWords(sentence.text);
+  /// 盲听模式确保当前句可播。
+  Future<bool> _ensureBlindSentenceReady(int sentenceIndex) async {
+    if (sentenceIndex < 0 || sentenceIndex >= _sentences.length) return false;
+    return _ensureAudioLoaded(_sentences[sentenceIndex]);
+  }
+
+  /// 盲听引擎状态变化回调。
+  void _onBlindFlowStateChanged(BlindPracticeFlowState flowState) {
+    final previousIndex = state.currentSentenceIndex;
+    final phase = flowState.phase;
+    final interval = phase is BlindWaitingInterval ? phase : null;
+    final sentenceChanged = previousIndex != flowState.sentenceIndex;
 
     state = state.copyWith(
-      isAnnotationMode: true,
-      isPlaying: true,
-      currentPlayCount: startPlayCount,
-      isPauseBetweenPlays: false,
-      isPauseBetweenSentences: false,
-      isTextRevealed: false,
-      isCountdownPaused: false,
-      isCountdownFastForward: false,
-      stepFinished: false,
+      blindFlowState: flowState,
+      currentSentenceIndex: flowState.sentenceIndex,
+      currentPlayCount: flowState.repeatIndex + 1,
+      isPlaying: phase is BlindPlayingPrompt,
+      isPauseBetweenPlays: interval != null,
+      isPauseBetweenSentences: interval?.isBetweenSentences ?? false,
+      pauseDuration: interval?.total ?? Duration.zero,
+      pauseRemaining: interval?.remaining ?? Duration.zero,
+      isCountdownPaused: interval?.isPaused ?? false,
+      isCountdownFastForward: interval == null
+          ? false
+          : state.isCountdownFastForward,
+      isAnnotationMode: false,
+      stepFinished: phase is BlindSessionCompleted,
+      isTextRevealed: sentenceChanged ? false : state.isTextRevealed,
+      isManualForSentence: sentenceChanged ? false : state.isManualForSentence,
     );
 
-    _engine.playSentenceLoop(
-      sentence: sentence,
-      repeatCount: state.targetRepeatCount,
-      startPlayCount: startPlayCount,
-      pauseCalculator: listenAndRepeatPauseCalculator,
-      onPlayCountChanged: (count) {
-        state = state.copyWith(currentPlayCount: count, isPlaying: true);
-      },
-      onPauseStarted: (dur) {
-        // 停顿开始 = 用户跟读 = 输出
-        _addOutputWords(wordCount);
-        state = state.copyWith(
-          isPauseBetweenPlays: true,
-          isPlaying: false,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: dur,
-          pauseRemaining: dur,
-        );
-      },
-      onPauseEnded: () {
-        state = state.copyWith(isPauseBetweenPlays: false);
-      },
-      onTick: (remaining) {
-        state = state.copyWith(pauseRemaining: remaining);
-      },
-      onAllPlaysCompleted: () async {
-        // 最后一遍只有输入，没有跟读停顿
-        // 保持 annotationMode，让句间停顿也触发自动录音（与跟读页一致）
-        await _autoAdvance();
-      },
-    );
+    if (phase is BlindSessionCompleted) {
+      _studyStopwatch.stop();
+      _stopPeriodicSaveTimer();
+    }
+  }
+
+  /// 盲听播放一遍当前句。
+  Future<bool> _playSentenceForBlind(Sentence sentence, int flowToken) async {
+    final engine = ref.read(audioEngineProvider.notifier);
+    final sessionId = engine.newSession();
+    await engine.playClipOnce(sentence, sessionId);
+    return true;
   }
 
   /// 停止计时并保存已记录的学习时长，刷新统计 UI
@@ -833,57 +876,75 @@ class BookmarkReview extends _$BookmarkReview {
     }
   }
 
-  /// 自动推进到下一句（含句间停顿）
-  Future<void> _autoAdvance() async {
-    final isLastSentence =
-        state.currentSentenceIndex >= state.totalSentences - 1;
+  Future<void> _playSentenceForRepeat(Sentence sentence, int flowToken) async {
+    final bookmarkSentence = currentBookmarkSentence;
+    if (bookmarkSentence == null) return;
 
-    // 使用设置计算句间停顿时长
-    final sentence = currentSentence;
-    final pauseDur = sentence != null
-        ? state.settings.calculateInterSentencePause(sentence.duration)
-        : const Duration(seconds: 1);
-
-    await _engine.autoAdvance(
-      pauseDuration: pauseDur,
-      onPauseStarted: (dur) {
+    final loaded = await _ensureAudioLoaded(bookmarkSentence);
+    if (!loaded) {
+      AppLogger.log('BookmarkRepeat', '✗ 跟读模式加载音频失败，跳过当前句');
+      if (state.currentSentenceIndex >= state.totalSentences - 1) {
+        _exitAnnotationMode();
         state = state.copyWith(
+          isAnnotationMode: false,
           isPlaying: false,
-          isPauseBetweenPlays: true,
-          isPauseBetweenSentences: true,
-          isCountdownPaused: false,
-          isCountdownFastForward: false,
-          pauseDuration: dur,
-          pauseRemaining: dur,
+          stepFinished: true,
+          clearRepeatFlowState: true,
         );
-      },
-      onTick: (remaining) {
-        state = state.copyWith(pauseRemaining: remaining);
-      },
-      onAdvance: () async {
-        if (isLastSentence) {
-          // 复习完成，停止计时
-          _studyStopwatch.stop();
-          _stopPeriodicSaveTimer();
-          state = state.copyWith(
-            isPlaying: false,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
-            stepFinished: true,
-          );
-        } else {
-          state = state.copyWith(
-            currentSentenceIndex: state.currentSentenceIndex + 1,
-            currentPlayCount: 1,
-            isTextRevealed: false,
-            isPauseBetweenPlays: false,
-            isPauseBetweenSentences: false,
-            isAnnotationMode: false,
-            isManualForSentence: false,
-          );
-          await _startSentence();
-        }
-      },
+        _studyStopwatch.stop();
+        _stopPeriodicSaveTimer();
+      } else {
+        await goToNext();
+      }
+      return;
+    }
+
+    final engine = ref.read(audioEngineProvider.notifier);
+    final sessionId = engine.newSession();
+    await engine.playClipOnce(sentence, sessionId);
+    unawaited(_addOutputWords(countWords(sentence.text)));
+  }
+
+  void _startRecordingForRepeat({
+    required String promptId,
+    required String referenceText,
+    required Duration maxDuration,
+  }) {
+    final controller = ref.read(speechRecordingControllerProvider.notifier);
+    controller.setMaxRecordingDuration(maxDuration);
+    unawaited(
+      controller.startRecording(
+        promptId: promptId,
+        referenceText: referenceText,
+      ),
     );
+  }
+
+  Future<void> _cancelRecordingForRepeat() async {
+    await ref
+        .read(speechRecordingControllerProvider.notifier)
+        .cancelActiveRecording();
+  }
+
+  Future<void> _stopAndEvaluateForRepeat({
+    required String referenceText,
+  }) async {
+    await ref
+        .read(speechRecordingControllerProvider.notifier)
+        .stopAndEvaluate(referenceText: referenceText);
+  }
+
+  void _clearRecordingForRepeat() {
+    ref.read(speechRecordingControllerProvider.notifier).clearRecording();
+  }
+
+  void _setMaxRecordingDuration(Duration duration) {
+    ref
+        .read(speechRecordingControllerProvider.notifier)
+        .setMaxRecordingDuration(duration);
+  }
+
+  bool _hasDetectedSpeech() {
+    return ref.read(speechRecordingControllerProvider).hasDetectedSpeech;
   }
 }

@@ -1,12 +1,10 @@
-/// 跟读/复述页面共享的底部操作面板
+/// 跟读/复述页面共享的中间操作区
 ///
 /// 布局从上到下：
 /// 1. 评分 badge（可选，点击播放录音）
 /// 2. 中间区域（固定高度）：提示文本 / 倒计时+快进 / 录音按钮+状态标签 / 加载动画（互斥）
-/// 3. 播放控制栏（上一个/播放暂停/下一个）
-/// 4. 遍数 + 模式标签
 ///
-/// 用于跟读、难句补练、收藏复习页面。
+/// 底部播放控制和遍数标签由外部 footer 组件统一负责。
 library;
 
 import 'package:flutter/material.dart';
@@ -15,11 +13,9 @@ import '../../l10n/app_localizations.dart';
 import '../../models/speech_practice_models.dart';
 import '../../providers/speech/speech_recording_controller.dart';
 import '../../theme/app_theme.dart';
-import 'playback_controls.dart';
 import 'processing_indicator.dart';
 import 'recording_button.dart' show RecordingButton, RecordingButtonMode;
 import 'status_label.dart';
-import '../practice/practice_play_count_label.dart';
 
 /// 录音/倒计时区域固定高度（录音面板最高：24 状态 + 4 间距 + 56 按钮 + 16 底部 = 100）
 const double kTurnAreaHeight = 100;
@@ -30,7 +26,7 @@ const double _kPlaybackLeftSpacing = 32 + 48 + 56 + 48;
 /// next 按钮宽度
 const double _kNavButtonSize = 32;
 
-/// 跟读/复述页面共享的底部操作面板
+/// 跟读/复述页面共享的中间操作区
 class RepeatPracticePanel extends StatelessWidget {
   // ========== 评分 badge ==========
 
@@ -66,34 +62,6 @@ class RepeatPracticePanel extends StatelessWidget {
   /// 录音按钮点击回调
   final VoidCallback onRecordTap;
 
-  // ========== 播放控制 ==========
-
-  /// 是否可以返回上一个
-  final bool canGoPrev;
-
-  /// 是否为最后一个
-  final bool isLast;
-
-  /// 中间按钮图标（播放/暂停）
-  final IconData centerIcon;
-
-  /// 上一个回调
-  final VoidCallback onPrevious;
-
-  /// 下一个回调
-  final VoidCallback onNext;
-
-  /// 播放/暂停回调
-  final VoidCallback onCenter;
-
-  // ========== 遍数标签 ==========
-
-  /// 预格式化的遍数文本
-  final String playCountText;
-
-  /// 是否为手动模式
-  final bool isManualMode;
-
   /// 本地化
   final AppLocalizations l10n;
 
@@ -112,14 +80,6 @@ class RepeatPracticePanel extends StatelessWidget {
     this.countdownWidget,
     this.fastForwardButton,
     required this.onRecordTap,
-    required this.canGoPrev,
-    required this.isLast,
-    required this.centerIcon,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onCenter,
-    required this.playCountText,
-    required this.isManualMode,
     required this.l10n,
     required this.theme,
   });
@@ -127,11 +87,7 @@ class RepeatPracticePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: AppSpacing.l,
-        right: AppSpacing.l,
-        bottom: AppSpacing.m,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -146,30 +102,7 @@ class RepeatPracticePanel extends StatelessWidget {
             ),
 
           // 中间区域（固定高度，避免布局跳动）
-          SizedBox(
-            height: kTurnAreaHeight,
-            child: _buildCenterArea(context),
-          ),
-
-          // 播放控制栏
-          PlaybackControls(
-            canGoPrev: canGoPrev,
-            isLast: isLast,
-            centerIcon: centerIcon,
-            onPrevious: onPrevious,
-            onNext: onNext,
-            onCenter: onCenter,
-          ),
-
-          const SizedBox(height: AppSpacing.s),
-
-          // 遍数 + 模式标签
-          PracticePlayCountLabel(
-            isManualMode: isManualMode,
-            playCountText: playCountText,
-            l10n: l10n,
-            theme: theme,
-          ),
+          SizedBox(height: kTurnAreaHeight, child: _buildCenterArea(context)),
         ],
       ),
     );
@@ -220,7 +153,8 @@ class RepeatPracticePanel extends StatelessWidget {
   /// 录音区域（录音按钮+状态标签 / 评估加载动画）
   Widget _buildRecordingArea(BuildContext context) {
     final isRecordingCurrent = turnState.isRecordingPrompt(currentPromptId);
-    final isProcessing = turnState.promptId == currentPromptId &&
+    final isProcessing =
+        turnState.promptId == currentPromptId &&
         turnState.phase == SpeechRecordingPhase.processing;
 
     if (isProcessing) {
@@ -229,25 +163,15 @@ class RepeatPracticePanel extends StatelessWidget {
       );
     }
 
-    // 录音即将开始但 SpeechRecordingController 尚未就绪（异步启动中）：
-    // 无评分、无错误、turnState 还是 idle → 显示 recording 状态避免 flash
     final hasError = currentAttempt?.errorMessage != null;
-    final hasScore = currentAttempt?.score != null;
-    final isStartingRecording = !isRecordingCurrent &&
-        !hasError &&
-        !hasScore &&
-        turnState.phase == SpeechRecordingPhase.idle;
 
     final mode = isRecordingCurrent
         ? switch (turnState.phase) {
             SpeechRecordingPhase.awaitingSpeech ||
-            SpeechRecordingPhase.speaking =>
-              RecordingButtonMode.recording,
+            SpeechRecordingPhase.speaking => RecordingButtonMode.recording,
             _ => RecordingButtonMode.idle,
           }
-        : isStartingRecording
-            ? RecordingButtonMode.recording
-            : RecordingButtonMode.idle;
+        : RecordingButtonMode.idle;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.m),
@@ -267,10 +191,7 @@ class RepeatPracticePanel extends StatelessWidget {
             bold: hasError,
           ),
           const SizedBox(height: AppSpacing.xs),
-          RecordingButton(
-            mode: mode,
-            onTap: onRecordTap,
-          ),
+          RecordingButton(mode: mode, onTap: onRecordTap),
         ],
       ),
     );

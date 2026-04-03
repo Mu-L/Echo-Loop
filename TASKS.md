@@ -1,12 +1,50 @@
 # Fluency 任务清单
 
-> 最后更新：2026-03-30
+> 最后更新：2026-04-03
 > 当前焦点：录音+识别功能
 
 ## 历史归档
 - [Milestone 2 - 学习流程引擎](./docs/tasks-archive/milestone-2-learning-engine.md)
 - [Milestone 3 - 收藏与标注体系 + 体验优化](./docs/tasks-archive/milestone-3-completed.md)
 - [Milestone 4 - 功能完善与体验打磨](./docs/tasks-archive/milestone-4-features-and-polish.md)
+
+---
+
+## 已完成：难句补练/收藏复习盲听等待态状态机化
+
+- [x] 复用现有 `BlindPracticeFlowEngine`，将难句补练盲听流程从布尔状态拼装迁移为显式 phase 状态机
+- [x] `ReviewDifficultPracticeState` 新增 `blindFlowState`，盲听 UI 从状态机派生播放/倒计时/等待态
+- [x] 难句补练页在设置、偷看字幕、查词前统一进入 `WaitingForUser`
+- [x] 收藏复习页盲听流程接入同一套 `BlindPracticeFlowEngine`，跨音频播放前通过 `onBeforeSentenceStart` 预加载音频
+- [x] 修复 blind flow dispose 竞态，Provider 销毁后不再继续回调状态或读取 provider
+- [x] 补充 provider/widget 回归测试，覆盖盲听 `WaitingForUser` 保持、两页设置弹窗进入等待态
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：难句补练/收藏复习单底部控制重构
+
+- [x] 新增 `PracticePlaybackFooter`，统一 `上一句 / 播放 / 下一句 + 遍数标签`
+- [x] `RepeatPracticePanel` 收敛为纯跟读中间区，不再内嵌 footer
+- [x] `ReviewDifficultPracticeScreen` 改为“中间内容切换 + 单一 footer”结构
+- [x] `BookmarkReviewScreen` 改为同样的单一 footer 结构，删除旧 `AnnotationWithRecording`
+- [x] `BookmarkReviewProvider` 跟读模式迁移到 `RepeatFlowEngine`
+- [x] 难句补练/收藏复习 screen tests 补齐“盲听/跟读都只有一套 footer”回归断言
+
+  **完成时间**: 2026-04-03
+
+---
+
+## 已完成：难句跟读复用边界收敛 + 主页面测试补齐
+
+- [x] `ListenAndRepeatPlayerScreen` / `ReviewDifficultPracticeScreen` / `BookmarkReviewScreen` 将 `ref.listen` 从 `build()` 下沉到 `initState` 的 `listenManual`
+- [x] `ReviewDifficultPractice` / `BookmarkReview` 收回标记持久化逻辑，Screen 不再直接操作 `BookmarkDao`
+- [x] `BookmarkReview` 的音频加载回调移除 `dynamic`，改为显式 typed loader
+- [x] 重写 `listen_and_repeat_player_screen_test.dart`，覆盖标题/进度/录音区/完成弹窗
+- [x] 修复难句补练与收藏复习 screen tests 的测试依赖漂移（`AnnotationContentView` 依赖补齐），并临时跳过 7 个已失真断言
+
+  **完成时间**: 2026-04-02
 
 ---
 
@@ -238,6 +276,9 @@
 - [x] 难句补练页面，评级badge上方没有边距，这个bug之前应该修复过了，为什么还有
 
   **完成时间**: 2026-03-24
+- [x] 难句跟读页面播放中取消标记后，`flowToken` 不应被 UI 刷新复用；修复后原句播放完成仍会正常收口并继续流程
+
+  **完成时间**: 2026-04-02
 
 - [x] 全文盲听阶段（复习阶段第一次学习）没有正常恢复进度：新增双轨断点字段 + 段落切换时异步保存 + 进入时 clamp 恢复
 

@@ -1,7 +1,7 @@
 /// 练习页面共享的顶部进度条区域
 ///
 /// 显示线性进度条、句数进度、句子时长、时间戳。
-/// 当 [audioName] 非 null 时额外显示音频来源行。
+/// 当 [showAudioSource] 为 true 且 [audioName] 非 null 时额外显示音频来源行。
 /// 用于难句补练、难句跟读和收藏复习。
 library;
 
@@ -27,6 +27,9 @@ class PracticeProgressSection extends StatelessWidget {
   /// 音频来源名称（非 null 时显示来源行）
   final String? audioName;
 
+  /// 是否显示音频来源行
+  final bool showAudioSource;
+
   /// 时间戳文本（如 "01:23.4 - 01:25.7"）
   final String? timestampText;
 
@@ -40,6 +43,7 @@ class PracticeProgressSection extends StatelessWidget {
     required this.progressText,
     this.durationText,
     this.audioName,
+    this.showAudioSource = false,
     this.timestampText,
     this.l10n,
   });
@@ -79,7 +83,7 @@ class PracticeProgressSection extends StatelessWidget {
             ],
           ),
           // 来源音频名称
-          if (audioName != null && l10n != null) ...[
+          if (showAudioSource && audioName != null && l10n != null) ...[
             const SizedBox(height: 2),
             Row(
               children: [

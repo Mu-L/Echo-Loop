@@ -145,6 +145,9 @@ class RepeatFlowEngine {
   /// 当前状态
   RepeatFlowState _state = const RepeatFlowState();
 
+  /// 当前原句播放完成后是否转入等待用户状态。
+  bool _waitAfterCurrentPrompt = false;
+
   RepeatFlowEngine({
     required this.onStateChanged,
     required this.callbacks,
@@ -153,6 +156,9 @@ class RepeatFlowEngine {
 
   /// 当前状态（只读）
   RepeatFlowState get state => _state;
+
+  /// 当前原句播完后是否会进入等待态。
+  bool get willEnterWaitingAfterCurrentPrompt => _waitAfterCurrentPrompt;
 
   /// 当前句子
   Sentence? get currentSentence =>
@@ -210,13 +216,20 @@ class RepeatFlowEngine {
   }
 
   /// 进入等待用户操作状态
-  void enterWaitingForUser() {
+  void enterWaitingForUser({bool afterCurrentPrompt = false}) {
     final phase = _state.phase;
     if (phase is WaitingForUser || phase is Idle || phase is SessionCompleted) {
       return;
     }
 
+    if (afterCurrentPrompt && phase is PlayingPrompt) {
+      _waitAfterCurrentPrompt = true;
+      AppLogger.log(logTag, '→ WaitingForUser (当前句播完后)');
+      return;
+    }
+
     _stopActiveResources();
+    _waitAfterCurrentPrompt = false;
     _updateState(
       _state.copyWith(
         phase: const WaitingForUser(WaitingReason.userInteraction),
@@ -230,7 +243,7 @@ class RepeatFlowEngine {
   /// 仅自动模式生效。手动模式下不打断。
   void onUserInteraction() {
     if (_config.isManualMode()) return;
-    enterWaitingForUser();
+    enterWaitingForUser(afterCurrentPrompt: true);
   }
 
   /// 下一句
@@ -365,6 +378,7 @@ class RepeatFlowEngine {
 
   /// 重播当前句子
   Future<void> replayCurrentSentence() async {
+    _waitAfterCurrentPrompt = false;
     _stopActiveResources();
     callbacks.clearRecording();
     _updateState(
@@ -385,6 +399,7 @@ class RepeatFlowEngine {
     final sentence = currentSentence;
     if (sentence == null) return;
 
+    _waitAfterCurrentPrompt = false;
     _atomicReset();
     callbacks.clearRecording();
 
@@ -411,6 +426,7 @@ class RepeatFlowEngine {
 
   /// 停止会话
   void stopSession() {
+    _waitAfterCurrentPrompt = false;
     _atomicReset();
     _updateState(_state.copyWith(phase: const Idle()));
   }
@@ -466,6 +482,7 @@ class RepeatFlowEngine {
 
   /// 释放资源
   void dispose() {
+    _waitAfterCurrentPrompt = false;
     _countdown.cancel();
     _playbackService.dispose();
     _sentences = [];
@@ -510,7 +527,23 @@ class RepeatFlowEngine {
     if (_state.phase is! PlayingPrompt) return;
 
     AppLogger.log(logTag, '原句播放完成');
-    _config.onSentencePlayed?.call(currentSentence!);
+    final sentence = currentSentence!;
+    _config.onSentencePlayed?.call(sentence);
+
+    if (_waitAfterCurrentPrompt) {
+      _waitAfterCurrentPrompt = false;
+      _updateState(
+        _state.copyWith(
+          repeatIndex: 0,
+          totalRepeats: _config.getRepeatCount(sentence),
+          intervalDuration: _config.getIntervalDuration(sentence),
+          recordingPath: null,
+          recordingScore: null,
+          phase: const WaitingForUser(WaitingReason.userInteraction),
+        ),
+      );
+      return;
+    }
 
     if (_config.isManualMode()) {
       _updateState(
@@ -626,6 +659,7 @@ class RepeatFlowEngine {
 
   /// 跳转到指定句子
   Future<void> _jumpToSentence(int index) async {
+    _waitAfterCurrentPrompt = false;
     _atomicReset();
     callbacks.clearRecording();
 
@@ -648,6 +682,7 @@ class RepeatFlowEngine {
 
   void _atomicReset() {
     _stopActiveResources();
+    _waitAfterCurrentPrompt = false;
     _state = _state.copyWith(flowToken: _state.flowToken + 1);
   }
 

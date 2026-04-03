@@ -195,6 +195,10 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   /// 进入等待用户操作状态
   void enterWaitingForUser() => _engine.enterWaitingForUser();
 
+  /// 当前原句播完后进入等待用户操作状态。
+  void enterWaitingForUserAfterCurrentPrompt() =>
+      _engine.enterWaitingForUser(afterCurrentPrompt: true);
+
   /// 用户交互（查词/翻译等）
   void onUserInteraction() => _engine.onUserInteraction();
 
@@ -250,6 +254,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     ref
         .read(speechRecordingControllerProvider.notifier)
         .setManualMode(_engine.config.isManualMode());
+    if (_engine.willEnterWaitingAfterCurrentPrompt) {
+      return;
+    }
     // 等待态只刷新当前句配置，不应立刻自动重播。
     await _engine.restartCurrentSentence(
       autoplay: state.phase is! WaitingForUser,

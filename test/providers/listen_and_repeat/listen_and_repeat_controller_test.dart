@@ -206,6 +206,73 @@ void main() {
 
       expect(readState().phase, isA<WaitingForUser>());
     });
+
+    test('播放中 onUserInteraction 不打断当前句，播完后进入 WaitingForUser', () async {
+      final audioEngine = _ControlledAudioEngine();
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          speechRecordingControllerProvider.overrideWith(
+            TestSpeechRecordingController.new,
+          ),
+        ],
+      );
+      controller = container.read(listenAndRepeatControllerProvider.notifier);
+
+      await controller.prepareSession(
+        sentences: createTestSentences(count: 1),
+        config: _testConfig(),
+      );
+
+      unawaited(controller.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(readState().phase, isA<PlayingPrompt>());
+
+      controller.onUserInteraction();
+
+      expect(readState().phase, isA<PlayingPrompt>());
+
+      audioEngine.playCompleter?.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(readState().phase, isA<WaitingForUser>());
+    });
+
+    test('播放中修改设置不打断也不重播，播完后进入 WaitingForUser', () async {
+      final audioEngine = _ControlledAudioEngine();
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          speechRecordingControllerProvider.overrideWith(
+            TestSpeechRecordingController.new,
+          ),
+        ],
+      );
+      controller = container.read(listenAndRepeatControllerProvider.notifier);
+
+      await controller.prepareSession(
+        sentences: createTestSentences(count: 1),
+        config: _testConfig(),
+      );
+
+      unawaited(controller.startPlaying());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      controller.onUserInteraction();
+      await controller.applySettingsChange();
+
+      expect(readState().phase, isA<PlayingPrompt>());
+
+      audioEngine.playCompleter?.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final state = readState();
+      expect(state.phase, isA<WaitingForUser>());
+      expect(state.repeatIndex, 0);
+    });
   });
 
   group('切句', () {
