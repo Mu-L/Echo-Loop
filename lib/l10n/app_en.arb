@@ -585,13 +585,13 @@
       "count": { "type": "int" }
     }
   },
-  "intensiveListenPassInfo": "Intensive listen {count}x",
+  "intensiveListenPassInfo": "Practiced {count}x",
   "@intensiveListenPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
     }
   },
-  "shadowingPassInfo": "Shadowing {count}x",
+  "shadowingPassInfo": "Practiced {count}x",
   "@shadowingPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
@@ -670,7 +670,7 @@
   "retellSettingsTitle": "Retell Settings",
   "retellRepeatCount": "Repeat per paragraph",
   "retellPauseMode": "Pause between paragraphs",
-  "retellPassInfo": "Retell {count}x",
+  "retellPassInfo": "Practiced {count}x",
   "@retellPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
@@ -997,8 +997,8 @@
   "clearCacheSuccess": "Cache cleared",
   "clearCacheEmpty": "Cache is already empty",
   "confirm": "Confirm",
-  "autoCompletedNoDifficult": "All sentences understood. Auto-completed.",
-  "autoCompletedNoDifficultReview": "No difficult sentences to practice. Auto-completed.",
+  "autoCompletedNoDifficult": "0 difficult sentences, skipped",
+  "autoCompletedNoDifficultReview": "0 difficult sentences, skipped",
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",
   "writeFeedback": "Write Feedback",

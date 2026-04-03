@@ -1071,17 +1071,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String difficultSentenceCount(int count) {
-    return '标记 $count 个难句';
+    return '$count 个难句';
   }
 
   @override
   String intensiveListenPassInfo(int count) {
-    return '精听 $count 遍';
+    return '已练习 $count 遍';
   }
 
   @override
   String shadowingPassInfo(int count) {
-    return '跟读 $count 遍';
+    return '已练习 $count 遍';
   }
 
   @override
@@ -1189,7 +1189,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String retellPassInfo(int count) {
-    return '复述 $count 遍';
+    return '已练习 $count 遍';
   }
 
   @override
@@ -1788,10 +1788,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirm => '确认';
 
   @override
-  String get autoCompletedNoDifficult => '精听全部听懂，已自动完成';
+  String get autoCompletedNoDifficult => '0 个难句，已跳过';
 
   @override
-  String get autoCompletedNoDifficultReview => '无需补练的难句，已自动完成';
+  String get autoCompletedNoDifficultReview => '0 个难句，已跳过';
 
   @override
   String get termsOfService => '服务条款';

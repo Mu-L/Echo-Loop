@@ -1043,21 +1043,25 @@ class _FirstStudySection extends ConsumerWidget {
     final stepDataMap = {
       SubStageType.blindListen: _StepData(
         icon: Icons.headphones,
+        iconColor: Colors.blue,
         name: l10n.stepBlindListening,
         description: l10n.stepBlindListeningDesc,
       ),
       SubStageType.intensiveListen: _StepData(
         icon: Icons.hearing,
+        iconColor: Colors.indigo,
         name: l10n.stepIntensiveListening,
         description: l10n.stepIntensiveListeningDesc,
       ),
       SubStageType.listenAndRepeat: _StepData(
         icon: Icons.record_voice_over,
+        iconColor: Colors.orange,
         name: l10n.stepShadowing,
         description: l10n.stepShadowingDesc,
       ),
       SubStageType.retell: _StepData(
         icon: Icons.chat,
+        iconColor: Colors.teal,
         name: l10n.stepRetelling,
         description: l10n.stepRetellingDesc,
       ),
@@ -1170,8 +1174,11 @@ class _FirstStudySection extends ConsumerWidget {
                 }
               } else if (subStage == SubStageType.listenAndRepeat) {
                 // 跟读：已完成且无难句时显示自动完成提示
-                if (isCompleted &&
-                    (progress?.intensiveListenDifficultCount ?? -1) == 0) {
+                final bookmarkCount = ref
+                        .watch(_bookmarkCountProvider(audioItemId))
+                        .valueOrNull ??
+                    0;
+                if (isCompleted && bookmarkCount == 0) {
                   subtitle = l10n.autoCompletedNoDifficult;
                 } else if (isCompleted || isCurrent) {
                   subtitle = _buildShadowingSubtitle(ref, l10n);
@@ -1193,7 +1200,11 @@ class _FirstStudySection extends ConsumerWidget {
               } else if (isCompleted &&
                   subStage == SubStageType.listenAndRepeat) {
                 // 无难句自动完成的跟读步骤：点击只显示提示
-                if ((progress?.intensiveListenDifficultCount ?? -1) == 0) {
+                final bookmarkCount = ref
+                        .watch(_bookmarkCountProvider(audioItemId))
+                        .valueOrNull ??
+                    0;
+                if (bookmarkCount == 0) {
                   onTap = () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(l10n.autoCompletedNoDifficult)),
@@ -1209,6 +1220,7 @@ class _FirstStudySection extends ConsumerWidget {
               return _StepCard(
                 stepNumber: index + 1,
                 icon: stepData.icon,
+                iconColor: stepData.iconColor,
                 name: stepData.name,
                 description: stepData.description,
                 isCompleted: isCompleted,
@@ -1402,11 +1414,13 @@ class _FirstStudySection extends ConsumerWidget {
 /// 步骤数据模型（内部使用）
 class _StepData {
   final IconData icon;
+  final Color? iconColor;
   final String name;
   final String description;
 
   const _StepData({
     required this.icon,
+    this.iconColor,
     required this.name,
     required this.description,
   });
@@ -1416,6 +1430,7 @@ class _StepData {
 class _StepCard extends StatelessWidget {
   final int stepNumber;
   final IconData icon;
+  final Color? iconColor;
   final String name;
   final String description;
   final bool isCompleted;
@@ -1431,6 +1446,7 @@ class _StepCard extends StatelessWidget {
   const _StepCard({
     required this.stepNumber,
     required this.icon,
+    this.iconColor,
     required this.name,
     required this.description,
     required this.isCompleted,
@@ -1517,8 +1533,9 @@ class _StepCard extends StatelessWidget {
                         Icon(
                           icon,
                           color: isCompleted
-                              ? theme.colorScheme.outline
-                              : theme.colorScheme.primary,
+                              ? (iconColor ?? theme.colorScheme.primary)
+                                  .withAlpha(100)
+                              : iconColor ?? theme.colorScheme.primary,
                           size: 24,
                         ),
                         const SizedBox(width: AppSpacing.m),
@@ -1693,6 +1710,7 @@ class _ReviewRoundSection extends ConsumerWidget {
     return switch (subStage) {
       SubStageType.blindListen => _StepData(
         icon: Icons.headphones,
+        iconColor: Colors.blue,
         name: l10n.stepBlindListening,
         description: isZh
             ? '全文盲听，不看字幕先听一遍。'
@@ -1700,28 +1718,33 @@ class _ReviewRoundSection extends ConsumerWidget {
       ),
       SubStageType.intensiveListen => _StepData(
         icon: Icons.hearing,
+        iconColor: Colors.indigo,
         name: l10n.stepIntensiveListening,
         description: l10n.stepIntensiveListeningDesc,
       ),
       SubStageType.listenAndRepeat => _StepData(
         icon: Icons.record_voice_over,
+        iconColor: Colors.orange,
         name: l10n.stepShadowing,
         description: l10n.stepShadowingDesc,
       ),
       SubStageType.retell => _StepData(
         icon: Icons.chat,
+        iconColor: Colors.teal,
         name: l10n.stepRetelling,
         description: l10n.stepRetellingDesc,
       ),
       SubStageType.reviewDifficultPractice => _StepData(
-        icon: Icons.hearing,
+        icon: Icons.record_voice_over,
+        iconColor: Colors.orange,
         name: isZh ? '难句补练' : 'Difficult sentence practice',
         description: isZh
-            ? '先盲听，听不懂点击“听不懂”，再跟读补练。'
+            ? '先盲听，听不懂点击”听不懂”，再跟读补练。'
             : 'Blind listen first; if unclear, tap can\'t understand and practice.',
       ),
       SubStageType.reviewRetellParagraph => _StepData(
-        icon: Icons.notes,
+        icon: Icons.chat,
+        iconColor: Colors.teal,
         name: isZh ? '段落复述' : 'Paragraph retelling',
         description: isZh
             ? '听完一段，用自己的话（英文）复述。'
@@ -1729,6 +1752,7 @@ class _ReviewRoundSection extends ConsumerWidget {
       ),
       SubStageType.reviewRetellSummary => _StepData(
         icon: Icons.summarize,
+        iconColor: Colors.cyan,
         name: isZh ? '全文总结复述' : 'Summary retelling',
         description: isZh
             ? '用 3-5 句话概述全文大意。'
@@ -1978,20 +2002,30 @@ class _ReviewRoundSection extends ConsumerWidget {
               final isCurrent =
                   progress?.isCurrentSubStage(review.stage, subStage) ?? false;
 
-              // 已完成且无难句的补练步骤显示自动完成提示
+              // 难句补练步骤：显示难句数量或自动完成提示
               String? subtitle;
-              if (subStage == SubStageType.reviewDifficultPractice &&
-                  isCompleted &&
-                  (progress?.intensiveListenDifficultCount ?? -1) == 0) {
-                subtitle = l10n.autoCompletedNoDifficultReview;
+              if (subStage == SubStageType.reviewDifficultPractice) {
+                final bookmarkCount = ref
+                        .watch(_bookmarkCountProvider(audioItemId))
+                        .valueOrNull ??
+                    0;
+                if (isCompleted && bookmarkCount == 0) {
+                  subtitle = l10n.autoCompletedNoDifficultReview;
+                } else if (bookmarkCount > 0) {
+                  subtitle = l10n.difficultSentenceCount(bookmarkCount);
+                }
               }
 
               // 已完成的复习子步骤支持点击进入自由练习
               VoidCallback? onTap;
               if (isCompleted) {
                 // 无难句自动完成的补练步骤：点击只显示提示
+                final bookmarkCount = ref
+                        .watch(_bookmarkCountProvider(audioItemId))
+                        .valueOrNull ??
+                    0;
                 if (subStage == SubStageType.reviewDifficultPractice &&
-                    (progress?.intensiveListenDifficultCount ?? -1) == 0) {
+                    bookmarkCount == 0) {
                   onTap = () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -2020,6 +2054,7 @@ class _ReviewRoundSection extends ConsumerWidget {
               return _StepCard(
                 stepNumber: index + 1,
                 icon: subStageData.icon,
+                iconColor: subStageData.iconColor,
                 name: subStageData.name,
                 description: subStageData.description,
                 isCompleted: isCompleted,

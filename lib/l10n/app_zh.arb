@@ -422,19 +422,19 @@
       "duration": { "type": "String" }
     }
   },
-  "difficultSentenceCount": "标记 {count} 个难句",
+  "difficultSentenceCount": "{count} 个难句",
   "@difficultSentenceCount": {
     "placeholders": {
       "count": { "type": "int" }
     }
   },
-  "intensiveListenPassInfo": "精听 {count} 遍",
+  "intensiveListenPassInfo": "已练习 {count} 遍",
   "@intensiveListenPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
     }
   },
-  "shadowingPassInfo": "跟读 {count} 遍",
+  "shadowingPassInfo": "已练习 {count} 遍",
   "@shadowingPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
@@ -513,7 +513,7 @@
   "retellSettingsTitle": "复述设置",
   "retellRepeatCount": "每段重复次数",
   "retellPauseMode": "段间停顿",
-  "retellPassInfo": "复述 {count} 遍",
+  "retellPassInfo": "已练习 {count} 遍",
   "@retellPassInfo": {
     "placeholders": {
       "count": { "type": "int" }
@@ -746,8 +746,8 @@
   "clearCacheSuccess": "缓存已清除",
   "clearCacheEmpty": "缓存已为空",
   "confirm": "确认",
-  "autoCompletedNoDifficult": "精听全部听懂，已自动完成",
-  "autoCompletedNoDifficultReview": "无需补练的难句，已自动完成",
+  "autoCompletedNoDifficult": "0 个难句，已跳过",
+  "autoCompletedNoDifficultReview": "0 个难句，已跳过",
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
   "writeFeedback": "意见反馈",

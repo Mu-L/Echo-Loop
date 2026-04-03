@@ -291,22 +291,7 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
-  /// 保存难句数快照（可多次调用，用于中途退出/自由练习时保存）
-  Future<void> saveDifficultCount(String audioItemId, int count) async {
-    final progress = state.progressMap[audioItemId];
-    if (progress == null) return;
 
-    final updated = progress.copyWith(
-      intensiveListenDifficultCount: count,
-      updatedAt: DateTime.now(),
-    );
-
-    await _persistProgress(updated);
-
-    final newMap = Map<String, LearningProgress>.from(state.progressMap);
-    newMap[audioItemId] = updated;
-    state = state.copyWith(progressMap: newMap);
-  }
 
   /// 精听完成时递增总遍数（+1）
   Future<void> incrementIntensiveListenPassCount(String audioItemId) async {

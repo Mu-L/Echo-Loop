@@ -106,12 +106,8 @@ class _IntensiveListenPlayerScreenState
     if (session.isFreePlay) {
       await _saveSentenceProgress(isFreePlay: true);
 
-      // 保存难句书签 + 难句数快照（与非 freePlay 路径一致）
+      // 保存难句书签
       await _saveDifficultSentences();
-      final totalDifficultCount = await _loadTotalDifficultCount();
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .saveDifficultCount(widget.audioItemId, totalDifficultCount);
 
       await ref.read(learningSessionProvider.notifier).exitLearningMode();
       if (mounted) context.pop();
@@ -145,11 +141,6 @@ class _IntensiveListenPlayerScreenState
     // 保存断点 + 难句 + 难句数快照
     await _saveSentenceProgress(isFreePlay: false);
     await _saveDifficultSentences();
-
-    final totalDifficultCount = await _loadTotalDifficultCount();
-    await ref
-        .read(learningProgressNotifierProvider.notifier)
-        .saveDifficultCount(widget.audioItemId, totalDifficultCount);
 
     // 先 exitLearningMode 同步书签到 LP，再 pop 页面
     // （pop 后 widget 销毁，ref.read 可能失效）
@@ -212,11 +203,6 @@ class _IntensiveListenPlayerScreenState
       );
     }
 
-    // 4. 同步难句数快照到 learning_progress（以数据库总量为准）
-    final totalDifficultCount = await _loadTotalDifficultCount();
-    await ref
-        .read(learningProgressNotifierProvider.notifier)
-        .saveDifficultCount(widget.audioItemId, totalDifficultCount);
   }
 
   /// 保存难句书签到数据库（增量同步：新增 + 移除）
@@ -361,10 +347,7 @@ class _IntensiveListenPlayerScreenState
     // 自由练习模式：弹窗询问"完成"或"再来一遍"
     if (session.isFreePlay) {
       final l10n = AppLocalizations.of(context)!;
-      // 弹窗前保存统计并递增遍数
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .saveDifficultCount(widget.audioItemId, totalDifficultCount);
+      // 弹窗前递增遍数
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .incrementIntensiveListenPassCount(widget.audioItemId);
@@ -401,9 +384,6 @@ class _IntensiveListenPlayerScreenState
 
     // 弹窗前保存统计（事实记录，不影响步骤进度）
     try {
-      await ref
-          .read(learningProgressNotifierProvider.notifier)
-          .saveDifficultCount(widget.audioItemId, totalDifficultCount);
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .incrementIntensiveListenPassCount(widget.audioItemId);

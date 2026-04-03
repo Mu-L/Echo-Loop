@@ -2045,13 +2045,13 @@ abstract class AppLocalizations {
   /// No description provided for @intensiveListenPassInfo.
   ///
   /// In en, this message translates to:
-  /// **'Intensive listen {count}x'**
+  /// **'Practiced {count}x'**
   String intensiveListenPassInfo(int count);
 
   /// No description provided for @shadowingPassInfo.
   ///
   /// In en, this message translates to:
-  /// **'Shadowing {count}x'**
+  /// **'Practiced {count}x'**
   String shadowingPassInfo(int count);
 
   /// No description provided for @retellBriefingTitle.
@@ -2231,7 +2231,7 @@ abstract class AppLocalizations {
   /// No description provided for @retellPassInfo.
   ///
   /// In en, this message translates to:
-  /// **'Retell {count}x'**
+  /// **'Practiced {count}x'**
   String retellPassInfo(int count);
 
   /// No description provided for @retellNoDifficultSentences.
@@ -3299,13 +3299,13 @@ abstract class AppLocalizations {
   /// No description provided for @autoCompletedNoDifficult.
   ///
   /// In en, this message translates to:
-  /// **'All sentences understood. Auto-completed.'**
+  /// **'0 difficult sentences, skipped'**
   String get autoCompletedNoDifficult;
 
   /// No description provided for @autoCompletedNoDifficultReview.
   ///
   /// In en, this message translates to:
-  /// **'No difficult sentences to practice. Auto-completed.'**
+  /// **'0 difficult sentences, skipped'**
   String get autoCompletedNoDifficultReview;
 
   /// No description provided for @termsOfService.

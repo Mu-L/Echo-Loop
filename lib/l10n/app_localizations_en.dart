@@ -1108,12 +1108,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String intensiveListenPassInfo(int count) {
-    return 'Intensive listen ${count}x';
+    return 'Practiced ${count}x';
   }
 
   @override
   String shadowingPassInfo(int count) {
-    return 'Shadowing ${count}x';
+    return 'Practiced ${count}x';
   }
 
   @override
@@ -1223,7 +1223,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String retellPassInfo(int count) {
-    return 'Retell ${count}x';
+    return 'Practiced ${count}x';
   }
 
   @override
@@ -1838,12 +1838,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirm => 'Confirm';
 
   @override
-  String get autoCompletedNoDifficult =>
-      'All sentences understood. Auto-completed.';
+  String get autoCompletedNoDifficult => '0 difficult sentences, skipped';
 
   @override
-  String get autoCompletedNoDifficultReview =>
-      'No difficult sentences to practice. Auto-completed.';
+  String get autoCompletedNoDifficultReview => '0 difficult sentences, skipped';
 
   @override
   String get termsOfService => 'Terms of Service';
