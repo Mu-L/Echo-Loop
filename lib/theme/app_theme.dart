@@ -140,7 +140,7 @@ class AppTheme {
 
       // 列表项主题：圆角 + 宽松间距
       listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
