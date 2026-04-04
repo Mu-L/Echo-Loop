@@ -752,9 +752,12 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.m),
               children: [
-                _ProgressCard(l10n: l10n, progress: progress),
-                const SizedBox(height: AppSpacing.s),
-                _AudioInfoRow(l10n: l10n, audioItem: audioItem),
+                _ProgressCard(
+                  l10n: l10n,
+                  progress: progress,
+                  audioItem: audioItem,
+                  now: now,
+                ),
                 if (!hasTranscript) ...[
                   const SizedBox(height: AppSpacing.s),
                   _NoTranscriptBanner(l10n: l10n, audioItem: audioItem),
@@ -875,12 +878,19 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   }
 }
 
-/// 顶部进度卡片 — 圆环进度 + 状态文字
+/// 顶部进度卡片 — 圆环进度 + 状态文字 + 逾期徽章 + 音频元信息
 class _ProgressCard extends StatelessWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
+  final AudioItem? audioItem;
+  final DateTime now;
 
-  const _ProgressCard({required this.l10n, this.progress});
+  const _ProgressCard({
+    required this.l10n,
+    this.progress,
+    this.audioItem,
+    required this.now,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -888,21 +898,26 @@ class _ProgressCard extends StatelessWidget {
     final percent = progress?.progressPercent ?? 0.0;
     final percentText = '${(percent * 100).round()}%';
 
-    // 状态文字
-    final statusText = _getStatusText();
+    final isInProgress = _isInProgress();
+    final overdueText = _getOverdueText();
+    // 第一行徽章：进行中显示 In Progress，否则显示逾期
+    final badgeText = isInProgress ? l10n.learningInProgress : overdueText;
+    final badgeIsError = !isInProgress && overdueText != null;
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.l),
         child: Row(
           children: [
+            // 左侧：圆环进度
             SizedBox(
               width: 64,
               height: 64,
               child: CustomPaint(
                 painter: _ProgressRingPainter(
                   progress: percent,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  backgroundColor:
+                      theme.colorScheme.surfaceContainerHighest,
                   progressColor: theme.colorScheme.primary,
                 ),
                 child: Center(
@@ -917,23 +932,68 @@ class _ProgressCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.m),
+            // 右侧：三行信息
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    l10n.learningPlanProgress,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // 第一行：大阶段 + 逾期徽章
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _getStageText(),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (badgeText != null) ...[
+                        const SizedBox(width: AppSpacing.s),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeIsError
+                                ? theme.colorScheme.error
+                                    .withValues(alpha: 0.1)
+                                : theme.colorScheme
+                                    .surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 10,
+                              color: badgeIsError
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontWeight: badgeIsError
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    statusText,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  // 第二行：子阶段
+                  if (_getSubStageText() case final subStage?) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subStage,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
+                  ],
+                  // 第三行：音频元信息
+                  if (audioItem != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    _buildAudioInfo(theme),
+                  ],
                 ],
               ),
             ),
@@ -943,15 +1003,95 @@ class _ProgressCard extends StatelessWidget {
     );
   }
 
-  /// 获取状态文字
-  String _getStatusText() {
+  /// 构建音频元信息行
+  Widget _buildAudioInfo(ThemeData theme) {
+    final item = audioItem!;
+    final chips = <Widget>[];
+
+    if (item.totalDuration > 0) {
+      chips.add(
+        _InfoChip(
+          icon: Icons.timer_outlined,
+          label: SubtitleParser.formatDuration(
+            Duration(seconds: item.totalDuration),
+          ),
+          theme: theme,
+        ),
+      );
+    }
+    if (item.sentenceCount > 0) {
+      chips.add(
+        _InfoChip(
+          icon: Icons.format_list_numbered,
+          label: l10n.sentenceCountLabel(item.sentenceCount),
+          theme: theme,
+        ),
+      );
+    }
+    if (item.wordCount > 0) {
+      chips.add(
+        _InfoChip(
+          icon: Icons.text_fields,
+          label: l10n.wordCountLabel(item.wordCount),
+          theme: theme,
+        ),
+      );
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: AppSpacing.s,
+      runSpacing: AppSpacing.xs,
+      children: chips,
+    );
+  }
+
+  /// 第一行：大阶段文字
+  String _getStageText() {
     if (progress == null || !progress!.isStarted) {
       return l10n.learningPlanNotStarted;
     }
     if (progress!.isCompleted) {
       return l10n.learningCompleted;
     }
-    return '${reviewStageLabel(l10n, progress!.currentStage)} ${l10n.learningInProgress}';
+    return reviewStageLabel(l10n, progress!.currentStage);
+  }
+
+  /// 第二行：子阶段文字（未开始/已完成时返回 null）
+  String? _getSubStageText() {
+    if (progress == null || !progress!.isStarted || progress!.isCompleted) {
+      return null;
+    }
+    final subStageName = switch (progress!.currentSubStage) {
+      SubStageType.blindListen => l10n.stepBlindListening,
+      SubStageType.intensiveListen => l10n.stepIntensiveListening,
+      SubStageType.listenAndRepeat => l10n.stepShadowing,
+      SubStageType.retell => l10n.stepRetelling,
+      SubStageType.reviewDifficultPractice =>
+        l10n.reviewDifficultPracticeTitle,
+      SubStageType.reviewRetellParagraph => l10n.retellBriefingTitle,
+      SubStageType.reviewRetellSummary => l10n.retellBriefingTitle,
+    };
+    return subStageName;
+  }
+
+  /// 是否正在学习中（当前阶段已完成至少 1 个子阶段）
+  bool _isInProgress() {
+    if (progress == null || !progress!.isStarted || progress!.isCompleted) {
+      return false;
+    }
+    return progress!.currentSubStageIndex > 0;
+  }
+
+  /// 获取逾期文案（未逾期返回 null）
+  String? _getOverdueText() {
+    if (progress == null || !progress!.isReviewOverdueAt(now)) return null;
+    final overdue = progress!.overdueDurationAt(now);
+    if (overdue == null || overdue.inDays > 7) return l10n.reviewDue;
+    if (overdue.inDays > 0) return l10n.overdueDays(overdue.inDays);
+    final hours = overdue.inHours.clamp(1, 999);
+    return l10n.overdueHours(hours);
   }
 }
 
@@ -2071,65 +2211,6 @@ class _ReviewRoundSection extends ConsumerWidget {
 }
 
 /// 音频信息行 — 显示时长、句子数、单词数
-class _AudioInfoRow extends StatelessWidget {
-  final AppLocalizations l10n;
-  final AudioItem audioItem;
-
-  const _AudioInfoRow({required this.l10n, required this.audioItem});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final chips = <Widget>[];
-
-    // 时长
-    if (audioItem.totalDuration > 0) {
-      chips.add(
-        _InfoChip(
-          icon: Icons.timer_outlined,
-          label: SubtitleParser.formatDuration(
-            Duration(seconds: audioItem.totalDuration),
-          ),
-          theme: theme,
-        ),
-      );
-    }
-
-    // 句子数
-    if (audioItem.sentenceCount > 0) {
-      chips.add(
-        _InfoChip(
-          icon: Icons.format_list_numbered,
-          label: l10n.sentenceCountLabel(audioItem.sentenceCount),
-          theme: theme,
-        ),
-      );
-    }
-
-    // 单词数
-    if (audioItem.wordCount > 0) {
-      chips.add(
-        _InfoChip(
-          icon: Icons.text_fields,
-          label: l10n.wordCountLabel(audioItem.wordCount),
-          theme: theme,
-        ),
-      );
-    }
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-      child: Wrap(
-        spacing: AppSpacing.s,
-        runSpacing: AppSpacing.xs,
-        children: chips,
-      ),
-    );
-  }
-}
-
 /// 单个信息标签
 class _InfoChip extends StatelessWidget {
   final IconData icon;
@@ -2147,12 +2228,12 @@ class _InfoChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 4),
+        Icon(icon, size: 14, color: theme.colorScheme.outline),
+        const SizedBox(width: 3),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.outline,
           ),
         ),
       ],
