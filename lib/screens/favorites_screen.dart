@@ -1041,24 +1041,29 @@ class _SavedPhraseTileState extends ConsumerState<_SavedPhraseTile> {
                       const SizedBox(height: AppSpacing.xs),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.headphones,
-                              size: 12,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${l10n.bookmarkReviewFromAudio(_audioName!)}',
-                              style: theme.textTheme.labelSmall?.copyWith(
+                        child: GestureDetector(
+                          onTap: () => context.push(
+                            AppRoutes.audioLearningPlan(phrase.audioItemId!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.headphones,
+                                size: 12,
                                 color: theme.colorScheme.onSurfaceVariant
                                     .withValues(alpha: 0.5),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                '${l10n.bookmarkReviewFromAudio(_audioName!)}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
