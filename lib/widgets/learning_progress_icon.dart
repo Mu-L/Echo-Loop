@@ -51,7 +51,7 @@ class LearningProgressIcon extends StatelessWidget {
           color: theme.colorScheme.surfaceContainerHighest,
         ),
         child: Icon(
-          Icons.audiotrack,
+          Icons.graphic_eq,
           size: iconSize,
           color: theme.colorScheme.onSurfaceVariant,
         ),
@@ -100,7 +100,7 @@ class LearningProgressIcon extends StatelessWidget {
             ),
           ),
           Icon(
-            Icons.audiotrack,
+            Icons.graphic_eq,
             size: iconSize,
             color: theme.colorScheme.primary,
           ),

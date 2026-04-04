@@ -118,8 +118,8 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      // 无音频时长时不显示 music_note 图标
-      expect(find.byIcon(Icons.music_note), findsNothing);
+      // 无音频时长时不显示耳机图标
+      expect(find.byIcon(Icons.graphic_eq), findsNothing);
     });
   });
 }

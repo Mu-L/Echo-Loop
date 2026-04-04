@@ -110,7 +110,7 @@ class BlindListenBriefingSheet extends StatelessWidget {
           const SizedBox(height: AppSpacing.l),
 
           // 耳机图标
-          Icon(Icons.headphones, size: 56, color: theme.colorScheme.primary),
+          Icon(Icons.graphic_eq, size: 56, color: theme.colorScheme.primary),
           const SizedBox(height: AppSpacing.m),
 
           // 标题
@@ -172,7 +172,7 @@ class BlindListenBriefingSheet extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.music_note,
+                          Icons.graphic_eq,
                           size: 16,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
