@@ -839,11 +839,11 @@
   "goToLibrary": "Go to Library",
   "allDoneTitle": "All done for now!",
   "allDoneHint": "Great work today. Come back later for reviews.",
-  "overdueDays": "Review due · due {count}d ago",
+  "overdueDays": "Due {count}d ago",
   "@overdueDays": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "overdueHours": "Review due · due {count}h ago",
+  "overdueHours": "Due {count}h ago",
   "@overdueHours": {
     "placeholders": { "count": { "type": "int" } }
   },

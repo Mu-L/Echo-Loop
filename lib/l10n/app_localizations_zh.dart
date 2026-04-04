@@ -1487,12 +1487,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String overdueDays(int count) {
-    return '待复习 · $count天前到期';
+    return '$count天前到期';
   }
 
   @override
   String overdueHours(int count) {
-    return '待复习 · $count小时前到期';
+    return '$count小时前到期';
   }
 
   @override

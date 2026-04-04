@@ -1532,12 +1532,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String overdueDays(int count) {
-    return 'Review due · due ${count}d ago';
+    return 'Due ${count}d ago';
   }
 
   @override
   String overdueHours(int count) {
-    return 'Review due · due ${count}h ago';
+    return 'Due ${count}h ago';
   }
 
   @override
