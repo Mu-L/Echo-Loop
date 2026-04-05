@@ -81,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 26;
+  static const currentSchemaVersion = 27;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -267,6 +267,24 @@ class AppDatabase extends _$AppDatabase {
         // v25→v26：新建 saved_sense_groups 表
         if (from < 26) {
           await m.createTable(savedSenseGroups);
+        }
+        // v26→v27：saved_sense_groups 新增练习统计字段
+        if (from < 27) {
+          await _addColumnIfNotExists(
+            'saved_sense_groups',
+            'total_study_ms',
+            'INTEGER NOT NULL DEFAULT 0',
+          );
+          await _addColumnIfNotExists(
+            'saved_sense_groups',
+            'viewed_back',
+            'INTEGER NOT NULL DEFAULT 0',
+          );
+          await _addColumnIfNotExists(
+            'saved_sense_groups',
+            'last_practiced_at',
+            'INTEGER',
+          );
         }
         // v12→v13：audio_items 新增 transcript_source, audio_sha256, transcript_language 列
         if (from < 13) {

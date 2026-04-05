@@ -3197,8 +3197,44 @@ abstract class AppLocalizations {
   /// No description provided for @flashcardSortSmart.
   ///
   /// In en, this message translates to:
-  /// **'Smart'**
+  /// **'Auto'**
   String get flashcardSortSmart;
+
+  /// No description provided for @flashcardSortSmartDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Order based on memory patterns'**
+  String get flashcardSortSmartDesc;
+
+  /// No description provided for @flashcardSortRandomDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle randomly each time'**
+  String get flashcardSortRandomDesc;
+
+  /// No description provided for @flashcardSortAlphaAscDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort alphabetically A to Z'**
+  String get flashcardSortAlphaAscDesc;
+
+  /// No description provided for @flashcardSortAlphaDescDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort alphabetically Z to A'**
+  String get flashcardSortAlphaDescDesc;
+
+  /// No description provided for @flashcardSortTimeAscDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest saved first'**
+  String get flashcardSortTimeAscDesc;
+
+  /// No description provided for @flashcardSortTimeDescDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest saved first'**
+  String get flashcardSortTimeDescDesc;
 
   /// No description provided for @flashcardNoDefinition.
   ///

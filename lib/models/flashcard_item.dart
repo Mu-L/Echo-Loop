@@ -30,6 +30,9 @@ sealed class FlashcardItem {
   /// 练习次数
   int get practiceCount;
 
+  /// 上次练习时间
+  DateTime? get lastPracticedAt;
+
   /// 收藏时间
   DateTime get createdAt;
 
@@ -81,6 +84,9 @@ class FlashcardWordItem extends FlashcardItem {
 
   @override
   int get practiceCount => savedWord.practiceCount;
+
+  @override
+  DateTime? get lastPracticedAt => savedWord.lastPracticedAt;
 
   @override
   DateTime get createdAt => savedWord.createdAt;
@@ -137,6 +143,9 @@ class FlashcardPhraseItem extends FlashcardItem {
 
   @override
   int get practiceCount => savedPhrase.practiceCount;
+
+  @override
+  DateTime? get lastPracticedAt => savedPhrase.lastPracticedAt;
 
   @override
   DateTime get createdAt => savedPhrase.createdAt;

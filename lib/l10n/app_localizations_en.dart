@@ -1789,7 +1789,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get flashcardSortRandom => 'Random';
 
   @override
-  String get flashcardSortSmart => 'Smart';
+  String get flashcardSortSmart => 'Auto';
+
+  @override
+  String get flashcardSortSmartDesc => 'Order based on memory patterns';
+
+  @override
+  String get flashcardSortRandomDesc => 'Shuffle randomly each time';
+
+  @override
+  String get flashcardSortAlphaAscDesc => 'Sort alphabetically A to Z';
+
+  @override
+  String get flashcardSortAlphaDescDesc => 'Sort alphabetically Z to A';
+
+  @override
+  String get flashcardSortTimeAscDesc => 'Oldest saved first';
+
+  @override
+  String get flashcardSortTimeDescDesc => 'Newest saved first';
 
   @override
   String get flashcardNoDefinition => 'No definition';

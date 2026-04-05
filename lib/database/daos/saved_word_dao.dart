@@ -129,6 +129,10 @@ class SavedWordDao extends DatabaseAccessor<AppDatabase>
         word,
       ],
     );
+    // customStatement 不会自动通知 stream watcher，手动触发
+    attachedDatabase.notifyUpdates(
+      {TableUpdate.onTable(savedWords, kind: UpdateKind.update)},
+    );
   }
 
   /// 监听所有未删除的收藏单词（按指定排序）

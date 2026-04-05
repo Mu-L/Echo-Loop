@@ -131,8 +131,8 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
               _settings.isManualMode
                   ? l10n.flashcardControlModeManualDesc
                   : l10n.flashcardControlModeAutoDesc,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
 
@@ -175,8 +175,8 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                 _settings.timerMode == FlashcardTimerMode.smart
                     ? l10n.flashcardTimerSmartDesc
                     : l10n.flashcardTimerFixedDesc,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
               ),
 
@@ -223,12 +223,12 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
               child: SegmentedButton<FlashcardSortMode>(
                 segments: [
                   ButtonSegment(
-                    value: FlashcardSortMode.random,
-                    label: Text(l10n.flashcardSortRandom),
-                  ),
-                  ButtonSegment(
                     value: FlashcardSortMode.smart,
                     label: Text(l10n.flashcardSortSmart),
+                  ),
+                  ButtonSegment(
+                    value: FlashcardSortMode.random,
+                    label: Text(l10n.flashcardSortRandom),
                   ),
                   ButtonSegment(
                     value: FlashcardSortMode.alphabeticalAsc,
@@ -274,6 +274,23 @@ class _FlashcardSettingsSheetState extends State<FlashcardSettingsSheet> {
                 style: SegmentedButton.styleFrom(
                   textStyle: theme.textTheme.bodySmall,
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            // 排序方式描述
+            Text(
+              switch (_settings.sortMode) {
+                FlashcardSortMode.smart => l10n.flashcardSortSmartDesc,
+                FlashcardSortMode.random => l10n.flashcardSortRandomDesc,
+                FlashcardSortMode.alphabeticalAsc =>
+                  l10n.flashcardSortAlphaAscDesc,
+                FlashcardSortMode.alphabeticalDesc =>
+                  l10n.flashcardSortAlphaDescDesc,
+                FlashcardSortMode.timeAsc => l10n.flashcardSortTimeAscDesc,
+                FlashcardSortMode.timeDesc => l10n.flashcardSortTimeDescDesc,
+              },
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
 

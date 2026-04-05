@@ -31,7 +31,7 @@ enum FlashcardSortMode {
   /// 随机排序
   random,
 
-  /// 智能排序（练习少、没翻过背面、很久没练的优先）
+  /// 智能排序（基于遗忘曲线，超期比例高的优先）
   smart,
 }
 
@@ -49,7 +49,7 @@ class FlashcardSettings {
   /// 背面固定倒计时秒数（默认 10）
   final int fixedTimerBackSeconds;
 
-  /// 排序方式（默认 random）
+  /// 排序方式（默认 smart）
   final FlashcardSortMode sortMode;
 
   /// 翻转到背面时自动播放来源例句（默认 true）
@@ -69,7 +69,7 @@ class FlashcardSettings {
     this.timerMode = FlashcardTimerMode.smart,
     this.fixedTimerSeconds = 5,
     this.fixedTimerBackSeconds = 10,
-    this.sortMode = FlashcardSortMode.random,
+    this.sortMode = FlashcardSortMode.smart,
     this.autoPlaySentence = true,
     this.autoPlayWord = true,
   });
@@ -158,21 +158,41 @@ class FlashcardSettings {
     return (maxTime - decay * (maxTime - minTime)).round();
   }
 
-  /// 计算智能排序分数（分数越高越靠前）
+  /// 基础复习间隔（分钟）
+  static const double _baseInterval = 60.0;
+
+  /// 新词默认超期比例
+  static const double _newWordOverdue = 2.0;
+
+  /// 超期比例上限
+  static const double _maxOverdue = 10.0;
+
+  /// 计算智能排序分数（基于遗忘曲线，分数越高越靠前）
   ///
-  /// score = -10*practiceCount + (viewedBack ? -5 : 0) + minutesSinceLastPractice/60
+  /// 算法：
+  /// 1. 期望复习间隔 = baseInterval × 2^practiceCount（随练习次数指数增长）
+  /// 2. 超期比例 = 距上次练习时间 / 期望间隔
+  /// 3. 新词（未练习过）固定为 2.0，优先但不霸占第一
+  /// 4. 结果 clamp 到 [0, 10]，防止极端值
   static double calculateSmartScore({
     required int practiceCount,
-    required bool viewedBack,
     required DateTime? lastPracticedAt,
   }) {
+    // 新词：固定超期比例
+    if (lastPracticedAt == null) return _newWordOverdue;
+
     final now = DateTime.now();
-    final minutesSinceLastPractice = lastPracticedAt != null
-        ? now.difference(lastPracticedAt).inMinutes.toDouble()
-        : 10080.0; // 7 天（首次未练习给予高优先级）
-    return -10.0 * practiceCount +
-        (viewedBack ? -5.0 : 0.0) +
-        minutesSinceLastPractice / 60.0;
+    final minutesSince = now.difference(lastPracticedAt).inMinutes.toDouble();
+    // 期望复习间隔（分钟），随练习次数指数增长
+    final interval = _baseInterval * _pow2(practiceCount);
+    final overdue = minutesSince / interval;
+    return overdue.clamp(0.0, _maxOverdue);
+  }
+
+  /// 2 的整数次幂（避免 dart:math 依赖）
+  static double _pow2(int exponent) {
+    if (exponent <= 0) return 1.0;
+    return (1 << exponent).toDouble();
   }
 
   /// 解析控制模式：非法值回退 auto
@@ -200,10 +220,10 @@ class FlashcardSettings {
     return raw;
   }
 
-  /// 解析排序模式：非法值回退 random
+  /// 解析排序模式：非法值回退 smart
   static FlashcardSortMode _parseSortMode(dynamic raw) {
-    if (raw is! String) return FlashcardSortMode.random;
+    if (raw is! String) return FlashcardSortMode.smart;
     return FlashcardSortMode.values.where((e) => e.name == raw).firstOrNull ??
-        FlashcardSortMode.random;
+        FlashcardSortMode.smart;
   }
 }

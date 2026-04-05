@@ -7,14 +7,9 @@ part of 'intensive_listen_player_provider.dart';
 // **************************************************************************
 
 String _$intensiveListenPlayerHash() =>
-    r'21fa2cda7a1396a7f1e2d845ed28641ce23aa6c7';
+    r'b20d628c931c4b65f59e1c537295ef2a67cb4160';
 
-/// 精听专用播放器 Provider
-///
-/// 直接操作 AudioEngine 的 playClipOnce 基元，实现逐句播放循环。
-/// 使用 engine 的 sessionId 防止异步竞态。
-///
-/// Copied from [IntensiveListenPlayer].
+/// See also [IntensiveListenPlayer].
 @ProviderFor(IntensiveListenPlayer)
 final intensiveListenPlayerProvider =
     NotifierProvider<IntensiveListenPlayer, IntensiveListenState>.internal(

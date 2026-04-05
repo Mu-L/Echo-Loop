@@ -1737,7 +1737,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get flashcardSortRandom => '随机';
 
   @override
-  String get flashcardSortSmart => '智能排序';
+  String get flashcardSortSmart => '自动';
+
+  @override
+  String get flashcardSortSmartDesc => '根据记忆规律自动决定顺序';
+
+  @override
+  String get flashcardSortRandomDesc => '每次随机打乱顺序';
+
+  @override
+  String get flashcardSortAlphaAscDesc => '按字母 A 到 Z 排列';
+
+  @override
+  String get flashcardSortAlphaDescDesc => '按字母 Z 到 A 排列';
+
+  @override
+  String get flashcardSortTimeAscDesc => '最早收藏的排在前面';
+
+  @override
+  String get flashcardSortTimeDescDesc => '最近收藏的排在前面';
 
   @override
   String get flashcardNoDefinition => '暂无释义';

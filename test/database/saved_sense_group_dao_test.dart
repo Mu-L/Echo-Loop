@@ -325,4 +325,100 @@ void main() {
       expect(texts, {'first of all', 'in conclusion'});
     });
   });
+
+  // ========== 练习统计更新 ==========
+
+  group('updatePracticeStats', () {
+    test('更新 practiceCount、totalStudyMs、viewedBack、lastPracticedAt',
+        () async {
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'in the morning',
+        displayText: 'In the morning',
+      );
+
+      // 初始值
+      var all = await (db.select(db.savedSenseGroups)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(all.first.practiceCount, 0);
+      expect(all.first.totalStudyMs, 0);
+      expect(all.first.viewedBack, false);
+      expect(all.first.lastPracticedAt, isNull);
+
+      // 练习一次
+      await db.savedSenseGroupDao.updatePracticeStats(
+        phraseText: 'in the morning',
+        studyMs: 3000,
+      );
+
+      all = await (db.select(db.savedSenseGroups)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(all.first.practiceCount, 1);
+      expect(all.first.totalStudyMs, 3000);
+      expect(all.first.viewedBack, true);
+      expect(all.first.lastPracticedAt, isNotNull);
+    });
+
+    test('多次调用累加正确', () async {
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'as a result',
+        displayText: 'As a result',
+      );
+
+      await db.savedSenseGroupDao.updatePracticeStats(
+        phraseText: 'as a result',
+        studyMs: 2000,
+      );
+      await db.savedSenseGroupDao.updatePracticeStats(
+        phraseText: 'as a result',
+        studyMs: 4000,
+      );
+
+      final all = await (db.select(db.savedSenseGroups)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(all.first.practiceCount, 2);
+      expect(all.first.totalStudyMs, 6000);
+    });
+
+    test('studyMs 超过 60000 被 clamp', () async {
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'on the other hand',
+        displayText: 'On the other hand',
+      );
+
+      await db.savedSenseGroupDao.updatePracticeStats(
+        phraseText: 'on the other hand',
+        studyMs: 120000,
+      );
+
+      final all = await (db.select(db.savedSenseGroups)
+            ..where((t) => t.deletedAt.isNull()))
+          .get();
+      expect(all.first.totalStudyMs, 60000);
+    });
+
+    test('更新后 watchAll stream 收到新数据', () async {
+      await db.savedSenseGroupDao.saveSenseGroup(
+        phraseText: 'for instance',
+        displayText: 'For instance',
+      );
+
+      // 监听 stream，跳过初始值
+      final stream = db.savedSenseGroupDao.watchAll().skip(1);
+      final future = stream.first;
+
+      // 更新统计
+      await db.savedSenseGroupDao.updatePracticeStats(
+        phraseText: 'for instance',
+        studyMs: 5000,
+      );
+
+      // stream 应发射更新后的数据
+      final updated = await future.timeout(const Duration(seconds: 3));
+      expect(updated.first.practiceCount, 1);
+      expect(updated.first.lastPracticedAt, isNotNull);
+    });
+  });
 }

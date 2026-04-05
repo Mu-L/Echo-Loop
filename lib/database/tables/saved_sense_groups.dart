@@ -41,8 +41,17 @@ class SavedSenseGroups extends Table {
   /// 意群精确结束时间（毫秒）
   IntColumn get groupEndMs => integer().nullable()();
 
-  /// 练习次数
+  /// 练习次数（Flashcard 翻转到背面计为 1 次）
   IntColumn get practiceCount => integer().withDefault(const Constant(0))();
+
+  /// 累计学习时长（毫秒），单张卡片最长 60 秒截断
+  IntColumn get totalStudyMs => integer().withDefault(const Constant(0))();
+
+  /// 是否曾翻转到背面查看释义
+  BoolColumn get viewedBack => boolean().withDefault(const Constant(false))();
+
+  /// 最近一次练习时间
+  DateTimeColumn get lastPracticedAt => dateTime().nullable()();
 
   /// 收藏时间
   DateTimeColumn get createdAt => dateTime()();

@@ -7280,6 +7280,45 @@ class $SavedSenseGroupsTable extends SavedSenseGroups
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _totalStudyMsMeta = const VerificationMeta(
+    'totalStudyMs',
+  );
+  @override
+  late final GeneratedColumn<int> totalStudyMs = GeneratedColumn<int>(
+    'total_study_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _viewedBackMeta = const VerificationMeta(
+    'viewedBack',
+  );
+  @override
+  late final GeneratedColumn<bool> viewedBack = GeneratedColumn<bool>(
+    'viewed_back',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("viewed_back" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _lastPracticedAtMeta = const VerificationMeta(
+    'lastPracticedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastPracticedAt =
+      GeneratedColumn<DateTime>(
+        'last_practiced_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -7338,6 +7377,9 @@ class $SavedSenseGroupsTable extends SavedSenseGroups
     groupStartMs,
     groupEndMs,
     practiceCount,
+    totalStudyMs,
+    viewedBack,
+    lastPracticedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -7449,6 +7491,30 @@ class $SavedSenseGroupsTable extends SavedSenseGroups
         ),
       );
     }
+    if (data.containsKey('total_study_ms')) {
+      context.handle(
+        _totalStudyMsMeta,
+        totalStudyMs.isAcceptableOrUnknown(
+          data['total_study_ms']!,
+          _totalStudyMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('viewed_back')) {
+      context.handle(
+        _viewedBackMeta,
+        viewedBack.isAcceptableOrUnknown(data['viewed_back']!, _viewedBackMeta),
+      );
+    }
+    if (data.containsKey('last_practiced_at')) {
+      context.handle(
+        _lastPracticedAtMeta,
+        lastPracticedAt.isAcceptableOrUnknown(
+          data['last_practiced_at']!,
+          _lastPracticedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -7530,6 +7596,18 @@ class $SavedSenseGroupsTable extends SavedSenseGroups
         DriftSqlType.int,
         data['${effectivePrefix}practice_count'],
       )!,
+      totalStudyMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_study_ms'],
+      )!,
+      viewedBack: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}viewed_back'],
+      )!,
+      lastPracticedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_practiced_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -7586,8 +7664,17 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
   /// 意群精确结束时间（毫秒）
   final int? groupEndMs;
 
-  /// 练习次数
+  /// 练习次数（Flashcard 翻转到背面计为 1 次）
   final int practiceCount;
+
+  /// 累计学习时长（毫秒），单张卡片最长 60 秒截断
+  final int totalStudyMs;
+
+  /// 是否曾翻转到背面查看释义
+  final bool viewedBack;
+
+  /// 最近一次练习时间
+  final DateTime? lastPracticedAt;
 
   /// 收藏时间
   final DateTime createdAt;
@@ -7612,6 +7699,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
     this.groupStartMs,
     this.groupEndMs,
     required this.practiceCount,
+    required this.totalStudyMs,
+    required this.viewedBack,
+    this.lastPracticedAt,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -7645,6 +7735,11 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
       map['group_end_ms'] = Variable<int>(groupEndMs);
     }
     map['practice_count'] = Variable<int>(practiceCount);
+    map['total_study_ms'] = Variable<int>(totalStudyMs);
+    map['viewed_back'] = Variable<bool>(viewedBack);
+    if (!nullToAbsent || lastPracticedAt != null) {
+      map['last_practiced_at'] = Variable<DateTime>(lastPracticedAt);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -7681,6 +7776,11 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
           ? const Value.absent()
           : Value(groupEndMs),
       practiceCount: Value(practiceCount),
+      totalStudyMs: Value(totalStudyMs),
+      viewedBack: Value(viewedBack),
+      lastPracticedAt: lastPracticedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastPracticedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -7707,6 +7807,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
       groupStartMs: serializer.fromJson<int?>(json['groupStartMs']),
       groupEndMs: serializer.fromJson<int?>(json['groupEndMs']),
       practiceCount: serializer.fromJson<int>(json['practiceCount']),
+      totalStudyMs: serializer.fromJson<int>(json['totalStudyMs']),
+      viewedBack: serializer.fromJson<bool>(json['viewedBack']),
+      lastPracticedAt: serializer.fromJson<DateTime?>(json['lastPracticedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -7728,6 +7831,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
       'groupStartMs': serializer.toJson<int?>(groupStartMs),
       'groupEndMs': serializer.toJson<int?>(groupEndMs),
       'practiceCount': serializer.toJson<int>(practiceCount),
+      'totalStudyMs': serializer.toJson<int>(totalStudyMs),
+      'viewedBack': serializer.toJson<bool>(viewedBack),
+      'lastPracticedAt': serializer.toJson<DateTime?>(lastPracticedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -7747,6 +7853,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
     Value<int?> groupStartMs = const Value.absent(),
     Value<int?> groupEndMs = const Value.absent(),
     int? practiceCount,
+    int? totalStudyMs,
+    bool? viewedBack,
+    Value<DateTime?> lastPracticedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -7769,6 +7878,11 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
     groupStartMs: groupStartMs.present ? groupStartMs.value : this.groupStartMs,
     groupEndMs: groupEndMs.present ? groupEndMs.value : this.groupEndMs,
     practiceCount: practiceCount ?? this.practiceCount,
+    totalStudyMs: totalStudyMs ?? this.totalStudyMs,
+    viewedBack: viewedBack ?? this.viewedBack,
+    lastPracticedAt: lastPracticedAt.present
+        ? lastPracticedAt.value
+        : this.lastPracticedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -7807,6 +7921,15 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
       practiceCount: data.practiceCount.present
           ? data.practiceCount.value
           : this.practiceCount,
+      totalStudyMs: data.totalStudyMs.present
+          ? data.totalStudyMs.value
+          : this.totalStudyMs,
+      viewedBack: data.viewedBack.present
+          ? data.viewedBack.value
+          : this.viewedBack,
+      lastPracticedAt: data.lastPracticedAt.present
+          ? data.lastPracticedAt.value
+          : this.lastPracticedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -7830,6 +7953,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
           ..write('groupStartMs: $groupStartMs, ')
           ..write('groupEndMs: $groupEndMs, ')
           ..write('practiceCount: $practiceCount, ')
+          ..write('totalStudyMs: $totalStudyMs, ')
+          ..write('viewedBack: $viewedBack, ')
+          ..write('lastPracticedAt: $lastPracticedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -7851,6 +7977,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
     groupStartMs,
     groupEndMs,
     practiceCount,
+    totalStudyMs,
+    viewedBack,
+    lastPracticedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -7871,6 +8000,9 @@ class SavedSenseGroup extends DataClass implements Insertable<SavedSenseGroup> {
           other.groupStartMs == this.groupStartMs &&
           other.groupEndMs == this.groupEndMs &&
           other.practiceCount == this.practiceCount &&
+          other.totalStudyMs == this.totalStudyMs &&
+          other.viewedBack == this.viewedBack &&
+          other.lastPracticedAt == this.lastPracticedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -7889,6 +8021,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
   final Value<int?> groupStartMs;
   final Value<int?> groupEndMs;
   final Value<int> practiceCount;
+  final Value<int> totalStudyMs;
+  final Value<bool> viewedBack;
+  final Value<DateTime?> lastPracticedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -7905,6 +8040,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
     this.groupStartMs = const Value.absent(),
     this.groupEndMs = const Value.absent(),
     this.practiceCount = const Value.absent(),
+    this.totalStudyMs = const Value.absent(),
+    this.viewedBack = const Value.absent(),
+    this.lastPracticedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -7922,6 +8060,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
     this.groupStartMs = const Value.absent(),
     this.groupEndMs = const Value.absent(),
     this.practiceCount = const Value.absent(),
+    this.totalStudyMs = const Value.absent(),
+    this.viewedBack = const Value.absent(),
+    this.lastPracticedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -7942,6 +8083,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
     Expression<int>? groupStartMs,
     Expression<int>? groupEndMs,
     Expression<int>? practiceCount,
+    Expression<int>? totalStudyMs,
+    Expression<bool>? viewedBack,
+    Expression<DateTime>? lastPracticedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -7959,6 +8103,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
       if (groupStartMs != null) 'group_start_ms': groupStartMs,
       if (groupEndMs != null) 'group_end_ms': groupEndMs,
       if (practiceCount != null) 'practice_count': practiceCount,
+      if (totalStudyMs != null) 'total_study_ms': totalStudyMs,
+      if (viewedBack != null) 'viewed_back': viewedBack,
+      if (lastPracticedAt != null) 'last_practiced_at': lastPracticedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -7978,6 +8125,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
     Value<int?>? groupStartMs,
     Value<int?>? groupEndMs,
     Value<int>? practiceCount,
+    Value<int>? totalStudyMs,
+    Value<bool>? viewedBack,
+    Value<DateTime?>? lastPracticedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -7995,6 +8145,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
       groupStartMs: groupStartMs ?? this.groupStartMs,
       groupEndMs: groupEndMs ?? this.groupEndMs,
       practiceCount: practiceCount ?? this.practiceCount,
+      totalStudyMs: totalStudyMs ?? this.totalStudyMs,
+      viewedBack: viewedBack ?? this.viewedBack,
+      lastPracticedAt: lastPracticedAt ?? this.lastPracticedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -8038,6 +8191,15 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
     if (practiceCount.present) {
       map['practice_count'] = Variable<int>(practiceCount.value);
     }
+    if (totalStudyMs.present) {
+      map['total_study_ms'] = Variable<int>(totalStudyMs.value);
+    }
+    if (viewedBack.present) {
+      map['viewed_back'] = Variable<bool>(viewedBack.value);
+    }
+    if (lastPracticedAt.present) {
+      map['last_practiced_at'] = Variable<DateTime>(lastPracticedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -8067,6 +8229,9 @@ class SavedSenseGroupsCompanion extends UpdateCompanion<SavedSenseGroup> {
           ..write('groupStartMs: $groupStartMs, ')
           ..write('groupEndMs: $groupEndMs, ')
           ..write('practiceCount: $practiceCount, ')
+          ..write('totalStudyMs: $totalStudyMs, ')
+          ..write('viewedBack: $viewedBack, ')
+          ..write('lastPracticedAt: $lastPracticedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -14769,6 +14934,9 @@ typedef $$SavedSenseGroupsTableCreateCompanionBuilder =
       Value<int?> groupStartMs,
       Value<int?> groupEndMs,
       Value<int> practiceCount,
+      Value<int> totalStudyMs,
+      Value<bool> viewedBack,
+      Value<DateTime?> lastPracticedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -14787,6 +14955,9 @@ typedef $$SavedSenseGroupsTableUpdateCompanionBuilder =
       Value<int?> groupStartMs,
       Value<int?> groupEndMs,
       Value<int> practiceCount,
+      Value<int> totalStudyMs,
+      Value<bool> viewedBack,
+      Value<DateTime?> lastPracticedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -14878,6 +15049,21 @@ class $$SavedSenseGroupsTableFilterComposer
 
   ColumnFilters<int> get practiceCount => $composableBuilder(
     column: $table.practiceCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalStudyMs => $composableBuilder(
+    column: $table.totalStudyMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get viewedBack => $composableBuilder(
+    column: $table.viewedBack,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastPracticedAt => $composableBuilder(
+    column: $table.lastPracticedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14984,6 +15170,21 @@ class $$SavedSenseGroupsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get totalStudyMs => $composableBuilder(
+    column: $table.totalStudyMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get viewedBack => $composableBuilder(
+    column: $table.viewedBack,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastPracticedAt => $composableBuilder(
+    column: $table.lastPracticedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -15085,6 +15286,21 @@ class $$SavedSenseGroupsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get totalStudyMs => $composableBuilder(
+    column: $table.totalStudyMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get viewedBack => $composableBuilder(
+    column: $table.viewedBack,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastPracticedAt => $composableBuilder(
+    column: $table.lastPracticedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -15164,6 +15380,9 @@ class $$SavedSenseGroupsTableTableManager
                 Value<int?> groupStartMs = const Value.absent(),
                 Value<int?> groupEndMs = const Value.absent(),
                 Value<int> practiceCount = const Value.absent(),
+                Value<int> totalStudyMs = const Value.absent(),
+                Value<bool> viewedBack = const Value.absent(),
+                Value<DateTime?> lastPracticedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -15180,6 +15399,9 @@ class $$SavedSenseGroupsTableTableManager
                 groupStartMs: groupStartMs,
                 groupEndMs: groupEndMs,
                 practiceCount: practiceCount,
+                totalStudyMs: totalStudyMs,
+                viewedBack: viewedBack,
+                lastPracticedAt: lastPracticedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -15198,6 +15420,9 @@ class $$SavedSenseGroupsTableTableManager
                 Value<int?> groupStartMs = const Value.absent(),
                 Value<int?> groupEndMs = const Value.absent(),
                 Value<int> practiceCount = const Value.absent(),
+                Value<int> totalStudyMs = const Value.absent(),
+                Value<bool> viewedBack = const Value.absent(),
+                Value<DateTime?> lastPracticedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -15214,6 +15439,9 @@ class $$SavedSenseGroupsTableTableManager
                 groupStartMs: groupStartMs,
                 groupEndMs: groupEndMs,
                 practiceCount: practiceCount,
+                totalStudyMs: totalStudyMs,
+                viewedBack: viewedBack,
+                lastPracticedAt: lastPracticedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

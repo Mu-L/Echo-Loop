@@ -253,47 +253,43 @@ void main() {
 
   // ========== 智能排序分数 ==========
 
-  group('智能排序分数', () {
-    test('未练习过的单词分数更高', () {
-      final scoreA = FlashcardSettings.calculateSmartScore(
+  group('智能排序分数 — 遗忘曲线', () {
+    test('新词分数高于刚练完的词', () {
+      final scoreNew = FlashcardSettings.calculateSmartScore(
         practiceCount: 0,
-        viewedBack: false,
         lastPracticedAt: null,
       );
-      final scoreB = FlashcardSettings.calculateSmartScore(
+      final scorePracticed = FlashcardSettings.calculateSmartScore(
         practiceCount: 3,
-        viewedBack: true,
         lastPracticedAt: DateTime.now(),
       );
-      expect(scoreA, greaterThan(scoreB));
-    });
-
-    test('翻过背面的单词分数更低', () {
-      final scoreViewed = FlashcardSettings.calculateSmartScore(
-        practiceCount: 1,
-        viewedBack: true,
-        lastPracticedAt: DateTime.now(),
-      );
-      final scoreNotViewed = FlashcardSettings.calculateSmartScore(
-        practiceCount: 1,
-        viewedBack: false,
-        lastPracticedAt: DateTime.now(),
-      );
-      expect(scoreNotViewed, greaterThan(scoreViewed));
+      expect(scoreNew, greaterThan(scorePracticed));
     });
 
     test('很久没练习的单词分数更高', () {
       final scoreRecent = FlashcardSettings.calculateSmartScore(
         practiceCount: 2,
-        viewedBack: true,
         lastPracticedAt: DateTime.now(),
       );
       final scoreOld = FlashcardSettings.calculateSmartScore(
         practiceCount: 2,
-        viewedBack: true,
         lastPracticedAt: DateTime.now().subtract(const Duration(days: 7)),
       );
       expect(scoreOld, greaterThan(scoreRecent));
+    });
+
+    test('练习次数多的词间隔更长，不容易超期', () {
+      final lastPracticed =
+          DateTime.now().subtract(const Duration(days: 1));
+      final scoreLow = FlashcardSettings.calculateSmartScore(
+        practiceCount: 1,
+        lastPracticedAt: lastPracticed,
+      );
+      final scoreHigh = FlashcardSettings.calculateSmartScore(
+        practiceCount: 8,
+        lastPracticedAt: lastPracticed,
+      );
+      expect(scoreLow, greaterThan(scoreHigh));
     });
   });
 }

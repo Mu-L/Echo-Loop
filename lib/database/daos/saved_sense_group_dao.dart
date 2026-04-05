@@ -99,16 +99,33 @@ class SavedSenseGroupDao extends DatabaseAccessor<AppDatabase>
 
   /// 更新 Flashcard 练习统计
   ///
-  /// 每次翻转到背面时调用：practiceCount +1，更新 updatedAt。
-  Future<void> updatePracticeStats({required String phraseText}) async {
+  /// 每次翻转到背面时调用：practiceCount +1，累加学习时长，
+  /// 标记已翻看背面，记录练习时间。
+  Future<void> updatePracticeStats({
+    required String phraseText,
+    required int studyMs,
+  }) async {
+    final clampedMs = studyMs.clamp(0, 60000);
     await customStatement(
       '''
       UPDATE saved_sense_groups
       SET practice_count = practice_count + 1,
+          total_study_ms = total_study_ms + ?,
+          viewed_back = 1,
+          last_practiced_at = ?,
           updated_at = ?
       WHERE phrase_text = ? AND deleted_at IS NULL
     ''',
-      [DateTime.now().millisecondsSinceEpoch ~/ 1000, phraseText],
+      [
+        clampedMs,
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        phraseText,
+      ],
+    );
+    // customStatement 不会自动通知 stream watcher，手动触发
+    attachedDatabase.notifyUpdates(
+      {TableUpdate.onTable(savedSenseGroups, kind: UpdateKind.update)},
     );
   }
 

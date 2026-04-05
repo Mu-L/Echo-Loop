@@ -7,12 +7,9 @@ part of 'review_difficult_practice_provider.dart';
 // **************************************************************************
 
 String _$reviewDifficultPracticeHash() =>
-    r'56d363204a941133b8aec7c3e17cab394e5ed8a8';
+    r'a9fb043bcde17c4dd686a5b745c6d6caa9d791db';
 
 /// 难句补练 Provider
-///
-/// 组合 SentencePlaybackEngine 实现盲听→自动推进的逐句训练循环。
-/// 用户可偷看字幕或进入标注模式（听不懂），交互与精听一致。
 ///
 /// Copied from [ReviewDifficultPractice].
 @ProviderFor(ReviewDifficultPractice)

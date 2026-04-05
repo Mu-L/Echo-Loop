@@ -16,7 +16,7 @@ void main() {
       expect(settings.timerMode, FlashcardTimerMode.smart);
       expect(settings.fixedTimerSeconds, 5);
       expect(settings.fixedTimerBackSeconds, 10);
-      expect(settings.sortMode, FlashcardSortMode.random);
+      expect(settings.sortMode, FlashcardSortMode.smart);
       expect(settings.autoPlaySentence, true);
       expect(settings.autoPlayWord, true);
       expect(settings.isManualMode, false);
@@ -80,7 +80,7 @@ void main() {
       expect(settings.timerMode, FlashcardTimerMode.smart);
       expect(settings.fixedTimerSeconds, 5);
       expect(settings.fixedTimerBackSeconds, 10);
-      expect(settings.sortMode, FlashcardSortMode.random);
+      expect(settings.sortMode, FlashcardSortMode.smart);
       expect(settings.autoPlaySentence, true);
       expect(settings.autoPlayWord, true);
     });
@@ -97,7 +97,7 @@ void main() {
       expect(settings.timerMode, FlashcardTimerMode.smart);
       expect(settings.fixedTimerSeconds, 5);
       expect(settings.fixedTimerBackSeconds, 10);
-      expect(settings.sortMode, FlashcardSortMode.random);
+      expect(settings.sortMode, FlashcardSortMode.smart);
     });
 
     test('fromJson 类型错误回退默认', () {
@@ -112,7 +112,7 @@ void main() {
       expect(settings.timerMode, FlashcardTimerMode.smart);
       expect(settings.fixedTimerSeconds, 5);
       expect(settings.fixedTimerBackSeconds, 10);
-      expect(settings.sortMode, FlashcardSortMode.random);
+      expect(settings.sortMode, FlashcardSortMode.smart);
     });
 
     test('fromJson 旧数据 timerMode=off 迁移为 controlMode=manual', () {
@@ -218,37 +218,116 @@ void main() {
     });
   });
 
-  group('calculateSmartScore', () {
-    test('首次未练习得分最高', () {
+  group('calculateSmartScore — 遗忘曲线', () {
+    test('新词（未练习）固定返回 2.0', () {
       final score = FlashcardSettings.calculateSmartScore(
         practiceCount: 0,
-        viewedBack: false,
         lastPracticedAt: null,
       );
-      expect(score, closeTo(168.0, 0.1));
+      expect(score, 2.0);
     });
 
-    test('练习多次得分降低', () {
+    test('刚练完的词分数接近 0', () {
       final score = FlashcardSettings.calculateSmartScore(
-        practiceCount: 5,
-        viewedBack: true,
+        practiceCount: 1,
         lastPracticedAt: DateTime.now(),
       );
-      expect(score, closeTo(-55.0, 0.1));
+      expect(score, closeTo(0.0, 0.1));
     });
 
-    test('viewedBack 降低 5 分', () {
-      final scoreNoView = FlashcardSettings.calculateSmartScore(
-        practiceCount: 0,
-        viewedBack: false,
-        lastPracticedAt: DateTime.now(),
+    test('超期比例随时间增长', () {
+      // 练 1 次，间隔 120min，过了 360min → overdue = 3.0
+      final score = FlashcardSettings.calculateSmartScore(
+        practiceCount: 1,
+        lastPracticedAt: DateTime.now().subtract(const Duration(minutes: 360)),
       );
-      final scoreViewed = FlashcardSettings.calculateSmartScore(
-        practiceCount: 0,
-        viewedBack: true,
-        lastPracticedAt: DateTime.now(),
+      expect(score, closeTo(3.0, 0.1));
+    });
+
+    test('练习次数越多间隔越长，同样时间超期比例越低', () {
+      final lastPracticed =
+          DateTime.now().subtract(const Duration(hours: 12));
+      // 练 1 次：interval=120min, 720/120=6.0
+      final score1 = FlashcardSettings.calculateSmartScore(
+        practiceCount: 1,
+        lastPracticedAt: lastPracticed,
       );
-      expect(scoreNoView - scoreViewed, closeTo(5.0, 0.1));
+      // 练 5 次：interval=1920min, 720/1920=0.375
+      final score5 = FlashcardSettings.calculateSmartScore(
+        practiceCount: 5,
+        lastPracticedAt: lastPracticed,
+      );
+      expect(score1, greaterThan(score5));
+    });
+
+    test('超期比例上限 clamp 到 10', () {
+      // 练 1 次，间隔 120min，过了 7 天 = 10080min → 84 → clamp 10
+      final score = FlashcardSettings.calculateSmartScore(
+        practiceCount: 1,
+        lastPracticedAt:
+            DateTime.now().subtract(const Duration(days: 7)),
+      );
+      expect(score, 10.0);
+    });
+  });
+
+  // ========== 智能排序集成 ==========
+
+  group('smart 排序 — 多词排序验证', () {
+    /// 辅助：按 smart score 降序排列 displayText
+    List<String> sortBySmartScore(
+      List<({String name, int practice, DateTime? lastPracticed})> items,
+    ) {
+      final scored = items.map((e) {
+        final score = FlashcardSettings.calculateSmartScore(
+          practiceCount: e.practice,
+          lastPracticedAt: e.lastPracticed,
+        );
+        return (name: e.name, score: score);
+      }).toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+      return scored.map((e) => e.name).toList();
+    }
+
+    test('严重超期的词排在新词前面', () {
+      final now = DateTime.now();
+      final result = sortBySmartScore([
+        (name: 'new', practice: 0, lastPracticed: null),
+        (name: 'overdue', practice: 1, lastPracticed: now.subtract(const Duration(days: 1))),
+      ]);
+      // overdue score=10(clamp), new score=2.0
+      expect(result, ['overdue', 'new']);
+    });
+
+    test('新词排在刚练完的词前面', () {
+      final now = DateTime.now();
+      final result = sortBySmartScore([
+        (name: 'justDone', practice: 3, lastPracticed: now),
+        (name: 'new', practice: 0, lastPracticed: null),
+      ]);
+      expect(result, ['new', 'justDone']);
+    });
+
+    test('练习多次的熟词即使很久没碰也不会排到最前', () {
+      final now = DateTime.now();
+      final result = sortBySmartScore([
+        // 练 10 次，7 天没碰，interval=60*1024=61440min，overdue=10080/61440=0.16
+        (name: 'master', practice: 10, lastPracticed: now.subtract(const Duration(days: 7))),
+        // 练 1 次，1 天没碰，interval=120min，overdue=1440/120=12→clamp10
+        (name: 'beginner', practice: 1, lastPracticed: now.subtract(const Duration(days: 1))),
+        // 新词 score=2.0
+        (name: 'new', practice: 0, lastPracticed: null),
+      ]);
+      expect(result, ['beginner', 'new', 'master']);
+    });
+
+    test('相同 practiceCount 的词按超期时间排序', () {
+      final now = DateTime.now();
+      final result = sortBySmartScore([
+        (name: 'recent', practice: 3, lastPracticed: now.subtract(const Duration(hours: 2))),
+        (name: 'old', practice: 3, lastPracticed: now.subtract(const Duration(days: 2))),
+      ]);
+      expect(result, ['old', 'recent']);
     });
   });
 }

@@ -166,6 +166,16 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     final settings = await _loadSettings();
     debugPrint('[PERF] flashcard _loadSettings: ${sw.elapsedMilliseconds}ms');
 
+    // [DEBUG] 排序前：打印前 5 个 item 的关键字段
+    debugPrint('[FLASHCARD] initialize: sortMode=${settings.sortMode.name}, '
+        'itemCount=${items.length}');
+    for (var i = 0; i < items.length && i < 5; i++) {
+      final it = items[i];
+      debugPrint('[FLASHCARD]   [$i] ${it.displayText}: '
+          'practiceCount=${it.practiceCount}, '
+          'lastPracticedAt=${it.lastPracticedAt}');
+    }
+
     // 排序
     final sorted = _sortItems(items, settings.sortMode);
     debugPrint('[PERF] flashcard _sortItems: ${sw.elapsedMilliseconds}ms');
@@ -521,6 +531,14 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   /// 重新开始（再来一遍）
   Future<void> reset() async {
     _countdown.cancel();
+    // [DEBUG] reset 时检查内存中 items 是否已更新
+    debugPrint('[FLASHCARD] reset: ${state.words.length} items');
+    for (var i = 0; i < state.words.length && i < 5; i++) {
+      final it = state.words[i];
+      debugPrint('[FLASHCARD]   reset [$i] ${it.displayText}: '
+          'practiceCount=${it.practiceCount}, '
+          'lastPracticedAt=${it.lastPracticedAt}');
+    }
     // 先保存已累计时间
     await _saveAndRefreshStudyTime();
     await initialize(state.words);
@@ -640,6 +658,11 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     final cardStart = state.cardStartTime ?? now;
     final studyMs = now.difference(cardStart).inMilliseconds;
 
+    debugPrint('[FLASHCARD] _recordPracticeStats: ${item.displayText}, '
+        'studyMs=$studyMs, '
+        'oldPracticeCount=${item.practiceCount}, '
+        'oldLastPracticedAt=${item.lastPracticedAt}');
+
     switch (item) {
       case FlashcardWordItem():
         await ref
@@ -648,7 +671,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       case FlashcardPhraseItem():
         await ref
             .read(savedSenseGroupDaoProvider)
-            .updatePracticeStats(phraseText: item.dbKey);
+            .updatePracticeStats(phraseText: item.dbKey, studyMs: studyMs);
     }
   }
 
@@ -684,16 +707,25 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       case FlashcardSortMode.random:
         sorted.shuffle();
       case FlashcardSortMode.smart:
+        // [DEBUG] 排序前打印每个 item 的 score
+        for (final item in sorted) {
+          final score = FlashcardSettings.calculateSmartScore(
+            practiceCount: item.practiceCount,
+            lastPracticedAt: item.lastPracticedAt,
+          );
+          debugPrint('[FLASHCARD] smart score: ${item.displayText} → '
+              'score=${score.toStringAsFixed(2)}, '
+              'practice=${item.practiceCount}, '
+              'lastPracticed=${item.lastPracticedAt}');
+        }
         sorted.sort((a, b) {
           final scoreA = FlashcardSettings.calculateSmartScore(
             practiceCount: a.practiceCount,
-            viewedBack: false,
-            lastPracticedAt: null,
+            lastPracticedAt: a.lastPracticedAt,
           );
           final scoreB = FlashcardSettings.calculateSmartScore(
             practiceCount: b.practiceCount,
-            viewedBack: false,
-            lastPracticedAt: null,
+            lastPracticedAt: b.lastPracticedAt,
           );
           return scoreB.compareTo(scoreA);
         });

@@ -325,4 +325,80 @@ void main() {
       expect(words.first.sentenceText, 'Test sentence');
     });
   });
+
+  // ========== 练习统计更新 ==========
+
+  group('updatePracticeStats', () {
+    test('更新 practiceCount、totalStudyMs、viewedBack、lastPracticedAt',
+        () async {
+      await db.savedWordDao.saveWord(word: 'apple');
+
+      // 初始值
+      var words = await db.savedWordDao.getAll();
+      expect(words.first.practiceCount, 0);
+      expect(words.first.totalStudyMs, 0);
+      expect(words.first.viewedBack, false);
+      expect(words.first.lastPracticedAt, isNull);
+
+      // 练习一次
+      await db.savedWordDao.updatePracticeStats(
+        word: 'apple',
+        studyMs: 3000,
+      );
+
+      words = await db.savedWordDao.getAll();
+      expect(words.first.practiceCount, 1);
+      expect(words.first.totalStudyMs, 3000);
+      expect(words.first.viewedBack, true);
+      expect(words.first.lastPracticedAt, isNotNull);
+    });
+
+    test('多次调用累加正确', () async {
+      await db.savedWordDao.saveWord(word: 'banana');
+
+      await db.savedWordDao.updatePracticeStats(
+        word: 'banana',
+        studyMs: 2000,
+      );
+      await db.savedWordDao.updatePracticeStats(
+        word: 'banana',
+        studyMs: 4000,
+      );
+
+      final words = await db.savedWordDao.getAll();
+      expect(words.first.practiceCount, 2);
+      expect(words.first.totalStudyMs, 6000);
+    });
+
+    test('studyMs 超过 60000 被 clamp', () async {
+      await db.savedWordDao.saveWord(word: 'cat');
+
+      await db.savedWordDao.updatePracticeStats(
+        word: 'cat',
+        studyMs: 120000,
+      );
+
+      final words = await db.savedWordDao.getAll();
+      expect(words.first.totalStudyMs, 60000);
+    });
+
+    test('更新后 watchAll stream 收到新数据', () async {
+      await db.savedWordDao.saveWord(word: 'dog');
+
+      // 监听 stream，跳过初始值
+      final stream = db.savedWordDao.watchAll().skip(1);
+      final future = stream.first;
+
+      // 更新统计
+      await db.savedWordDao.updatePracticeStats(
+        word: 'dog',
+        studyMs: 5000,
+      );
+
+      // stream 应发射更新后的数据
+      final updated = await future.timeout(const Duration(seconds: 3));
+      expect(updated.first.practiceCount, 1);
+      expect(updated.first.lastPracticedAt, isNotNull);
+    });
+  });
 }
