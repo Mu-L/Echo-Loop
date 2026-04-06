@@ -286,7 +286,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: Text(
-                kReleaseMode ? 'v$version' : 'v$version (Debug)',
+                kReleaseMode
+                    ? 'Version $version'
+                    : 'Version $version (Debug)',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
