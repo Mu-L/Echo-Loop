@@ -252,16 +252,16 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     final flippingToBack = !state.isShowingBack;
     if (flippingToBack) _recordPracticeStats();
 
-    // 翻回正面时停止例句播放，避免状态混乱
+    // 1. 先同步翻转 → UI 立即开始动画（不被平台通道阻塞）
+    _engine.userFlipCard();
     if (!flippingToBack) {
-      await _stopAllPlayback();
       state = state.copyWith(isSentencePlaying: false);
     }
 
-    // 引擎原子性翻转+等待，_onEngineStateChanged 同步 isShowingBack
-    _engine.userFlipCard();
+    // 2. 异步停止旧播放（不阻塞翻转动画）
+    await _stopAllPlayback();
 
-    // 自动播放（不改 phase，不启动倒计时）
+    // 3. 自动播放新内容
     final item = state.currentWord;
     if (item != null) {
       await _autoPlayAfterFlip(item, flippingToBack);
