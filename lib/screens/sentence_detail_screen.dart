@@ -1,57 +1,138 @@
-/// 收藏句子详情页面
+/// 句子详情页面
 ///
-/// 从收藏列表点击进入，展示单个句子的精听界面。
-/// 包含解析/翻译/意群工具栏和单句播放按钮，不包含上下句导航。
+/// 通用句子解析页面，展示单个句子的翻译/语法/意群工具栏和播放按钮。
+/// 支持收藏切换（BookmarkToggleRow）。
+/// 由复述页面的句子列表和收藏页面的句子列表共同使用。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
+import '../models/sentence.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
+import '../providers/listening_practice/bookmark_manager.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/tappable_wrapper.dart';
 import '../widgets/practice/annotation_content_view.dart';
 
-/// 收藏句子详情页面参数
-class BookmarkSentenceDetailArgs {
-  /// 书签数据
-  final Bookmark bookmark;
-
+/// 句子详情页面参数
+class SentenceDetailArgs {
   /// 音频 ID
-  final String audioId;
+  final String audioItemId;
 
   /// 音频名称（用于 AppBar 显示）
   final String audioName;
 
-  const BookmarkSentenceDetailArgs({
-    required this.bookmark,
-    required this.audioId,
+  /// 句子文本
+  final String sentenceText;
+
+  /// 句子索引
+  final int sentenceIndex;
+
+  /// 句子起始时间（毫秒）
+  final int startTimeMs;
+
+  /// 句子结束时间（毫秒）
+  final int endTimeMs;
+
+  const SentenceDetailArgs({
+    required this.audioItemId,
     required this.audioName,
+    required this.sentenceText,
+    required this.sentenceIndex,
+    required this.startTimeMs,
+    required this.endTimeMs,
   });
 }
 
-/// 收藏句子详情页面
-class BookmarkSentenceDetailScreen extends ConsumerStatefulWidget {
+/// 句子详情页面
+class SentenceDetailScreen extends ConsumerStatefulWidget {
   /// 页面参数
-  final BookmarkSentenceDetailArgs args;
+  final SentenceDetailArgs args;
 
-  const BookmarkSentenceDetailScreen({super.key, required this.args});
+  const SentenceDetailScreen({super.key, required this.args});
 
   @override
-  ConsumerState<BookmarkSentenceDetailScreen> createState() =>
-      _BookmarkSentenceDetailScreenState();
+  ConsumerState<SentenceDetailScreen> createState() =>
+      _SentenceDetailScreenState();
 }
 
-class _BookmarkSentenceDetailScreenState
-    extends ConsumerState<BookmarkSentenceDetailScreen> {
+class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
   bool _isPlaying = false;
+  bool _isBookmarked = false;
+  bool _bookmarkLoaded = false;
+  bool _isTogglingBookmark = false;
 
-  String _formatTime(double seconds) {
+  @override
+  void initState() {
+    super.initState();
+    _loadBookmarkStatus();
+  }
+
+  @override
+  void dispose() {
+    // 退出时停止播放，覆盖返回按钮和系统滑动返回手势
+    ref.read(audioEngineProvider.notifier).stop();
+    super.dispose();
+  }
+
+  /// 从数据库加载收藏状态
+  Future<void> _loadBookmarkStatus() async {
+    final dao = ref.read(bookmarkDaoProvider);
+    final indices = await BookmarkManager.loadBookmarks(
+      widget.args.audioItemId,
+      dao: dao,
+    );
+    if (mounted) {
+      setState(() {
+        _isBookmarked = indices.contains(widget.args.sentenceIndex);
+        _bookmarkLoaded = true;
+      });
+    }
+  }
+
+  /// 切换收藏状态（防重入）
+  Future<void> _toggleBookmark() async {
+    if (_isTogglingBookmark) return;
+    _isTogglingBookmark = true;
+
+    try {
+      final dao = ref.read(bookmarkDaoProvider);
+      final args = widget.args;
+      if (_isBookmarked) {
+        await BookmarkManager.removeBookmarksFromDb(
+          args.audioItemId,
+          {args.sentenceIndex},
+          dao: dao,
+        );
+      } else {
+        final sentence = Sentence(
+          index: args.sentenceIndex,
+          text: args.sentenceText,
+          startTime: Duration(milliseconds: args.startTimeMs),
+          endTime: Duration(milliseconds: args.endTimeMs),
+        );
+        await BookmarkManager.addBookmarkToDb(
+          args.audioItemId,
+          sentence,
+          dao: dao,
+        );
+      }
+      if (mounted) {
+        setState(() => _isBookmarked = !_isBookmarked);
+      }
+    } finally {
+      _isTogglingBookmark = false;
+    }
+  }
+
+  String _formatTime(int ms) {
+    final seconds = ms / 1000;
     final m = seconds ~/ 60;
     final s = (seconds % 60).toInt();
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
@@ -71,12 +152,12 @@ class _BookmarkSentenceDetailScreenState
 
     try {
       final engineState = ref.read(audioEngineProvider);
-      final bm = widget.args.bookmark;
+      final args = widget.args;
 
       // 如果当前加载的不是同一音频，重新加载
-      if (engineState.currentAudioId != widget.args.audioId) {
+      if (engineState.currentAudioId != args.audioItemId) {
         final dao = ref.read(audioItemDaoProvider);
-        final row = await dao.getById(widget.args.audioId);
+        final row = await dao.getById(args.audioItemId);
         if (row == null || !mounted) {
           setState(() => _isPlaying = false);
           return;
@@ -105,12 +186,8 @@ class _BookmarkSentenceDetailScreenState
       if (!mounted) return;
 
       final sessionId = engine.newSession();
-      final start = Duration(
-        milliseconds: (bm.startTime * 1000).round(),
-      );
-      final end = Duration(
-        milliseconds: (bm.endTime * 1000).round(),
-      );
+      final start = Duration(milliseconds: args.startTimeMs);
+      final end = Duration(milliseconds: args.endTimeMs);
       await engine.playRangeOnce(start, end, sessionId);
     } catch (_) {
       // 忽略播放错误（音频文件不存在等）
@@ -125,24 +202,18 @@ class _BookmarkSentenceDetailScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final bm = widget.args.bookmark;
+    final args = widget.args;
 
-    final durationSec = bm.endTime - bm.startTime;
+    final durationMs = args.endTimeMs - args.startTimeMs;
+    final durationSec = durationMs / 1000;
     final durationText = l10n.sentenceDuration(durationSec.toStringAsFixed(1));
     final timeRangeText =
-        '${_formatTime(bm.startTime)} - ${_formatTime(bm.endTime)}';
+        '${_formatTime(args.startTimeMs)} - ${_formatTime(args.endTimeMs)}';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.args.audioName),
+        title: Text(args.audioName),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () {
-            ref.read(audioEngineProvider.notifier).stop();
-            Navigator.of(context).pop();
-          },
-        ),
       ),
       body: Column(
         children: [
@@ -151,7 +222,7 @@ class _BookmarkSentenceDetailScreenState
             padding: const EdgeInsets.only(
               left: AppSpacing.l,
               right: AppSpacing.l,
-              top: AppSpacing.s,
+              top: AppSpacing.m,
             ),
             child: Row(
               children: [
@@ -171,6 +242,19 @@ class _BookmarkSentenceDetailScreenState
               ],
             ),
           ),
+
+          const SizedBox(height: AppSpacing.m),
+
+          // 收藏标记行
+          if (_bookmarkLoaded)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+              child: BookmarkToggleRow(
+                isDifficult: _isBookmarked,
+                onTap: _toggleBookmark,
+              ),
+            ),
+
           const SizedBox(height: AppSpacing.m),
 
           // 主体内容：解析/翻译/意群 + 句子文本
@@ -178,12 +262,12 @@ class _BookmarkSentenceDetailScreenState
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
               child: AnnotationContentView(
-                text: bm.sentenceText,
+                text: args.sentenceText,
                 aiNotifier: ref.read(sentenceAiNotifierProvider),
-                audioItemId: widget.args.audioId,
-                sentenceIndex: bm.sentenceIndex,
-                sentenceStartMs: (bm.startTime * 1000).round(),
-                sentenceEndMs: (bm.endTime * 1000).round(),
+                audioItemId: args.audioItemId,
+                sentenceIndex: args.sentenceIndex,
+                sentenceStartMs: args.startTimeMs,
+                sentenceEndMs: args.endTimeMs,
                 onStopMainPlayer: () {
                   if (_isPlaying) {
                     ref.read(audioEngineProvider.notifier).stop();
@@ -194,7 +278,7 @@ class _BookmarkSentenceDetailScreenState
             ),
           ),
 
-          // 底部播放按钮（与精听页面 footer 位置一致）
+          // 底部播放按钮
           Padding(
             padding: const EdgeInsets.only(
               top: AppSpacing.m,

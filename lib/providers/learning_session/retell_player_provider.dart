@@ -24,6 +24,7 @@ import '../../services/study_event_recorder.dart';
 import '../../utils/keyword_extraction.dart';
 import '../../utils/word_counter.dart';
 import '../audio_engine/audio_engine_provider.dart';
+import '../listening_practice/bookmark_manager.dart';
 import '../learned_vocabulary_tracker_provider.dart';
 import '../retell_recording_controller_provider.dart';
 import 'countdown_controller.dart';
@@ -88,6 +89,9 @@ class RetellPlayerState {
   /// 是否正在等待用户继续操作
   final bool isWaitingForUser;
 
+  /// 已收藏句子索引集合
+  final Set<int> bookmarkedSentenceIndices;
+
   /// 当前步骤是否自然完成（用于 Screen 层检测完成信号）
   final bool stepFinished;
 
@@ -106,6 +110,7 @@ class RetellPlayerState {
     this.isCountdownPaused = false,
     this.isCountdownFastForward = false,
     this.userOverrodeDisplayMode = false,
+    this.bookmarkedSentenceIndices = const {},
     this.isWaitingForUser = false,
     this.stepFinished = false,
   });
@@ -125,6 +130,7 @@ class RetellPlayerState {
     bool? isCountdownPaused,
     bool? isCountdownFastForward,
     bool? userOverrodeDisplayMode,
+    Set<int>? bookmarkedSentenceIndices,
     bool? isWaitingForUser,
     bool? stepFinished,
   }) {
@@ -146,6 +152,8 @@ class RetellPlayerState {
           isCountdownFastForward ?? this.isCountdownFastForward,
       userOverrodeDisplayMode:
           userOverrodeDisplayMode ?? this.userOverrodeDisplayMode,
+      bookmarkedSentenceIndices:
+          bookmarkedSentenceIndices ?? this.bookmarkedSentenceIndices,
       isWaitingForUser: isWaitingForUser ?? this.isWaitingForUser,
       stepFinished: stepFinished ?? this.stepFinished,
     );
@@ -281,6 +289,59 @@ class RetellPlayer extends _$RetellPlayer {
 
     // 注入 recorder 到录音控制器
     ref.read(retellRecordingControllerProvider.notifier).setRecorder(_recorder);
+
+    // 从句子的 isBookmarked 字段初始化收藏状态
+    final preBookmarked = <int>{
+      for (final paragraph in paragraphs)
+        for (final s in paragraph)
+          if (s.isBookmarked) s.index,
+    };
+    if (preBookmarked.isNotEmpty) {
+      state = state.copyWith(bookmarkedSentenceIndices: preBookmarked);
+    }
+  }
+
+  /// 从数据库加载收藏状态（初始化后异步调用）
+  Future<void> initializeBookmarks(String audioItemId) async {
+    final dao = ref.read(bookmarkDaoProvider);
+    final indices = await BookmarkManager.loadBookmarks(
+      audioItemId,
+      dao: dao,
+    );
+    // 同步到句子对象
+    BookmarkManager.updateSentenceBookmarkStatus(_allSentences, indices);
+    state = state.copyWith(bookmarkedSentenceIndices: indices);
+  }
+
+  /// 切换句子收藏状态
+  ///
+  /// 先写 DB，成功后再更新内存状态，避免 DB 失败导致状态不一致。
+  Future<void> toggleBookmark(String audioItemId, Sentence sentence) async {
+    final dao = ref.read(bookmarkDaoProvider);
+    final isCurrentlyBookmarked = state.bookmarkedSentenceIndices.contains(
+      sentence.index,
+    );
+
+    if (isCurrentlyBookmarked) {
+      await BookmarkManager.removeBookmarksFromDb(
+        audioItemId,
+        {sentence.index},
+        dao: dao,
+      );
+    } else {
+      await BookmarkManager.addBookmarkToDb(audioItemId, sentence, dao: dao);
+    }
+
+    // DB 操作完成后更新内存
+    final newSet = Set<int>.from(state.bookmarkedSentenceIndices);
+    if (isCurrentlyBookmarked) {
+      newSet.remove(sentence.index);
+      sentence.isBookmarked = false;
+    } else {
+      newSet.add(sentence.index);
+      sentence.isBookmarked = true;
+    }
+    state = state.copyWith(bookmarkedSentenceIndices: newSet);
   }
 
   /// 获取当前段落第一句的全局句子索引（用于保存断点）
@@ -513,10 +574,15 @@ class RetellPlayer extends _$RetellPlayer {
   ///
   /// 如果当前段落正在播放且 [afterCurrentParagraph] 为 true，
   /// 则允许当前段自然播完后再停在等待态。
-  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
+  /// [stopImmediately] 为 true 时，无论当前状态，立即停止播放进入等待态。
+  void enterWaitingForUser({
+    bool afterCurrentParagraph = false,
+    bool stopImmediately = false,
+  }) {
     if (state.isWaitingForUser || state.stepFinished) return;
 
-    if (state.phase == RetellPhase.listening &&
+    if (!stopImmediately &&
+        state.phase == RetellPhase.listening &&
         state.isPlaying &&
         afterCurrentParagraph) {
       _waitAfterCurrentParagraph = true;
@@ -615,7 +681,7 @@ class RetellPlayer extends _$RetellPlayer {
     _paragraphs = [];
     _allSentences = [];
     _keywordsMap = {};
-    state = const RetellPlayerState();
+    state = const RetellPlayerState(); // bookmarkedSentenceIndices 随之清空
   }
 
   // ========== 内部方法 ==========

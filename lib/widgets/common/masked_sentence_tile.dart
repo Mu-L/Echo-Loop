@@ -1,4 +1,4 @@
-/// 复述句子 Tile
+/// 遮盖句子 Tile
 ///
 /// 段落内单个句子的显示组件，支持多种渲染模式：
 /// - 按 displayMode 显示关键词/全部显示/全部隐藏（listening 和 retelling 通用）
@@ -17,8 +17,8 @@ import '../../utils/keyword_extraction.dart';
 /// Wrap 子元素间距（px）— 模拟自然空格宽度
 const _wordSpacing = 4.0;
 
-/// 复述句子 Tile
-class RetellSentenceTile extends StatelessWidget {
+/// 遮盖句子 Tile
+class MaskedSentenceTile extends StatelessWidget {
   /// 句子数据
   final Sentence sentence;
 
@@ -31,23 +31,27 @@ class RetellSentenceTile extends StatelessWidget {
   /// 是否为当前播放中的句子
   final bool isPlayingSentence;
 
-  /// 可见单词点击回调（词典查询）
-  final ValueChanged<String>? onWordTap;
+  /// 是否已收藏（只读标记）
+  final bool isBookmarked;
 
-  const RetellSentenceTile({
+  /// 点击整行回调
+  final VoidCallback? onTap;
+
+  const MaskedSentenceTile({
     super.key,
     required this.sentence,
     required this.displayMode,
     required this.keywordIndices,
     required this.isPlayingSentence,
-    this.onWordTap,
+    this.isBookmarked = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return AnimatedContainer(
+    final content = AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.m,
@@ -69,9 +73,9 @@ class RetellSentenceTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 句子序号 + 内容
+          // 句子序号 + 内容 + 收藏标记
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
                 width: 24,
@@ -83,11 +87,31 @@ class RetellSentenceTile extends StatelessWidget {
                 ),
               ),
               Expanded(child: _buildMaskedText(theme, tokenize(sentence.text))),
+              if (isBookmarked)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.bookmark,
+                    size: 14,
+                    color: Colors.amber,
+                  ),
+                ),
             ],
           ),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        // 背景色在 AnimatedContainer 上，涟漪会被遮挡，改用高亮反馈
+        splashColor: Colors.transparent,
+        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+        child: content,
+      );
+    }
+    return content;
   }
 
   /// 构建遮盖文本
@@ -128,9 +152,6 @@ class RetellSentenceTile extends StatelessWidget {
           isNextMasked:
               i < words.length - 1 && shouldMask(i) && shouldMask(i + 1),
           theme: theme,
-          onTap: (!shouldMask(i) && onWordTap != null)
-              ? () => onWordTap!(words[i])
-              : null,
         ),
     ];
   }
@@ -147,7 +168,6 @@ class _WordBlock extends StatelessWidget {
   final bool isPrevMasked;
   final bool isNextMasked;
   final ThemeData theme;
-  final VoidCallback? onTap;
 
   const _WordBlock({
     required this.text,
@@ -155,7 +175,6 @@ class _WordBlock extends StatelessWidget {
     required this.theme,
     this.isPrevMasked = false,
     this.isNextMasked = false,
-    this.onTap,
   });
 
   @override
@@ -183,7 +202,7 @@ class _WordBlock extends StatelessWidget {
 
     // 连续遮盖词：向右溢出绘制桥接色块填充 Wrap spacing
     if (isMasked && isNextMasked) {
-      final result = Stack(
+      return Stack(
         clipBehavior: Clip.none,
         children: [
           child,
@@ -196,16 +215,8 @@ class _WordBlock extends StatelessWidget {
           ),
         ],
       );
-
-      if (onTap != null) {
-        return GestureDetector(onTap: onTap, child: result);
-      }
-      return result;
     }
 
-    if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: child);
-    }
     return child;
   }
 }

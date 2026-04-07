@@ -8,9 +8,7 @@ import 'package:flutter/material.dart';
 import '../../models/retell_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
-import '../retell/retell_sentence_tile.dart';
-
-typedef ParagraphWordTap = void Function(Sentence sentence, String word);
+import 'masked_sentence_tile.dart';
 
 /// 段落句子列表卡片
 class ParagraphSentenceListCard extends StatelessWidget {
@@ -18,7 +16,12 @@ class ParagraphSentenceListCard extends StatelessWidget {
   final RetellDisplayMode displayMode;
   final Map<int, Set<int>> keywordMap;
   final int playingSentenceIndex;
-  final ParagraphWordTap? onWordTap;
+
+  /// 已收藏句子索引集合（用于显示只读标记）
+  final Set<int> bookmarkedSentenceIndices;
+
+  /// 点击句子回调
+  final ValueChanged<Sentence>? onSentenceTap;
 
   const ParagraphSentenceListCard({
     super.key,
@@ -26,7 +29,8 @@ class ParagraphSentenceListCard extends StatelessWidget {
     required this.displayMode,
     required this.keywordMap,
     required this.playingSentenceIndex,
-    this.onWordTap,
+    this.bookmarkedSentenceIndices = const {},
+    this.onSentenceTap,
   });
 
   @override
@@ -45,14 +49,15 @@ class ParagraphSentenceListCard extends StatelessWidget {
         ),
         itemBuilder: (context, index) {
           final sentence = sentences[index];
-          return RetellSentenceTile(
+          return MaskedSentenceTile(
             sentence: sentence,
             displayMode: displayMode,
             keywordIndices: keywordMap[sentence.index] ?? const {},
             isPlayingSentence: index == playingSentenceIndex,
-            onWordTap: onWordTap == null
+            isBookmarked: bookmarkedSentenceIndices.contains(sentence.index),
+            onTap: onSentenceTap == null
                 ? null
-                : (word) => onWordTap!(sentence, word),
+                : () => onSentenceTap!(sentence),
           );
         },
       ),

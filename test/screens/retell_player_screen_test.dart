@@ -28,7 +28,7 @@ import 'package:fluency/services/sentence_ai_api_client.dart';
 import 'package:fluency/theme/app_theme.dart';
 import 'package:fluency/widgets/common/playback_controls.dart';
 import 'package:fluency/widgets/common/recording_button.dart';
-import 'package:fluency/widgets/retell/retell_sentence_tile.dart';
+import 'package:fluency/widgets/common/masked_sentence_tile.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -63,12 +63,16 @@ class _TrackingRetellPlayer extends _StaticRetellPlayer {
 
   int waitingCalls = 0;
   bool? lastAfterCurrentParagraph;
+  bool? lastStopImmediately;
 
   @override
-  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
+  void enterWaitingForUser({
+    bool afterCurrentParagraph = false,
+    bool stopImmediately = false,
+  }) {
     waitingCalls += 1;
     lastAfterCurrentParagraph = afterCurrentParagraph;
-    super.enterWaitingForUser(afterCurrentParagraph: afterCurrentParagraph);
+    lastStopImmediately = stopImmediately;
   }
 }
 
@@ -367,7 +371,7 @@ void main() {
       expect(find.text('Recording...'), findsNothing);
     });
 
-    testWidgets('点词查词前会进入 waiting for user', (tester) async {
+    testWidgets('点击句子进入详情前会进入 waiting for user', (tester) async {
       final testParagraphs = createTestParagraphs();
       final initialState = RetellPlayerState(
         currentParagraphIndex: 0,
@@ -395,15 +399,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final firstWord = find.descendant(
-        of: find.byType(RetellSentenceTile).first,
-        matching: find.byType(GestureDetector),
-      ).first;
-      await tester.tap(firstWord);
+      // 点击第一个 MaskedSentenceTile 的 InkWell
+      final firstTile = find.byType(MaskedSentenceTile).first;
+      await tester.tap(firstTile);
       await tester.pump();
 
       expect(trackingPlayer.waitingCalls, 1);
-      expect(trackingPlayer.lastAfterCurrentParagraph, true);
+      expect(trackingPlayer.lastStopImmediately, true);
     });
   });
 }

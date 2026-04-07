@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/models/retell_settings.dart';
 import 'package:fluency/models/sentence.dart';
-import 'package:fluency/widgets/retell/retell_sentence_tile.dart';
+import 'package:fluency/widgets/common/masked_sentence_tile.dart';
 
 import '../helpers/test_app.dart';
 
@@ -16,7 +16,7 @@ Sentence _sentence(String text, {int index = 0}) {
   );
 }
 
-/// 包装 RetellSentenceTile 用于测试
+/// 包装 MaskedSentenceTile 用于测试
 Widget _buildTile({
   required Sentence sentence,
   RetellDisplayMode displayMode = RetellDisplayMode.keywordsOnly,
@@ -24,7 +24,7 @@ Widget _buildTile({
   bool isPlayingSentence = false,
 }) {
   return createTestApp(
-    RetellSentenceTile(
+    MaskedSentenceTile(
       sentence: sentence,
       displayMode: displayMode,
       keywordIndices: keywordIndices,
@@ -34,7 +34,7 @@ Widget _buildTile({
 }
 
 void main() {
-  group('RetellSentenceTile 蒙版连续显示', () {
+  group('MaskedSentenceTile 蒙版连续显示', () {
     testWidgets('hideAll 模式：每个词独立渲染但视觉连续', (tester) async {
       await tester.pumpWidget(_buildTile(
         sentence: _sentence('I love you'),

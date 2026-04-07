@@ -17,13 +17,15 @@ import '../l10n/app_localizations.dart';
 import '../models/retell_settings.dart';
 import '../models/sentence.dart';
 import '../providers/learning_progress_provider.dart';
+import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/retell_player_provider.dart';
 import '../widgets/common/recording_button.dart' show RecordingButtonMode;
 import '../providers/retell_recording_controller_provider.dart';
 import '../services/app_logger.dart';
 import '../utils/wakelock_mixin.dart';
-import '../widgets/intensive_listen/word_dictionary_sheet.dart';
+import '../router/app_router.dart';
+import 'sentence_detail_screen.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
@@ -57,6 +59,9 @@ class RetellPlayerScreen extends ConsumerStatefulWidget {
 class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     with WakelockMixin {
   bool _isShowingDialog = false;
+
+  /// 是否正在跳转到句子详情页，防止连点
+  bool _isNavigatingToDetail = false;
 
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
@@ -631,33 +636,49 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     await showRetellSettingsSheet(context);
   }
 
-  Future<void> _handleWordTap(Sentence sentence, String word) async {
+  /// 点击句子 → 立即停止播放 → 进入句子详情页 → 返回后刷新收藏
+  Future<void> _handleSentenceTap(Sentence sentence) async {
+    if (_isNavigatingToDetail) return;
+    _isNavigatingToDetail = true;
+
     final recordingState = ref.read(retellRecordingControllerProvider);
-    final playerState = ref.read(retellPlayerProvider);
 
     if (recordingState.phase == RetellRecordingPhase.recording) {
       await ref
           .read(retellRecordingControllerProvider.notifier)
           .cancelActiveRecording();
-      ref.read(retellPlayerProvider.notifier).enterWaitingForUser();
-    } else {
-      ref.read(retellPlayerProvider.notifier).enterWaitingForUser(
-            afterCurrentParagraph:
-                playerState.phase == RetellPhase.listening &&
-                playerState.isPlaying,
-          );
+    }
+    ref
+        .read(retellPlayerProvider.notifier)
+        .enterWaitingForUser(stopImmediately: true);
+
+    if (!mounted) {
+      _isNavigatingToDetail = false;
+      return;
     }
 
-    if (!mounted) return;
-    await showWordDictionarySheet(
-      context: context,
-      word: word,
-      audioItemId: widget.audioItemId,
-      sentenceIndex: sentence.index,
-      sentenceText: sentence.text,
-      sentenceStartMs: sentence.startTime.inMilliseconds,
-      sentenceEndMs: sentence.endTime.inMilliseconds,
+    final lpState = ref.read(listeningPracticeProvider);
+    final audioName = lpState.currentAudioItem?.name ?? '';
+
+    await context.push(
+      AppRoutes.sentenceDetail,
+      extra: SentenceDetailArgs(
+        audioItemId: widget.audioItemId,
+        audioName: audioName,
+        sentenceText: sentence.text,
+        sentenceIndex: sentence.index,
+        startTimeMs: sentence.startTime.inMilliseconds,
+        endTimeMs: sentence.endTime.inMilliseconds,
+      ),
     );
+
+    _isNavigatingToDetail = false;
+
+    // 返回后刷新收藏状态（详情页可能修改了收藏）
+    if (!mounted) return;
+    await ref
+        .read(retellPlayerProvider.notifier)
+        .initializeBookmarks(widget.audioItemId);
   }
 
   @override
@@ -681,6 +702,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
           s.pauseDuration,
           s.isCountdownPaused,
           s.isCountdownFastForward,
+          s.bookmarkedSentenceIndices,
           s.userOverrodeDisplayMode,
           s.stepFinished,
         ),
@@ -755,7 +777,8 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
                 playingSentenceIndex: state.phase == RetellPhase.listening
                     ? state.playingSentenceIndex
                     : -1,
-                onWordTap: _handleWordTap,
+                bookmarkedSentenceIndices: state.bookmarkedSentenceIndices,
+                onSentenceTap: _handleSentenceTap,
               ),
               contentControls: state.settings.keywordMethod != KeywordMethod.off
                   ? ParagraphVisibilityControls(

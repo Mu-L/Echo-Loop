@@ -14,7 +14,7 @@ import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
 import '../models/dict_entry.dart';
-import '../screens/bookmark_sentence_detail_screen.dart';
+import '../screens/sentence_detail_screen.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../services/tts_service.dart';
 import '../providers/flashcard/flashcard_provider.dart';
@@ -526,12 +526,16 @@ class _BookmarkSentenceTileState extends ConsumerState<_BookmarkSentenceTile> {
 
   /// 跳转到句子详情页（单句精听）
   void _openDetail() {
+    final bm = widget.bookmark;
     context.push(
-      AppRoutes.bookmarkSentenceDetail,
-      extra: BookmarkSentenceDetailArgs(
-        bookmark: widget.bookmark,
-        audioId: widget.audioId,
+      AppRoutes.sentenceDetail,
+      extra: SentenceDetailArgs(
+        audioItemId: widget.audioId,
         audioName: widget.audioName,
+        sentenceText: bm.sentenceText,
+        sentenceIndex: bm.sentenceIndex,
+        startTimeMs: (bm.startTime * 1000).round(),
+        endTimeMs: (bm.endTime * 1000).round(),
       ),
     );
   }

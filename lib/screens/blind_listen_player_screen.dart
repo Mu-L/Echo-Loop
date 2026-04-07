@@ -16,7 +16,6 @@ import '../router/app_router.dart';
 import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
-import '../models/sentence.dart';
 import '../models/retell_settings.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
@@ -30,7 +29,6 @@ import '../widgets/common/countdown_chip.dart';
 import '../widgets/common/paragraph_practice_scaffold.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/dialogs/free_play_complete_dialog.dart';
-import '../widgets/intensive_listen/word_dictionary_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
 
 /// 盲听播放器页面
@@ -257,26 +255,6 @@ class _BlindListenPlayerScreenState
     await showBlindListenSettingsSheet(context);
   }
 
-  Future<void> _handleWordTap(Sentence sentence, String word) async {
-    AppLogger.log(
-      'BlindListenScreen',
-      '点词查词 "$word" → 请求进入 WaitingForUser',
-    );
-    ref
-        .read(blindListenPlayerProvider.notifier)
-        .enterWaitingForUser(afterCurrentParagraph: true);
-    if (!mounted) return;
-    await showWordDictionarySheet(
-      context: context,
-      word: word,
-      audioItemId: widget.audioItemId,
-      sentenceIndex: sentence.index,
-      sentenceText: sentence.text,
-      sentenceStartMs: sentence.startTime.inMilliseconds,
-      sentenceEndMs: sentence.endTime.inMilliseconds,
-    );
-  }
-
   Future<void> _handleExit() async {
     final l10n = AppLocalizations.of(context)!;
     final sessionState = ref.read(learningSessionProvider);
@@ -475,9 +453,6 @@ class _BlindListenPlayerScreenState
                 : RetellDisplayMode.hideAll,
             keywordMap: const {},
             playingSentenceIndex: playerState.playingSentenceIndex,
-            onWordTap: playerState.displayMode == BlindListenDisplayMode.showAll
-                ? _handleWordTap
-                : null,
           ),
           contentControls: GestureDetector(
             onTap: () {

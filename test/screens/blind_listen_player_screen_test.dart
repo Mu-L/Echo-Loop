@@ -11,7 +11,6 @@ import 'package:fluency/l10n/app_localizations.dart';
 import 'package:fluency/models/blind_listen_settings.dart';
 import 'package:fluency/models/intensive_listen_settings.dart'
     show ShadowingControlMode;
-import 'package:fluency/models/sentence.dart';
 import 'package:fluency/providers/audio_engine/audio_engine_provider.dart';
 import 'package:fluency/providers/learning_progress_provider.dart';
 import 'package:fluency/providers/learning_session/blind_listen_player_provider.dart';
@@ -20,7 +19,6 @@ import 'package:fluency/providers/listening_practice/listening_practice_provider
 import 'package:fluency/screens/blind_listen_player_screen.dart';
 import 'package:fluency/theme/app_theme.dart';
 import 'package:fluency/widgets/common/playback_controls.dart';
-import 'package:fluency/widgets/retell/retell_sentence_tile.dart';
 
 import '../helpers/mock_providers.dart';
 
@@ -31,29 +29,6 @@ class _StaticBlindListenPlayer extends TestBlindListenPlayer {
   Future<void> startPlaying() async {}
 }
 
-class _TrackingBlindListenPlayer extends _StaticBlindListenPlayer {
-  _TrackingBlindListenPlayer(super.initialState, this.sentences);
-
-  int waitingCalls = 0;
-  bool? lastAfterCurrentParagraph;
-  final List<Sentence> sentences;
-
-  @override
-  List<Sentence> get currentParagraphSentences => List.unmodifiable(sentences);
-
-  @override
-  Duration get currentParagraphDuration {
-    if (sentences.isEmpty) return Duration.zero;
-    return sentences.last.endTime - sentences.first.startTime;
-  }
-
-  @override
-  void enterWaitingForUser({bool afterCurrentParagraph = false}) {
-    waitingCalls += 1;
-    lastAfterCurrentParagraph = afterCurrentParagraph;
-    super.enterWaitingForUser(afterCurrentParagraph: afterCurrentParagraph);
-  }
-}
 
 void main() {
   Widget createTestWidget({
@@ -274,37 +249,6 @@ void main() {
       expect(find.text('Try to recall what you just heard'), findsNothing);
     });
 
-    testWidgets('点词查词前会进入 waiting for user', (tester) async {
-      final sentences = createTestSentences(count: 4);
-      const initialState = BlindListenPlayerState(
-        currentParagraphIndex: 0,
-        totalParagraphs: 2,
-        currentRepeatCount: 1,
-        isPlaying: true,
-        displayMode: BlindListenDisplayMode.showAll,
-      );
-      final trackingPlayer = _TrackingBlindListenPlayer(
-        initialState,
-        sentences,
-      );
-
-      await tester.pumpWidget(
-        createTestWidget(
-          playerState: initialState,
-          playerFactory: (_) => trackingPlayer,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final firstWord = find.descendant(
-        of: find.byType(RetellSentenceTile).first,
-        matching: find.byType(GestureDetector),
-      ).first;
-      await tester.tap(firstWord);
-      await tester.pump();
-
-      expect(trackingPlayer.waitingCalls, 1);
-      expect(trackingPlayer.lastAfterCurrentParagraph, true);
-    });
+    // 盲听页面不再支持点词查词（已移除 onWordTap）
   });
 }
