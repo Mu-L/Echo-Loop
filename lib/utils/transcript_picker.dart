@@ -21,7 +21,7 @@ Future<String?> pickAndSaveTranscript() async {
   if (!kIsWeb && Platform.isIOS) {
     result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['srt', 'lrc', 'txt', 'vtt', 'ass', 'ssa'],
+      allowedExtensions: ['srt', 'vtt'],
       allowMultiple: false,
     );
   } else {
@@ -29,7 +29,7 @@ Future<String?> pickAndSaveTranscript() async {
         !kIsWeb && Platform.isMacOS ? await _getDownloadsDirectory() : null;
     result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['srt', 'lrc', 'txt', 'vtt', 'ass', 'ssa'],
+      allowedExtensions: ['srt', 'vtt'],
       initialDirectory: initialDir,
       allowMultiple: false,
     );
