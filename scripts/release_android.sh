@@ -13,41 +13,128 @@ fail() {
   exit 1
 }
 
-# 确保 ANDROID_HOME 已设置
+usage() {
+  cat <<'EOF'
+Usage: scripts/release_android.sh [--upload] [--skip-build] [-h|--help]
+
+Build a release APK and optionally upload it to Cloudflare R2.
+
+Options:
+  --upload      Upload the APK to R2 after building.
+  --skip-build  Skip the build step (use existing APK in build/release/).
+  -h, --help    Show this help.
+
+Environment variables:
+  API_BASE_URL          API base URL (default: https://www.echo-loop.top)
+
+  R2 upload (required when --upload):
+  R2_ENDPOINT           S3-compatible endpoint URL
+  R2_ACCESS_KEY_ID      R2 API token access key ID
+  R2_SECRET_ACCESS_KEY  R2 API token secret access key
+  R2_BUCKET             R2 bucket name
+  R2_PUBLIC_URL         Public base URL for download links
+EOF
+}
+
+# --- 参数解析 ---
+DO_UPLOAD=false
+SKIP_BUILD=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --upload)     DO_UPLOAD=true; shift ;;
+    --skip-build) SKIP_BUILD=true; shift ;;
+    -h|--help)    usage; exit 0 ;;
+    *)            fail "Unknown option: $1. Use -h for help." ;;
+  esac
+done
+
+# --- 环境检查 ---
 if [[ -z "${ANDROID_HOME:-}" ]]; then
-  if [[ -d "$HOME/Android/sdk" ]]; then
+  if [[ -d "$HOME/Android/Sdk" ]]; then
+    export ANDROID_HOME="$HOME/Android/Sdk"
+  elif [[ -d "$HOME/Android/sdk" ]]; then
     export ANDROID_HOME="$HOME/Android/sdk"
   else
-    fail "ANDROID_HOME is not set and ~/Android/sdk does not exist"
+    fail "ANDROID_HOME is not set and ~/Android/Sdk does not exist"
   fi
 fi
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/tools:$PATH"
+
+API_BASE_URL="${API_BASE_URL:-https://www.echo-loop.top}"
 
 # 从 pubspec.yaml 读取版本号
 RAW_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
 [[ -n "$RAW_VERSION" ]] || fail "Unable to read version from pubspec.yaml"
 
-# 分离版本名和构建号（格式: 1.0.4 或 1.0.4+5）
 VERSION="${RAW_VERSION%%+*}"
 ARCH="arm64"
 APK_NAME="Echo-Loop-${VERSION}-${ARCH}.apk"
+APK_PATH="build/release/$APK_NAME"
 
 log "Version: $VERSION"
 log "Architecture: $ARCH"
-log "Output: build/release/$APK_NAME"
+log "API base URL: $API_BASE_URL"
+log "Output: $APK_PATH"
 
-# 清理并构建
-log "Cleaning..."
-flutter clean
+# --- 构建 ---
+if [[ "$SKIP_BUILD" == false ]]; then
+  log "Cleaning..."
+  flutter clean
 
-log "Building release APK..."
-flutter build apk --release --target-platform android-arm64
+  log "Building release APK..."
+  flutter build apk --release \
+    --target-platform android-arm64 \
+    --dart-define="API_BASE_URL=${API_BASE_URL}"
 
-# 复制并重命名产物
-SRC="build/app/outputs/flutter-apk/app-release.apk"
-[[ -f "$SRC" ]] || fail "APK not found at $SRC"
+  SRC="build/app/outputs/flutter-apk/app-release.apk"
+  [[ -f "$SRC" ]] || fail "APK not found at $SRC"
 
-mkdir -p build/release
-cp "$SRC" "build/release/$APK_NAME"
+  mkdir -p build/release
+  cp "$SRC" "$APK_PATH"
 
-SIZE="$(du -h "build/release/$APK_NAME" | cut -f1 | xargs)"
-log "Done: build/release/$APK_NAME ($SIZE)"
+  SIZE="$(du -h "$APK_PATH" | cut -f1 | xargs)"
+  log "Build done: $APK_PATH ($SIZE)"
+else
+  log "Skipping build (--skip-build)"
+  [[ -f "$APK_PATH" ]] || fail "APK not found at $APK_PATH. Run without --skip-build first."
+fi
+
+# --- 上传到 R2 ---
+if [[ "$DO_UPLOAD" == true ]]; then
+  # 检查必要环境变量
+  : "${R2_ENDPOINT:?Set R2_ENDPOINT}"
+  : "${R2_ACCESS_KEY_ID:?Set R2_ACCESS_KEY_ID}"
+  : "${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY}"
+  : "${R2_BUCKET:?Set R2_BUCKET}"
+  : "${R2_PUBLIC_URL:?Set R2_PUBLIC_URL}"
+
+  command -v aws >/dev/null 2>&1 || fail "aws CLI not found. Install it first."
+
+  R2_KEY="android/$APK_NAME"
+  R2_LATEST_KEY="android/Echo-Loop-latest.apk"
+
+  log "Uploading to R2: s3://${R2_BUCKET}/${R2_KEY} ..."
+
+  AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+  aws s3 cp "$APK_PATH" "s3://${R2_BUCKET}/${R2_KEY}" \
+    --endpoint-url "$R2_ENDPOINT" \
+    --region auto \
+    --content-type "application/vnd.android.package-archive"
+
+  log "Copying to latest: s3://${R2_BUCKET}/${R2_LATEST_KEY} ..."
+
+  AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+  aws s3 cp "$APK_PATH" "s3://${R2_BUCKET}/${R2_LATEST_KEY}" \
+    --endpoint-url "$R2_ENDPOINT" \
+    --region auto \
+    --content-type "application/vnd.android.package-archive"
+
+  DOWNLOAD_URL="${R2_PUBLIC_URL%/}/${R2_LATEST_KEY}"
+  log "Upload done!"
+  log "Download URL: $DOWNLOAD_URL"
+fi
+
+log "All done."
