@@ -1269,5 +1269,6 @@
     }
   },
   "duplicatesSkippedDetail": "The following audio files already exist in the library and were skipped:",
-  "removeFile": "Remove"
+  "removeFile": "Remove",
+  "goToSettings": "Go to Settings"
 }

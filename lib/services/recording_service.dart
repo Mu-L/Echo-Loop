@@ -67,6 +67,9 @@ class RecordingService {
   /// 录音开始时间（用于计算录音时长）
   DateTime? _recordingStartedAt;
 
+  /// 防重入标志：startRecording 正在执行中。
+  bool _isStarting = false;
+
   /// 学习事件记录器（外部设置，用于记录说的时长）
   ///
   /// Provider 进入学习模式时注入、退出时置 null。
@@ -91,11 +94,10 @@ class RecordingService {
 
   /// 确保已获取麦克风与语音识别权限。
   ///
-  /// 已缓存 granted 时跳过 MethodChannel 调用。
+  /// 每次都查询原生层获取实时权限状态，防止用户在系统设置中撤销权限后
+  /// 缓存过期导致判断错误。
   Future<bool> ensurePermissions() async {
     if (!_backend.isSupported) return false;
-
-    if (_permissions.isGranted) return true;
 
     var perms = await _backend.getPermissionStatus();
     if (!perms.isGranted) {
@@ -107,7 +109,7 @@ class RecordingService {
 
   /// 开始录音。
   ///
-  /// 自动执行 warmup → 权限检查 → startSession。
+  /// 自动执行权限检查 → warmup → startSession。
   /// 返回录音文件路径，失败时抛出 [SpeechPracticePlatformException]。
   Future<String> startRecording({required String promptId}) async {
     if (!_backend.isSupported) {
@@ -117,29 +119,40 @@ class RecordingService {
       );
     }
 
-    // warmup 引擎
-    await _backend.warmup();
+    // 防重入：快速连点时避免多次 warmup + startSession
+    if (_isStarting) return _currentFilePath!;
+    _isStarting = true;
 
-    // 订阅事件流
-    _eventSub ??= _backend.events.listen(_handleEvent);
+    try {
+      // 权限检查（必须在 warmup 之前，否则 iOS/macOS 原生 warmup
+      // 会把 notDetermined 当作 denied 直接返回错误）
+      final granted = await ensurePermissions();
+      if (!granted) {
+        throw const SpeechPracticePlatformException(
+          'permissionDenied',
+          'Microphone or speech recognition permission denied.',
+        );
+      }
 
-    // 权限检查
-    final granted = await ensurePermissions();
-    if (!granted) {
+      // warmup 引擎
+      await _backend.warmup();
+
+      // 订阅事件流
+      _eventSub ??= _backend.events.listen(_handleEvent);
+
+      // 开始录音
+      final filePath = await _backend.startSession(promptId: promptId);
+      _recordingPromptId = promptId;
+      _currentFilePath = filePath;
+      _recordingStartedAt = DateTime.now();
+
+      return filePath;
+    } catch (e) {
       await _backend.shutdown();
-      throw const SpeechPracticePlatformException(
-        'permissionDenied',
-        'Microphone or speech recognition permission denied.',
-      );
+      rethrow;
+    } finally {
+      _isStarting = false;
     }
-
-    // 开始录音
-    final filePath = await _backend.startSession(promptId: promptId);
-    _recordingPromptId = promptId;
-    _currentFilePath = filePath;
-    _recordingStartedAt = DateTime.now();
-
-    return filePath;
   }
 
   /// 停止录音并等待 final transcript。

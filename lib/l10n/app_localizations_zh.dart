@@ -2270,4 +2270,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get removeFile => '移除';
+
+  @override
+  String get goToSettings => '前往设置';
 }

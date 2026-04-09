@@ -11,8 +11,10 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/speech_practice_models.dart';
@@ -190,7 +192,7 @@ class RepeatPracticePanel extends StatelessWidget {
                         width: PlaybackControls.controlButtonSize,
                         height: _kButtonRowHeight,
                         child: Center(
-                          child: hintText != null
+                          child: (hintText != null || _isPermissionDenied)
                               ? const SizedBox.shrink()
                               : _buildCenterContent(),
                         ),
@@ -223,8 +225,8 @@ class RepeatPracticePanel extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // 顶层：hintText 占满整行居中显示
-                  if (hintText != null)
+                  // 顶层：hintText / 权限引导按钮 占满整行居中显示
+                  if (hintText != null || _isPermissionDenied)
                     Center(child: _buildCenterContent()),
                 ],
               ),
@@ -267,6 +269,15 @@ class RepeatPracticePanel extends StatelessWidget {
       return countdownWidget!;
     }
 
+    // 权限被拒绝：显示"前往设置"按钮
+    if (isInPause && _isPermissionDenied) {
+      return FilledButton.tonalIcon(
+        onPressed: _openAppSettings,
+        icon: const Icon(Icons.settings, size: 18),
+        label: Text(l10n.goToSettings),
+      );
+    }
+
     // 停顿中：录音按钮
     if (isInPause) {
       return RecordingButton(mode: recordingMode, onTap: onRecordTap);
@@ -275,9 +286,22 @@ class RepeatPracticePanel extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
+  /// 当前是否处于权限被拒绝状态。
+  bool get _isPermissionDenied =>
+      currentAttempt?.status == SpeechPracticeAttemptStatus.permissionDenied;
+
   /// 状态文字（录音提示 / 错误信息）
   Widget? _buildStatusText(BuildContext context) {
     if (!isInPause || isProcessing) return null;
+
+    // 权限被拒绝：使用国际化文案
+    if (_isPermissionDenied) {
+      return StatusLabel(
+        text: l10n.listenAndRepeatRecognitionPermissionDenied,
+        color: Theme.of(context).colorScheme.error,
+        bold: true,
+      );
+    }
 
     final hasError = currentAttempt?.errorMessage != null;
     if (hasError) {
@@ -293,5 +317,21 @@ class RepeatPracticePanel extends StatelessWidget {
     }
 
     return null;
+  }
+
+  /// 打开系统设置页面（引导用户授予权限）。
+  void _openAppSettings() {
+    if (Platform.isIOS) {
+      launchUrl(Uri.parse('app-settings:'));
+    } else if (Platform.isAndroid) {
+      launchUrl(Uri.parse('package:top.echo_loop'));
+    } else if (Platform.isMacOS) {
+      // macOS：打开系统偏好设置 > 隐私与安全性 > 麦克风
+      launchUrl(
+        Uri.parse(
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+        ),
+      );
+    }
   }
 }

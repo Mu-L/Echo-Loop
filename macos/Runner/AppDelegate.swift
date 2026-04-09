@@ -128,20 +128,14 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
     }
   }
 
+  /// 依次请求麦克风权限和语音识别权限（先麦克风，更符合用户直觉）。
   private func requestPermissions(result: @escaping FlutterResult) {
-    let group = DispatchGroup()
-    group.enter()
-    SFSpeechRecognizer.requestAuthorization { _ in
-      group.leave()
-    }
-
-    group.enter()
     AVCaptureDevice.requestAccess(for: .audio) { _ in
-      group.leave()
-    }
-
-    group.notify(queue: .main) {
-      result(self.permissionMap())
+      SFSpeechRecognizer.requestAuthorization { _ in
+        DispatchQueue.main.async {
+          result(self.permissionMap())
+        }
+      }
     }
   }
 
@@ -151,7 +145,18 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   /// 才返回成功，确保后续 startSession 在引擎稳定状态下执行。
   /// 非蓝牙设备立即返回。
   private func warmup(_ arguments: [String: Any]?, result: @escaping FlutterResult) {
-    guard microphonePermissionStatus() == "granted", speechPermissionStatus() == "granted" else {
+    let micStatus = microphonePermissionStatus()
+    let speechStatus = speechPermissionStatus()
+
+    // notDetermined 时自动请求权限，请求完成后重新进入 warmup。
+    if micStatus == "notDetermined" || speechStatus == "notDetermined" {
+      requestPermissions { [weak self] _ in
+        self?.warmup(arguments, result: result)
+      }
+      return
+    }
+
+    guard micStatus == "granted", speechStatus == "granted" else {
       result(FlutterError(
         code: SpeechPracticeMacError.permissionDenied.rawValue,
         message: "Microphone or speech permission denied",
@@ -408,8 +413,20 @@ final class MacSpeechPracticeHandler: NSObject, FlutterStreamHandler {
   }
 
   /// 完整初始化：warmup 未完成时的回退路径。
+  ///
+  /// 如果权限尚未请求（notDetermined），会自动触发系统权限弹窗。
   private func startSessionFull(promptId: String, locale: String, result: @escaping FlutterResult) {
-    guard microphonePermissionStatus() == "granted", speechPermissionStatus() == "granted" else {
+    let micStatus = microphonePermissionStatus()
+    let speechStatus = speechPermissionStatus()
+
+    if micStatus == "notDetermined" || speechStatus == "notDetermined" {
+      requestPermissions { [weak self] _ in
+        self?.startSessionFull(promptId: promptId, locale: locale, result: result)
+      }
+      return
+    }
+
+    guard micStatus == "granted", speechStatus == "granted" else {
       result(FlutterError(
         code: SpeechPracticeMacError.permissionDenied.rawValue,
         message: "Microphone or speech permission denied",
