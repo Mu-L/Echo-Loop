@@ -18,6 +18,7 @@
 - [x] Provider `toggleStar` → `togglePin`，togglePin 后重排列表
 - [x] `AudioListView.sortAudioItems` 置顶项固定在前不参与排序，合集排序同理
 - [x] UI 布局：ListTile → IntrinsicHeight 自定义布局，pin 按钮上 + 菜单下纵向排列
+- [x] 音频列表项 trailing 改为紧凑按钮尺寸，去掉纵向平分高度，修复 pin/菜单上下结构导致的卡片过高过稀疏问题
 - [x] 图标 star → push_pin（30° 倾斜、size 20、pinned 红色 `AppTheme.pinColor`）
 - [x] 国际化：星标 → 置顶
 - [x] 测试：provider 排序 6 项 + collection 排序 4 项 + sortAudioItems 单测 8 项

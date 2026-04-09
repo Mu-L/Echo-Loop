@@ -44,6 +44,19 @@ void main() {
       );
     }
 
+    Widget buildCompactTile(AudioLibraryState libraryState) {
+      return createTestApp(
+        Center(
+          child: SizedBox(width: 360, child: const _AudioListTileWrapper()),
+        ),
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(libraryState),
+          ),
+        ],
+      );
+    }
+
     testWidgets('未置顶时显示 push_pin_outlined 图标', (tester) async {
       await tester.pumpWidget(
         buildTile(AudioLibraryState(audioItems: [baseItem])),
@@ -94,14 +107,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // leading 图标现在显示进度状态，不再根据置顶变色
-      final audioIcon = tester.widget<Icon>(find.byIcon(Icons.audiotrack));
+      final audioIcon = tester.widget<Icon>(find.byIcon(Icons.graphic_eq));
       expect(audioIcon.color, isNotNull);
       expect(audioIcon.color, isNot(AppTheme.bookmarkColor));
     });
 
     testWidgets('点击置顶按钮触发 togglePin 并更新图标', (tester) async {
       await tester.pumpWidget(
-        buildTile(AudioLibraryState(audioItems: [baseItem])),
+        buildCompactTile(AudioLibraryState(audioItems: [baseItem])),
       );
       await tester.pumpAndSettle();
 
@@ -112,6 +125,24 @@ void main() {
       // 验证切换成功 — 图标变为实心图钉
       expect(find.byIcon(Icons.push_pin), findsOneWidget);
       expect(find.byIcon(Icons.push_pin_outlined), findsNothing);
+    });
+
+    testWidgets('右侧按钮贴近 item 上下边缘，增大可触达区域', (tester) async {
+      await tester.pumpWidget(
+        buildCompactTile(AudioLibraryState(audioItems: [baseItem])),
+      );
+      await tester.pumpAndSettle();
+
+      final cardRect = tester.getRect(find.byType(Card).first);
+      final pinRect = tester.getRect(
+        find.byKey(const Key('audio_list_tile_pin_hit_area')),
+      );
+      final menuRect = tester.getRect(
+        find.byKey(const Key('audio_list_tile_menu_hit_area')),
+      );
+
+      expect(pinRect.top - cardRect.top, lessThanOrEqualTo(4));
+      expect(cardRect.bottom - menuRect.bottom, lessThanOrEqualTo(4));
     });
   });
 
@@ -154,7 +185,7 @@ void main() {
 
       expect(find.text('Last'), findsNothing);
       expect(find.text('上次'), findsNothing);
-      expect(find.byIcon(Icons.star_border), findsOneWidget);
+      expect(find.byIcon(Icons.push_pin_outlined), findsOneWidget);
       expect(find.byType(PopupMenuButton<String>), findsOneWidget);
     });
   });
