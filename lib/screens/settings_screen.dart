@@ -591,7 +591,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // 保存文件：移动端用分享面板，桌面端用保存对话框
       final fileName = zipPath.split('/').last;
       if (Platform.isIOS || Platform.isAndroid) {
-        await Share.shareXFiles([XFile(zipPath)], subject: fileName);
+        final box = context.findRenderObject() as RenderBox?;
+        await Share.shareXFiles(
+          [XFile(zipPath)],
+          subject: fileName,
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : Rect.zero,
+        );
       } else {
         final savePath = await FilePicker.platform.saveFile(
           dialogTitle: l10n.exportData,

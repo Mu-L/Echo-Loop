@@ -585,7 +585,13 @@ class AudioListTile extends ConsumerWidget {
 
       // 4. 平台分发保存
       if (Platform.isIOS || Platform.isAndroid) {
-        await Share.shareXFiles([XFile(exportPath)]);
+        final box = context.findRenderObject() as RenderBox?;
+        await Share.shareXFiles(
+          [XFile(exportPath)],
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : Rect.zero,
+        );
       } else {
         final ext = p.extension(exportPath).replaceFirst('.', '');
         final fileName = p.basename(exportPath);
@@ -616,9 +622,9 @@ class AudioListTile extends ConsumerWidget {
       } catch (_) {}
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.exportAudio}: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${l10n.exportAudio}: $e')));
     }
   }
 
