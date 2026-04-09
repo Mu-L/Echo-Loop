@@ -226,16 +226,14 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
       widget.onTimingsChanged?.call(null);
     } else {
       _activeChunks = chunks;
-      if (_wordTimestamps != null) {
-        final timings = _sgService.computeTimings(
-          chunks: chunks,
-          wordTimestamps: _wordTimestamps!,
-          sentenceStartMs: widget.sentenceStartMs ?? 0,
-          sentenceEndMs: widget.sentenceEndMs ?? 0,
-        );
-        setState(() => _senseGroupTimings = timings);
-        widget.onTimingsChanged?.call(timings);
-      }
+      final timings = _sgService.computeTimings(
+        chunks: chunks,
+        wordTimestamps: _wordTimestamps ?? const [],
+        sentenceStartMs: widget.sentenceStartMs ?? 0,
+        sentenceEndMs: widget.sentenceEndMs ?? 0,
+      );
+      setState(() => _senseGroupTimings = timings);
+      widget.onTimingsChanged?.call(timings);
     }
   }
 

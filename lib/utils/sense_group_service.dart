@@ -60,8 +60,8 @@ class SenseGroupService {
 
   /// 请求 AI 拆分意群
   ///
-  /// 返回拆分结果和对应的时间范围（有词级时间戳时计算，否则为 null）。
-  Future<(SenseGroupResult result, List<SenseGroupTiming>? timings)>
+  /// 返回拆分结果和对应的时间范围。有词级时间戳时精确计算，否则按词数均分。
+  Future<(SenseGroupResult result, List<SenseGroupTiming> timings)>
       requestSenseGroups({
     required String text,
     required SentenceAiNotifier ai,
@@ -70,14 +70,12 @@ class SenseGroupService {
     List<WordTimestamp>? wordTimestamps,
   }) async {
     final result = await ai.getSenseGroups(text);
-    final timings = wordTimestamps != null
-        ? computeTimings(
-            chunks: result.medium,
-            wordTimestamps: wordTimestamps,
-            sentenceStartMs: sentenceStartMs,
-            sentenceEndMs: sentenceEndMs,
-          )
-        : null;
+    final timings = computeTimings(
+      chunks: result.medium,
+      wordTimestamps: wordTimestamps ?? const [],
+      sentenceStartMs: sentenceStartMs,
+      sentenceEndMs: sentenceEndMs,
+    );
     return (result, timings);
   }
 
