@@ -96,18 +96,18 @@ class $AudioItemsTable extends AudioItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
-  static const VerificationMeta _isStarredMeta = const VerificationMeta(
-    'isStarred',
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
   );
   @override
-  late final GeneratedColumn<bool> isStarred = GeneratedColumn<bool>(
-    'is_starred',
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
     aliasedName,
     false,
     type: DriftSqlType.bool,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_starred" IN (0, 1))',
+      'CHECK ("is_pinned" IN (0, 1))',
     ),
     defaultValue: const Constant(false),
   );
@@ -199,7 +199,7 @@ class $AudioItemsTable extends AudioItems
     totalDuration,
     sentenceCount,
     wordCount,
-    isStarred,
+    isPinned,
     transcriptSource,
     audioSha256,
     transcriptLanguage,
@@ -282,10 +282,10 @@ class $AudioItemsTable extends AudioItems
         wordCount.isAcceptableOrUnknown(data['word_count']!, _wordCountMeta),
       );
     }
-    if (data.containsKey('is_starred')) {
+    if (data.containsKey('is_pinned')) {
       context.handle(
-        _isStarredMeta,
-        isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta),
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
       );
     }
     if (data.containsKey('transcript_source')) {
@@ -385,9 +385,9 @@ class $AudioItemsTable extends AudioItems
         DriftSqlType.int,
         data['${effectivePrefix}word_count'],
       )!,
-      isStarred: attachedDatabase.typeMapping.read(
+      isPinned: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
-        data['${effectivePrefix}is_starred'],
+        data['${effectivePrefix}is_pinned'],
       )!,
       transcriptSource: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -451,8 +451,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// 字幕单词数
   final int wordCount;
 
-  /// 是否星标
-  final bool isStarred;
+  /// 是否置顶
+  final bool isPinned;
 
   /// 字幕来源：0=local, 1=ai, null=无字幕
   final int? transcriptSource;
@@ -483,7 +483,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     required this.totalDuration,
     required this.sentenceCount,
     required this.wordCount,
-    required this.isStarred,
+    required this.isPinned,
     this.transcriptSource,
     this.audioSha256,
     this.transcriptLanguage,
@@ -505,7 +505,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     map['total_duration'] = Variable<int>(totalDuration);
     map['sentence_count'] = Variable<int>(sentenceCount);
     map['word_count'] = Variable<int>(wordCount);
-    map['is_starred'] = Variable<bool>(isStarred);
+    map['is_pinned'] = Variable<bool>(isPinned);
     if (!nullToAbsent || transcriptSource != null) {
       map['transcript_source'] = Variable<int>(transcriptSource);
     }
@@ -538,7 +538,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       totalDuration: Value(totalDuration),
       sentenceCount: Value(sentenceCount),
       wordCount: Value(wordCount),
-      isStarred: Value(isStarred),
+      isPinned: Value(isPinned),
       transcriptSource: transcriptSource == null && nullToAbsent
           ? const Value.absent()
           : Value(transcriptSource),
@@ -573,7 +573,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       totalDuration: serializer.fromJson<int>(json['totalDuration']),
       sentenceCount: serializer.fromJson<int>(json['sentenceCount']),
       wordCount: serializer.fromJson<int>(json['wordCount']),
-      isStarred: serializer.fromJson<bool>(json['isStarred']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
       transcriptSource: serializer.fromJson<int?>(json['transcriptSource']),
       audioSha256: serializer.fromJson<String?>(json['audioSha256']),
       transcriptLanguage: serializer.fromJson<String?>(
@@ -599,7 +599,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
       'totalDuration': serializer.toJson<int>(totalDuration),
       'sentenceCount': serializer.toJson<int>(sentenceCount),
       'wordCount': serializer.toJson<int>(wordCount),
-      'isStarred': serializer.toJson<bool>(isStarred),
+      'isPinned': serializer.toJson<bool>(isPinned),
       'transcriptSource': serializer.toJson<int?>(transcriptSource),
       'audioSha256': serializer.toJson<String?>(audioSha256),
       'transcriptLanguage': serializer.toJson<String?>(transcriptLanguage),
@@ -619,7 +619,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     int? totalDuration,
     int? sentenceCount,
     int? wordCount,
-    bool? isStarred,
+    bool? isPinned,
     Value<int?> transcriptSource = const Value.absent(),
     Value<String?> audioSha256 = const Value.absent(),
     Value<String?> transcriptLanguage = const Value.absent(),
@@ -638,7 +638,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     totalDuration: totalDuration ?? this.totalDuration,
     sentenceCount: sentenceCount ?? this.sentenceCount,
     wordCount: wordCount ?? this.wordCount,
-    isStarred: isStarred ?? this.isStarred,
+    isPinned: isPinned ?? this.isPinned,
     transcriptSource: transcriptSource.present
         ? transcriptSource.value
         : this.transcriptSource,
@@ -669,7 +669,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ? data.sentenceCount.value
           : this.sentenceCount,
       wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
-      isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
       transcriptSource: data.transcriptSource.present
           ? data.transcriptSource.value
           : this.transcriptSource,
@@ -701,7 +701,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           ..write('totalDuration: $totalDuration, ')
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
-          ..write('isStarred: $isStarred, ')
+          ..write('isPinned: $isPinned, ')
           ..write('transcriptSource: $transcriptSource, ')
           ..write('audioSha256: $audioSha256, ')
           ..write('transcriptLanguage: $transcriptLanguage, ')
@@ -723,7 +723,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
     totalDuration,
     sentenceCount,
     wordCount,
-    isStarred,
+    isPinned,
     transcriptSource,
     audioSha256,
     transcriptLanguage,
@@ -744,7 +744,7 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
           other.totalDuration == this.totalDuration &&
           other.sentenceCount == this.sentenceCount &&
           other.wordCount == this.wordCount &&
-          other.isStarred == this.isStarred &&
+          other.isPinned == this.isPinned &&
           other.transcriptSource == this.transcriptSource &&
           other.audioSha256 == this.audioSha256 &&
           other.transcriptLanguage == this.transcriptLanguage &&
@@ -763,7 +763,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
   final Value<int> totalDuration;
   final Value<int> sentenceCount;
   final Value<int> wordCount;
-  final Value<bool> isStarred;
+  final Value<bool> isPinned;
   final Value<int?> transcriptSource;
   final Value<String?> audioSha256;
   final Value<String?> transcriptLanguage;
@@ -781,7 +781,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.totalDuration = const Value.absent(),
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
-    this.isStarred = const Value.absent(),
+    this.isPinned = const Value.absent(),
     this.transcriptSource = const Value.absent(),
     this.audioSha256 = const Value.absent(),
     this.transcriptLanguage = const Value.absent(),
@@ -800,7 +800,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     this.totalDuration = const Value.absent(),
     this.sentenceCount = const Value.absent(),
     this.wordCount = const Value.absent(),
-    this.isStarred = const Value.absent(),
+    this.isPinned = const Value.absent(),
     this.transcriptSource = const Value.absent(),
     this.audioSha256 = const Value.absent(),
     this.transcriptLanguage = const Value.absent(),
@@ -823,7 +823,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Expression<int>? totalDuration,
     Expression<int>? sentenceCount,
     Expression<int>? wordCount,
-    Expression<bool>? isStarred,
+    Expression<bool>? isPinned,
     Expression<int>? transcriptSource,
     Expression<String>? audioSha256,
     Expression<String>? transcriptLanguage,
@@ -842,7 +842,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       if (totalDuration != null) 'total_duration': totalDuration,
       if (sentenceCount != null) 'sentence_count': sentenceCount,
       if (wordCount != null) 'word_count': wordCount,
-      if (isStarred != null) 'is_starred': isStarred,
+      if (isPinned != null) 'is_pinned': isPinned,
       if (transcriptSource != null) 'transcript_source': transcriptSource,
       if (audioSha256 != null) 'audio_sha256': audioSha256,
       if (transcriptLanguage != null) 'transcript_language': transcriptLanguage,
@@ -864,7 +864,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     Value<int>? totalDuration,
     Value<int>? sentenceCount,
     Value<int>? wordCount,
-    Value<bool>? isStarred,
+    Value<bool>? isPinned,
     Value<int?>? transcriptSource,
     Value<String?>? audioSha256,
     Value<String?>? transcriptLanguage,
@@ -883,7 +883,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
       totalDuration: totalDuration ?? this.totalDuration,
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
-      isStarred: isStarred ?? this.isStarred,
+      isPinned: isPinned ?? this.isPinned,
       transcriptSource: transcriptSource ?? this.transcriptSource,
       audioSha256: audioSha256 ?? this.audioSha256,
       transcriptLanguage: transcriptLanguage ?? this.transcriptLanguage,
@@ -922,8 +922,8 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
     if (wordCount.present) {
       map['word_count'] = Variable<int>(wordCount.value);
     }
-    if (isStarred.present) {
-      map['is_starred'] = Variable<bool>(isStarred.value);
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
     }
     if (transcriptSource.present) {
       map['transcript_source'] = Variable<int>(transcriptSource.value);
@@ -963,7 +963,7 @@ class AudioItemsCompanion extends UpdateCompanion<AudioItem> {
           ..write('totalDuration: $totalDuration, ')
           ..write('sentenceCount: $sentenceCount, ')
           ..write('wordCount: $wordCount, ')
-          ..write('isStarred: $isStarred, ')
+          ..write('isPinned: $isPinned, ')
           ..write('transcriptSource: $transcriptSource, ')
           ..write('audioSha256: $audioSha256, ')
           ..write('transcriptLanguage: $transcriptLanguage, ')
@@ -1012,18 +1012,18 @@ class $CollectionsTable extends Collections
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _isStarredMeta = const VerificationMeta(
-    'isStarred',
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
   );
   @override
-  late final GeneratedColumn<bool> isStarred = GeneratedColumn<bool>(
-    'is_starred',
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
     aliasedName,
     false,
     type: DriftSqlType.bool,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_starred" IN (0, 1))',
+      'CHECK ("is_pinned" IN (0, 1))',
     ),
     defaultValue: const Constant(false),
   );
@@ -1066,7 +1066,7 @@ class $CollectionsTable extends Collections
     id,
     name,
     createdDate,
-    isStarred,
+    isPinned,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -1107,10 +1107,10 @@ class $CollectionsTable extends Collections
     } else if (isInserting) {
       context.missing(_createdDateMeta);
     }
-    if (data.containsKey('is_starred')) {
+    if (data.containsKey('is_pinned')) {
       context.handle(
-        _isStarredMeta,
-        isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta),
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
       );
     }
     if (data.containsKey('updated_at')) {
@@ -1154,9 +1154,9 @@ class $CollectionsTable extends Collections
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_date'],
       )!,
-      isStarred: attachedDatabase.typeMapping.read(
+      isPinned: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
-        data['${effectivePrefix}is_starred'],
+        data['${effectivePrefix}is_pinned'],
       )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -1189,8 +1189,8 @@ class Collection extends DataClass implements Insertable<Collection> {
   /// 创建时间
   final DateTime createdDate;
 
-  /// 星标
-  final bool isStarred;
+  /// 置顶
+  final bool isPinned;
 
   /// 最后修改时间
   final DateTime updatedAt;
@@ -1204,7 +1204,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     required this.id,
     required this.name,
     required this.createdDate,
-    required this.isStarred,
+    required this.isPinned,
     required this.updatedAt,
     this.deletedAt,
     required this.syncStatus,
@@ -1215,7 +1215,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_date'] = Variable<DateTime>(createdDate);
-    map['is_starred'] = Variable<bool>(isStarred);
+    map['is_pinned'] = Variable<bool>(isPinned);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -1229,7 +1229,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       id: Value(id),
       name: Value(name),
       createdDate: Value(createdDate),
-      isStarred: Value(isStarred),
+      isPinned: Value(isPinned),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -1247,7 +1247,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdDate: serializer.fromJson<DateTime>(json['createdDate']),
-      isStarred: serializer.fromJson<bool>(json['isStarred']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncStatus: serializer.fromJson<int>(json['syncStatus']),
@@ -1260,7 +1260,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdDate': serializer.toJson<DateTime>(createdDate),
-      'isStarred': serializer.toJson<bool>(isStarred),
+      'isPinned': serializer.toJson<bool>(isPinned),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncStatus': serializer.toJson<int>(syncStatus),
@@ -1271,7 +1271,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     String? id,
     String? name,
     DateTime? createdDate,
-    bool? isStarred,
+    bool? isPinned,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
     int? syncStatus,
@@ -1279,7 +1279,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     id: id ?? this.id,
     name: name ?? this.name,
     createdDate: createdDate ?? this.createdDate,
-    isStarred: isStarred ?? this.isStarred,
+    isPinned: isPinned ?? this.isPinned,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -1291,7 +1291,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       createdDate: data.createdDate.present
           ? data.createdDate.value
           : this.createdDate,
-      isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncStatus: data.syncStatus.present
@@ -1306,7 +1306,7 @@ class Collection extends DataClass implements Insertable<Collection> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdDate: $createdDate, ')
-          ..write('isStarred: $isStarred, ')
+          ..write('isPinned: $isPinned, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -1319,7 +1319,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     id,
     name,
     createdDate,
-    isStarred,
+    isPinned,
     updatedAt,
     deletedAt,
     syncStatus,
@@ -1331,7 +1331,7 @@ class Collection extends DataClass implements Insertable<Collection> {
           other.id == this.id &&
           other.name == this.name &&
           other.createdDate == this.createdDate &&
-          other.isStarred == this.isStarred &&
+          other.isPinned == this.isPinned &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
           other.syncStatus == this.syncStatus);
@@ -1341,7 +1341,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime> createdDate;
-  final Value<bool> isStarred;
+  final Value<bool> isPinned;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> syncStatus;
@@ -1350,7 +1350,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdDate = const Value.absent(),
-    this.isStarred = const Value.absent(),
+    this.isPinned = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1360,7 +1360,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     required String id,
     required String name,
     required DateTime createdDate,
-    this.isStarred = const Value.absent(),
+    this.isPinned = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1373,7 +1373,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? createdDate,
-    Expression<bool>? isStarred,
+    Expression<bool>? isPinned,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? syncStatus,
@@ -1383,7 +1383,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdDate != null) 'created_date': createdDate,
-      if (isStarred != null) 'is_starred': isStarred,
+      if (isPinned != null) 'is_pinned': isPinned,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1395,7 +1395,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Value<String>? id,
     Value<String>? name,
     Value<DateTime>? createdDate,
-    Value<bool>? isStarred,
+    Value<bool>? isPinned,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? syncStatus,
@@ -1405,7 +1405,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       id: id ?? this.id,
       name: name ?? this.name,
       createdDate: createdDate ?? this.createdDate,
-      isStarred: isStarred ?? this.isStarred,
+      isPinned: isPinned ?? this.isPinned,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1425,8 +1425,8 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     if (createdDate.present) {
       map['created_date'] = Variable<DateTime>(createdDate.value);
     }
-    if (isStarred.present) {
-      map['is_starred'] = Variable<bool>(isStarred.value);
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -1449,7 +1449,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdDate: $createdDate, ')
-          ..write('isStarred: $isStarred, ')
+          ..write('isPinned: $isPinned, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -9587,7 +9587,7 @@ typedef $$AudioItemsTableCreateCompanionBuilder =
       Value<int> totalDuration,
       Value<int> sentenceCount,
       Value<int> wordCount,
-      Value<bool> isStarred,
+      Value<bool> isPinned,
       Value<int?> transcriptSource,
       Value<String?> audioSha256,
       Value<String?> transcriptLanguage,
@@ -9607,7 +9607,7 @@ typedef $$AudioItemsTableUpdateCompanionBuilder =
       Value<int> totalDuration,
       Value<int> sentenceCount,
       Value<int> wordCount,
-      Value<bool> isStarred,
+      Value<bool> isPinned,
       Value<int?> transcriptSource,
       Value<String?> audioSha256,
       Value<String?> transcriptLanguage,
@@ -9854,8 +9854,8 @@ class $$AudioItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isStarred => $composableBuilder(
-    column: $table.isStarred,
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10144,8 +10144,8 @@ class $$AudioItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isStarred => $composableBuilder(
-    column: $table.isStarred,
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10224,8 +10224,8 @@ class $$AudioItemsTableAnnotationComposer
   GeneratedColumn<int> get wordCount =>
       $composableBuilder(column: $table.wordCount, builder: (column) => column);
 
-  GeneratedColumn<bool> get isStarred =>
-      $composableBuilder(column: $table.isStarred, builder: (column) => column);
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
 
   GeneratedColumn<int> get transcriptSource => $composableBuilder(
     column: $table.transcriptSource,
@@ -10506,7 +10506,7 @@ class $$AudioItemsTableTableManager
                 Value<int> totalDuration = const Value.absent(),
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
-                Value<bool> isStarred = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 Value<int?> transcriptSource = const Value.absent(),
                 Value<String?> audioSha256 = const Value.absent(),
                 Value<String?> transcriptLanguage = const Value.absent(),
@@ -10524,7 +10524,7 @@ class $$AudioItemsTableTableManager
                 totalDuration: totalDuration,
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
-                isStarred: isStarred,
+                isPinned: isPinned,
                 transcriptSource: transcriptSource,
                 audioSha256: audioSha256,
                 transcriptLanguage: transcriptLanguage,
@@ -10544,7 +10544,7 @@ class $$AudioItemsTableTableManager
                 Value<int> totalDuration = const Value.absent(),
                 Value<int> sentenceCount = const Value.absent(),
                 Value<int> wordCount = const Value.absent(),
-                Value<bool> isStarred = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 Value<int?> transcriptSource = const Value.absent(),
                 Value<String?> audioSha256 = const Value.absent(),
                 Value<String?> transcriptLanguage = const Value.absent(),
@@ -10562,7 +10562,7 @@ class $$AudioItemsTableTableManager
                 totalDuration: totalDuration,
                 sentenceCount: sentenceCount,
                 wordCount: wordCount,
-                isStarred: isStarred,
+                isPinned: isPinned,
                 transcriptSource: transcriptSource,
                 audioSha256: audioSha256,
                 transcriptLanguage: transcriptLanguage,
@@ -10810,7 +10810,7 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       required String id,
       required String name,
       required DateTime createdDate,
-      Value<bool> isStarred,
+      Value<bool> isPinned,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -10821,7 +10821,7 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<DateTime> createdDate,
-      Value<bool> isStarred,
+      Value<bool> isPinned,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> syncStatus,
@@ -10885,8 +10885,8 @@ class $$CollectionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isStarred => $composableBuilder(
-    column: $table.isStarred,
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10955,8 +10955,8 @@ class $$CollectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isStarred => $composableBuilder(
-    column: $table.isStarred,
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10996,8 +10996,8 @@ class $$CollectionsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get isStarred =>
-      $composableBuilder(column: $table.isStarred, builder: (column) => column);
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -11068,7 +11068,7 @@ class $$CollectionsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdDate = const Value.absent(),
-                Value<bool> isStarred = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -11077,7 +11077,7 @@ class $$CollectionsTableTableManager
                 id: id,
                 name: name,
                 createdDate: createdDate,
-                isStarred: isStarred,
+                isPinned: isPinned,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,
@@ -11088,7 +11088,7 @@ class $$CollectionsTableTableManager
                 required String id,
                 required String name,
                 required DateTime createdDate,
-                Value<bool> isStarred = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> syncStatus = const Value.absent(),
@@ -11097,7 +11097,7 @@ class $$CollectionsTableTableManager
                 id: id,
                 name: name,
                 createdDate: createdDate,
-                isStarred: isStarred,
+                isPinned: isPinned,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 syncStatus: syncStatus,

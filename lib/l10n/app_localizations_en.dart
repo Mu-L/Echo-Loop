@@ -330,16 +330,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get renameCollection => 'Rename';
 
   @override
-  String get starCollection => 'Star';
+  String get pinCollection => 'Pin to Top';
 
   @override
-  String get unstarCollection => 'Unstar';
+  String get unpinCollection => 'Unpin';
 
   @override
-  String get starAudio => 'Star';
+  String get pinAudio => 'Pin to Top';
 
   @override
-  String get unstarAudio => 'Unstar';
+  String get unpinAudio => 'Unpin';
 
   @override
   String get sortByNameAsc => 'Name (A-Z)';

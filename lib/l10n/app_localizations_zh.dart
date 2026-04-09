@@ -329,16 +329,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get renameCollection => '重命名';
 
   @override
-  String get starCollection => '星标';
+  String get pinCollection => '置顶';
 
   @override
-  String get unstarCollection => '取消星标';
+  String get unpinCollection => '取消置顶';
 
   @override
-  String get starAudio => '星标';
+  String get pinAudio => '置顶';
 
   @override
-  String get unstarAudio => '取消星标';
+  String get unpinAudio => '取消置顶';
 
   @override
   String get sortByNameAsc => '名称 (A-Z)';

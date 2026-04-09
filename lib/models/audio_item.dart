@@ -29,7 +29,7 @@ class AudioItem {
   final int totalDuration; // in seconds
   final int sentenceCount;
   final int wordCount;
-  final bool isStarred;
+  final bool isPinned;
 
   /// 字幕来源：null 表示无字幕
   final TranscriptSource? transcriptSource;
@@ -49,7 +49,7 @@ class AudioItem {
     this.totalDuration = 0,
     this.sentenceCount = 0,
     this.wordCount = 0,
-    this.isStarred = false,
+    this.isPinned = false,
     this.transcriptSource,
     this.audioSha256,
     this.transcriptLanguage,
@@ -80,7 +80,7 @@ class AudioItem {
     'totalDuration': totalDuration,
     'sentenceCount': sentenceCount,
     'wordCount': wordCount,
-    'isStarred': isStarred,
+    'isPinned': isPinned,
     'transcriptSource': transcriptSource?.index,
     'audioSha256': audioSha256,
     'transcriptLanguage': transcriptLanguage,
@@ -95,7 +95,7 @@ class AudioItem {
     totalDuration: json['totalDuration'] ?? 0,
     sentenceCount: json['sentenceCount'] ?? 0,
     wordCount: json['wordCount'] ?? 0,
-    isStarred: json['isStarred'] ?? false,
+    isPinned: json['isPinned'] ?? json['isStarred'] ?? false,
     transcriptSource: TranscriptSource.fromIndex(json['transcriptSource']),
     audioSha256: json['audioSha256'],
     transcriptLanguage: json['transcriptLanguage'],
@@ -110,7 +110,7 @@ class AudioItem {
     int? totalDuration,
     int? sentenceCount,
     int? wordCount,
-    bool? isStarred,
+    bool? isPinned,
     Object? transcriptSource = _sentinel,
     Object? audioSha256 = _sentinel,
     Object? transcriptLanguage = _sentinel,
@@ -126,7 +126,7 @@ class AudioItem {
       totalDuration: totalDuration ?? this.totalDuration,
       sentenceCount: sentenceCount ?? this.sentenceCount,
       wordCount: wordCount ?? this.wordCount,
-      isStarred: isStarred ?? this.isStarred,
+      isPinned: isPinned ?? this.isPinned,
       transcriptSource: transcriptSource == _sentinel
           ? this.transcriptSource
           : transcriptSource as TranscriptSource?,

@@ -11,8 +11,8 @@ class Collections extends Table {
   /// 创建时间
   DateTimeColumn get createdDate => dateTime()();
 
-  /// 星标
-  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
+  /// 置顶
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
 
   /// 最后修改时间
   DateTimeColumn get updatedAt => dateTime()();

@@ -26,8 +26,8 @@ class AudioItems extends Table {
   /// 字幕单词数
   IntColumn get wordCount => integer().withDefault(const Constant(0))();
 
-  /// 是否星标
-  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
+  /// 是否置顶
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
 
   /// 字幕来源：0=local, 1=ai, null=无字幕
   IntColumn get transcriptSource => integer().nullable()();

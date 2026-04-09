@@ -16,7 +16,10 @@ class AudioItemDao extends DatabaseAccessor<AppDatabase>
   Future<List<AudioItem>> getAllActive() {
     return (select(audioItems)
           ..where((t) => t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.desc(t.addedDate)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.isPinned),
+            (t) => OrderingTerm.desc(t.addedDate),
+          ]))
         .get();
   }
 
@@ -24,7 +27,10 @@ class AudioItemDao extends DatabaseAccessor<AppDatabase>
   Stream<List<AudioItem>> watchAllActive() {
     return (select(audioItems)
           ..where((t) => t.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.desc(t.addedDate)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.isPinned),
+            (t) => OrderingTerm.desc(t.addedDate),
+          ]))
         .watch();
   }
 
@@ -68,8 +74,7 @@ class AudioItemDao extends DatabaseAccessor<AppDatabase>
   ///
   /// 独立查询，避免列表加载时读取大 JSON 字段。
   Future<String?> getWordTimestamps(String audioItemId) async {
-    final query = select(audioItems)
-      ..where((t) => t.id.equals(audioItemId));
+    final query = select(audioItems)..where((t) => t.id.equals(audioItemId));
     final row = await query.getSingleOrNull();
     return row?.wordTimestampsJson;
   }

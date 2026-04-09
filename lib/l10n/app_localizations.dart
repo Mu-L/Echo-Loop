@@ -722,29 +722,29 @@ abstract class AppLocalizations {
   /// **'Rename'**
   String get renameCollection;
 
-  /// No description provided for @starCollection.
+  /// No description provided for @pinCollection.
   ///
   /// In en, this message translates to:
-  /// **'Star'**
-  String get starCollection;
+  /// **'Pin to Top'**
+  String get pinCollection;
 
-  /// No description provided for @unstarCollection.
+  /// No description provided for @unpinCollection.
   ///
   /// In en, this message translates to:
-  /// **'Unstar'**
-  String get unstarCollection;
+  /// **'Unpin'**
+  String get unpinCollection;
 
-  /// No description provided for @starAudio.
+  /// No description provided for @pinAudio.
   ///
   /// In en, this message translates to:
-  /// **'Star'**
-  String get starAudio;
+  /// **'Pin to Top'**
+  String get pinAudio;
 
-  /// No description provided for @unstarAudio.
+  /// No description provided for @unpinAudio.
   ///
   /// In en, this message translates to:
-  /// **'Unstar'**
-  String get unstarAudio;
+  /// **'Unpin'**
+  String get unpinAudio;
 
   /// No description provided for @sortByNameAsc.
   ///

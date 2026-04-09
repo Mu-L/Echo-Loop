@@ -81,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 27;
+  static const currentSchemaVersion = 28;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -260,9 +260,7 @@ class AppDatabase extends _$AppDatabase {
           } catch (_) {
             // word_timestamp_cache 表可能不存在（全新安装直接到 v25）
           }
-          await customStatement(
-            'DROP TABLE IF EXISTS word_timestamp_cache',
-          );
+          await customStatement('DROP TABLE IF EXISTS word_timestamp_cache');
         }
         // v25→v26：新建 saved_sense_groups 表
         if (from < 26) {
@@ -328,6 +326,15 @@ class AppDatabase extends _$AppDatabase {
             CREATE INDEX IF NOT EXISTS idx_audio_item_tags_reverse
             ON audio_item_tags(audio_item_id)
           ''');
+        }
+        // v27→v28：isStarred → isPinned 重命名
+        if (from < 28) {
+          await customStatement(
+            'ALTER TABLE audio_items RENAME COLUMN is_starred TO is_pinned',
+          );
+          await customStatement(
+            'ALTER TABLE collections RENAME COLUMN is_starred TO is_pinned',
+          );
         }
         // v5→v6：audio_items 新增 sentenceCount、wordCount 列
         if (from < 6) {
