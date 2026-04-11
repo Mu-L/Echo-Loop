@@ -462,6 +462,25 @@ class AsrModelManager {
     }
   }
 
+  /// 清理不再使用的旧模型目录。
+  ///
+  /// 保留 [keepModelId] 对应的目录，删除其他所有模型目录。
+  /// 在启动时调用，防止推荐模型变更后旧文件残留。
+  Future<void> cleanupUnusedModels(String keepModelId) async {
+    final root = Directory(await _modelsRoot);
+    if (!root.existsSync()) return;
+
+    await for (final entity in root.list()) {
+      if (entity is Directory) {
+        final dirName = p.basename(entity.path);
+        if (dirName != keepModelId) {
+          AppLogger.log('ASRModel', '🗑 清理旧模型: $dirName');
+          await entity.delete(recursive: true);
+        }
+      }
+    }
+  }
+
   /// 根据设备硬件推荐模型。
   ///
   /// [ramBytes] 由原生层提供（全平台统一）。

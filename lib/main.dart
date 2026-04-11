@@ -181,6 +181,8 @@ void main() async {
       recommendedModel: recommendedAsrModel,
       defaultBackend: defaultBackend,
     );
+    // 清理推荐模型变更后残留的旧模型文件（异步，不阻塞启动）
+    unawaited(modelManager.cleanupUnusedModels(recommendedAsrModel.id));
   }
 
   runApp(
