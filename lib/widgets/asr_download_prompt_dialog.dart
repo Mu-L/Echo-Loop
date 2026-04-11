@@ -4,6 +4,8 @@
 /// 真正进入录音页面后，不再额外弹本地 ASR 守卫 UI。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,16 +43,9 @@ Future<bool> ensureAsrReadyBeforeSpeechPractice(
   }
 
   if (state.downloadStatus == AsrModelDownloadStatus.downloaded) {
-    await _ensureEngineLoaded(ref);
-    final readyState = ref.read(offlineAsrSettingsProvider);
-    if (readyState.engineReady) {
-      return true;
-    }
-    if (readyState.downloadStatus == AsrModelDownloadStatus.failed) {
-      if (!context.mounted) return false;
-      return _showRepairPrompt(context, ref);
-    }
-    return false;
+    // 后台异步加载引擎，不阻塞进入学习页面
+    unawaited(_ensureEngineLoaded(ref));
+    return true;
   }
 
   if (state.isDownloading) {
@@ -74,15 +69,6 @@ Future<bool> ensureAsrReadyForSubStage(
     return true;
   }
   return ensureAsrReadyBeforeSpeechPractice(context, ref);
-}
-
-/// 退出录音页面时卸载引擎，释放内存。
-void unloadAsrEngine(WidgetRef ref) {
-  final state = ref.read(offlineAsrSettingsProvider);
-  if (state.backend != AsrBackend.offline) return;
-
-  final notifier = ref.read(offlineAsrSettingsProvider.notifier);
-  notifier.unloadEngine();
 }
 
 /// 后台加载引擎（fire-and-forget，不阻塞 UI）。
