@@ -27,6 +27,7 @@ import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
+import '../services/dictionary_download_manager.dart';
 import '../services/temp_cleanup_service.dart';
 import '../utils/file_size.dart';
 import '../services/demo_data_seeder.dart';
@@ -265,12 +266,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // 3. 清理临时目录（录音 .caf 残留、导出/导入临时文件 + Library/Caches）
     final result = await cleanupAllTempFiles();
 
+    // 4. 清理非当前语言的词典文件 + 旧版遗留 dict.db
+    final settings = ref.read(appSettingsProvider);
+    final dictManager = DictionaryDownloadManager();
+    final dictFreed = await dictManager.deleteUnusedDictionaries(
+      settings.nativeLanguage,
+    );
+    dictManager.dispose();
+    final totalFreed = result.freedBytes + dictFreed;
+
     if (!context.mounted) return;
     final String message;
-    if (deleted == 0 && result.freedBytes == 0) {
+    if (deleted == 0 && totalFreed == 0) {
       message = l10n.clearCacheEmpty;
-    } else if (result.freedBytes > 0) {
-      message = l10n.clearCacheSuccessWithSize(formatBytes(result.freedBytes));
+    } else if (totalFreed > 0) {
+      message = l10n.clearCacheSuccessWithSize(formatBytes(totalFreed));
     } else {
       message = l10n.clearCacheSuccess;
     }
@@ -1388,13 +1398,11 @@ class _DictionaryLookupDialogState extends State<_DictionaryLookupDialog> {
     super.dispose();
   }
 
-  Future<void> _lookup() async {
+  void _lookup() {
     final word = _controller.text.trim();
     if (word.isEmpty) return;
 
-    setState(() => _loading = true);
-    final entry = await DictionaryService.instance.lookup(word);
-    if (!mounted) return;
+    final entry = DictionaryService.instance.lookup(word);
     setState(() {
       _result = entry;
       _searched = true;

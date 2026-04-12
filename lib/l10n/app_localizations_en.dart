@@ -2472,4 +2472,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goToSettings => 'Go to Settings';
+
+  @override
+  String get dictionaryDownloading => 'Downloading dictionary...';
+
+  @override
+  String get dictionaryDownloadFailed => 'Dictionary download failed';
+
+  @override
+  String get dictionaryNotDownloaded => 'Dictionary not yet downloaded';
+
+  @override
+  String get download => 'Download';
+
+  @override
+  String get retry => 'Retry';
 }

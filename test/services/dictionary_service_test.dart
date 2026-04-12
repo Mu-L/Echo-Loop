@@ -3,12 +3,8 @@
 /// 使用内存 SQLite 数据库验证精确匹配和词形还原 fallback 逻辑。
 library;
 
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluency/services/dictionary_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// 创建内存数据库并插入测试数据
@@ -37,31 +33,6 @@ Database _createTestDb() {
   return db;
 }
 
-Future<Uint8List> _createTestDbBytes(List<String> words) async {
-  final dir = await Directory.systemTemp.createTemp('dict_service_test_');
-  final path = '${dir.path}/dict.db';
-  final db = sqlite3.open(path);
-  db.execute('''
-    CREATE TABLE words (
-      word TEXT PRIMARY KEY,
-      phonetic TEXT NOT NULL,
-      translation TEXT,
-      collins INTEGER DEFAULT 0,
-      tag TEXT
-    )
-  ''');
-  for (final word in words) {
-    db.execute(
-      'INSERT INTO words (word, phonetic, translation, collins, tag) VALUES (?, ?, ?, 0, ?)',
-      [word, word, '$word translation', ''],
-    );
-  }
-  db.dispose();
-  final bytes = await File(path).readAsBytes();
-  await dir.delete(recursive: true);
-  return bytes;
-}
-
 void main() {
   late DictionaryService service;
   late Database db;
@@ -75,199 +46,146 @@ void main() {
     db.dispose();
   });
 
+  group('isAvailable', () {
+    test('withDatabase 构造后为 true', () {
+      expect(service.isAvailable, isTrue);
+    });
+
+    test('未打开数据库时为 false', () {
+      final emptyService = DictionaryService.withDatabase(_createTestDb());
+      emptyService.close();
+      expect(emptyService.isAvailable, isFalse);
+    });
+  });
+
+  group('数据库未就绪', () {
+    test('lookup 返回 null', () {
+      final closedService = DictionaryService.withDatabase(_createTestDb());
+      closedService.close();
+      expect(closedService.lookup('professor'), isNull);
+    });
+
+    test('lookupAll 返回空 map', () {
+      final closedService = DictionaryService.withDatabase(_createTestDb());
+      closedService.close();
+      expect(closedService.lookupAll(['professor']), isEmpty);
+    });
+  });
+
   group('精确匹配', () {
-    test('查到已有单词', () async {
-      final entry = await service.lookup('professor');
+    test('查到已有单词', () {
+      final entry = service.lookup('professor');
       expect(entry, isNotNull);
       expect(entry!.word, 'professor');
       expect(entry.phonetic, contains('fes'));
     });
 
-    test('大小写不敏感', () async {
-      final entry = await service.lookup('Professor');
+    test('大小写不敏感', () {
+      final entry = service.lookup('Professor');
       expect(entry, isNotNull);
       expect(entry!.word, 'professor');
     });
 
-    test('查不到且无法还原的词返回 null', () async {
-      final entry = await service.lookup('xyznotaword');
+    test('查不到且无法还原的词返回 null', () {
+      final entry = service.lookup('xyznotaword');
       expect(entry, isNull);
     });
 
-    test('会去掉单词两侧多余符号', () async {
-      final entry = await service.lookup(' "Professor!" ');
+    test('会去掉单词两侧多余符号', () {
+      final entry = service.lookup(' "Professor!" ');
       expect(entry, isNotNull);
       expect(entry!.word, 'professor');
     });
 
-    test('只有符号时返回 null', () async {
-      final entry = await service.lookup('..."\'!?');
+    test('只有符号时返回 null', () {
+      final entry = service.lookup('..."\'!?');
       expect(entry, isNull);
     });
   });
 
   group('词形还原 fallback', () {
-    test('复数 -s → 原形（professors → professor）', () async {
-      final entry = await service.lookup('professors');
+    test('复数 -s → 原形（professors → professor）', () {
+      final entry = service.lookup('professors');
       expect(entry, isNotNull);
       expect(entry!.word, 'professor');
     });
 
-    test('动词 -ing → 原形（running → run）', () async {
-      final entry = await service.lookup('running');
+    test('动词 -ing → 原形（running → run）', () {
+      final entry = service.lookup('running');
       expect(entry, isNotNull);
       expect(entry!.word, 'run');
     });
 
-    test('动词 -s → 原形（goes → go）', () async {
-      final entry = await service.lookup('goes');
+    test('动词 -s → 原形（goes → go）', () {
+      final entry = service.lookup('goes');
       expect(entry, isNotNull);
       expect(entry!.word, 'go');
     });
 
-    test('比较级 -er → 原形（happier → happy）', () async {
-      final entry = await service.lookup('happier');
+    test('比较级 -er → 原形（happier → happy）', () {
+      final entry = service.lookup('happier');
       expect(entry, isNotNull);
       expect(entry!.word, 'happy');
     });
 
-    test('过去式 -ied → 原形（studied → study）', () async {
-      final entry = await service.lookup('studied');
+    test('过去式 -ied → 原形（studied → study）', () {
+      final entry = service.lookup('studied');
       expect(entry, isNotNull);
       expect(entry!.word, 'study');
     });
 
-    test('不规则复数（children → child）', () async {
-      final entry = await service.lookup('children');
+    test('不规则复数（children → child）', () {
+      final entry = service.lookup('children');
       expect(entry, isNotNull);
       expect(entry!.word, 'child');
     });
 
-    test('不规则复数（mice → mouse）', () async {
-      final entry = await service.lookup('mice');
+    test('不规则复数（mice → mouse）', () {
+      final entry = service.lookup('mice');
       expect(entry, isNotNull);
       expect(entry!.word, 'mouse');
     });
 
-    test('不规则过去式（went → go）', () async {
-      final entry = await service.lookup('went');
+    test('不规则过去式（went → go）', () {
+      final entry = service.lookup('went');
       expect(entry, isNotNull);
       expect(entry!.word, 'go');
     });
 
-    test('最高级 -est → 原形（happiest → happy）', () async {
-      final entry = await service.lookup('happiest');
+    test('最高级 -est → 原形（happiest → happy）', () {
+      final entry = service.lookup('happiest');
       expect(entry, isNotNull);
       expect(entry!.word, 'happy');
     });
 
-    test('过去分词 -ed（studied → study）', () async {
-      final entry = await service.lookup('studies');
+    test('过去分词 -ed（studied → study）', () {
+      final entry = service.lookup('studies');
       expect(entry, isNotNull);
       expect(entry!.word, 'study');
     });
   });
 
   group('批量查询 lookupAll', () {
-    test('大小写不敏感', () async {
-      final results = await service.lookupAll(['Professor', 'RUN']);
+    test('大小写不敏感', () {
+      final results = service.lookupAll(['Professor', 'RUN']);
       expect(results['Professor'], isNotNull);
       expect(results['Professor']!.word, 'professor');
       expect(results['RUN'], isNotNull);
       expect(results['RUN']!.word, 'run');
     });
 
-    test('未收录的词不出现在结果中', () async {
-      final results = await service.lookupAll(['professor', 'xyznotaword']);
+    test('未收录的词不出现在结果中', () {
+      final results = service.lookupAll(['professor', 'xyznotaword']);
       expect(results.containsKey('professor'), isTrue);
       expect(results.containsKey('xyznotaword'), isFalse);
     });
 
-    test('词形还原 fallback', () async {
-      final results = await service.lookupAll(['professors', 'running']);
+    test('词形还原 fallback', () {
+      final results = service.lookupAll(['professors', 'running']);
       expect(results['professors'], isNotNull);
       expect(results['professors']!.word, 'professor');
       expect(results['running'], isNotNull);
       expect(results['running']!.word, 'run');
-    });
-  });
-
-  group('词典 asset 自动升级', () {
-    late Directory appDir;
-    late SharedPreferences prefs;
-
-    setUp(() async {
-      SharedPreferences.setMockInitialValues({});
-      prefs = await SharedPreferences.getInstance();
-      appDir = await Directory.systemTemp.createTemp('dict_upgrade_app_dir_');
-    });
-
-    tearDown(() async {
-      if (appDir.existsSync()) {
-        await appDir.delete(recursive: true);
-      }
-    });
-
-    test('首次使用时会复制 asset 词典', () async {
-      var installCount = 0;
-      final bytes = await _createTestDbBytes(['prioritize']);
-      final installService = DictionaryService.withEnvironment(
-        prefs: prefs,
-        appDirProvider: () async => appDir,
-        assetBytesLoader: () async => bytes,
-        onDictionaryInstalled: () => installCount++,
-      );
-
-      final entry = await installService.lookup('prioritize');
-
-      expect(entry, isNotNull);
-      expect(entry!.word, 'prioritize');
-      expect(File('${appDir.path}/dict.db').existsSync(), isTrue);
-      expect(installCount, 1);
-    });
-
-    test('asset 未变化时不会重复覆盖本地词典', () async {
-      var installCount = 0;
-      final bytes = await _createTestDbBytes(['prioritize']);
-      final firstService = DictionaryService.withEnvironment(
-        prefs: prefs,
-        appDirProvider: () async => appDir,
-        assetBytesLoader: () async => bytes,
-        onDictionaryInstalled: () => installCount++,
-      );
-      await firstService.lookup('prioritize');
-      firstService.dispose();
-
-      final secondService = DictionaryService.withEnvironment(
-        prefs: prefs,
-        appDirProvider: () async => appDir,
-        assetBytesLoader: () async => bytes,
-        onDictionaryInstalled: () => installCount++,
-      );
-      final entry = await secondService.lookup('prioritize');
-
-      expect(entry, isNotNull);
-      expect(entry!.word, 'prioritize');
-      expect(installCount, 1);
-    });
-
-    test('旧用户本地已有旧库时会被新版 asset 自动覆盖', () async {
-      final oldBytes = await _createTestDbBytes(['hello']);
-      await File('${appDir.path}/dict.db').writeAsBytes(oldBytes, flush: true);
-
-      final newBytes = await _createTestDbBytes(['prioritize']);
-      final upgradeService = DictionaryService.withEnvironment(
-        prefs: prefs,
-        appDirProvider: () async => appDir,
-        assetBytesLoader: () async => newBytes,
-      );
-
-      final newEntry = await upgradeService.lookup('prioritize');
-      final oldEntry = await upgradeService.lookup('hello');
-
-      expect(newEntry, isNotNull);
-      expect(newEntry!.word, 'prioritize');
-      expect(oldEntry, isNull);
     });
   });
 }

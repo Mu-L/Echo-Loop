@@ -2399,4 +2399,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get goToSettings => '前往设置';
+
+  @override
+  String get dictionaryDownloading => '词典下载中...';
+
+  @override
+  String get dictionaryDownloadFailed => '词典下载失败';
+
+  @override
+  String get dictionaryNotDownloaded => '词典尚未下载';
+
+  @override
+  String get download => '下载';
+
+  @override
+  String get retry => '重试';
 }

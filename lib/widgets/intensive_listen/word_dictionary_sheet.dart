@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/dict_entry.dart';
+import '../../providers/dictionary_provider.dart';
 import '../../providers/saved_word_provider.dart';
 import '../../services/dictionary_service.dart';
 import '../../services/tts_service.dart';
@@ -109,9 +110,13 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     _lookup();
   }
 
-  Future<void> _lookup() async {
-    final entry = await DictionaryService.instance.lookup(_normalizedWord);
-    if (!mounted) return;
+  void _lookup() {
+    if (!DictionaryService.instance.isAvailable) {
+      // 词典未就绪，不查询，由 build 根据 dictionaryProvider 状态展示
+      setState(() => _loading = false);
+      return;
+    }
+    final entry = DictionaryService.instance.lookup(_normalizedWord);
     setState(() {
       _entry = entry;
       _notFound = entry == null;
@@ -141,6 +146,12 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dictState = ref.watch(dictionaryProvider);
+
+    // 词典下载完成后自动重新查询
+    if (dictState.status == DictionaryStatus.downloaded && _entry == null && !_notFound) {
+      _lookup();
+    }
 
     return SafeArea(
       child: Padding(
@@ -174,6 +185,8 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
                   child: CircularProgressIndicator.adaptive(),
                 ),
               )
+            else if (!DictionaryService.instance.isAvailable)
+              _buildDictUnavailable(theme, dictState)
             else ...[
               // 词典内容（支持滚动）
               Flexible(
@@ -198,6 +211,49 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// 词典不可用时的提示（下载中 / 失败 / 未下载）
+  Widget _buildDictUnavailable(ThemeData theme, DictionaryState dictState) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.l),
+      child: Column(
+        children: [
+          if (dictState.status == DictionaryStatus.downloading) ...[
+            Text(
+              l10n.dictionaryDownloading,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.m),
+            LinearProgressIndicator(value: dictState.progress),
+          ] else ...[
+            Text(
+              dictState.status == DictionaryStatus.failed
+                  ? l10n.dictionaryDownloadFailed
+                  : l10n.dictionaryNotDownloaded,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.m),
+            FilledButton.tonal(
+              onPressed: () {
+                ref.read(dictionaryProvider.notifier).retryDownload();
+              },
+              child: Text(
+                dictState.status == DictionaryStatus.failed
+                    ? l10n.retry
+                    : l10n.download,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

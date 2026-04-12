@@ -204,7 +204,7 @@ class FlashcardNotifier extends _$FlashcardNotifier {
 
     // 批量加载词典
     final allTexts = sorted.map((w) => w.displayText).toList();
-    final allEntries = await DictionaryService.instance.lookupAll(allTexts);
+    final allEntries = DictionaryService.instance.lookupAll(allTexts);
     debugPrint(
       '[PERF] flashcard lookupAll (${allTexts.length} words): '
       '${sw.elapsedMilliseconds}ms',

@@ -1339,5 +1339,10 @@
   },
   "duplicatesSkippedDetail": "The following audio files already exist in the library and were skipped:",
   "removeFile": "Remove",
-  "goToSettings": "Go to Settings"
+  "goToSettings": "Go to Settings",
+  "dictionaryDownloading": "Downloading dictionary...",
+  "dictionaryDownloadFailed": "Dictionary download failed",
+  "dictionaryNotDownloaded": "Dictionary not yet downloaded",
+  "download": "Download",
+  "retry": "Retry"
 }

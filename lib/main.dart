@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
-import 'dart:io' show File, Platform;
+import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:audio_session/audio_session.dart';
@@ -16,10 +14,10 @@ import 'database/app_database.dart';
 import 'database/providers.dart';
 import 'database/migration/sp_to_drift_migration.dart';
 import 'providers/package_info_provider.dart';
+import 'providers/dictionary_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/review_reminder_provider.dart';
 import 'router/app_router.dart';
-import 'services/dictionary_service.dart';
 import 'services/bundled_example_installer.dart';
 import 'services/temp_cleanup_service.dart';
 import 'theme/app_theme.dart';
@@ -34,6 +32,7 @@ import 'services/asr/asr_model_manager.dart';
 import 'services/asr/offline_asr_engine.dart';
 import 'services/app_logger.dart';
 import 'services/speech_practice_platform.dart';
+import 'services/storage_migration_service.dart';
 
 /// 通过原生网络栈连接后端服务器。
 ///
@@ -49,33 +48,14 @@ Future<void> _triggerNetworkPermission() async {
   }
 }
 
-/// 数据库文件重命名迁移：fluency.db → echo_loop.db
-///
-/// 旧版本使用 `fluency.db` / `fluency_demo.db`，新版本统一为
-/// `echo_loop.db` / `echo_loop_demo.db`。仅在新文件不存在时重命名。
-Future<void> _migrateDbFileNames() async {
-  final docsDir = await getApplicationDocumentsDirectory();
-  const renames = {
-    'fluency.db': 'echo_loop.db',
-    'fluency_demo.db': 'echo_loop_demo.db',
-  };
-  for (final entry in renames.entries) {
-    final oldFile = File(p.join(docsDir.path, entry.key));
-    final newFile = File(p.join(docsDir.path, entry.value));
-    if (await oldFile.exists() && !await newFile.exists()) {
-      await oldFile.rename(newFile.path);
-    }
-  }
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initTimeago();
 
   final packageInfo = await PackageInfo.fromPlatform();
 
-  // 数据库文件名迁移（fluency → echo_loop）
-  await _migrateDbFileNames();
+  // 数据目录迁移（Documents → Application Support）
+  await migrateToAppSupportDirectory();
 
   // 检查是否处于演示模式
   final prefs = await SharedPreferences.getInstance();
@@ -154,12 +134,8 @@ void main() async {
   // 清理上次残留的录音临时文件（沙盒/tmp/ 中超过 60 秒的文件），不阻塞启动
   unawaited(cleanupRecordingTempFiles());
 
-  // 预热本地词典数据库，避免首次查询时冷启动延迟（异步，不阻塞启动）
-  unawaited(
-    DictionaryService.instance.warmUp().catchError(
-      (e) => debugPrint('Dictionary warm-up skipped: $e'),
-    ),
-  );
+  // 词典由 dictionaryProvider 管理下载和打开，
+  // 在 FluencyApp.initState 中 eagerly read 触发初始化。
 
   // 离线 ASR 初始化（全平台）。
   // Android 固定 offline 后端，iOS/macOS 默认 platform 后端（可切换）。
@@ -228,6 +204,9 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
       onResume: _onAppResumed,
       onHide: _onAppBackground,
     );
+
+    // 预加载词典（触发下载或打开本地词典）
+    ref.read(dictionaryProvider);
 
     // 冷启动 app_open 事件 + 设置保护期
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -632,10 +632,9 @@ class _WordsViewState extends ConsumerState<_WordsView> {
     if (_listEquals(wordStrings, _lastWordKeys)) return;
     _lastWordKeys = wordStrings;
 
-    DictionaryService.instance.lookupAll(wordStrings).then((entries) {
-      if (!mounted) return;
-      setState(() => _dictMap = entries);
-    });
+    final entries = DictionaryService.instance.lookupAll(wordStrings);
+    if (!mounted) return;
+    setState(() => _dictMap = entries);
   }
 
   static bool _listEquals(List<String> a, List<String> b) {

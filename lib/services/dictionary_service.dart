@@ -1,53 +1,24 @@
 /// 本地词典查询服务
 ///
-/// 基于 SQLite 的离线词典，从 assets 中加载 dict.db，
-/// 首次使用时复制到应用文档目录，后续直接打开查询。
+/// 基于 SQLite 的离线词典，由 [DictionaryProvider] 负责下载和打开数据库，
+/// 本服务仅提供查询能力。数据库未就绪时，查询方法返回 null / 空 map。
 library;
 
-import 'dart:io';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:lemmatizerx/lemmatizerx.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../models/dict_entry.dart';
 
 /// 词典服务单例
 class DictionaryService {
-  DictionaryService._()
-    : _prefsOverride = null,
-      _appDirProvider = null,
-      _assetBytesLoader = null,
-      _onDictionaryInstalled = null;
+  DictionaryService._();
 
   /// 测试用构造器，允许注入已打开的数据库
   @visibleForTesting
-  DictionaryService.withDatabase(Database db)
-    : _db = db,
-      _prefsOverride = null,
-      _appDirProvider = null,
-      _assetBytesLoader = null,
-      _onDictionaryInstalled = null;
-
-  /// 测试用构造器，允许注入词典 asset、目录和偏好存储。
-  @visibleForTesting
-  DictionaryService.withEnvironment({
-    SharedPreferences? prefs,
-    Future<Directory> Function()? appDirProvider,
-    Future<Uint8List> Function()? assetBytesLoader,
-    void Function()? onDictionaryInstalled,
-  }) : _prefsOverride = prefs,
-       _appDirProvider = appDirProvider,
-       _assetBytesLoader = assetBytesLoader,
-       _onDictionaryInstalled = onDictionaryInstalled;
+  DictionaryService.withDatabase(Database db) : _db = db;
 
   static DictionaryService _instance = DictionaryService._();
-  static const String _dictAssetPath = 'assets/dict/dict.db';
-  static const String _dictAssetShaKey = 'dictionary_asset_sha256';
 
   /// 全局单例
   static DictionaryService get instance => _instance;
@@ -62,95 +33,36 @@ class DictionaryService {
 
   Database? _db;
   final Lemmatizer _lemmatizer = Lemmatizer();
-  final SharedPreferences? _prefsOverride;
-  final Future<Directory> Function()? _appDirProvider;
-  final Future<Uint8List> Function()? _assetBytesLoader;
-  final void Function()? _onDictionaryInstalled;
 
   static final RegExp _edgePunctuationPattern = RegExp(
     r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$',
   );
 
-  /// 预热词典数据库
+  /// 词典数据库是否已就绪
+  bool get isAvailable => _db != null;
+
+  /// 打开指定路径的词典数据库
   ///
-  /// 在 app 启动时调用，提前完成数据库初始化（复制 asset、打开连接），
-  /// 避免首次查询时的冷启动延迟。
-  Future<void> warmUp() => _ensureInitialized();
-
-  /// 确保数据库已初始化
-  Future<void> _ensureInitialized() async {
-    if (_db != null) return;
-
-    final appDir = _appDirProvider != null
-        ? await _appDirProvider()
-        : await getApplicationSupportDirectory();
-    final dbPath = p.join(appDir.path, 'dict.db');
-    final dbFile = File(dbPath);
-    final prefs = await _getPrefs();
-    final assetBytes = await _loadAssetBytes();
-    final assetSha = sha256.convert(assetBytes).toString();
-    final installedSha = prefs.getString(_dictAssetShaKey);
-
-    // 首次安装或 asset 发生变化时，覆盖本地词典。
-    // 这样用户升级应用后会自动拿到新版词库，不会一直卡在旧缓存。
-    final shouldInstall = !dbFile.existsSync() || installedSha != assetSha;
-    if (shouldInstall) {
-      await _installDictionaryFile(
-        dbFile: dbFile,
-        assetBytes: assetBytes,
-        assetSha: assetSha,
-        prefs: prefs,
-      );
-    }
-
+  /// 由 [DictionaryProvider] 在词典下载完成后调用。
+  /// 如果之前已打开其他数据库，会先关闭。
+  void openDatabase(String dbPath) {
+    _db?.dispose();
     _db = sqlite3.open(dbPath, mode: OpenMode.readOnly);
   }
 
-  Future<SharedPreferences> _getPrefs() async {
-    return _prefsOverride ?? SharedPreferences.getInstance();
+  /// 关闭当前数据库连接
+  ///
+  /// 切换母语词典时需要先关闭再打开新词典。
+  void close() {
+    _db?.dispose();
+    _db = null;
   }
 
-  Future<Uint8List> _loadAssetBytes() async {
-    if (_assetBytesLoader != null) {
-      return _assetBytesLoader();
-    }
-    final data = await rootBundle.load(_dictAssetPath);
-    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-  }
-
-  Future<void> _installDictionaryFile({
-    required File dbFile,
-    required Uint8List assetBytes,
-    required String assetSha,
-    required SharedPreferences prefs,
-  }) async {
-    final tempFile = File('${dbFile.path}.tmp');
-    final hadExistingFile = dbFile.existsSync();
-
-    try {
-      await tempFile.writeAsBytes(assetBytes, flush: true);
-      if (hadExistingFile) {
-        await dbFile.delete();
-      }
-      await tempFile.rename(dbFile.path);
-      await prefs.setString(_dictAssetShaKey, assetSha);
-      _onDictionaryInstalled?.call();
-    } catch (error) {
-      if (tempFile.existsSync()) {
-        await tempFile.delete();
-      }
-      if (!hadExistingFile) {
-        rethrow;
-      }
-      debugPrint('Dictionary asset upgrade skipped: $error');
-    }
-  }
-
-  /// 查询单词，返回词典条目；未找到返回 null
+  /// 查询单词，返回词典条目；未找到或数据库未就绪时返回 null
   ///
   /// 精确匹配失败时，自动通过词形还原（lemmatization）尝试查找原形。
-  Future<DictEntry?> lookup(String word) async {
-    await _ensureInitialized();
+  DictEntry? lookup(String word) {
+    if (_db == null) return null;
 
     final lower = _normalizeLookupWord(word);
     if (lower.isEmpty) return null;
@@ -198,9 +110,9 @@ class DictionaryService {
   /// 批量查询多个单词的词典条目
   ///
   /// 返回 word → DictEntry 的映射，未找到的单词不包含在结果中。
-  /// 用于一次性预加载列表中所有单词的释义，避免逐个异步查询导致 UI 闪烁。
-  Future<Map<String, DictEntry>> lookupAll(List<String> words) async {
-    await _ensureInitialized();
+  /// 数据库未就绪时返回空 map。
+  Map<String, DictEntry> lookupAll(List<String> words) {
+    if (_db == null) return {};
     final result = <String, DictEntry>{};
 
     // 1. 归一化，建立 normalizedWord → [原始 word] 的映射

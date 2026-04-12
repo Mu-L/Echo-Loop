@@ -4417,6 +4417,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go to Settings'**
   String get goToSettings;
+
+  /// No description provided for @dictionaryDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading dictionary...'**
+  String get dictionaryDownloading;
+
+  /// No description provided for @dictionaryDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary download failed'**
+  String get dictionaryDownloadFailed;
+
+  /// No description provided for @dictionaryNotDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary not yet downloaded'**
+  String get dictionaryNotDownloaded;
+
+  /// No description provided for @download.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get download;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate
