@@ -328,6 +328,11 @@ class FlashcardFlowEngine {
 
     // 自动播放例句（手动模式下也播放）
     if (_config.isAutoPlaySentence() && hasSentence) {
+      // 词汇播放完后短暂停顿，再播放例句
+      if (_config.isAutoPlayWord()) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        if (_disposed || token != _state.flowToken) return;
+      }
       _updateState(_state.copyWith(phase: const FlashcardPlayingSentence()));
       await _callbacks.playSentence(token);
       if (_disposed || token != _state.flowToken) return;

@@ -288,19 +288,27 @@ class FlashcardNotifier extends _$FlashcardNotifier {
   Future<void> _autoPlayAfterFlip(FlashcardItem item, bool isBack) async {
     final token = _engine.state.flowToken;
 
-    // TTS 朗读单词
+    // 朗读单词（意群优先使用原音）
     if (state.settings.autoPlayWord) {
       AppLogger.log(
         'FC',
-        'flipTTS start: "${item.displayText}" (token=$token)',
+        'flipSpeak start: "${item.displayText}" (token=$token)',
       );
       if (!_inputStopwatch.isRunning) _inputStopwatch.start();
-      await TtsService.instance.speak(item.displayText);
+
+      var playedOriginal = false;
+      if (item is FlashcardPhraseItem) {
+        playedOriginal = await _playPhraseAudio(item);
+      }
+      if (!playedOriginal) {
+        await TtsService.instance.speak(item.displayText);
+      }
+
       _inputStopwatch.stop();
       AppLogger.log(
         'FC',
-        'flipTTS done: "${item.displayText}" (token=$token, '
-            'current=${_engine.state.flowToken}, '
+        'flipSpeak done: "${item.displayText}" (original=$playedOriginal, '
+            'token=$token, current=${_engine.state.flowToken}, '
             'stale=${token != _engine.state.flowToken})',
       );
       if (token != _engine.state.flowToken) return;
@@ -311,6 +319,11 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     if (isBack &&
         state.settings.autoPlaySentence &&
         item.sentenceText != null) {
+      // 词汇播放完后短暂停顿，再播放例句
+      if (state.settings.autoPlayWord) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        if (token != _engine.state.flowToken) return;
+      }
       state = state.copyWith(isSentencePlaying: true);
       try {
         await _playSentenceAudio(item);
@@ -578,15 +591,24 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     );
   }
 
-  /// TTS 回调：朗读单词
+  /// TTS 回调：朗读单词（意群优先使用原音）
   Future<void> _onSpeakWord(String word, int token) async {
-    AppLogger.log('FC', 'TTS start: "$word" (token=$token)');
+    AppLogger.log('FC', 'speakWord start: "$word" (token=$token)');
     if (!_inputStopwatch.isRunning) _inputStopwatch.start();
-    await TtsService.instance.speak(word);
+
+    final item = state.currentWord;
+    var playedOriginal = false;
+    if (item is FlashcardPhraseItem) {
+      playedOriginal = await _playPhraseAudio(item);
+    }
+    if (!playedOriginal) {
+      await TtsService.instance.speak(word);
+    }
+
     _inputStopwatch.stop();
     AppLogger.log(
       'FC',
-      'TTS done: "$word" (token=$token, '
+      'speakWord done: "$word" (original=$playedOriginal, token=$token, '
           'current=${_engine.state.flowToken}, '
           'stale=${token != _engine.state.flowToken})',
     );
@@ -747,6 +769,67 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       await engine.playRangeOnce(startTime, endTime, sessionId);
     } catch (e, stackTrace) {
       AppLogger.log('FC-Audio', '_playSentenceAudio error: $e\n$stackTrace');
+    }
+  }
+
+  /// 播放意群原声片段（使用 groupStartMs/groupEndMs）
+  ///
+  /// 返回 true 表示播放成功，false 表示原音不可用（调用方应回退 TTS）。
+  Future<bool> _playPhraseAudio(FlashcardPhraseItem item) async {
+    final phrase = item.savedPhrase;
+    if (phrase.audioItemId == null ||
+        phrase.groupStartMs == null ||
+        phrase.groupEndMs == null) {
+      return false;
+    }
+
+    const minDurationMs = 200;
+    if (phrase.groupEndMs! - phrase.groupStartMs! < minDurationMs) {
+      AppLogger.log(
+        'FC-Audio',
+        '_playPhraseAudio: timing too short '
+            '${phrase.groupStartMs}-${phrase.groupEndMs}ms',
+      );
+      return false;
+    }
+
+    try {
+      final engine = ref.read(audioEngineProvider.notifier);
+      final engineState = ref.read(audioEngineProvider);
+
+      final dao = ref.read(audioItemDaoProvider);
+      final row = await dao.getById(phrase.audioItemId!);
+      if (row == null) return false;
+
+      final audioItem = model.AudioItem(
+        id: row.id,
+        name: row.name,
+        audioPath: row.audioPath,
+        transcriptPath: row.transcriptPath,
+        addedDate: row.addedDate,
+        totalDuration: row.totalDuration,
+        sentenceCount: row.sentenceCount,
+        wordCount: row.wordCount,
+        isPinned: row.isPinned,
+        transcriptSource: model.TranscriptSource.fromIndex(
+          row.transcriptSource,
+        ),
+        audioSha256: row.audioSha256,
+        transcriptLanguage: row.transcriptLanguage,
+      );
+
+      if (engineState.currentAudioId != phrase.audioItemId) {
+        await engine.loadAudio(audioItem, 1.0);
+      }
+
+      final startTime = Duration(milliseconds: phrase.groupStartMs!);
+      final endTime = Duration(milliseconds: phrase.groupEndMs!);
+      final sessionId = engine.newSession();
+      await engine.playRangeOnce(startTime, endTime, sessionId);
+      return true;
+    } catch (e, stackTrace) {
+      AppLogger.log('FC-Audio', '_playPhraseAudio error: $e\n$stackTrace');
+      return false;
     }
   }
 
