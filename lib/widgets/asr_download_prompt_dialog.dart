@@ -146,6 +146,7 @@ class _EnableDownloadPromptDialog extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
 
     return AlertDialog(
+      titlePadding: EdgeInsets.zero,
       title: _DialogTitle(
         title: l10n.speechRecognitionRequiredTitle,
         onClose: () => Navigator.of(context).pop(),
@@ -175,6 +176,7 @@ class _RepairPromptDialog extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
 
     return AlertDialog(
+      titlePadding: EdgeInsets.zero,
       title: _DialogTitle(
         title: isFailed
             ? l10n.speechModelDownloadFailed
@@ -187,10 +189,6 @@ class _RepairPromptDialog extends ConsumerWidget {
             : l10n.speechModelRepairMessage,
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.notNow),
-        ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(isFailed ? l10n.retryDownload : l10n.downloadNow),
@@ -217,6 +215,7 @@ class _DownloadProgressDialog extends ConsumerWidget {
     final isFailed = state.downloadStatus == AsrModelDownloadStatus.failed;
 
     return AlertDialog(
+      titlePadding: EdgeInsets.zero,
       title: _DialogTitle(
         title: isFailed
             ? l10n.speechModelDownloadFailed
@@ -276,13 +275,27 @@ class _DialogTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Stack(
       children: [
-        Expanded(child: Text(title)),
-        IconButton(
-          onPressed: onClose,
-          icon: const Icon(Icons.close),
-          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+        // 标题文字，右侧留出关闭按钮的空间
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 48, 0),
+          child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        ),
+        // 关闭按钮固定在右上角
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close, size: 20),
+            style: IconButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(32, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          ),
         ),
       ],
     );
