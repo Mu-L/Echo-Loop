@@ -1373,10 +1373,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get disableAction => '关闭';
 
   @override
-  String get speechRecognitionRequiredTitle => '语音练习需要语音识别';
+  String get speechRecognitionRequiredTitle => '需要下载语音识别模型';
 
   @override
-  String get speechRecognitionRequiredMessage => '需要下载语音识别模型才能使用语音练习功能。';
+  String get speechRecognitionRequiredMessage =>
+      '语音识别用于自动评估跟读和复述效果，需要下载模型才能使用。你可以在设置中关闭此功能。';
 
   @override
   String get downloadAndEnable => '下载并启用';

@@ -1419,11 +1419,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get disableAction => 'Disable';
 
   @override
-  String get speechRecognitionRequiredTitle => 'Speech Recognition Required';
+  String get speechRecognitionRequiredTitle =>
+      'Speech Recognition Model Required';
 
   @override
   String get speechRecognitionRequiredMessage =>
-      'A speech recognition model is required for voice practice. Download now?';
+      'Speech recognition is used to automatically evaluate your read-along and retelling. A model download is required. You can disable this in Settings.';
 
   @override
   String get downloadAndEnable => 'Download & Enable';

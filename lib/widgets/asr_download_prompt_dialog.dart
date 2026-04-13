@@ -153,10 +153,6 @@ class _EnableDownloadPromptDialog extends ConsumerWidget {
       ),
       content: Text(l10n.speechRecognitionRequiredMessage),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.notNow),
-        ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(l10n.downloadAndEnable),

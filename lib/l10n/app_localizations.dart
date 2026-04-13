@@ -2561,13 +2561,13 @@ abstract class AppLocalizations {
   /// No description provided for @speechRecognitionRequiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Speech Recognition Required'**
+  /// **'Speech Recognition Model Required'**
   String get speechRecognitionRequiredTitle;
 
   /// No description provided for @speechRecognitionRequiredMessage.
   ///
   /// In en, this message translates to:
-  /// **'A speech recognition model is required for voice practice. Download now?'**
+  /// **'Speech recognition is used to automatically evaluate your read-along and retelling. A model download is required. You can disable this in Settings.'**
   String get speechRecognitionRequiredMessage;
 
   /// No description provided for @downloadAndEnable.
