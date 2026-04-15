@@ -1693,10 +1693,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesVocabularySaved => '已收藏';
 
   @override
-  String get favoritesVocabularyRemoved => '已取消收藏';
+  String get favoritesVocabularyRemoved => '再次收藏';
 
   @override
-  String get favoritesBookmarkRemoved => '已取消收藏';
+  String get favoritesBookmarkRemoved => '再次收藏';
 
   @override
   String get undo => '撤销';

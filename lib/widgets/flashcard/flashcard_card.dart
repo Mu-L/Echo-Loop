@@ -605,32 +605,35 @@ class _SaveToggleButton extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.m,
-          vertical: AppSpacing.s,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isUnsaved ? Icons.bookmark_border : Icons.bookmark,
-              size: 20,
-              color: isUnsaved ? theme.colorScheme.outline : Colors.amber,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              isUnsaved
-                  ? l10n.favoritesVocabularyRemoved
-                  : l10n.flashcardUnsaveHint,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.outline,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.m,
+            vertical: AppSpacing.s,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isUnsaved ? Icons.bookmark_border : Icons.bookmark,
+                size: 20,
+                color: isUnsaved ? theme.colorScheme.outline : Colors.amber,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                isUnsaved
+                    ? l10n.favoritesVocabularyRemoved
+                    : l10n.flashcardUnsaveHint,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
