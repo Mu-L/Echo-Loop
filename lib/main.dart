@@ -26,7 +26,6 @@ import 'services/notification_tap_router_bridge.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'analytics/analytics_providers.dart';
 import 'services/user_id_service.dart';
-import 'analytics/models/event_names.dart';
 import 'firebase_options.dart';
 import 'providers/offline_asr_settings_provider.dart';
 import 'services/asr/asr_model_manager.dart';
@@ -192,38 +191,13 @@ class FluencyApp extends ConsumerStatefulWidget {
 
 class _FluencyAppState extends ConsumerState<FluencyApp> {
   StreamSubscription<NotificationIntent>? _intentSubscription;
-  late final AppLifecycleListener _lifecycleListener;
-
-  /// App 进入前台的时间戳，用于计算 foreground_duration_ms
-  DateTime? _foregroundSince;
-
-  /// 启动保护标记，防止 macOS 启动过程中的 resume 事件误触发 warm open
-  bool _coldStartDone = false;
 
   @override
   void initState() {
     super.initState();
 
-    // App 生命周期事件追踪
-    _foregroundSince = DateTime.now();
-    _lifecycleListener = AppLifecycleListener(
-      onResume: _onAppResumed,
-      onHide: _onAppBackground,
-    );
-
     // 预加载词典（触发下载或打开本地词典）
     ref.read(dictionaryProvider);
-
-    // 冷启动 app_open 事件 + 设置保护期
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(analyticsServiceProvider).track(Events.appOpen, {
-        EventParams.launchType: 'cold',
-      });
-      // 延迟 5 秒解除保护，避免启动过程中的 resume 误报 warm
-      Future.delayed(const Duration(seconds: 5), () {
-        _coldStartDone = true;
-      });
-    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final bridge = ref.read(notificationTapRouterBridgeProvider);
@@ -245,28 +219,7 @@ class _FluencyAppState extends ConsumerState<FluencyApp> {
   @override
   void dispose() {
     _intentSubscription?.cancel();
-    _lifecycleListener.dispose();
     super.dispose();
-  }
-
-  /// App 从后台恢复
-  void _onAppResumed() {
-    if (!_coldStartDone) return; // 启动保护期内忽略
-    _foregroundSince = DateTime.now();
-    ref.read(analyticsServiceProvider).track(Events.appOpen, {
-      EventParams.launchType: 'warm',
-    });
-  }
-
-  /// App 进入后台
-  void _onAppBackground() {
-    if (!_coldStartDone) return; // 启动保护期内忽略
-    final durationMs = _foregroundSince != null
-        ? DateTime.now().difference(_foregroundSince!).inMilliseconds
-        : 0;
-    ref.read(analyticsServiceProvider).track(Events.appBackground, {
-      EventParams.foregroundDurationMs: durationMs,
-    });
   }
 
   void _handleNotificationIntent(NotificationIntent intent) {

@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/app_database.dart' as db;
 import '../database/providers.dart';
 import '../models/collection.dart';
@@ -157,6 +159,7 @@ class CollectionList extends _$CollectionList {
       rawCollections: [...state.rawCollections, collection],
     );
     await _upsertCollection(collection);
+    ref.read(analyticsServiceProvider).track(Events.collectionCreate);
   }
 
   Future<void> deleteCollection(String id) async {

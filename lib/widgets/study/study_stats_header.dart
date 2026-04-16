@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/study_time_service.dart';
@@ -41,6 +43,9 @@ class StudyStatsHeader extends ConsumerWidget {
           _TodayCard(
             stats: stats,
             studyTimeService: ref.read(studyTimeServiceProvider),
+            onStudyTimeTap: () => ref
+                .read(analyticsServiceProvider)
+                .track(Events.studyTimeViewed),
           ),
           if (stats.dailySeconds.any((s) => s > 0)) ...[
             const SizedBox(height: AppSpacing.s),
@@ -73,8 +78,13 @@ class StudyStatsHeader extends ConsumerWidget {
 class _TodayCard extends StatelessWidget {
   final StudyStats stats;
   final StudyTimeService studyTimeService;
+  final VoidCallback? onStudyTimeTap;
 
-  const _TodayCard({required this.stats, required this.studyTimeService});
+  const _TodayCard({
+    required this.stats,
+    required this.studyTimeService,
+    this.onStudyTimeTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -93,11 +103,14 @@ class _TodayCard extends StatelessWidget {
             // 第一行：今日时长（点击弹出阶段总览）
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => showDayStageBreakdownSheet(
-                context: context,
-                date: today,
-                studyTimeService: studyTimeService,
-              ),
+              onTap: () {
+                onStudyTimeTap?.call();
+                showDayStageBreakdownSheet(
+                  context: context,
+                  date: today,
+                  studyTimeService: studyTimeService,
+                );
+              },
               child: Row(
                 children: [
                   Icon(

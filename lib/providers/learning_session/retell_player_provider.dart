@@ -214,6 +214,23 @@ class RetellPlayer extends _$RetellPlayer {
       _positionSub?.cancel();
       _invalidateRetellCountdown();
     });
+
+    // 监听录音评估完成，上报 recording_complete 事件
+    ref.listen(retellRecordingControllerProvider, (prev, next) {
+      if (prev == null) return;
+      if (prev.phase != RetellRecordingPhase.idle &&
+          next.phase == RetellRecordingPhase.idle &&
+          next.currentAttempt != null) {
+        final attempt = next.currentAttempt!;
+        ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
+          EventParams.audioId:
+              ref.read(learningSessionProvider).audioItemId ?? '',
+          EventParams.mode: 'retell',
+          if (attempt.score != null) EventParams.score: attempt.score!,
+        });
+      }
+    });
+
     return const RetellPlayerState();
   }
 

@@ -6,16 +6,9 @@ library;
 
 /// 事件名常量
 abstract class Events {
-  // ── 生命周期 ──
-  /// App 启动（冷启动/热启动）
-  static const appOpen = 'app_open';
-
-  /// App 进入后台
-  static const appBackground = 'app_background';
-
   // ── 页面浏览 ──
-  /// 页面切换
-  static const screenView = 'screen_view';
+  /// 页面切换（使用 PostHog 官方 Mobile 保留名，兼容官方 Dashboard 模板）
+  static const screenView = r'$screen';
 
   // ── 学习会话 ──
   /// 进入学习页面（避免 Firebase 保留名 session_start）
@@ -68,6 +61,65 @@ abstract class Events {
 
   /// 学习阶段推进
   static const stageAdvance = 'stage_advance';
+
+  // ── 内容创建 ──
+  /// 创建合集
+  static const collectionCreate = 'collection_create';
+
+  /// 上传音频
+  static const audioUpload = 'audio_upload';
+
+  // ── AI 功能 ──
+  /// 请求翻译
+  static const translationRequested = 'translation_requested';
+
+  /// 请求语法解析
+  static const analysisRequested = 'analysis_requested';
+
+  /// 请求意群拆分
+  static const senseGroupRequested = 'sense_group_requested';
+
+  // ── 字幕 ──
+  /// 本地上传字幕成功
+  static const subtitleUploaded = 'subtitle_uploaded';
+
+  /// AI 转录任务发起
+  static const transcriptionStarted = 'transcription_started';
+
+  /// AI 转录任务完成
+  static const transcriptionComplete = 'transcription_complete';
+
+  // ── 复习会话 ──
+  /// 收藏句子复习开始
+  static const bookmarkReviewStart = 'bookmark_review_start';
+
+  /// 收藏句子复习完成（dispose 时上报，含中途退出）
+  static const bookmarkReviewComplete = 'bookmark_review_complete';
+
+  /// 单词卡片复习开始
+  static const flashcardStart = 'flashcard_start';
+
+  /// 单词卡片复习完成（全部翻完）
+  static const flashcardComplete = 'flashcard_complete';
+
+  // ── 录音完成（三个界面共用，mode 参数区分） ──
+  /// 单次录音评估完成
+  static const recordingComplete = 'recording_complete';
+
+  // ── 查单词 ──
+  /// 用户查询单词
+  static const wordLookup = 'word_lookup';
+
+  // ── 设置 ──
+  /// 提醒时间修改
+  static const reminderUpdated = 'reminder_updated';
+
+  /// 语音识别设置变更
+  static const asrSettingChanged = 'asr_setting_changed';
+
+  // ── 统计查看 ──
+  /// 查看今日学习时长明细
+  static const studyTimeViewed = 'study_time_viewed';
 }
 
 /// 事件参数名常量
@@ -77,12 +129,9 @@ abstract class EventParams {
   static const stage = 'stage';
   static const durationMs = 'duration_ms';
 
-  // ── 生命周期 ──
-  static const launchType = 'launch_type';
-  static const foregroundDurationMs = 'foreground_duration_ms';
-
   // ── 页面浏览 ──
-  static const screenName = 'screen_name';
+  /// PostHog 官方保留属性名，用于填充 Activity 流的 URL/Screen 列
+  static const screenName = r'$screen_name';
   static const previousScreen = 'previous_screen';
 
   // ── 学习会话 ──
@@ -103,4 +152,29 @@ abstract class EventParams {
   static const totalDurationMs = 'total_duration_ms';
   static const fromStage = 'from_stage';
   static const toStage = 'to_stage';
+
+  // ── 录音评估 ──
+  /// 录音来源界面：listen_repeat / retell / difficult_practice
+  static const mode = 'mode';
+
+  /// 录音评分（0.0 ~ 1.0，null 表示识别失败）
+  static const score = 'score';
+
+  // ── 查单词 ──
+  static const word = 'word';
+
+  // ── 设置 ──
+  static const reminderEnabled = 'reminder_enabled';
+
+  /// 格式 HH:mm（仅收藏复习提醒时间）
+  static const reminderTime = 'reminder_time';
+
+  static const asrEnabled = 'asr_enabled';
+
+  /// 值：'platform'（系统 ASR）或 'offline'（本地模型）
+  static const asrBackend = 'asr_backend';
+
+  // ── 复习会话 ──
+  static const totalCards = 'total_cards';
+  static const totalSentencesCount = 'total_sentences_count';
 }

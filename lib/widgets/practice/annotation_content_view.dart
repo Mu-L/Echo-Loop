@@ -11,6 +11,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/sense_group_result.dart';
@@ -165,6 +167,8 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final endMs = widget.sentenceEndMs ?? 0;
     final ai = widget.aiNotifier;
     if (ai == null) return;
+
+    ref.read(analyticsServiceProvider).track(Events.senseGroupRequested);
 
     try {
       final (result, timings) = await _sgService.requestSenseGroups(
@@ -431,6 +435,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                 onToolbarStateChanged: _toolbarNotifier.notify,
                 onRequestTranslation: ai != null
                     ? () async {
+                        ref.read(analyticsServiceProvider).track(
+                          Events.translationRequested,
+                        );
                         final result = await ai.getTranslation(
                           widget.text,
                           targetLanguage: nativeLanguage,
@@ -440,6 +447,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                     : null,
                 onRequestAnalysis: ai != null
                     ? () async {
+                        ref.read(analyticsServiceProvider).track(
+                          Events.analysisRequested,
+                        );
                         final result = await ai.getAnalysis(
                           widget.text,
                           targetLanguage: nativeLanguage,

@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../services/asr/asr_model_manager.dart';
 import '../services/asr/offline_asr_engine.dart';
 import 'asr_engine_provider.dart';
@@ -177,6 +179,10 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
     if (state.backend == AsrBackend.platform) {
       state = state.copyWith(enabled: true, clearErrorMessage: true);
       await _persistEnabled(true);
+      ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
+        EventParams.asrEnabled: true,
+        EventParams.asrBackend: AsrBackend.platform.name,
+      });
       return;
     }
 
@@ -196,11 +202,19 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       );
       await _persistEnabled(true);
       await _persistDownloadCompleted(modelId, true);
+      ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
+        EventParams.asrEnabled: true,
+        EventParams.asrBackend: AsrBackend.offline.name,
+      });
       // 引擎不在此处加载，进入录音页面时按需加载。
     } else {
       // 先标记 enabled，下载完成后引擎自动初始化。
       state = state.copyWith(enabled: true, clearErrorMessage: true);
       await _persistEnabled(true);
+      ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
+        EventParams.asrEnabled: true,
+        EventParams.asrBackend: AsrBackend.offline.name,
+      });
       await _downloadAndInitialize(modelId);
     }
   }
@@ -229,6 +243,10 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
     );
     await _persistEnabled(false);
     await _persistDownloadCompleted(state.recommendedModel.id, fullyDownloaded);
+    ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
+      EventParams.asrEnabled: false,
+      EventParams.asrBackend: state.backend.name,
+    });
   }
 
   /// 按需加载引擎（进入录音页面时调用，不阻塞 UI）。
@@ -420,6 +438,10 @@ class OfflineAsrSettingsNotifier extends Notifier<OfflineAsrSettingsState> {
       state = state.copyWith(backend: backend);
     }
     await _persistBackend(backend);
+    ref.read(analyticsServiceProvider).track(Events.asrSettingChanged, {
+      EventParams.asrEnabled: state.enabled,
+      EventParams.asrBackend: backend.name,
+    });
 
     final modelId = state.recommendedModel.id;
 

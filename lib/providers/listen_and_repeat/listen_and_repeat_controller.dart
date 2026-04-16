@@ -11,6 +11,8 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/intensive_listen_settings.dart';
 import '../../models/sentence.dart';
@@ -164,6 +166,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
       startIndex: startIndex,
       isFreePlay: isFreePlay,
     );
+    ref.read(analyticsServiceProvider).track(Events.listenRepeatStart, {
+      EventParams.audioId: audioItemId,
+    });
   }
 
   // ========== 公开方法（Screen 调用） ==========
@@ -331,6 +336,9 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
 
   /// 退出学习模式
   Future<void> exitLearningMode() async {
+    ref.read(analyticsServiceProvider).track(Events.listenRepeatComplete, {
+      EventParams.audioId: _engine.config.audioItemId,
+    });
     disposeSession();
     await disposeStudyTask(ref);
   }
@@ -448,6 +456,11 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
         next.currentAttempt != null) {
       final attempt = next.currentAttempt!;
       _engine.onRecordingFinished(attempt.filePath, attempt.score);
+      ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
+        EventParams.audioId: _engine.config.audioItemId,
+        EventParams.mode: 'listen_repeat',
+        if (attempt.score != null) EventParams.score: attempt.score!,
+      });
     }
 
     // 录音取消/超时 → 通知 engine

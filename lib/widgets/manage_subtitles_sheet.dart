@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../models/audio_item.dart';
 import '../database/providers.dart';
 import '../providers/audio_library_provider.dart';
@@ -682,6 +684,9 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             ),
           );
 
+      ref.read(analyticsServiceProvider).track(Events.subtitleUploaded, {
+        EventParams.audioId: audioItem.id,
+      });
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
       if (!context.mounted) return;
@@ -752,6 +757,9 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     ref
         .read(transcriptionTaskManagerProvider.notifier)
         .startTranscription(audioItem, _selectedLanguage);
+    ref.read(analyticsServiceProvider).track(Events.transcriptionStarted, {
+      EventParams.audioId: audioItem.id,
+    });
   }
 
   /// 处理删除字幕

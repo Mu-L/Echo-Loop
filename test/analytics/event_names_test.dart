@@ -5,8 +5,6 @@ void main() {
   group('Events 常量', () {
     test('所有事件名不为空', () {
       const events = [
-        Events.appOpen,
-        Events.appBackground,
         Events.screenView,
         Events.learningStart,
         Events.learningEnd,
@@ -23,6 +21,23 @@ void main() {
         Events.difficultPracticeComplete,
         Events.firstLearnComplete,
         Events.stageAdvance,
+        Events.collectionCreate,
+        Events.audioUpload,
+        Events.translationRequested,
+        Events.analysisRequested,
+        Events.senseGroupRequested,
+        Events.subtitleUploaded,
+        Events.transcriptionStarted,
+        Events.transcriptionComplete,
+        Events.bookmarkReviewStart,
+        Events.bookmarkReviewComplete,
+        Events.flashcardStart,
+        Events.flashcardComplete,
+        Events.recordingComplete,
+        Events.wordLookup,
+        Events.reminderUpdated,
+        Events.asrSettingChanged,
+        Events.studyTimeViewed,
       ];
 
       for (final name in events) {
@@ -32,8 +47,6 @@ void main() {
 
     test('所有事件名不重复', () {
       const events = [
-        Events.appOpen,
-        Events.appBackground,
         Events.screenView,
         Events.learningStart,
         Events.learningEnd,
@@ -50,17 +63,32 @@ void main() {
         Events.difficultPracticeComplete,
         Events.firstLearnComplete,
         Events.stageAdvance,
+        Events.collectionCreate,
+        Events.audioUpload,
+        Events.translationRequested,
+        Events.analysisRequested,
+        Events.senseGroupRequested,
+        Events.subtitleUploaded,
+        Events.transcriptionStarted,
+        Events.transcriptionComplete,
+        Events.bookmarkReviewStart,
+        Events.bookmarkReviewComplete,
+        Events.flashcardStart,
+        Events.flashcardComplete,
+        Events.recordingComplete,
+        Events.wordLookup,
+        Events.reminderUpdated,
+        Events.asrSettingChanged,
+        Events.studyTimeViewed,
       ];
 
       final unique = events.toSet();
       expect(unique.length, events.length, reason: '存在重复的事件名');
     });
 
-    test('事件名符合命名规范（小写下划线连接）', () {
+    test('自定义事件名符合命名规范（小写下划线连接）', () {
+      // 排除 PostHog 官方保留名（$screen 等以 $ 开头）
       const events = [
-        Events.appOpen,
-        Events.appBackground,
-        Events.screenView,
         Events.learningStart,
         Events.learningEnd,
         Events.blindListenStart,
@@ -76,6 +104,23 @@ void main() {
         Events.difficultPracticeComplete,
         Events.firstLearnComplete,
         Events.stageAdvance,
+        Events.collectionCreate,
+        Events.audioUpload,
+        Events.translationRequested,
+        Events.analysisRequested,
+        Events.senseGroupRequested,
+        Events.subtitleUploaded,
+        Events.transcriptionStarted,
+        Events.transcriptionComplete,
+        Events.bookmarkReviewStart,
+        Events.bookmarkReviewComplete,
+        Events.flashcardStart,
+        Events.flashcardComplete,
+        Events.recordingComplete,
+        Events.wordLookup,
+        Events.reminderUpdated,
+        Events.asrSettingChanged,
+        Events.studyTimeViewed,
       ];
 
       final pattern = RegExp(r'^[a-z][a-z0-9_]*$');
@@ -92,8 +137,6 @@ void main() {
         EventParams.audioId,
         EventParams.stage,
         EventParams.durationMs,
-        EventParams.launchType,
-        EventParams.foregroundDurationMs,
         EventParams.screenName,
         EventParams.previousScreen,
         EventParams.isFreePractice,
@@ -105,6 +148,15 @@ void main() {
         EventParams.totalDurationMs,
         EventParams.fromStage,
         EventParams.toStage,
+        EventParams.mode,
+        EventParams.score,
+        EventParams.word,
+        EventParams.reminderEnabled,
+        EventParams.reminderTime,
+        EventParams.asrEnabled,
+        EventParams.asrBackend,
+        EventParams.totalCards,
+        EventParams.totalSentencesCount,
       ];
 
       for (final name in params) {
@@ -117,8 +169,6 @@ void main() {
         EventParams.audioId,
         EventParams.stage,
         EventParams.durationMs,
-        EventParams.launchType,
-        EventParams.foregroundDurationMs,
         EventParams.screenName,
         EventParams.previousScreen,
         EventParams.isFreePractice,
@@ -130,6 +180,15 @@ void main() {
         EventParams.totalDurationMs,
         EventParams.fromStage,
         EventParams.toStage,
+        EventParams.mode,
+        EventParams.score,
+        EventParams.word,
+        EventParams.reminderEnabled,
+        EventParams.reminderTime,
+        EventParams.asrEnabled,
+        EventParams.asrBackend,
+        EventParams.totalCards,
+        EventParams.totalSentencesCount,
       ];
 
       final unique = params.toSet();

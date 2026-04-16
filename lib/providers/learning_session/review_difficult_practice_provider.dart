@@ -686,6 +686,12 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
         next.currentAttempt != null) {
       final attempt = next.currentAttempt!;
       _repeatEngine!.onRecordingFinished(attempt.filePath, attempt.score);
+      ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
+        EventParams.audioId:
+            ref.read(learningSessionProvider).audioItemId ?? '',
+        EventParams.mode: 'difficult_practice',
+        if (attempt.score != null) EventParams.score: attempt.score!,
+      });
     }
 
     // 录音取消/超时

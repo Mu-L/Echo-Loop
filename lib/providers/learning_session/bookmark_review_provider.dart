@@ -15,6 +15,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/app_database.dart' as db;
 import '../../services/app_logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -132,6 +134,12 @@ class BookmarkReview extends _$BookmarkReview {
       _blindEngine.dispose();
       _repeatEngine?.dispose();
       _periodicSaveTimer?.cancel();
+      if (_sentences.isNotEmpty) {
+        ref.read(analyticsServiceProvider).track(Events.bookmarkReviewComplete, {
+          EventParams.totalSentencesCount: _sentences.length,
+          EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
+        });
+      }
       _saveAndRefreshStudyTime();
       _lifecycleListener.dispose();
     });
@@ -246,6 +254,9 @@ class BookmarkReview extends _$BookmarkReview {
     _studyStopwatch.reset();
     _studyStopwatch.start();
     _schedulePeriodicSave();
+    ref.read(analyticsServiceProvider).track(Events.bookmarkReviewStart, {
+      EventParams.totalSentencesCount: _sentences.length,
+    });
 
     // 注入 recorder 到录音控制器
     ref.read(speechRecordingControllerProvider.notifier).setRecorder(_recorder);

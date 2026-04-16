@@ -17,6 +17,8 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../database/providers.dart';
 import '../../models/audio_item.dart' as model;
 import '../../models/flashcard_item.dart';
@@ -244,6 +246,9 @@ class FlashcardNotifier extends _$FlashcardNotifier {
     _studyStopwatch.reset();
     _studyStopwatch.start();
     _startInputTimeTracking();
+    ref.read(analyticsServiceProvider).track(Events.flashcardStart, {
+      EventParams.totalCards: withDict.length,
+    });
 
     // 启动第一张卡片的自动流程
     // 先 await stop，确保前一个 session 的音频彻底停止（AudioEngine keepAlive，
@@ -365,6 +370,10 @@ class FlashcardNotifier extends _$FlashcardNotifier {
       // 最后一张 → 完成
       _engine.markCompleted();
       _saveStudyTime();
+      ref.read(analyticsServiceProvider).track(Events.flashcardComplete, {
+        EventParams.totalCards: state.words.length,
+        EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
+      });
       state = state.copyWith(
         isCompleted: true,
         phase: const FlashcardSessionCompleted(),

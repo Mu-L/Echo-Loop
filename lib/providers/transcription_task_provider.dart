@@ -6,6 +6,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
 import 'package:path/path.dart' as p;
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../utils/app_data_dir.dart';
 import 'package:universal_io/io.dart';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
@@ -377,6 +379,9 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
 
     _updateState(audioItem.id, const TranscriptionCompleted());
     _cancelTokens.remove(audioItem.id);
+    ref.read(analyticsServiceProvider).track(Events.transcriptionComplete, {
+      EventParams.audioId: audioItem.id,
+    });
 
     // 10 秒后自动清理 completed 状态，避免内存累积
     Future.delayed(const Duration(seconds: 10), () {

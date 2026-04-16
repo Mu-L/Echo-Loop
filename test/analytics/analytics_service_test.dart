@@ -49,27 +49,27 @@ void main() {
     });
 
     test('track 转发事件到 channel', () async {
-      await service.track(Events.appOpen, {
-        EventParams.launchType: 'cold',
+      await service.track(Events.learningStart, {
+        EventParams.audioId: 'audio-123',
       });
 
       expect(channel.events, hasLength(1));
-      expect(channel.events.first.name, Events.appOpen);
-      expect(channel.events.first.params?[EventParams.launchType], 'cold');
+      expect(channel.events.first.name, Events.learningStart);
+      expect(channel.events.first.params?[EventParams.audioId], 'audio-123');
     });
 
     test('track 无参数时传 null', () async {
-      await service.track(Events.appBackground);
+      await service.track(Events.collectionCreate);
 
       expect(channel.events, hasLength(1));
-      expect(channel.events.first.name, Events.appBackground);
+      expect(channel.events.first.name, Events.collectionCreate);
       expect(channel.events.first.params, isNull);
     });
 
     test('用户未同意时 track 静默丢弃', () async {
       await consent.revokeConsent();
 
-      await service.track(Events.appOpen);
+      await service.track(Events.collectionCreate);
       await service.track(Events.learningStart, {EventParams.audioId: '123'});
 
       expect(channel.events, isEmpty);
@@ -93,7 +93,7 @@ void main() {
 
     test('撤回同意后停止采集，重新同意后恢复', () async {
       // 同意状态：事件正常
-      await service.track(Events.appOpen);
+      await service.track(Events.collectionCreate);
       expect(channel.events, hasLength(1));
 
       // 撤回同意：事件丢弃

@@ -13,6 +13,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/dict_entry.dart';
 import '../../providers/dictionary_provider.dart';
@@ -122,6 +124,11 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
       _notFound = entry == null;
       _loading = false;
     });
+    if (entry != null) {
+      ref.read(analyticsServiceProvider).track(Events.wordLookup, {
+        EventParams.word: _normalizedWord,
+      });
+    }
   }
 
   /// 切换收藏状态

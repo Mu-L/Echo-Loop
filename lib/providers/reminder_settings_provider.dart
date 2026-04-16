@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../models/reminder_settings.dart';
 
 part 'reminder_settings_provider.g.dart';
@@ -53,5 +55,9 @@ class ReminderSettingsNotifier extends _$ReminderSettingsNotifier {
     } catch (e) {
       debugPrint('ReminderSettings: 保存设置失败: $e');
     }
+    ref.read(analyticsServiceProvider).track(Events.reminderUpdated, {
+      EventParams.reminderEnabled: settings.savedReviewReminderEnabled,
+      EventParams.reminderTime: settings.formattedTime,
+    });
   }
 }
