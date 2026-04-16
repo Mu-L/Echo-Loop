@@ -12,7 +12,6 @@ import '../database/providers.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/transcription_task_provider.dart';
-import '../services/transcription_api_client.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../utils/transcript_picker.dart';
@@ -812,21 +811,10 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       }
     }
 
-    // 2. 删除后端转录记录（仅 AI 转录且有 SHA256 时）
-    if (audioItem.transcriptSource == TranscriptSource.ai &&
-        audioItem.audioSha256 != null &&
-        audioItem.transcriptLanguage != null) {
-      try {
-        await ref
-            .read(transcriptionApiClientProvider)
-            .deleteTranscript(
-              audioItem.audioSha256!,
-              audioItem.transcriptLanguage!,
-            );
-      } catch (_) {
-        // 后端删除失败不阻塞本地操作
-      }
-    }
+    // 注意：不删除后端转录记录。
+    // userAudios 表按 SHA256 去重，多个用户共享同一条记录，
+    // 删除后端 transcript 会影响所有共用同一音频的用户。
+    // 用户重新转录时，后端 upsert 会覆盖旧记录，无需手动删除。
 
     // 3. 清除词级时间戳
     await ref

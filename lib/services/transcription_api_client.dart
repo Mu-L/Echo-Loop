@@ -253,17 +253,6 @@ class TranscriptionApiClient {
     return TranscriptResult.fromJson(response.data!);
   }
 
-  /// 删除后端转录记录
-  ///
-  /// 通过 [sha256] + [language] 删除 `user_audio_transcripts` 表中的记录。
-  /// 如果记录不存在也不报错（幂等操作）。
-  Future<void> deleteTranscript(String sha256, String language) async {
-    await _dio.delete<Map<String, dynamic>>(
-      '/api/v1/user-audio/transcript',
-      queryParameters: {'sha256': sha256, 'language': language},
-    );
-  }
-
   /// 释放资源
   void dispose() => _dio.close();
 }
