@@ -80,4 +80,8 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     testImplementation("junit:junit:4.13.2")
+    // flutter-plugin-loader 将 integration_test (dev_dependency) 只注入 debugImplementation，
+    // 但 GeneratedPluginRegistrant.java 在所有构建变体中均引用该类，导致 release 编译失败。
+    // 此处补充 releaseImplementation 使编译通过；try-catch 保证运行时初始化失败不影响 app。
+    releaseImplementation(project(":integration_test"))
 }

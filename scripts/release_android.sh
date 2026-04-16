@@ -87,11 +87,16 @@ if [[ "$SKIP_BUILD" == false ]]; then
   flutter clean
 
   log "Building release APK..."
+  DART_DEFINES=(
+    "--dart-define=API_BASE_URL=${API_BASE_URL}"
+    "--dart-define=POSTHOG_HOST=${POSTHOG_HOST}"
+  )
+  # POSTHOG_API_KEY 为空时不传，让代码使用内置默认值
+  [[ -n "${POSTHOG_API_KEY:-}" ]] && DART_DEFINES+=("--dart-define=POSTHOG_API_KEY=${POSTHOG_API_KEY}")
+
   flutter build apk --release \
     --target-platform android-arm64 \
-    --dart-define="API_BASE_URL=${API_BASE_URL}" \
-    --dart-define="POSTHOG_API_KEY=${POSTHOG_API_KEY}" \
-    --dart-define="POSTHOG_HOST=${POSTHOG_HOST}"
+    "${DART_DEFINES[@]}"
 
   SRC="build/app/outputs/flutter-apk/app-release.apk"
   [[ -f "$SRC" ]] || fail "APK not found at $SRC"

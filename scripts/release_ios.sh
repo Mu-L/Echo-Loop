@@ -162,7 +162,12 @@ POSTHOG_HOST="${POSTHOG_HOST:-https://us.i.posthog.com}"
 API_KEY_ID="${APP_STORE_API_KEY_ID:-5GB5KL75VZ}"
 API_ISSUER_ID="${APP_STORE_API_ISSUER_ID:-3ec439fe-b66c-4034-b8c2-16e133fc4d6b}"
 API_KEY_PATH="${APP_STORE_API_KEY_PATH:-$ROOT_DIR/ios/AuthKey_${API_KEY_ID}.p8}"
-DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}" "POSTHOG_API_KEY=${POSTHOG_API_KEY}" "POSTHOG_HOST=${POSTHOG_HOST}")"
+# POSTHOG_API_KEY 为空时不传，让代码使用内置默认值
+if [[ -n "${POSTHOG_API_KEY:-}" ]]; then
+  DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}" "POSTHOG_API_KEY=${POSTHOG_API_KEY}" "POSTHOG_HOST=${POSTHOG_HOST}")"
+else
+  DART_DEFINES_VALUE="$(encode_dart_define "API_BASE_URL=${API_BASE_URL}" "POSTHOG_HOST=${POSTHOG_HOST}")"
+fi
 
 [[ -d "$WORKSPACE" ]] || fail "Workspace not found: $WORKSPACE"
 [[ -f "$API_KEY_PATH" ]] || fail "API key file not found: $API_KEY_PATH"
