@@ -329,15 +329,6 @@ class TestCollectionList extends CollectionList {
   }
 
   @override
-  void toggleViewMode() {
-    state = state.copyWith(
-      viewMode: state.viewMode == CollectionViewMode.grid
-          ? CollectionViewMode.list
-          : CollectionViewMode.grid,
-    );
-  }
-
-  @override
   void setSortType(CollectionSortType type) {
     state = state.copyWith(sortType: type);
   }

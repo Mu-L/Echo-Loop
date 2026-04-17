@@ -11,12 +11,9 @@ part 'collection_provider.g.dart';
 
 enum CollectionSortType { nameAsc, nameDesc, dateAsc, dateDesc }
 
-enum CollectionViewMode { grid, list }
-
 class CollectionState {
   final List<Collection> rawCollections;
   final bool isLoading;
-  final CollectionViewMode viewMode;
   final CollectionSortType sortType;
 
   /// 缓存每个合集的音频 ID 列表（从 junction 表加载）
@@ -25,7 +22,6 @@ class CollectionState {
   const CollectionState({
     this.rawCollections = const [],
     this.isLoading = false,
-    this.viewMode = CollectionViewMode.list,
     this.sortType = CollectionSortType.dateDesc,
     this.audioIdsMap = const {},
   });
@@ -77,14 +73,12 @@ class CollectionState {
   CollectionState copyWith({
     List<Collection>? rawCollections,
     bool? isLoading,
-    CollectionViewMode? viewMode,
     CollectionSortType? sortType,
     Map<String, List<String>>? audioIdsMap,
   }) {
     return CollectionState(
       rawCollections: rawCollections ?? this.rawCollections,
       isLoading: isLoading ?? this.isLoading,
-      viewMode: viewMode ?? this.viewMode,
       sortType: sortType ?? this.sortType,
       audioIdsMap: audioIdsMap ?? this.audioIdsMap,
     );
@@ -273,14 +267,6 @@ class CollectionList extends _$CollectionList {
     } catch (e) {
       return null;
     }
-  }
-
-  void toggleViewMode() {
-    state = state.copyWith(
-      viewMode: state.viewMode == CollectionViewMode.grid
-          ? CollectionViewMode.list
-          : CollectionViewMode.grid,
-    );
   }
 
   void setSortType(CollectionSortType type) {

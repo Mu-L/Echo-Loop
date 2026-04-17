@@ -72,7 +72,6 @@ void main() {
                 () => TestCollectionList(
                   CollectionState(
                     rawCollections: [c1, c2],
-                    viewMode: CollectionViewMode.list,
                     audioIdsMap: {
                       '1': ['a1', 'a2'],
                       '2': ['a3'],
@@ -114,7 +113,6 @@ void main() {
                 () => TestCollectionList(
                   CollectionState(
                     rawCollections: [c],
-                    viewMode: CollectionViewMode.list,
                   ),
                 ),
               ),
@@ -244,7 +242,6 @@ void main() {
                 () => TestCollectionList(
                   CollectionState(
                     rawCollections: [c],
-                    viewMode: CollectionViewMode.list,
                   ),
                 ),
               ),
@@ -272,42 +269,6 @@ void main() {
         expect(card.color, isNotNull);
       });
 
-      testWidgets('网格视图菜单内也提供置顶切换', (tester) async {
-        final c = createTestCollection(
-          id: '1',
-          name: 'Grid Collection',
-          isPinned: false,
-        );
-
-        await tester.pumpWidget(
-          createTestScreen(
-            const LibraryScreen(),
-            overrides: [
-              appSettingsProvider.overrideWith(() => TestAppSettings()),
-              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
-              collectionListProvider.overrideWith(
-                () => TestCollectionList(
-                  CollectionState(
-                    rawCollections: [c],
-                    viewMode: CollectionViewMode.grid,
-                  ),
-                ),
-              ),
-              listeningPracticeProvider.overrideWith(
-                () => TestListeningPractice(),
-              ),
-              audioEngineProvider.overrideWith(() => TestAudioEngine()),
-            ],
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(
-          find.byKey(const Key('collection_grid_menu_hit_area')),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('Pin to Top'), findsOneWidget);
-      });
     });
   });
 }

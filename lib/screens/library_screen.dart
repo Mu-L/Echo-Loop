@@ -125,20 +125,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       return [
         // 合集排序
         const CollectionSortButton(),
-        // 视图切换
-        Consumer(
-          builder: (context, ref, _) {
-            final viewMode = ref.watch(
-              collectionListProvider.select((s) => s.viewMode),
-            );
-            final isGrid = viewMode == CollectionViewMode.grid;
-            return IconButton(
-              icon: Icon(isGrid ? Icons.view_list : Icons.grid_view),
-              onPressed: () =>
-                  ref.read(collectionListProvider.notifier).toggleViewMode(),
-            );
-          },
-        ),
         // 创建合集
         GuideTarget(
           step: createStep,
@@ -230,13 +216,6 @@ class _CollectionListBody extends ConsumerWidget {
     if (collectionState.isEmpty) return const CollectionEmptyState();
 
     final collections = collectionState.collections;
-    if (collectionState.viewMode == CollectionViewMode.grid) {
-      return CollectionGridView(
-        collections: collections,
-        firstItemStep: listStep,
-        firstMenuStep: menuStep,
-      );
-    }
     return CollectionListView(
       collections: collections,
       firstItemStep: listStep,

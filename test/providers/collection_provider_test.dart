@@ -26,7 +26,6 @@ void main() {
 
         expect(state.rawCollections, isEmpty);
         expect(state.isLoading, isFalse);
-        expect(state.viewMode, CollectionViewMode.list);
         expect(state.sortType, CollectionSortType.dateDesc);
         expect(state.isEmpty, isTrue);
       });
@@ -335,7 +334,6 @@ void main() {
 
         expect(copied.isLoading, isTrue);
         expect(copied.sortType, CollectionSortType.nameAsc);
-        expect(copied.viewMode, CollectionViewMode.list);
       });
     });
   });
