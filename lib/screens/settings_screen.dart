@@ -457,12 +457,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('🔧'),
           title: Text(l10n.timeMachine),
-          subtitle: Text(
-            formattedTimeMachine == null
-                ? l10n.timeMachineUseSystemTime
-                : '${l10n.timeMachineCurrentTime}: $formattedTimeMachine',
+          trailing: _trailingValue(
+            context,
+            formattedTimeMachine ?? l10n.timeMachineUseSystemTime,
           ),
-          trailing: const Icon(Icons.chevron_right),
           onTap: () => _showTimeMachineDialog(
             context,
             l10n,
@@ -473,7 +471,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('🎙'),
           title: const Text('ASR 引擎测试'),
-          subtitle: const Text('测试 Platform / Moonshine / Whisper'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const AsrTestScreen()),
@@ -482,7 +479,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('📋'),
           title: const Text('日志'),
-          subtitle: const Text('查看应用内运行日志'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
@@ -491,16 +487,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('🧭'),
           title: Text(l10n.resetNewUserGuide),
-          subtitle: Text(l10n.resetNewUserGuideSubtitle),
           onTap: () => _resetNewUserGuide(context, ref, l10n),
         ),
         ListTile(
           leading: _emojiIcon('📊'),
           title: const Text('Analytics'),
-          subtitle: Text(
-            '通道: ${ref.read(analyticsServiceProvider).channelName}',
+          trailing: _trailingValue(
+            context,
+            ref.read(analyticsServiceProvider).channelName,
           ),
-          trailing: const Icon(Icons.chevron_right),
           onTap: () {
             final service = ref.read(analyticsServiceProvider);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -514,7 +509,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('🎭'),
           title: Text(l10n.demoMode),
-          subtitle: Text(l10n.demoModeSubtitle),
           trailing: settings.isDemoModeLoading
               ? const SizedBox(
                   width: 20,
@@ -530,28 +524,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('📤'),
           title: Text(l10n.exportData),
-          subtitle: Text(l10n.exportDataSubtitle),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _handleExport(context, ref),
         ),
         ListTile(
           leading: _emojiIcon('📥'),
           title: Text(l10n.importData),
-          subtitle: Text(l10n.importDataSubtitle),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _handleImport(context, ref),
         ),
         ListTile(
           leading: _emojiIcon('📖'),
           title: const Text('词典查询'),
-          subtitle: const Text('查询单词是否在词典中'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _showDictionaryLookupDialog(context),
         ),
         ListTile(
           leading: _emojiIcon('⚙️'),
           title: const Text('偏好设置'),
-          subtitle: const Text('查看 SharedPreferences 当前内容'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -562,7 +552,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ListTile(
           leading: _emojiIcon('💾'),
           title: const Text('内部存储'),
-          subtitle: const Text('浏览应用沙盒目录和文件大小'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -1099,6 +1088,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     }
     return result;
+  }
+
+  /// 开发者选项中显示「当前值 + chevron」的 trailing，保持与普通设置项一致的视觉。
+  Widget _trailingValue(BuildContext context, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+        const SizedBox(width: AppSpacing.xs),
+        const Icon(Icons.chevron_right),
+      ],
+    );
   }
 
   Widget _buildThemeModeTile(
