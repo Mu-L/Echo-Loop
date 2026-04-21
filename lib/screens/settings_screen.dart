@@ -26,6 +26,7 @@ import '../providers/learning_progress_provider.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
 import '../services/dictionary_download_manager.dart';
@@ -284,6 +285,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       message = l10n.clearCacheEmpty;
     } else if (totalFreed > 0) {
       message = l10n.clearCacheSuccessWithSize(formatBytes(totalFreed));
+      ref.read(analyticsServiceProvider).track(
+        Events.cacheCleared,
+        {EventParams.bytesFreed: totalFreed},
+      );
     } else {
       message = l10n.clearCacheSuccess;
     }
@@ -1237,6 +1242,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       title: Text(label),
       selected: isSelected,
       onTap: () {
+        if (!isSelected) {
+          ref.read(analyticsServiceProvider).track(
+            Events.nativeLanguageChanged,
+            {
+              EventParams.previousLanguage: settings.nativeLanguage,
+              EventParams.newLanguage: code,
+            },
+          );
+        }
         controller.setNativeLanguage(code);
         Navigator.pop(context);
       },
@@ -1330,6 +1344,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       selected: isSelected,
       onTap: () {
+        if (!isSelected) {
+          ref.read(analyticsServiceProvider).track(
+            Events.themeModeChanged,
+            {
+              EventParams.previousMode: settings.themeMode.name,
+              EventParams.newMode: mode.name,
+            },
+          );
+        }
         controller.setThemeMode(mode);
         Navigator.pop(context);
       },
@@ -1418,6 +1441,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       selected: isSelected,
       onTap: () {
+        if (!isSelected) {
+          ref.read(analyticsServiceProvider).track(
+            Events.appLocaleChanged,
+            {
+              EventParams.previousLocale: settings.locale?.languageCode ?? 'system',
+              EventParams.newLocale: locale?.languageCode ?? 'system',
+            },
+          );
+        }
         controller.setLocale(locale);
         Navigator.pop(context);
       },

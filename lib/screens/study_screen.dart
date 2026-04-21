@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
@@ -68,7 +70,13 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     final streakChip = Padding(
       padding: const EdgeInsets.only(right: AppSpacing.m),
       child: GestureDetector(
-        onTap: () => context.push(AppRoutes.activityCalendar),
+        onTap: () {
+          ref.read(analyticsServiceProvider).track(
+            Events.activityCalendarViewed,
+            {EventParams.streak: streak},
+          );
+          context.push(AppRoutes.activityCalendar);
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -396,7 +404,20 @@ class _TaskCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.s),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push(AppRoutes.audioLearningPlan(task.audioId)),
+        onTap: () {
+          ref.read(analyticsServiceProvider).track(
+            Events.studyTaskTapped,
+            {
+              EventParams.audioId: task.audioId,
+              EventParams.audioName: task.audioName,
+              EventParams.taskType: task.type.name.toLowerCase(),
+              EventParams.stage: task.stage.name,
+              EventParams.subStage: task.subStage.name,
+              EventParams.isOverdue: task.isOverdue ? 1 : 0,
+            },
+          );
+          context.push(AppRoutes.audioLearningPlan(task.audioId));
+        },
         child: IntrinsicHeight(
           child: Row(
             children: [

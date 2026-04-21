@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/models/event_names.dart';
 import '../database/app_database.dart';
 import '../database/daos/bookmark_dao.dart';
 import '../database/providers.dart';
@@ -349,6 +351,10 @@ class _FloatingSentenceReviewButton extends ConsumerWidget {
         context,
       )!.bookmarkReviewStartCount(validBookmarks.length),
       onPressed: () async {
+        ref.read(analyticsServiceProvider).track(
+          Events.bookmarkReviewButtonTapped,
+          {EventParams.totalSentencesCount: validBookmarks.length},
+        );
         final allowed = await ensureAsrReadyBeforeSpeechPractice(context, ref);
         if (!allowed || !context.mounted) return;
 
@@ -398,6 +404,10 @@ class _FloatingFlashcardButton extends ConsumerWidget {
       guideStep: guideStep,
       label: '${l10n.flashcardStartQuiz} ($totalCount)',
       onPressed: () {
+        ref.read(analyticsServiceProvider).track(
+          Events.flashcardButtonTapped,
+          {EventParams.totalCards: totalCount},
+        );
         final sw = Stopwatch()..start();
         // 构建 FlashcardItem 列表，按 createdAt 倒序
         final items = <FlashcardItem>[

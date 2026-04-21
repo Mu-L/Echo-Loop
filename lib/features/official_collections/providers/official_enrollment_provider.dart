@@ -1,9 +1,12 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../analytics/analytics_providers.dart';
+import '../../../analytics/models/event_names.dart';
 import '../../../providers/audio_library_provider.dart';
 import '../../../providers/collection_provider.dart';
 import '../../../services/app_logger.dart';
 import '../data/official_collection_repository.dart';
+import '../data/official_catalog_service.dart';
 
 part 'official_enrollment_provider.g.dart';
 
@@ -46,6 +49,7 @@ class OfficialEnrollment extends _$OfficialEnrollment {
   Future<EnrollResult> enroll(String remoteId) async {
     AppLogger.log(_logTag, 'enroll start remoteId=$remoteId');
     final repo = ref.read(officialCollectionRepositoryProvider);
+    final catalog = ref.read(officialCatalogServiceProvider);
     try {
       final localId = await repo.enroll(remoteId);
       await ref.read(audioLibraryProvider.notifier).loadLibrary();
@@ -56,6 +60,22 @@ class OfficialEnrollment extends _$OfficialEnrollment {
         'enroll success localId=$localId, collections=${snapshot.collections.length} '
         '(official=${snapshot.collections.where((c) => c.isOfficial).length})',
       );
+
+      // 埋点：获取合集详情作为参数
+      final catalogDetail = catalog.cached?.collections
+          .where((c) => c.id == remoteId)
+          .firstOrNull;
+      if (catalogDetail != null) {
+        ref.read(analyticsServiceProvider).track(
+          Events.officialCollectionEnroll,
+          {
+            EventParams.remoteId: remoteId,
+            EventParams.collectionName: catalogDetail.name,
+            EventParams.audioCount: catalogDetail.audios.length,
+          },
+        );
+      }
+
       return EnrollResult(localCollectionId: localId, createdNew: true);
     } on AlreadyEnrolledError catch (e) {
       AppLogger.log(_logTag, 'enroll already-enrolled localId=${e.localId}');

@@ -120,6 +120,46 @@ abstract class Events {
   // ── 统计查看 ──
   /// 查看今日学习时长明细
   static const studyTimeViewed = 'study_time_viewed';
+
+  // ── 精品合集 ──
+  /// 点击发现精品合集入口
+  static const discoverEntryTapped = 'discover_entry_tapped';
+
+  /// 成功添加官方合集
+  static const officialCollectionEnroll = 'official_collection_enroll';
+
+  /// 查看官方合集详情
+  static const officialCollectionDetailViewed = 'official_collection_detail_viewed';
+
+  // ── 学习 Tab ──
+  /// 查看活动日历
+  static const activityCalendarViewed = 'activity_calendar_viewed';
+
+  /// 点击学习任务卡片
+  static const studyTaskTapped = 'study_task_tapped';
+
+  /// 查看某天阶段明细
+  static const dayBreakdownViewed = 'day_breakdown_viewed';
+
+  // ── 收藏复习按钮 ──
+  /// 点击句子复习按钮
+  static const bookmarkReviewButtonTapped = 'bookmark_review_button_tapped';
+
+  /// 点击单词卡片复习按钮
+  static const flashcardButtonTapped = 'flashcard_button_tapped';
+
+  // ── 设置 ──
+  /// 主题模式切换
+  static const themeModeChanged = 'theme_mode_changed';
+
+  /// App 语言切换
+  static const appLocaleChanged = 'app_locale_changed';
+
+  /// 母语切换
+  static const nativeLanguageChanged = 'native_language_changed';
+
+  /// 清除缓存成功
+  static const cacheCleared = 'cache_cleared';
 }
 
 /// 事件参数名常量
@@ -144,6 +184,7 @@ abstract class EventParams {
   // ── 精听 ──
   static const totalSentences = 'total_sentences';
   static const difficultCount = 'difficult_count';
+  static const totalDifficultSentences = 'total_difficult_sentences';
 
   // ── 复述 ──
   static const totalParagraphs = 'total_paragraphs';
@@ -177,4 +218,28 @@ abstract class EventParams {
   // ── 复习会话 ──
   static const totalCards = 'total_cards';
   static const totalSentencesCount = 'total_sentences_count';
+
+  // ── 精品合集 ──
+  static const remoteId = 'remote_id';
+  static const collectionName = 'collection_name';
+  static const audioCount = 'audio_count';
+  static const enrolledCount = 'enrolled_count';
+  static const enrolled = 'enrolled';
+
+  // ── 学习 Tab ──
+  static const streak = 'streak';
+  static const taskType = 'task_type';
+  static const audioName = 'audio_name';
+  static const isOverdue = 'is_overdue';
+  static const subStage = 'sub_stage';
+  static const dateParam = 'date';
+
+  // ── 设置 ──
+  static const previousMode = 'previous_mode';
+  static const newMode = 'new_mode';
+  static const previousLocale = 'previous_locale';
+  static const newLocale = 'new_locale';
+  static const previousLanguage = 'previous_language';
+  static const newLanguage = 'new_language';
+  static const bytesFreed = 'bytes_freed';
 }

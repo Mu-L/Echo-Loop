@@ -258,7 +258,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     _prepareBlindFlow(startIndex: validIndex);
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeStart, {
       EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
-      EventParams.difficultCount: _sentences.length,
+      EventParams.totalDifficultSentences: _sentences.length,
     });
 
     // 注入 recorder
@@ -881,7 +881,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   void _trackDifficultPracticeComplete() {
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeComplete, {
       EventParams.audioId: ref.read(learningSessionProvider).audioItemId ?? '',
-      EventParams.totalSentences: state.totalSentences,
+      EventParams.totalDifficultSentences: state.totalSentences,
     });
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../analytics/analytics_providers.dart';
+import '../../../analytics/models/event_names.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/collection_provider.dart';
 
@@ -42,7 +44,14 @@ class DiscoverEntryBanner extends ConsumerWidget {
         child: Material(
           color: theme.colorScheme.primaryContainer,
           child: InkWell(
-            onTap: onTap ?? () => context.push('/discover'),
+            onTap: onTap ??
+                () {
+                  ref.read(analyticsServiceProvider).track(
+                    Events.discoverEntryTapped,
+                    {EventParams.enrolledCount: enrolledOfficialCount},
+                  );
+                  context.push('/discover');
+                },
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,

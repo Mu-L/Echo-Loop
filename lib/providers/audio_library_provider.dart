@@ -171,6 +171,7 @@ class AudioLibrary extends _$AudioLibrary {
     await _upsertItem(item);
     ref.read(analyticsServiceProvider).track(Events.audioUpload, {
       EventParams.audioId: item.id,
+      EventParams.audioName: item.name,
     });
   }
 

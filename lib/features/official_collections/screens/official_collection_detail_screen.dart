@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../analytics/analytics_providers.dart';
+import '../../../analytics/models/event_names.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/audio_item.dart';
 import '../../../providers/audio_library_provider.dart';
@@ -45,6 +47,7 @@ class OfficialCollectionDetailScreen extends ConsumerStatefulWidget {
 class _OfficialCollectionDetailScreenState
     extends ConsumerState<OfficialCollectionDetailScreen> {
   bool _enrolling = false;
+  bool _trackedView = false;
 
   @override
   void initState() {
@@ -54,6 +57,39 @@ class _OfficialCollectionDetailScreenState
       AppLogger.log(_logTag, 'initState: catalog not initialized → syncAll');
       unawaited(_syncCatalog());
     }
+    // 延迟埋点，确保 detail 数据可用
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackDetailView();
+    });
+  }
+
+  /// 页面浏览埋点（仅触发一次）
+  void _trackDetailView() {
+    if (_trackedView) return;
+    final detail = ref.read(officialCollectionDetailProvider(widget.remoteId));
+    if (detail == null) return;
+
+    final localId = _findLocalIdStatic(detail.id);
+    final enrolled = localId != null;
+    ref.read(analyticsServiceProvider).track(
+      Events.officialCollectionDetailViewed,
+      {
+        EventParams.remoteId: detail.id,
+        EventParams.collectionName: detail.name,
+        EventParams.audioCount: detail.audios.length,
+        EventParams.enrolled: enrolled ? 1 : 0,
+      },
+    );
+    _trackedView = true;
+  }
+
+  /// initState 中使用的静态版本（不依赖 context）
+  String? _findLocalIdStatic(String remoteId) {
+    final state = ref.read(collectionListProvider);
+    for (final c in state.collections) {
+      if (c.isOfficial && c.remoteId == remoteId) return c.id;
+    }
+    return null;
   }
 
   /// 触发全局唯一同步；helper 内部处理 outcome=updated 后的

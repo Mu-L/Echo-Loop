@@ -55,6 +55,13 @@ class StudyStatsHeader extends ConsumerWidget {
               dailyOutputSeconds: stats.dailyOutputSeconds,
               dailyTotalSeconds: stats.dailySeconds,
               onBarTap: (date) {
+                ref.read(analyticsServiceProvider).track(
+                  Events.dayBreakdownViewed,
+                  {
+                    EventParams.dateParam:
+                        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                  },
+                );
                 final service = ref.read(studyTimeServiceProvider);
                 showDayStageBreakdownSheet(
                   context: context,

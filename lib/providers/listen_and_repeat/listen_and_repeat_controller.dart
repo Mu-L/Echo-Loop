@@ -168,6 +168,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
     );
     ref.read(analyticsServiceProvider).track(Events.listenRepeatStart, {
       EventParams.audioId: audioItemId,
+      EventParams.totalSentences: difficultSentences.length,
     });
   }
 
@@ -338,6 +339,7 @@ class ListenAndRepeatController extends _$ListenAndRepeatController
   Future<void> exitLearningMode() async {
     ref.read(analyticsServiceProvider).track(Events.listenRepeatComplete, {
       EventParams.audioId: _engine.config.audioItemId,
+      EventParams.totalSentences: _sentences.length,
     });
     disposeSession();
     await disposeStudyTask(ref);
