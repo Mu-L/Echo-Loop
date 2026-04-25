@@ -22,6 +22,16 @@ const supportedNativeLanguages = <String, String>{
   'zh-TW': '繁體中文',
 };
 
+/// 根据系统 locale 匹配应用界面语言。
+///
+/// 当前界面只支持中文 / 英文：
+/// - 中文系列（zh）→ `Locale('zh', 'CN')`
+/// - 其它任何语言（含未识别）→ `Locale('en')`
+Locale matchUiLocale(Locale systemLocale) {
+  if (systemLocale.languageCode == 'zh') return const Locale('zh', 'CN');
+  return const Locale('en');
+}
+
 /// 根据系统 locale 匹配母语。
 ///
 /// 匹配规则：
@@ -115,12 +125,36 @@ class AppSettingsState {
   }
 }
 
+/// 启动期同步预读的界面语言。在 `main()` 同步从 SP 读出后通过
+/// `overrideWithValue` 注入；用作 `AppSettings.build()` 的初始值，避免
+/// 首帧 locale 为 null 引起的"先按系统语言渲染、再切到用户设置"闪烁。
+///
+/// 解析规则：
+/// - SP 'en' → Locale('en')
+/// - SP 'zh' / 'zh-CN' → Locale('zh', 'CN')
+/// - SP 'system' / 缺失 / 异常值 → null（跟随系统）
+///
+/// 未 override 时返回 null，单测里也安全。
+final initialUiLocaleProvider = Provider<Locale?>((ref) => null);
+
+/// 同步从 SP 读取并解析界面语言（main() 启动期使用）。
+Locale? readInitialUiLocaleSync(SharedPreferences prefs) {
+  final stored = prefs.getString(_localeKey);
+  return switch (stored) {
+    'en' => const Locale('en'),
+    'zh' || 'zh-CN' => const Locale('zh', 'CN'),
+    _ => null, // 'system' / null / 异常 → 跟随系统
+  };
+}
+
 @Riverpod(keepAlive: true)
 class AppSettings extends _$AppSettings {
   @override
   AppSettingsState build() {
+    // 用 main() 同步预读的 initialUiLocale 作为首帧值，避免闪烁。
+    final initialLocale = ref.read(initialUiLocaleProvider);
     _loadSettings();
-    return const AppSettingsState();
+    return AppSettingsState(locale: initialLocale);
   }
 
   Future<void> _loadSettings() async {
@@ -133,13 +167,10 @@ class AppSettings extends _$AppSettings {
       _ => ThemeMode.system,
     };
 
-    // 界面语言：兼容旧值 'zh' → 'zh-CN'
-    final localeString = prefs.getString(_localeKey);
-    final Locale? locale = switch (localeString) {
-      'en' => const Locale('en'),
-      'zh' || 'zh-CN' => const Locale('zh', 'CN'),
-      _ => null, // 'system' 或无值时跟随系统
-    };
+    // 界面语言：未设置或设置为 'system' 时返回 null，让 MaterialApp 跟随系统
+    // （`matchUiLocale` 的语义同样适用——zh 系列→中文，其它→英文）。
+    // 不再首次启动时自动持久化具体语言，保证设置页默认显示"跟随系统"。
+    final locale = readInitialUiLocaleSync(prefs);
 
     // 母语：首次启动时根据系统语言匹配并持久化
     final nativeLanguage = await _loadNativeLanguage(prefs);
@@ -152,6 +183,7 @@ class AppSettings extends _$AppSettings {
     state = state.copyWith(
       themeMode: themeMode,
       locale: locale,
+      clearLocale: locale == null,
       nativeLanguage: nativeLanguage,
       timeMachineDateTime: timeMachineDateTime,
       isDemoMode: isDemoMode,

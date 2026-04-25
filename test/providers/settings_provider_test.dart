@@ -179,7 +179,7 @@ void main() {
       expect(prefs.getBool('unlock_all_reviews'), isNull);
     });
 
-    test('无 locale 配置时默认跟随系统（null）', () async {
+    test('无 locale 配置时默认为 null（跟随系统），不自动写 SP', () async {
       SharedPreferences.setMockInitialValues({});
 
       final container = ProviderContainer();
@@ -190,9 +190,57 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(container.read(appSettingsProvider).locale, isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('locale'), isNull);
     });
 
-    test('locale 配置为 system 时加载为 null', () async {
+    test('initialUiLocaleProvider override 直接作为首帧 locale，无闪烁', () async {
+      SharedPreferences.setMockInitialValues({'locale': 'zh-CN'});
+
+      final container = ProviderContainer(
+        overrides: [
+          initialUiLocaleProvider.overrideWithValue(const Locale('zh', 'CN')),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      // 同步读取，无需 await：build() 已用 override 值作为初始 locale
+      expect(
+        container.read(appSettingsProvider).locale,
+        equals(const Locale('zh', 'CN')),
+      );
+
+      // hydrate 完成后值不变（SP 与 override 同源）
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        container.read(appSettingsProvider).locale,
+        equals(const Locale('zh', 'CN')),
+      );
+    });
+
+    test('readInitialUiLocaleSync 解析 SP 值', () async {
+      SharedPreferences.setMockInitialValues({'locale': 'en'});
+      var prefs = await SharedPreferences.getInstance();
+      expect(readInitialUiLocaleSync(prefs), equals(const Locale('en')));
+
+      SharedPreferences.setMockInitialValues({'locale': 'zh-CN'});
+      prefs = await SharedPreferences.getInstance();
+      expect(
+        readInitialUiLocaleSync(prefs),
+        equals(const Locale('zh', 'CN')),
+      );
+
+      SharedPreferences.setMockInitialValues({'locale': 'system'});
+      prefs = await SharedPreferences.getInstance();
+      expect(readInitialUiLocaleSync(prefs), isNull);
+
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      expect(readInitialUiLocaleSync(prefs), isNull);
+    });
+
+    test('locale 配置为 system 时加载为 null（用户显式选择跟随系统）', () async {
       SharedPreferences.setMockInitialValues({'locale': 'system'});
 
       final container = ProviderContainer();
@@ -205,7 +253,7 @@ void main() {
       expect(container.read(appSettingsProvider).locale, isNull);
     });
 
-    test('locale 配置为 zh 时正确加载', () async {
+    test('locale 配置为 zh 时回填为 zh-CN（兼容旧值）', () async {
       SharedPreferences.setMockInitialValues({'locale': 'zh'});
 
       final container = ProviderContainer();
@@ -215,7 +263,10 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
-      expect(container.read(appSettingsProvider).locale, const Locale('zh'));
+      expect(
+        container.read(appSettingsProvider).locale,
+        equals(const Locale('zh', 'CN')),
+      );
     });
 
     test('setLocale(null) 持久化为 system', () async {
@@ -246,6 +297,41 @@ void main() {
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('locale'), 'zh');
+    });
+  });
+
+  group('matchUiLocale', () {
+    test('zh 系列（不论国家）→ Locale("zh", "CN")', () {
+      expect(
+        matchUiLocale(const Locale('zh', 'CN')),
+        equals(const Locale('zh', 'CN')),
+      );
+      expect(
+        matchUiLocale(const Locale('zh', 'TW')),
+        equals(const Locale('zh', 'CN')),
+      );
+      expect(
+        matchUiLocale(const Locale('zh')),
+        equals(const Locale('zh', 'CN')),
+      );
+    });
+
+    test('英文 → Locale("en")', () {
+      expect(matchUiLocale(const Locale('en')), equals(const Locale('en')));
+      expect(
+        matchUiLocale(const Locale('en', 'US')),
+        equals(const Locale('en')),
+      );
+    });
+
+    test('其它任何语言均回退到英文', () {
+      expect(matchUiLocale(const Locale('ja')), equals(const Locale('en')));
+      expect(matchUiLocale(const Locale('ko')), equals(const Locale('en')));
+      expect(matchUiLocale(const Locale('fr')), equals(const Locale('en')));
+      expect(
+        matchUiLocale(const Locale('xx', 'YY')),
+        equals(const Locale('en')),
+      );
     });
   });
 }

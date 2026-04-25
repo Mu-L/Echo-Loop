@@ -27,6 +27,7 @@ import '../providers/new_user_guide_provider.dart';
 import '../providers/tag_provider.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
+import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
 import '../services/dictionary_download_manager.dart';
@@ -495,6 +496,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: () => _resetNewUserGuide(context, ref, l10n),
         ),
         ListTile(
+          leading: _emojiIcon('📝'),
+          title: Text(l10n.resetOnboarding),
+          onTap: () => _resetOnboarding(context, ref, l10n),
+        ),
+        ListTile(
           leading: _emojiIcon('📊'),
           title: const Text('Analytics'),
           trailing: _trailingValue(
@@ -592,6 +598,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(l10n.resetNewUserGuideDone)));
+  }
+
+  /// 重置 Onboarding 问卷状态：清空问卷答案 SP key，便于开发调试。
+  ///
+  /// 故意**不动**用户的界面语言（`locale` SP key）和其它设置——老用户
+  /// 已经选过中文，重置 onboarding 不应把他们的偏好一起抹掉，否则热重启后
+  /// 会回退到"跟随系统"。
+  ///
+  /// `initialOnboardingCompletedProvider` 在 `main()` 通过
+  /// `overrideWithValue` 注入，运行期不可改写，因此重置后必须重启 App
+  /// 才能再次进入问卷。
+  Future<void> _resetOnboarding(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) async {
+    final storage = ref.read(onboardingStorageProvider);
+    await storage.clear();
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.resetOnboardingDone)));
   }
 
   /// 显示词典查询对话框

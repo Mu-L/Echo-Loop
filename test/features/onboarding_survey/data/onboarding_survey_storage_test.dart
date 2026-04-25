@@ -19,7 +19,7 @@ void main() {
       expect(storage.completedAt, isNull);
     });
 
-    test('saveCompleted 同时写入答案和时间戳', () async {
+    test('saveCompleted 同时写入主答案和时间戳', () async {
       final prefs = await SharedPreferences.getInstance();
       final storage = OnboardingSurveyStorage(prefs);
       final now = DateTime(2026, 4, 25, 10, 0, 0);
@@ -37,6 +37,92 @@ void main() {
       expect(loaded, isNotNull);
       expect(loaded!.goal, equals(OnboardingGoal.work));
       expect(loaded.dailyMinutes, equals(OnboardingDailyMinutes.m20));
+      expect(loaded.examType, isNull);
+      expect(loaded.goalOtherText, isNull);
+    });
+
+    test('exam 分支：examType 必填，缺失时 saveCompleted 抛错', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final storage = OnboardingSurveyStorage(prefs);
+      expect(
+        () => storage.saveCompleted(
+          const OnboardingAnswers(
+            goal: OnboardingGoal.exam,
+            dailyMinutes: OnboardingDailyMinutes.m10,
+          ),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('exam 分支：examType 一并存读', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final storage = OnboardingSurveyStorage(prefs);
+      await storage.saveCompleted(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.exam,
+          examType: OnboardingExamType.ielts,
+          dailyMinutes: OnboardingDailyMinutes.m20,
+        ),
+      );
+      final loaded = storage.loadAnswers();
+      expect(loaded?.goal, equals(OnboardingGoal.exam));
+      expect(loaded?.examType, equals(OnboardingExamType.ielts));
+    });
+
+    test('exam → 切到非 exam 时 SP 清掉 examType 残留', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final storage = OnboardingSurveyStorage(prefs);
+      // 先写一次 exam
+      await storage.saveCompleted(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.exam,
+          examType: OnboardingExamType.cet,
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ),
+      );
+      // 再写一次 daily —— examType 应被清除
+      await storage.saveCompleted(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.daily,
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ),
+      );
+      expect(prefs.getString(OnboardingSurveyKeys.examType), isNull);
+      expect(storage.loadAnswers()?.examType, isNull);
+    });
+
+    test('other 分支：不再要求 goalOtherText，保存时会清掉旧文本', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(OnboardingSurveyKeys.goalOtherText, '旧文本');
+      final storage = OnboardingSurveyStorage(prefs);
+      await storage.saveCompleted(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.other,
+          goalOtherText: '  考公务员  ',
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ),
+      );
+      expect(prefs.getString(OnboardingSurveyKeys.goalOtherText), isNull);
+      final loaded = storage.loadAnswers();
+      expect(loaded?.goal, equals(OnboardingGoal.other));
+      expect(loaded?.goalOtherText, isNull);
+      expect(loaded?.dailyMinutes, equals(OnboardingDailyMinutes.m10));
+    });
+
+    test('content 分支：影视博客可以正常保存和读取', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final storage = OnboardingSurveyStorage(prefs);
+      await storage.saveCompleted(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.content,
+          dailyMinutes: OnboardingDailyMinutes.m20,
+        ),
+      );
+      final loaded = storage.loadAnswers();
+      expect(loaded?.goal, equals(OnboardingGoal.content));
+      expect(loaded?.dailyMinutes, equals(OnboardingDailyMinutes.m20));
+      expect(loaded?.goalOtherText, isNull);
     });
 
     test('未完成的答案不能保存', () async {
@@ -80,6 +166,18 @@ void main() {
       expect(storage.loadAnswers(), isNull); // 但答案不可用
     });
 
+    test('exam 分支但 examType 非法时 loadAnswers 返回 null', () async {
+      SharedPreferences.setMockInitialValues({
+        OnboardingSurveyKeys.goal: OnboardingGoal.exam,
+        OnboardingSurveyKeys.examType: 'unknown_exam',
+        OnboardingSurveyKeys.dailyMinutes: OnboardingDailyMinutes.m10,
+        OnboardingSurveyKeys.completedAtMs: 1000,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final storage = OnboardingSurveyStorage(prefs);
+      expect(storage.loadAnswers(), isNull);
+    });
+
     test('只有锚点没有答案字段时，loadAnswers 返回 null（不抛异常）', () async {
       SharedPreferences.setMockInitialValues({
         OnboardingSurveyKeys.completedAtMs: 1000,
@@ -96,12 +194,14 @@ void main() {
       await storage.saveCompleted(
         const OnboardingAnswers(
           goal: OnboardingGoal.exam,
+          examType: OnboardingExamType.toefl,
           dailyMinutes: OnboardingDailyMinutes.m10,
         ),
       );
       await storage.clear();
       expect(storage.isCompleted, isFalse);
       expect(storage.loadAnswers(), isNull);
+      expect(prefs.getString(OnboardingSurveyKeys.examType), isNull);
     });
 
     test('readIsCompletedSync 静态方法可在 main() 同步调用', () async {
@@ -114,7 +214,7 @@ void main() {
   });
 
   group('OnboardingAnswers', () {
-    test('isComplete 仅当两题都答时为 true', () {
+    test('isComplete 普通分支只需 goal + dailyMinutes', () {
       expect(const OnboardingAnswers().isComplete, isFalse);
       expect(
         const OnboardingAnswers(goal: OnboardingGoal.work).isComplete,
@@ -129,6 +229,42 @@ void main() {
       );
     });
 
+    test('isComplete: exam 分支必须有 examType', () {
+      expect(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.exam,
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ).isComplete,
+        isFalse,
+      );
+      expect(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.exam,
+          examType: OnboardingExamType.ielts,
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ).isComplete,
+        isTrue,
+      );
+    });
+
+    test('isComplete: other 分支不再要求 goalOtherText', () {
+      expect(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.other,
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ).isComplete,
+        isTrue,
+      );
+      expect(
+        const OnboardingAnswers(
+          goal: OnboardingGoal.other,
+          goalOtherText: '   ',
+          dailyMinutes: OnboardingDailyMinutes.m10,
+        ).isComplete,
+        isTrue,
+      );
+    });
+
     test('copyWith 不会清空已设置的字段', () {
       const original = OnboardingAnswers(goal: OnboardingGoal.exam);
       final updated = original.copyWith(
@@ -136,6 +272,19 @@ void main() {
       );
       expect(updated.goal, equals(OnboardingGoal.exam));
       expect(updated.dailyMinutes, equals(OnboardingDailyMinutes.m20));
+    });
+
+    test('copyWith.clearExamType 把 examType 置回 null', () {
+      const original = OnboardingAnswers(
+        goal: OnboardingGoal.exam,
+        examType: OnboardingExamType.ielts,
+      );
+      final cleared = original.copyWith(
+        goal: OnboardingGoal.daily,
+        clearExamType: true,
+      );
+      expect(cleared.goal, equals(OnboardingGoal.daily));
+      expect(cleared.examType, isNull);
     });
 
     test('相同字段值的实例相等', () {

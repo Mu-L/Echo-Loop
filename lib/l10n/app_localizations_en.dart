@@ -2668,6 +2668,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetNewUserGuideDone => 'New user guide has been reset';
 
   @override
+  String get resetOnboarding => 'Reset Onboarding Survey';
+
+  @override
+  String get resetOnboardingDone =>
+      'Onboarding reset; please restart the app to retake the survey';
+
+  @override
   String get discoverOfficialCollections => 'Discover Curated Collections';
 
   @override
@@ -2778,10 +2785,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioListColumnDuration => 'Duration';
 
   @override
-  String get onboardingTitle => '2 quick questions';
+  String get onboardingTitle => 'Quick chat';
 
   @override
-  String get onboardingSubtitle => '10 seconds to set things up';
+  String get onboardingSubtitle => '10 seconds to tailor your practice';
+
+  @override
+  String get onboardingBack => 'Back';
+
+  @override
+  String get onboardingContinue => 'Continue';
+
+  @override
+  String get onboardingExamPrompt => 'Which exam are you preparing for?';
+
+  @override
+  String get onboardingExamGaokao => 'Gaokao';
+
+  @override
+  String get onboardingExamCet => 'CET-4 / CET-6';
+
+  @override
+  String get onboardingExamTem => 'TEM-4 / TEM-8';
+
+  @override
+  String get onboardingExamKaoyan => 'Kaoyan';
+
+  @override
+  String get onboardingExamIelts => 'IELTS';
+
+  @override
+  String get onboardingExamToefl => 'TOEFL';
+
+  @override
+  String get onboardingExamOther => 'Other';
 
   @override
   String onboardingProgress(int current, int total) {
@@ -2795,31 +2832,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingDone => 'Done';
 
   @override
-  String get onboardingFinishedToast =>
-      'Got it. Let\'s start with something easy.';
+  String get onboardingFinishedTitle => 'All set';
+
+  @override
+  String get onboardingFinishedHint =>
+      'We\'ll tailor practice to your goals and pace.';
+
+  @override
+  String get onboardingSummaryHeadline =>
+      'Did you know? Mastering English isn\'t about learning more — it\'s about practicing deeper.';
+
+  @override
+  String get onboardingSummaryPoint1 =>
+      'Drill on real audio that matches your level';
+
+  @override
+  String get onboardingSummaryPoint2 =>
+      'Read in sense groups, learn words in context';
+
+  @override
+  String get onboardingSummaryPoint3 =>
+      'Build input and intuition through extensive listening and shadowing';
+
+  @override
+  String get onboardingSummaryPoint4 =>
+      'Retell to turn comprehension into spoken fluency';
+
+  @override
+  String get onboardingStart => 'Start learning';
 
   @override
   String get onboardingQ1Prompt => 'Why are you learning English?';
 
   @override
-  String get onboardingQ1OptionExam =>
-      'For an exam (CET / postgrad / IELTS / TOEFL)';
+  String get onboardingQ1OptionExam => 'For an exam';
 
   @override
-  String get onboardingQ1OptionDaily =>
-      'Everyday conversation (shows, chatting)';
+  String get onboardingQ1OptionDaily => 'Everyday conversation';
 
   @override
-  String get onboardingQ1OptionWork => 'Work English (meetings, emails)';
+  String get onboardingQ1OptionWork => 'Work';
 
   @override
   String get onboardingQ1OptionTravel => 'Travel abroad';
 
   @override
+  String get onboardingQ1OptionContent => 'Videos & Podcasts';
+
+  @override
   String get onboardingQ1OptionOther => 'Other';
 
   @override
-  String get onboardingQ2Prompt => 'How much time can you spend daily?';
+  String get onboardingQ2Prompt => 'How long can you practice each day?';
 
   @override
   String get onboardingQ2Option5 => 'About 5 min';
@@ -2828,11 +2892,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingQ2Option10 => 'About 10 min';
 
   @override
-  String get onboardingQ2Option20 => '15-20 min';
+  String get onboardingQ2Option20 => 'About 20 min';
 
   @override
   String get onboardingQ2Option30 => '30 min or more';
 
   @override
-  String get onboardingQ2OptionFlexible => 'Whenever I have time';
+  String get onboardingQ2OptionFlexible => 'It varies';
 }

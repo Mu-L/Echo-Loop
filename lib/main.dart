@@ -87,6 +87,10 @@ void main() async {
   // 用 `onboarding_completed_at_ms` 存在性判定，不引入冗余 bool key。
   final onboardingCompleted = OnboardingSurveyStorage.readIsCompletedSync(prefs);
 
+  // 界面语言同步预读：让首帧 MaterialApp.locale 直接拿到用户已选语言，
+  // 避免"先按系统语言渲染、再 hydrate 切到用户设置"的闪烁。
+  final initialUiLocale = readInitialUiLocaleSync(prefs);
+
   // 初始化数据库（演示模式使用独立数据库文件）
   final dbFileName = isDemoMode ? 'echo_loop_demo.db' : 'echo_loop.db';
   final database = AppDatabase(openConnectionWithName(dbFileName));
@@ -206,6 +210,7 @@ void main() async {
           sharedPreferencesProvider.overrideWithValue(prefs),
           initialOnboardingCompletedProvider
               .overrideWithValue(onboardingCompleted),
+          initialUiLocaleProvider.overrideWithValue(initialUiLocale),
           if (recommendedAsrModel != null)
             recommendedAsrModelProvider.overrideWithValue(recommendedAsrModel),
           if (initialOfflineAsrSettingsState != null)

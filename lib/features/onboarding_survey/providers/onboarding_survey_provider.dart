@@ -4,18 +4,17 @@
 /// `lib/providers/new_user_guide_provider.dart`，使用手动 Notifier
 /// （不走 riverpod_generator，简化构建链路）。
 ///
-/// 三层 gate 体现在 `shouldShowSurveyProvider`：
-///   isFirstLaunch && !onboardingCompleted && !hasLearningProgress
+/// 单一 gate 体现在 `shouldShowSurveyProvider`：仅判断 `completed_at_ms`
+/// 是否存在。老用户升级也会被弹出问卷，答完一次后永久过滤。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../providers/learning_progress_provider.dart';
-import '../../../providers/new_user_guide_provider.dart';
 import '../../../services/app_logger.dart';
 import '../data/onboarding_survey_storage.dart';
 import '../models/onboarding_answers.dart';
+import '../models/onboarding_question.dart';
 
 /// SharedPreferences 实例。
 ///
@@ -73,9 +72,19 @@ class OnboardingAnswersNotifier extends Notifier<OnboardingAnswers> {
   @override
   OnboardingAnswers build() => const OnboardingAnswers();
 
-  /// 设置 Q1（学习目标）。
+  /// 设置 Q1（学习目标）。切换 goal 时自动清掉旧分支副字段，
+  /// 避免上一选项遗留 examType。
   void setGoal(String goal) {
-    state = state.copyWith(goal: goal);
+    state = state.copyWith(
+      goal: goal,
+      clearExamType: goal != OnboardingGoal.exam,
+      clearGoalOtherText: true,
+    );
+  }
+
+  /// 设置 Q1.5（考试类型，仅 goal == exam 时使用）。
+  void setExamType(String examType) {
+    state = state.copyWith(examType: examType);
   }
 
   /// 设置 Q2（每日学习时长）。
@@ -104,25 +113,8 @@ final onboardingAnswersProvider =
 
 /// 是否应该展示问卷（router redirect 同步判定）。
 ///
-/// 三层 gate（任一失败即不展示）：
-/// 1. `isFirstLaunch`（硬门槛，老用户永远 false）
-/// 2. 问卷未完成
-/// 3. 没有学习进度（兜底：哨兵缺失但已学习的老用户）
-///
-/// 第 3 条的 `progressMap.isEmpty` 在加载完成（`!isLoading`）时才准——
-/// 加载中时返回 true（不阻塞首启用户进入问卷），由 onboarding 页 initState
-/// 异步兜底：检测到 progressMap 非空立即 markCompleted + 跳学习页。
+/// 唯一判定：问卷尚未完成（`completed_at_ms` 缺失）。
+/// 老用户升级也会被弹出一次问卷；用户答完写入完成锚点后永久过滤。
 final shouldShowSurveyProvider = Provider<bool>((ref) {
-  final isFirstLaunch = ref.watch(isFirstLaunchProvider);
-  if (!isFirstLaunch) return false;
-
-  final completed = ref.watch(onboardingCompletedProvider);
-  if (completed) return false;
-
-  final progress = ref.watch(learningProgressNotifierProvider);
-  if (!progress.isLoading && progress.progressMap.isNotEmpty) {
-    return false;
-  }
-
-  return true;
+  return !ref.watch(onboardingCompletedProvider);
 });

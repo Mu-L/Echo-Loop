@@ -4742,6 +4742,18 @@ abstract class AppLocalizations {
   /// **'New user guide has been reset'**
   String get resetNewUserGuideDone;
 
+  /// No description provided for @resetOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Onboarding Survey'**
+  String get resetOnboarding;
+
+  /// No description provided for @resetOnboardingDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding reset; please restart the app to retake the survey'**
+  String get resetOnboardingDone;
+
   /// No description provided for @discoverOfficialCollections.
   ///
   /// In en, this message translates to:
@@ -4937,14 +4949,74 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingTitle.
   ///
   /// In en, this message translates to:
-  /// **'2 quick questions'**
+  /// **'Quick chat'**
   String get onboardingTitle;
 
   /// No description provided for @onboardingSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'10 seconds to set things up'**
+  /// **'10 seconds to tailor your practice'**
   String get onboardingSubtitle;
+
+  /// No description provided for @onboardingBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get onboardingBack;
+
+  /// No description provided for @onboardingContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get onboardingContinue;
+
+  /// No description provided for @onboardingExamPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Which exam are you preparing for?'**
+  String get onboardingExamPrompt;
+
+  /// No description provided for @onboardingExamGaokao.
+  ///
+  /// In en, this message translates to:
+  /// **'Gaokao'**
+  String get onboardingExamGaokao;
+
+  /// No description provided for @onboardingExamCet.
+  ///
+  /// In en, this message translates to:
+  /// **'CET-4 / CET-6'**
+  String get onboardingExamCet;
+
+  /// No description provided for @onboardingExamTem.
+  ///
+  /// In en, this message translates to:
+  /// **'TEM-4 / TEM-8'**
+  String get onboardingExamTem;
+
+  /// No description provided for @onboardingExamKaoyan.
+  ///
+  /// In en, this message translates to:
+  /// **'Kaoyan'**
+  String get onboardingExamKaoyan;
+
+  /// No description provided for @onboardingExamIelts.
+  ///
+  /// In en, this message translates to:
+  /// **'IELTS'**
+  String get onboardingExamIelts;
+
+  /// No description provided for @onboardingExamToefl.
+  ///
+  /// In en, this message translates to:
+  /// **'TOEFL'**
+  String get onboardingExamToefl;
+
+  /// No description provided for @onboardingExamOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get onboardingExamOther;
 
   /// No description provided for @onboardingProgress.
   ///
@@ -4964,11 +5036,53 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get onboardingDone;
 
-  /// No description provided for @onboardingFinishedToast.
+  /// No description provided for @onboardingFinishedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Got it. Let\'s start with something easy.'**
-  String get onboardingFinishedToast;
+  /// **'All set'**
+  String get onboardingFinishedTitle;
+
+  /// No description provided for @onboardingFinishedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll tailor practice to your goals and pace.'**
+  String get onboardingFinishedHint;
+
+  /// No description provided for @onboardingSummaryHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Did you know? Mastering English isn\'t about learning more — it\'s about practicing deeper.'**
+  String get onboardingSummaryHeadline;
+
+  /// No description provided for @onboardingSummaryPoint1.
+  ///
+  /// In en, this message translates to:
+  /// **'Drill on real audio that matches your level'**
+  String get onboardingSummaryPoint1;
+
+  /// No description provided for @onboardingSummaryPoint2.
+  ///
+  /// In en, this message translates to:
+  /// **'Read in sense groups, learn words in context'**
+  String get onboardingSummaryPoint2;
+
+  /// No description provided for @onboardingSummaryPoint3.
+  ///
+  /// In en, this message translates to:
+  /// **'Build input and intuition through extensive listening and shadowing'**
+  String get onboardingSummaryPoint3;
+
+  /// No description provided for @onboardingSummaryPoint4.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell to turn comprehension into spoken fluency'**
+  String get onboardingSummaryPoint4;
+
+  /// No description provided for @onboardingStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start learning'**
+  String get onboardingStart;
 
   /// No description provided for @onboardingQ1Prompt.
   ///
@@ -4979,19 +5093,19 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ1OptionExam.
   ///
   /// In en, this message translates to:
-  /// **'For an exam (CET / postgrad / IELTS / TOEFL)'**
+  /// **'For an exam'**
   String get onboardingQ1OptionExam;
 
   /// No description provided for @onboardingQ1OptionDaily.
   ///
   /// In en, this message translates to:
-  /// **'Everyday conversation (shows, chatting)'**
+  /// **'Everyday conversation'**
   String get onboardingQ1OptionDaily;
 
   /// No description provided for @onboardingQ1OptionWork.
   ///
   /// In en, this message translates to:
-  /// **'Work English (meetings, emails)'**
+  /// **'Work'**
   String get onboardingQ1OptionWork;
 
   /// No description provided for @onboardingQ1OptionTravel.
@@ -4999,6 +5113,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Travel abroad'**
   String get onboardingQ1OptionTravel;
+
+  /// No description provided for @onboardingQ1OptionContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Videos & Podcasts'**
+  String get onboardingQ1OptionContent;
 
   /// No description provided for @onboardingQ1OptionOther.
   ///
@@ -5009,7 +5129,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ2Prompt.
   ///
   /// In en, this message translates to:
-  /// **'How much time can you spend daily?'**
+  /// **'How long can you practice each day?'**
   String get onboardingQ2Prompt;
 
   /// No description provided for @onboardingQ2Option5.
@@ -5027,7 +5147,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ2Option20.
   ///
   /// In en, this message translates to:
-  /// **'15-20 min'**
+  /// **'About 20 min'**
   String get onboardingQ2Option20;
 
   /// No description provided for @onboardingQ2Option30.
@@ -5039,7 +5159,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ2OptionFlexible.
   ///
   /// In en, this message translates to:
-  /// **'Whenever I have time'**
+  /// **'It varies'**
   String get onboardingQ2OptionFlexible;
 }
 

@@ -4,33 +4,20 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fluency/database/enums.dart';
 import 'package:fluency/features/onboarding_survey/data/onboarding_survey_storage.dart';
 import 'package:fluency/features/onboarding_survey/models/onboarding_question.dart';
 import 'package:fluency/features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'package:fluency/features/onboarding_survey/screens/onboarding_survey_screen.dart';
 import 'package:fluency/l10n/app_localizations.dart';
-import 'package:fluency/models/learning_progress.dart';
-import 'package:fluency/providers/learning_progress_provider.dart';
-import 'package:fluency/providers/new_user_guide_provider.dart';
 import 'package:fluency/router/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/mock_providers.dart';
 
-class _TestLearningProgressNotifier extends LearningProgressNotifier {
-  _TestLearningProgressNotifier(this._initial);
-  final LearningProgressState _initial;
-  @override
-  LearningProgressState build() => _initial;
-}
-
 /// 创建一个最小化的可路由测试 App，承载 onboarding 页 + study 占位页。
 Widget _wrap({
   required SharedPreferences prefs,
-  bool isFirstLaunch = true,
   bool initialOnboardingCompleted = false,
-  LearningProgressState progress = const LearningProgressState(),
 }) {
   final router = GoRouter(
     initialLocation: AppRoutes.onboardingSurvey,
@@ -48,12 +35,9 @@ Widget _wrap({
 
   return ProviderScope(
     overrides: [
-      isFirstLaunchProvider.overrideWithValue(isFirstLaunch),
       sharedPreferencesProvider.overrideWithValue(prefs),
-      initialOnboardingCompletedProvider
-          .overrideWithValue(initialOnboardingCompleted),
-      learningProgressNotifierProvider.overrideWith(
-        () => _TestLearningProgressNotifier(progress),
+      initialOnboardingCompletedProvider.overrideWithValue(
+        initialOnboardingCompleted,
       ),
       analyticsOverride(),
     ],
@@ -76,55 +60,178 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('初次进入按钮 disabled，选答后 enabled', (tester) async {
+  testWidgets('普通分支：选目标 → 自动跳时长 → 选时长 → 进入方法论页 → 点开始学习', (tester) async {
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(_wrap(prefs: prefs));
     await tester.pumpAndSettle();
 
-    expect(find.text('下一题'), findsOneWidget);
+    expect(find.text('你为什么学英语？'), findsOneWidget);
 
-    // 找到 FilledButton：未选时应 disabled
-    final buttonFinder = find.byType(FilledButton);
-    expect(buttonFinder, findsOneWidget);
-    final disabledButton = tester.widget<FilledButton>(buttonFinder);
-    expect(disabledButton.onPressed, isNull);
+    // 选"工作沟通" → 等待自动前进
+    await tester.tap(find.text('工作沟通'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    // 选第一个答案
-    await tester.tap(find.text('考试（四六级 / 考研 / 雅思托福）'));
-    await tester.pumpAndSettle();
+    // 已切到时长页
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('约 20 分钟'), findsOneWidget);
 
-    final enabledButton = tester.widget<FilledButton>(buttonFinder);
-    expect(enabledButton.onPressed, isNotNull);
-  });
+    // 选"不固定" → 自动跳到方法论 summary 页
+    await tester.tap(find.text('不固定'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
-  testWidgets('完整 2 题流程能走通并写入 SP', (tester) async {
-    final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(_wrap(prefs: prefs));
-    await tester.pumpAndSettle();
+    // summary 页：headline + 4 要点 + 开始学习 按钮，仍未提交
+    expect(find.textContaining('学好英语'), findsOneWidget);
+    expect(find.text('选择适合你水平的真实音频反复训练'), findsOneWidget);
+    expect(find.text('通过复述练习表达，把听懂变成会说'), findsOneWidget);
+    expect(find.text('开始学习'), findsOneWidget);
+    expect(OnboardingSurveyStorage(prefs).isCompleted, isFalse);
+    expect(find.text('STUDY_PLACEHOLDER'), findsNothing);
 
-    // Q1: 选职场英语
-    await tester.tap(find.text('职场英语（工作沟通、邮件、会议）'));
-    await tester.pumpAndSettle();
-    expect(find.text('下一题'), findsOneWidget);
-    await tester.tap(find.text('下一题'));
-    await tester.pumpAndSettle();
+    // 点击"开始学习" → 提交并跳转
+    await tester.tap(find.text('开始学习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    // Q2: 选灵活安排
-    expect(find.text('完成'), findsOneWidget);
-    await tester.tap(find.text('不固定，灵活安排'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('完成'));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
-
-    // 应导航到 study 页
     expect(find.text('STUDY_PLACEHOLDER'), findsOneWidget);
 
-    // SP 已写入
     final storage = OnboardingSurveyStorage(prefs);
     expect(storage.isCompleted, isTrue);
     final answers = storage.loadAnswers();
     expect(answers?.goal, equals(OnboardingGoal.work));
     expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.flexible));
+  });
+
+  testWidgets('考试分支：选应对考试 → 二级考试类型 → 选时长 → summary → 开始学习', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('应对考试'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('在准备哪种考试？'), findsOneWidget);
+    expect(find.text('雅思 IELTS'), findsOneWidget);
+
+    await tester.tap(find.text('雅思 IELTS'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+
+    await tester.tap(find.text('约 20 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    expect(find.text('开始学习'), findsOneWidget);
+    await tester.tap(find.text('开始学习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('STUDY_PLACEHOLDER'), findsOneWidget);
+    final answers = OnboardingSurveyStorage(prefs).loadAnswers();
+    expect(answers?.goal, equals(OnboardingGoal.exam));
+    expect(answers?.examType, equals(OnboardingExamType.ielts));
+    expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m20));
+  });
+
+  testWidgets('其他分支：选其他 → 自动跳时长 → summary → 开始学习', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('其他'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('继续'), findsNothing);
+
+    await tester.tap(find.text('约 10 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    await tester.tap(find.text('开始学习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('STUDY_PLACEHOLDER'), findsOneWidget);
+    final answers = OnboardingSurveyStorage(prefs).loadAnswers();
+    expect(answers?.goal, equals(OnboardingGoal.other));
+    expect(answers?.goalOtherText, isNull);
+    expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m10));
+  });
+
+  testWidgets('影视播客分支：选影视播客 → 自动跳时长 → summary → 开始学习', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('影视播客'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+
+    await tester.tap(find.text('约 20 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    await tester.tap(find.text('开始学习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('STUDY_PLACEHOLDER'), findsOneWidget);
+    final answers = OnboardingSurveyStorage(prefs).loadAnswers();
+    expect(answers?.goal, equals(OnboardingGoal.content));
+    expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m20));
+  });
+
+  testWidgets('summary 页可通过"上一步"返回时长页修改答案', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('日常交流'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    await tester.tap(find.text('约 10 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+    expect(find.text('开始学习'), findsOneWidget);
+    expect(find.text('上一步'), findsOneWidget);
+
+    await tester.tap(find.text('上一步'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    // 仍未写入完成态
+    expect(OnboardingSurveyStorage(prefs).isCompleted, isFalse);
+  });
+
+  testWidgets('上一步：从时长页可以回到目标页', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    // 第一题不显示上一步
+    expect(find.text('上一步'), findsNothing);
+
+    await tester.tap(find.text('日常交流'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('上一步'), findsOneWidget);
+
+    await tester.tap(find.text('上一步'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.text('你为什么学英语？'), findsOneWidget);
+  });
+
+  testWidgets('物理返回键被 PopScope 拦截', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(_wrap(prefs: prefs));
+    await tester.pumpAndSettle();
+
+    // ignore: deprecated_member_use
+    await ServicesBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/navigation',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('popRoute')),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('你为什么学英语？'), findsOneWidget);
   });
 
   testWidgets('无跳过按钮渲染', (tester) async {
@@ -134,60 +241,5 @@ void main() {
     expect(find.text('以后再说'), findsNothing);
     expect(find.text('Skip'), findsNothing);
     expect(find.text('Skip for now'), findsNothing);
-  });
-
-  testWidgets('物理返回键被 PopScope 拦截', (tester) async {
-    final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(_wrap(prefs: prefs));
-    await tester.pumpAndSettle();
-
-    // 模拟系统返回手势
-    // ignore: deprecated_member_use
-    await ServicesBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-      'flutter/navigation',
-      const JSONMethodCodec().encodeMethodCall(
-        const MethodCall('popRoute'),
-      ),
-      (_) {},
-    );
-    await tester.pumpAndSettle();
-
-    // 仍在 onboarding 页（题目仍可见）
-    expect(find.text('你为什么学英语？'), findsOneWidget);
-  });
-
-  testWidgets('进度条文字按题号变化', (tester) async {
-    final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(_wrap(prefs: prefs));
-    await tester.pumpAndSettle();
-
-    expect(find.text('第 1 题 / 共 2 题'), findsOneWidget);
-
-    await tester.tap(find.text('考试（四六级 / 考研 / 雅思托福）'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一题'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('第 2 题 / 共 2 题'), findsOneWidget);
-  });
-
-  testWidgets('老用户兜底：progressMap 非空时 initState 自动跳转 study', (tester) async {
-    final prefs = await SharedPreferences.getInstance();
-    final stub = LearningProgress(
-      audioItemId: 'a1',
-      currentStage: LearningStage.firstLearn,
-      currentSubStage: SubStageType.blindListen,
-      difficulty: DifficultyLevel.medium,
-      currentStageStartedAt: DateTime(2026),
-      updatedAt: DateTime(2026),
-    );
-    final progress = LearningProgressState(
-      progressMap: {'a1': stub},
-      isLoading: false,
-    );
-    await tester.pumpWidget(_wrap(prefs: prefs, progress: progress));
-    await tester.pumpAndSettle();
-
-    expect(find.text('STUDY_PLACEHOLDER'), findsOneWidget);
   });
 }

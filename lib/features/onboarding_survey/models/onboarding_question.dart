@@ -1,6 +1,6 @@
 /// Onboarding 问卷题目静态元数据
 ///
-/// 第一期只有 2 题：学习目标 + 每日学习时长。
+/// 三道题：学习目标 → （仅当目标=应对考试）考试类型 → 每日学习时长。
 /// 题目和选项不可变，运行时不会从配置或后端拉取。
 library;
 
@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 /// 题目 ID（用于埋点参数 question_id）
 abstract final class OnboardingQuestionId {
   static const goal = 'goal';
+  static const examType = 'exam_type';
   static const dailyMinutes = 'daily_minutes';
 }
 
@@ -18,10 +19,24 @@ abstract final class OnboardingGoal {
   static const daily = 'daily';
   static const work = 'work';
   static const travel = 'travel';
+  static const content = 'content';
   static const other = 'other';
 
   /// 全部合法值，用于 SP 解码时校验
-  static const all = [exam, daily, work, travel, other];
+  static const all = [exam, daily, work, travel, content, other];
+}
+
+/// 应对考试时的二级菜单：考试类型编码
+abstract final class OnboardingExamType {
+  static const gaokao = 'gaokao';
+  static const cet = 'cet';
+  static const tem = 'tem';
+  static const kaoyan = 'kaoyan';
+  static const ielts = 'ielts';
+  static const toefl = 'toefl';
+  static const other = 'other';
+
+  static const all = [gaokao, cet, tem, kaoyan, ielts, toefl, other];
 }
 
 /// 每日学习时长编码（Q2）
@@ -50,78 +65,3 @@ class OnboardingOption {
 
   const OnboardingOption({required this.code, required this.labelKey});
 }
-
-/// 单道题的元数据。
-@immutable
-class OnboardingQuestion {
-  /// 题目 ID（埋点用）
-  final String id;
-
-  /// 题干 l10n key
-  final String promptKey;
-
-  /// 选项列表，按界面展示顺序
-  final List<OnboardingOption> options;
-
-  const OnboardingQuestion({
-    required this.id,
-    required this.promptKey,
-    required this.options,
-  });
-}
-
-/// 第一期问卷的两道题。顺序固定。
-const onboardingQuestions = <OnboardingQuestion>[
-  OnboardingQuestion(
-    id: OnboardingQuestionId.goal,
-    promptKey: 'onboardingQ1Prompt',
-    options: [
-      OnboardingOption(
-        code: OnboardingGoal.exam,
-        labelKey: 'onboardingQ1OptionExam',
-      ),
-      OnboardingOption(
-        code: OnboardingGoal.daily,
-        labelKey: 'onboardingQ1OptionDaily',
-      ),
-      OnboardingOption(
-        code: OnboardingGoal.work,
-        labelKey: 'onboardingQ1OptionWork',
-      ),
-      OnboardingOption(
-        code: OnboardingGoal.travel,
-        labelKey: 'onboardingQ1OptionTravel',
-      ),
-      OnboardingOption(
-        code: OnboardingGoal.other,
-        labelKey: 'onboardingQ1OptionOther',
-      ),
-    ],
-  ),
-  OnboardingQuestion(
-    id: OnboardingQuestionId.dailyMinutes,
-    promptKey: 'onboardingQ2Prompt',
-    options: [
-      OnboardingOption(
-        code: OnboardingDailyMinutes.m5,
-        labelKey: 'onboardingQ2Option5',
-      ),
-      OnboardingOption(
-        code: OnboardingDailyMinutes.m10,
-        labelKey: 'onboardingQ2Option10',
-      ),
-      OnboardingOption(
-        code: OnboardingDailyMinutes.m20,
-        labelKey: 'onboardingQ2Option20',
-      ),
-      OnboardingOption(
-        code: OnboardingDailyMinutes.m30,
-        labelKey: 'onboardingQ2Option30',
-      ),
-      OnboardingOption(
-        code: OnboardingDailyMinutes.flexible,
-        labelKey: 'onboardingQ2OptionFlexible',
-      ),
-    ],
-  ),
-];

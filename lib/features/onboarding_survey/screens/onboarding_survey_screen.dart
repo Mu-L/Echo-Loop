@@ -1,11 +1,13 @@
-/// Onboarding 问卷页：首启用户必经的 2 题画像调研。
+/// Onboarding 问卷页。
 ///
 /// 设计要点：
 /// - PopScope.canPop=false 拦截物理返回 / 边缘滑动
-/// - 不能后退到上一题（按钮只显示"下一题/完成"）
-/// - 老用户兜底：initState 检测 progressMap 非空立即 markCompleted + go(study)
+/// - 选完一题自动跳下一题（自动前进，按需提供小号"上一步"）
+/// - "应对考试"展开二级菜单（考试类型）；其它选项直接进入时长
 /// - 完成时先 await 写 SP，再切状态，最后导航——保证崩溃也不会丢一致性
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,14 +16,20 @@ import 'package:go_router/go_router.dart';
 import '../../../analytics/analytics_providers.dart';
 import '../../../analytics/models/event_names.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../providers/learning_progress_provider.dart';
 import '../../../router/app_router.dart';
 import '../../../services/app_logger.dart';
 import '../models/onboarding_answers.dart';
 import '../models/onboarding_question.dart';
 import '../providers/onboarding_survey_provider.dart';
 import '../widgets/survey_choice_tile.dart';
-import '../widgets/survey_progress_bar.dart';
+
+/// 当前所在步骤。
+/// - examType 仅在 goal == exam 时进入。
+/// - summary 是答完所有题后的方法论介绍页，点击"开始学习"才真正提交并进入主界面。
+enum _SurveyStep { goal, examType, dailyMinutes, summary }
+
+/// 选完答案到自动跳下一步之间的延迟，留出选中高亮的视觉反馈。
+const _autoAdvanceDelay = Duration(milliseconds: 220);
 
 class OnboardingSurveyScreen extends ConsumerStatefulWidget {
   const OnboardingSurveyScreen({super.key});
@@ -33,10 +41,10 @@ class OnboardingSurveyScreen extends ConsumerStatefulWidget {
 
 class _OnboardingSurveyScreenState
     extends ConsumerState<OnboardingSurveyScreen> {
-  final _pageController = PageController();
-  int _currentIndex = 0;
+  _SurveyStep _step = _SurveyStep.goal;
+  final List<_SurveyStep> _history = [];
+  Timer? _advanceTimer;
   late final DateTime _startedAt;
-  bool _showSuccessAnimation = false;
   bool _submitting = false;
 
   @override
@@ -44,11 +52,8 @@ class _OnboardingSurveyScreenState
     super.initState();
     _startedAt = DateTime.now();
 
-    // 进入问卷打 shown 事件（包括老用户被异步 bypass 的也算 shown，
-    // 但他们会立刻被跳到 study，对漏斗影响极小）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _maybeBypassForExistingUser();
       ref.read(analyticsServiceProvider).track(
         Events.onboardingSurveyShown,
         const {EventParams.isFirstLaunch: true},
@@ -56,63 +61,77 @@ class _OnboardingSurveyScreenState
     });
   }
 
-  /// 老用户兜底：哨兵缺失但已有学习进度的用户秒过。
-  void _maybeBypassForExistingUser() {
-    final progress = ref.read(learningProgressNotifierProvider);
-    if (progress.isLoading) return;
-    if (progress.progressMap.isEmpty) return;
-    AppLogger.log(
-      'OnboardingSurvey',
-      'bypass for existing user: progressMap=${progress.progressMap.length}',
-    );
-    ref.read(onboardingCompletedProvider.notifier).markCompleted();
-    if (mounted) context.go(AppRoutes.study);
-  }
-
   @override
   void dispose() {
-    _pageController.dispose();
+    _advanceTimer?.cancel();
     super.dispose();
   }
 
-  void _onChoiceSelected(int questionIndex, String code) {
-    final notifier = ref.read(onboardingAnswersProvider.notifier);
-    final question = onboardingQuestions[questionIndex];
-    switch (question.id) {
-      case OnboardingQuestionId.goal:
-        notifier.setGoal(code);
-      case OnboardingQuestionId.dailyMinutes:
-        notifier.setDailyMinutes(code);
-    }
-    ref.read(analyticsServiceProvider).track(
-      Events.onboardingSurveyQuestionAnswered,
-      {EventParams.questionId: question.id, EventParams.answerCode: code},
-    );
-  }
+  // ─────────────────────── 选项处理 ───────────────────────
 
-  bool _isCurrentAnswered(OnboardingAnswers answers) {
-    final question = onboardingQuestions[_currentIndex];
-    switch (question.id) {
-      case OnboardingQuestionId.goal:
-        return answers.goal != null;
-      case OnboardingQuestionId.dailyMinutes:
-        return answers.dailyMinutes != null;
-    }
-    return false;
-  }
-
-  Future<void> _onPrimaryPressed() async {
+  void _selectGoal(String code) {
     if (_submitting) return;
-    if (_currentIndex < onboardingQuestions.length - 1) {
-      setState(() => _currentIndex += 1);
-      await _pageController.animateToPage(
-        _currentIndex,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+    final notifier = ref.read(onboardingAnswersProvider.notifier);
+    notifier.setGoal(code);
+    _trackAnswer(OnboardingQuestionId.goal, code);
+
+    if (code == OnboardingGoal.exam) {
+      _scheduleAdvance(() => _goToStep(_SurveyStep.examType));
       return;
     }
 
+    // daily / work / travel / content / other：直接进时长选择
+    _scheduleAdvance(() => _goToStep(_SurveyStep.dailyMinutes));
+  }
+
+  void _selectExamType(String code) {
+    if (_submitting) return;
+    ref.read(onboardingAnswersProvider.notifier).setExamType(code);
+    _trackAnswer(OnboardingQuestionId.examType, code);
+    _scheduleAdvance(() => _goToStep(_SurveyStep.dailyMinutes));
+  }
+
+  Future<void> _selectDailyMinutes(String code) async {
+    if (_submitting) return;
+    ref.read(onboardingAnswersProvider.notifier).setDailyMinutes(code);
+    _trackAnswer(OnboardingQuestionId.dailyMinutes, code);
+    // 进入方法论介绍页，由用户点击"开始学习"按钮触发实际提交。
+    _scheduleAdvance(() => _goToStep(_SurveyStep.summary));
+  }
+
+  // ─────────────────────── 步骤导航 ───────────────────────
+
+  void _scheduleAdvance(
+    VoidCallback action, {
+    Duration delay = _autoAdvanceDelay,
+  }) {
+    _advanceTimer?.cancel();
+    _advanceTimer = Timer(delay, () {
+      if (!mounted) return;
+      action();
+    });
+  }
+
+  void _goToStep(_SurveyStep next) {
+    setState(() {
+      _history.add(_step);
+      _step = next;
+    });
+  }
+
+  void _onBackPressed() {
+    if (_submitting) return;
+    _advanceTimer?.cancel();
+    if (_history.isEmpty) return;
+    setState(() {
+      _step = _history.removeLast();
+    });
+  }
+
+  // ─────────────────────── 提交与埋点 ───────────────────────
+
+  Future<void> _finish() async {
+    if (_submitting) return;
     setState(() => _submitting = true);
     final answers = ref.read(onboardingAnswersProvider);
     try {
@@ -138,197 +157,422 @@ class _OnboardingSurveyScreenState
     );
 
     if (!mounted) return;
-    setState(() => _showSuccessAnimation = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
     context.go(AppRoutes.study);
   }
+
+  void _trackAnswer(String questionId, String code) {
+    ref.read(analyticsServiceProvider).track(
+      Events.onboardingSurveyQuestionAnswered,
+      {EventParams.questionId: questionId, EventParams.answerCode: code},
+    );
+  }
+
+  // ─────────────────────── 渲染 ───────────────────────
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final answers = ref.watch(onboardingAnswersProvider);
-    final isAnswered = _isCurrentAnswered(answers);
-    final isLast = _currentIndex == onboardingQuestions.length - 1;
+    final totalSteps = _totalSteps(answers);
+    final currentIndex = _currentIndex(answers);
 
     return PopScope(
       canPop: false,
       child: Scaffold(
         body: SafeArea(
-          child: _showSuccessAnimation
-              ? _SuccessOverlay(message: l10n.onboardingFinishedToast)
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const SizedBox(height: 16),
-                              Text(
-                                l10n.onboardingTitle,
-                                style:
-                                    Theme.of(context).textTheme.headlineSmall,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                l10n.onboardingSubtitle,
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                              const SizedBox(height: 20),
-                              SurveyProgressBar(
-                                current: _currentIndex + 1,
-                                total: onboardingQuestions.length,
-                              ),
-                              const SizedBox(height: 16),
-                              Expanded(
-                                child: PageView.builder(
-                                  controller: _pageController,
-                                  physics:
-                                      const NeverScrollableScrollPhysics(),
-                                  itemCount: onboardingQuestions.length,
-                                  itemBuilder: (context, index) =>
-                                      _buildQuestionPage(index, answers),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  _TopBar(
+                    onBack: _history.isEmpty ? null : _onBackPressed,
+                    backLabel: l10n.onboardingBack,
+                    currentIndex: currentIndex,
+                    total: totalSteps,
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 480,
                                 ),
-                              ),
-                              SafeArea(
-                                top: false,
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  child: FilledButton(
-                                    onPressed:
-                                        (isAnswered && !_submitting)
-                                            ? _onPrimaryPressed
-                                            : null,
-                                    style: FilledButton.styleFrom(
-                                      minimumSize: const Size.fromHeight(52),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    28,
+                                    16,
+                                    28,
+                                    24,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 220),
+                                    switchInCurve: Curves.easeOut,
+                                    switchOutCurve: Curves.easeIn,
+                                    transitionBuilder: (child, animation) =>
+                                        FadeTransition(
+                                          opacity: animation,
+                                          child: child,
+                                        ),
+                                    child: KeyedSubtree(
+                                      key: ValueKey(_step),
+                                      child: _buildStepBody(l10n, answers),
                                     ),
-                                    child: _submitting
-                                        ? const SizedBox(
-                                            width: 22,
-                                            height: 22,
-                                            child:
-                                                CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                          )
-                                        : Text(
-                                            isLast
-                                                ? l10n.onboardingDone
-                                                : l10n.onboardingNext,
-                                          ),
                                   ),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (_submitting)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Color(0x33000000),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
                 ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildQuestionPage(int index, OnboardingAnswers answers) {
-    final l10n = AppLocalizations.of(context)!;
-    final question = onboardingQuestions[index];
-    final selectedCode = switch (question.id) {
-      OnboardingQuestionId.goal => answers.goal,
-      OnboardingQuestionId.dailyMinutes => answers.dailyMinutes,
-      _ => null,
-    };
+  /// 总步骤数：goal=exam → 3，其它 → 2。summary 页不计入指示点。
+  int _totalSteps(OnboardingAnswers answers) {
+    if (_step == _SurveyStep.summary) return 0;
+    return answers.goal == OnboardingGoal.exam ? 3 : 2;
+  }
+
+  /// 当前所处的逻辑步骤索引（0-based），用于点状指示器。
+  int _currentIndex(OnboardingAnswers answers) {
+    switch (_step) {
+      case _SurveyStep.goal:
+        return 0;
+      case _SurveyStep.examType:
+        return 1;
+      case _SurveyStep.dailyMinutes:
+        return answers.goal == OnboardingGoal.exam ? 2 : 1;
+      case _SurveyStep.summary:
+        return 0; // 不展示，配合 _totalSteps=0 隐藏指示点
+    }
+  }
+
+  Widget _buildStepBody(AppLocalizations l10n, OnboardingAnswers answers) {
+    switch (_step) {
+      case _SurveyStep.goal:
+        return _buildGoalStep(l10n, answers);
+      case _SurveyStep.examType:
+        return _buildExamTypeStep(l10n, answers);
+      case _SurveyStep.dailyMinutes:
+        return _buildDailyMinutesStep(l10n, answers);
+      case _SurveyStep.summary:
+        return _buildSummaryStep(l10n);
+    }
+  }
+
+  Widget _buildGoalStep(AppLocalizations l10n, OnboardingAnswers answers) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          _resolvePrompt(l10n, question.promptKey),
-          style: Theme.of(context).textTheme.titleLarge,
+        _Prompt(text: l10n.onboardingQ1Prompt),
+        const SizedBox(height: 24),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionExam,
+          selected: answers.goal == OnboardingGoal.exam,
+          onTap: () => _selectGoal(OnboardingGoal.exam),
         ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              for (final option in question.options)
-                SurveyChoiceTile(
-                  label: _resolveOption(l10n, option.labelKey),
-                  selected: option.code == selectedCode,
-                  onTap: () => _onChoiceSelected(index, option.code),
-                ),
-            ],
-          ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionDaily,
+          selected: answers.goal == OnboardingGoal.daily,
+          onTap: () => _selectGoal(OnboardingGoal.daily),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionWork,
+          selected: answers.goal == OnboardingGoal.work,
+          onTap: () => _selectGoal(OnboardingGoal.work),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionTravel,
+          selected: answers.goal == OnboardingGoal.travel,
+          onTap: () => _selectGoal(OnboardingGoal.travel),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionContent,
+          selected: answers.goal == OnboardingGoal.content,
+          onTap: () => _selectGoal(OnboardingGoal.content),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ1OptionOther,
+          selected: answers.goal == OnboardingGoal.other,
+          onTap: () => _selectGoal(OnboardingGoal.other),
         ),
       ],
     );
   }
 
-  // ---- l10n key 反查（小映射，避免在 model 层依赖 build_context） ----
-
-  String _resolvePrompt(AppLocalizations l10n, String key) {
-    return switch (key) {
-      'onboardingQ1Prompt' => l10n.onboardingQ1Prompt,
-      'onboardingQ2Prompt' => l10n.onboardingQ2Prompt,
-      _ => key,
-    };
+  Widget _buildExamTypeStep(AppLocalizations l10n, OnboardingAnswers answers) {
+    final selected = answers.examType;
+    // 中文用户保留全部考试；其它语言用户只展示国际通用考试 + Other，
+    // 因为中高考 / 四六级 / 专四专八 / 考研都是中国国内考试。
+    final isChinese = Localizations.localeOf(context).languageCode == 'zh';
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Prompt(text: l10n.onboardingExamPrompt),
+        const SizedBox(height: 24),
+        if (isChinese) ...[
+          SurveyChoiceTile(
+            label: l10n.onboardingExamGaokao,
+            selected: selected == OnboardingExamType.gaokao,
+            onTap: () => _selectExamType(OnboardingExamType.gaokao),
+          ),
+          SurveyChoiceTile(
+            label: l10n.onboardingExamCet,
+            selected: selected == OnboardingExamType.cet,
+            onTap: () => _selectExamType(OnboardingExamType.cet),
+          ),
+          SurveyChoiceTile(
+            label: l10n.onboardingExamTem,
+            selected: selected == OnboardingExamType.tem,
+            onTap: () => _selectExamType(OnboardingExamType.tem),
+          ),
+          SurveyChoiceTile(
+            label: l10n.onboardingExamKaoyan,
+            selected: selected == OnboardingExamType.kaoyan,
+            onTap: () => _selectExamType(OnboardingExamType.kaoyan),
+          ),
+        ],
+        SurveyChoiceTile(
+          label: l10n.onboardingExamIelts,
+          selected: selected == OnboardingExamType.ielts,
+          onTap: () => _selectExamType(OnboardingExamType.ielts),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingExamToefl,
+          selected: selected == OnboardingExamType.toefl,
+          onTap: () => _selectExamType(OnboardingExamType.toefl),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingExamOther,
+          selected: selected == OnboardingExamType.other,
+          onTap: () => _selectExamType(OnboardingExamType.other),
+        ),
+      ],
+    );
   }
 
-  String _resolveOption(AppLocalizations l10n, String key) {
-    return switch (key) {
-      'onboardingQ1OptionExam' => l10n.onboardingQ1OptionExam,
-      'onboardingQ1OptionDaily' => l10n.onboardingQ1OptionDaily,
-      'onboardingQ1OptionWork' => l10n.onboardingQ1OptionWork,
-      'onboardingQ1OptionTravel' => l10n.onboardingQ1OptionTravel,
-      'onboardingQ1OptionOther' => l10n.onboardingQ1OptionOther,
-      'onboardingQ2Option5' => l10n.onboardingQ2Option5,
-      'onboardingQ2Option10' => l10n.onboardingQ2Option10,
-      'onboardingQ2Option20' => l10n.onboardingQ2Option20,
-      'onboardingQ2Option30' => l10n.onboardingQ2Option30,
-      'onboardingQ2OptionFlexible' => l10n.onboardingQ2OptionFlexible,
-      _ => key,
-    };
+  Widget _buildDailyMinutesStep(
+    AppLocalizations l10n,
+    OnboardingAnswers answers,
+  ) {
+    final selected = answers.dailyMinutes;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Prompt(text: l10n.onboardingQ2Prompt),
+        const SizedBox(height: 24),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ2Option5,
+          selected: selected == OnboardingDailyMinutes.m5,
+          onTap: () => _selectDailyMinutes(OnboardingDailyMinutes.m5),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ2Option10,
+          selected: selected == OnboardingDailyMinutes.m10,
+          onTap: () => _selectDailyMinutes(OnboardingDailyMinutes.m10),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ2Option20,
+          selected: selected == OnboardingDailyMinutes.m20,
+          onTap: () => _selectDailyMinutes(OnboardingDailyMinutes.m20),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ2Option30,
+          selected: selected == OnboardingDailyMinutes.m30,
+          onTap: () => _selectDailyMinutes(OnboardingDailyMinutes.m30),
+        ),
+        SurveyChoiceTile(
+          label: l10n.onboardingQ2OptionFlexible,
+          selected: selected == OnboardingDailyMinutes.flexible,
+          onTap: () => _selectDailyMinutes(OnboardingDailyMinutes.flexible),
+        ),
+      ],
+    );
+  }
+
+  /// 答完所有题后的方法论介绍页：headline + 4 个要点 + 开始学习按钮。
+  /// 用户点"开始学习"才触发 [_finish]，写 SP 并导航到主界面。
+  Widget _buildSummaryStep(AppLocalizations l10n) {
+    final points = [
+      l10n.onboardingSummaryPoint1,
+      l10n.onboardingSummaryPoint2,
+      l10n.onboardingSummaryPoint3,
+      l10n.onboardingSummaryPoint4,
+    ];
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.onboardingSummaryHeadline,
+          textAlign: TextAlign.center,
+          style: textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 28),
+        for (final text in points)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, right: 12),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 20,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: textTheme.bodyLarge?.copyWith(
+                      height: 1.5,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 32),
+        FilledButton(
+          onPressed: _submitting ? null : _finish,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(l10n.onboardingStart),
+        ),
+      ],
+    );
   }
 }
 
-class _SuccessOverlay extends StatelessWidget {
-  const _SuccessOverlay({required this.message});
+/// 顶部条：左侧"上一步"小按钮，右侧步骤指示点。
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.onBack,
+    required this.backLabel,
+    required this.currentIndex,
+    required this.total,
+  });
 
-  final String message;
+  final VoidCallback? onBack;
+  final String backLabel;
+  final int currentIndex;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle, size: 64, color: colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      child: Row(
+        children: [
+          SizedBox(
+            height: 36,
+            child: onBack == null
+                ? const SizedBox.shrink()
+                : TextButton.icon(
+                    onPressed: onBack,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.onSurfaceVariant,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 36),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.chevron_left, size: 18),
+                    label: Text(
+                      backLabel,
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+          ),
+          const Spacer(),
+          _Dots(currentIndex: currentIndex, total: total),
+        ],
       ),
+    );
+  }
+}
+
+/// 步骤指示点：当前步骤为实心，其它为浅色。
+class _Dots extends StatelessWidget {
+  const _Dots({required this.currentIndex, required this.total});
+
+  final int currentIndex;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(total, (i) {
+        final active = i == currentIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: active ? 18 : 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: active ? colorScheme.primary : colorScheme.outlineVariant,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+/// 题干文字。
+class _Prompt extends StatelessWidget {
+  const _Prompt({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
     );
   }
 }

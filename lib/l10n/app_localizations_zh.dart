@@ -2583,6 +2583,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetNewUserGuideDone => '新手引导已重置';
 
   @override
+  String get resetOnboarding => '重置 Onboarding 问卷';
+
+  @override
+  String get resetOnboardingDone => 'Onboarding 已重置，请重启 App 以重新进入问卷';
+
+  @override
   String get discoverOfficialCollections => '发现精选合集';
 
   @override
@@ -2687,10 +2693,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioListColumnDuration => '时长';
 
   @override
-  String get onboardingTitle => '先问你 2 个小问题';
+  String get onboardingTitle => '先聊两句';
 
   @override
-  String get onboardingSubtitle => '10 秒，帮你找到适合的练法';
+  String get onboardingSubtitle => '10 秒帮你定制学习节奏';
+
+  @override
+  String get onboardingBack => '上一步';
+
+  @override
+  String get onboardingContinue => '继续';
+
+  @override
+  String get onboardingExamPrompt => '在准备哪种考试？';
+
+  @override
+  String get onboardingExamGaokao => '中高考';
+
+  @override
+  String get onboardingExamCet => '大学四六级';
+
+  @override
+  String get onboardingExamTem => '专四专八';
+
+  @override
+  String get onboardingExamKaoyan => '考研英语';
+
+  @override
+  String get onboardingExamIelts => '雅思 IELTS';
+
+  @override
+  String get onboardingExamToefl => '托福 TOEFL';
+
+  @override
+  String get onboardingExamOther => '其他';
 
   @override
   String onboardingProgress(int current, int total) {
@@ -2704,41 +2740,65 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingDone => '完成';
 
   @override
-  String get onboardingFinishedToast => '好了，我们大概懂你了。先从一个简单的开始吧。';
+  String get onboardingFinishedTitle => '记下了，准备好出发';
+
+  @override
+  String get onboardingFinishedHint => '我们会按你的目标和节奏来安排练习。';
+
+  @override
+  String get onboardingSummaryHeadline => '你知道么？学好英语，关键不在学得更多，而在练得更透';
+
+  @override
+  String get onboardingSummaryPoint1 => '选择适合你水平的真实音频反复训练';
+
+  @override
+  String get onboardingSummaryPoint2 => '按意群理解内容，在语境中掌握词汇';
+
+  @override
+  String get onboardingSummaryPoint3 => '通过大量听力和跟读积累输入与语感';
+
+  @override
+  String get onboardingSummaryPoint4 => '通过复述练习表达，把听懂变成会说';
+
+  @override
+  String get onboardingStart => '开始学习';
 
   @override
   String get onboardingQ1Prompt => '你为什么学英语？';
 
   @override
-  String get onboardingQ1OptionExam => '考试（四六级 / 考研 / 雅思托福）';
+  String get onboardingQ1OptionExam => '应对考试';
 
   @override
-  String get onboardingQ1OptionDaily => '日常对话（看剧、聊天）';
+  String get onboardingQ1OptionDaily => '日常交流';
 
   @override
-  String get onboardingQ1OptionWork => '职场英语（工作沟通、邮件、会议）';
+  String get onboardingQ1OptionWork => '工作沟通';
 
   @override
   String get onboardingQ1OptionTravel => '出国旅行';
 
   @override
-  String get onboardingQ1OptionOther => '其它';
+  String get onboardingQ1OptionContent => '影视播客';
 
   @override
-  String get onboardingQ2Prompt => '你每天大概能学多久？';
+  String get onboardingQ1OptionOther => '其他';
 
   @override
-  String get onboardingQ2Option5 => '5 分钟左右';
+  String get onboardingQ2Prompt => '每天大概能练多久？';
 
   @override
-  String get onboardingQ2Option10 => '10 分钟左右';
+  String get onboardingQ2Option5 => '约 5 分钟';
 
   @override
-  String get onboardingQ2Option20 => '15-20 分钟';
+  String get onboardingQ2Option10 => '约 10 分钟';
 
   @override
-  String get onboardingQ2Option30 => '半小时以上';
+  String get onboardingQ2Option20 => '约 20 分钟';
 
   @override
-  String get onboardingQ2OptionFlexible => '不固定，灵活安排';
+  String get onboardingQ2Option30 => '30 分钟以上';
+
+  @override
+  String get onboardingQ2OptionFlexible => '不固定';
 }
