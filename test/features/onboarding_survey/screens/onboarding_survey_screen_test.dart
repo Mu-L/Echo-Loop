@@ -65,14 +65,14 @@ void main() {
     await tester.pumpWidget(_wrap(prefs: prefs));
     await tester.pumpAndSettle();
 
-    expect(find.text('你为什么学英语？'), findsOneWidget);
+    expect(find.text('你学英语的主要目标是什么？'), findsOneWidget);
 
     // 选"工作沟通" → 等待自动前进
     await tester.tap(find.text('工作沟通'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
     // 已切到时长页
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
     expect(find.text('约 20 分钟'), findsOneWidget);
 
     // 选"不固定" → 自动跳到方法论 summary 页
@@ -108,13 +108,13 @@ void main() {
     await tester.tap(find.text('应对考试'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('在准备哪种考试？'), findsOneWidget);
+    expect(find.text('你当前在备考哪一类考试？'), findsOneWidget);
     expect(find.text('雅思 IELTS'), findsOneWidget);
 
     await tester.tap(find.text('雅思 IELTS'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
 
     await tester.tap(find.text('约 20 分钟'));
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
@@ -138,7 +138,7 @@ void main() {
     await tester.tap(find.text('其他'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
     expect(find.text('继续'), findsNothing);
 
@@ -163,7 +163,7 @@ void main() {
     await tester.tap(find.text('影视播客'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
 
     await tester.tap(find.text('约 20 分钟'));
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
@@ -193,7 +193,7 @@ void main() {
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
     // 仍未写入完成态
     expect(OnboardingSurveyStorage(prefs).isCompleted, isFalse);
   });
@@ -209,13 +209,13 @@ void main() {
     await tester.tap(find.text('日常交流'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('每天大概能练多久？'), findsOneWidget);
+    expect(find.text('你计划每天练习多久？'), findsOneWidget);
     expect(find.text('上一步'), findsOneWidget);
 
     await tester.tap(find.text('上一步'));
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
-    expect(find.text('你为什么学英语？'), findsOneWidget);
+    expect(find.text('你学英语的主要目标是什么？'), findsOneWidget);
   });
 
   testWidgets('物理返回键被 PopScope 拦截', (tester) async {
@@ -231,7 +231,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('你为什么学英语？'), findsOneWidget);
+    expect(find.text('你学英语的主要目标是什么？'), findsOneWidget);
   });
 
   testWidgets('无跳过按钮渲染', (tester) async {

@@ -4973,7 +4973,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingExamPrompt.
   ///
   /// In en, this message translates to:
-  /// **'Which exam are you preparing for?'**
+  /// **'Which exam are you currently preparing for?'**
   String get onboardingExamPrompt;
 
   /// No description provided for @onboardingExamGaokao.
@@ -5087,7 +5087,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ1Prompt.
   ///
   /// In en, this message translates to:
-  /// **'Why are you learning English?'**
+  /// **'What\'s your main goal for learning English?'**
   String get onboardingQ1Prompt;
 
   /// No description provided for @onboardingQ1OptionExam.
@@ -5129,7 +5129,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingQ2Prompt.
   ///
   /// In en, this message translates to:
-  /// **'How long can you practice each day?'**
+  /// **'How long do you plan to practice each day?'**
   String get onboardingQ2Prompt;
 
   /// No description provided for @onboardingQ2Option5.

@@ -2797,7 +2797,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingContinue => 'Continue';
 
   @override
-  String get onboardingExamPrompt => 'Which exam are you preparing for?';
+  String get onboardingExamPrompt =>
+      'Which exam are you currently preparing for?';
 
   @override
   String get onboardingExamGaokao => 'Gaokao';
@@ -2862,7 +2863,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingStart => 'Start learning';
 
   @override
-  String get onboardingQ1Prompt => 'Why are you learning English?';
+  String get onboardingQ1Prompt =>
+      'What\'s your main goal for learning English?';
 
   @override
   String get onboardingQ1OptionExam => 'For an exam';
@@ -2883,7 +2885,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingQ1OptionOther => 'Other';
 
   @override
-  String get onboardingQ2Prompt => 'How long can you practice each day?';
+  String get onboardingQ2Prompt => 'How long do you plan to practice each day?';
 
   @override
   String get onboardingQ2Option5 => 'About 5 min';

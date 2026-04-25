@@ -2705,7 +2705,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingContinue => '继续';
 
   @override
-  String get onboardingExamPrompt => '在准备哪种考试？';
+  String get onboardingExamPrompt => '你当前在备考哪一类考试？';
 
   @override
   String get onboardingExamGaokao => '中高考';
@@ -2764,7 +2764,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingStart => '开始学习';
 
   @override
-  String get onboardingQ1Prompt => '你为什么学英语？';
+  String get onboardingQ1Prompt => '你学英语的主要目标是什么？';
 
   @override
   String get onboardingQ1OptionExam => '应对考试';
@@ -2785,7 +2785,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingQ1OptionOther => '其他';
 
   @override
-  String get onboardingQ2Prompt => '每天大概能练多久？';
+  String get onboardingQ2Prompt => '你计划每天练习多久？';
 
   @override
   String get onboardingQ2Option5 => '约 5 分钟';
