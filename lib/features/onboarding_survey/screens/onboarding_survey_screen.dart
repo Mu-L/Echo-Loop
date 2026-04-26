@@ -302,7 +302,7 @@ class _OnboardingSurveyScreenState
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 60),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
           child: Column(
             children: [
               // 内容区：headline + 要点，整体在上半部分垂直居中
