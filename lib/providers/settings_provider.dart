@@ -96,7 +96,7 @@ class AppSettingsState {
   /// 直接使用后端返回的句边界。仅开发者选项可见，不暴露给普通用户。
   final bool subtitleAutoAlignEnabled;
 
-  /// 自动跳过静音段开关（默认关闭）。
+  /// 自动跳过静音段开关（默认开启）。
   ///
   /// 开启后，盲听 / 复述等段落级播放会按字幕时间戳自动跳过较长的静音段，
   /// 避免考试音频中长时间留白破坏体验。
@@ -115,7 +115,7 @@ class AppSettingsState {
     this.isDemoMode = false,
     this.isDemoModeLoading = false,
     this.subtitleAutoAlignEnabled = true,
-    this.skipSilenceEnabled = false,
+    this.skipSilenceEnabled = true,
     this.silenceThresholdSeconds = silenceThresholdDefaultSeconds,
   });
 
@@ -204,7 +204,7 @@ class AppSettings extends _$AppSettings {
     final isDemoMode = prefs.getBool(_demoModeKey) ?? false;
     final subtitleAutoAlignEnabled =
         prefs.getBool(_subtitleAutoAlignEnabledKey) ?? true;
-    final skipSilenceEnabled = prefs.getBool(_skipSilenceEnabledKey) ?? false;
+    final skipSilenceEnabled = prefs.getBool(_skipSilenceEnabledKey) ?? true;
     final storedThreshold = prefs.getInt(_silenceThresholdSecondsKey);
     final silenceThresholdSeconds =
         (storedThreshold ?? silenceThresholdDefaultSeconds).clamp(

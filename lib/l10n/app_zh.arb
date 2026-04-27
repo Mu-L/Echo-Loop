@@ -1155,7 +1155,7 @@
       "seconds": {"type": "int"}
     }
   },
-  "silenceSkipped": "检测到 {seconds}s 静音，已自动跳过",
+  "silenceSkipped": "已跳过 {seconds} 秒静音部分",
   "@silenceSkipped": {
     "placeholders": {
       "seconds": {"type": "int"}

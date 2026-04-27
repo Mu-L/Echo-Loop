@@ -2935,6 +2935,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String silenceSkipped(int seconds) {
-    return 'Skipped ${seconds}s of silence';
+    return 'Skipped ${seconds}s of silence part';
   }
 }

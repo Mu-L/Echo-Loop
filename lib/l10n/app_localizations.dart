@@ -5219,7 +5219,7 @@ abstract class AppLocalizations {
   /// No description provided for @silenceSkipped.
   ///
   /// In en, this message translates to:
-  /// **'Skipped {seconds}s of silence'**
+  /// **'Skipped {seconds}s of silence part'**
   String silenceSkipped(int seconds);
 }
 

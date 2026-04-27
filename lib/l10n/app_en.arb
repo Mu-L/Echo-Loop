@@ -1521,7 +1521,7 @@
       "seconds": {"type": "int"}
     }
   },
-  "silenceSkipped": "Skipped {seconds}s of silence",
+  "silenceSkipped": "Skipped {seconds}s of silence part",
   "@silenceSkipped": {
     "placeholders": {
       "seconds": {"type": "int"}

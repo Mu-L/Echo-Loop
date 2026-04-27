@@ -2833,6 +2833,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String silenceSkipped(int seconds) {
-    return '检测到 ${seconds}s 静音，已自动跳过';
+    return '已跳过 $seconds 秒静音部分';
   }
 }
