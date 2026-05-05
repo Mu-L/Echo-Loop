@@ -45,8 +45,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# 构建号来源优先级：命令行参数 > 环境变量 > 自动计算
-# 环境变量: MACOS_BUILD_NAME, MACOS_BUILD_NUMBER (兼容 ci.sh/release.sh)
+# 版本号来源优先级：命令行参数 > 环境变量 > 从 tag 解析
 if [[ -z "$BUILD_NAME" ]]; then
   BUILD_NAME="${MACOS_BUILD_NAME:-}"
 fi
@@ -54,13 +53,14 @@ if [[ -z "$BUILD_NUMBER" ]]; then
   BUILD_NUMBER="${MACOS_BUILD_NUMBER:-}"
 fi
 
-# 计算版本号和构建号（如果命令行和环境变量都没提供）
-if [[ -z "$BUILD_NAME" ]]; then
-  BUILD_NAME="$(get_build_name)" || fail "Unable to read version from pubspec.yaml"
-fi
-
-if [[ -z "$BUILD_NUMBER" ]]; then
-  calculate_build_number "$BUILD_NAME"
+# 如果参数和环境变量都没提供，从当前 commit 的 tag 解析
+if [[ -z "$BUILD_NAME" || -z "$BUILD_NUMBER" ]]; then
+  TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+[+][0-9]+$' | head -1 || true)"
+  if [[ -z "$TAG" ]]; then
+    fail "No version tag on current commit. Run ci.sh first, or provide --build-name and --build-number."
+  fi
+  log "Using tag: $TAG"
+  eval "$(parse_tag "$TAG")"
 fi
 
 # 安装包名字统一包含构建号

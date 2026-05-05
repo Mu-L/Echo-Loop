@@ -120,18 +120,26 @@ if [[ -n "$VERSION_LINE" ]]; then
   log "pubspec version: ${VERSION_LINE#*:}"
 fi
 
-# 计算构建号（参数优先 > 环境变量 > 自动计算）
+# 版本号来源优先级：命令行参数 > 环境变量 > 从 tag 解析
 if [[ -z "$BUILD_NAME" ]]; then
-  BUILD_NAME="$(get_build_name)" || fail "Unable to determine build name from pubspec.yaml"
+  BUILD_NAME="${IOS_BUILD_NAME:-}"
+fi
+if [[ -z "$BUILD_NUMBER" ]]; then
+  BUILD_NUMBER="${IOS_BUILD_NUMBER:-}"
 fi
 
-if [[ -z "$BUILD_NUMBER" ]]; then
-  calculate_build_number "$BUILD_NAME"
-  # BUILD_NUMBER 为空时表示第一次构建，Flutter 默认为 0
+# 如果参数和环境变量都没提供，从当前 commit 的 tag 解析
+if [[ -z "$BUILD_NAME" || -z "$BUILD_NUMBER" ]]; then
+  TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+[+][0-9]+$' | head -1 || true)"
+  if [[ -z "$TAG" ]]; then
+    fail "No version tag on current commit. Run ci.sh first, or provide --build-name and --build-number."
+  fi
+  log "Using tag: $TAG"
+  eval "$(parse_tag "$TAG")"
 fi
 
 log "Using build name: $BUILD_NAME"
-log "Using build number: ${BUILD_NUMBER:-0} (default)"
+log "Using build number: ${BUILD_NUMBER:-0}"
 log "Using API base URL: $API_BASE_URL"
 
 log "Checking available code signing identities"
