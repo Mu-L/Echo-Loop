@@ -74,9 +74,10 @@ parse_tag() {
   # v1.0.8+1 → 提取 1.0.8 和构建号
   local build_name="${TAG#v}"
   build_name="${build_name%+*}"
+  # 使用参数展开提取构建号（更可靠）
   local build_number="1"  # 默认为 1（对应无 +N 的旧 tag）
-  if [[ "$TAG" =~ [+][0-9]+$ ]]; then
-    build_number="${BASH_REMATCH[0]#+}"
+  if [[ "$TAG" == *+* ]]; then
+    build_number="${TAG##*+}"
   fi
   # 输出供 eval 解析
   echo "BUILD_NAME=${build_name}"
