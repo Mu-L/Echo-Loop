@@ -413,6 +413,8 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        analyticsOverride(),
+        ...studyTimeOverrides(),
         audioEngineProvider.overrideWith(() => TestAudioEngine()),
         bookmarkReviewProvider.overrideWith(
           () =>

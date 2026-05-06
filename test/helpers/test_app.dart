@@ -38,6 +38,7 @@ Widget createTestApp(
   // 默认 overrides：所有 Provider 使用测试替身
   final defaultOverrides = <Override>[
     analyticsOverride(),
+    ...studyTimeOverrides(),
     appSettingsProvider.overrideWith(
       () => TestAppSettings(
         AppSettingsState(themeMode: themeMode, locale: locale),
@@ -55,8 +56,14 @@ Widget createTestApp(
     blindListenPlayerProvider.overrideWith(() => TestBlindListenPlayer()),
   ];
 
+  // 合并自定义 overrides（覆盖同名 provider）
+  final allOverrides = <Override>[
+    ...defaultOverrides,
+    ...(overrides ?? []),
+  ];
+
   return ProviderScope(
-    overrides: overrides ?? defaultOverrides,
+    overrides: allOverrides,
     child: Builder(
       builder: (context) {
         // 注册 ShowcaseView 控制器（测试环境）
@@ -89,6 +96,7 @@ Widget createTestScreen(
 }) {
   final defaultOverrides = <Override>[
     analyticsOverride(),
+    ...studyTimeOverrides(),
     appSettingsProvider.overrideWith(
       () => TestAppSettings(AppSettingsState(locale: locale)),
     ),
@@ -99,10 +107,16 @@ Widget createTestScreen(
     audioEngineProvider.overrideWith(() => TestAudioEngine()),
   ];
 
+  // 合并自定义 overrides
+  final allOverrides = <Override>[
+    ...defaultOverrides,
+    ...(overrides ?? []),
+  ];
+
   final router = createTestRouter(screen);
 
   return ProviderScope(
-    overrides: overrides ?? defaultOverrides,
+    overrides: allOverrides,
     child: Builder(
       builder: (context) {
         // 注册 ShowcaseView 控制器（测试环境）

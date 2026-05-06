@@ -161,12 +161,15 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                     ),
                     // 删除按钮（仅有字幕且非进度模式时显示）
                     if (audioItem.hasTranscript && !isTaskActive)
-                      IconButton(
-                        onPressed: () =>
-                            _handleDeleteSubtitle(context, audioItem),
-                        icon: const Icon(Icons.delete_outline, size: 20),
-                        color: theme.colorScheme.onSurfaceVariant,
-                        visualDensity: VisualDensity.compact,
+                      Tooltip(
+                        message: l10n.deleteSubtitle,
+                        child: IconButton(
+                          onPressed: () =>
+                              _handleDeleteSubtitle(context, audioItem),
+                          icon: const Icon(Icons.delete_outline, size: 20),
+                          color: theme.colorScheme.onSurfaceVariant,
+                          visualDensity: VisualDensity.compact,
+                        ),
                       ),
                   ],
                 ),

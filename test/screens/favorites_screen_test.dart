@@ -152,6 +152,8 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        analyticsOverride(),
+        ...studyTimeOverrides(),
         bookmarkDaoProvider.overrideWithValue(
           _TestBookmarkDao(bookmarkController),
         ),
@@ -189,15 +191,15 @@ void main() {
 
       // tab 标签文本可见
       expect(find.text('Sentences'), findsOneWidget);
-      expect(find.text('Words'), findsOneWidget);
+      expect(find.text('Vocabulary'), findsOneWidget);
     });
 
-    testWidgets('点击 Words 切换到单词视图', (tester) async {
+    testWidgets('点击 Vocabulary 切换到单词视图', (tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      // 点击 Words 按钮
-      await tester.tap(find.text('Words'));
+      // 点击 Vocabulary 按钮
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
 
       // 单词视图加载中（stream 尚未发射数据）
@@ -208,7 +210,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      await tester.tap(find.text('Words'));
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
 
       await tester.tap(find.text('Sentences'));
@@ -406,7 +408,7 @@ void main() {
       await tester.pump();
 
       // 切到单词视图
-      await tester.tap(find.text('Words'));
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
       wordController.add([]);
       await tester.pump();
@@ -419,7 +421,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      await tester.tap(find.text('Words'));
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
       wordController.add([
         _createSavedWord(id: 1, word: 'apple'),
@@ -436,7 +438,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      await tester.tap(find.text('Words'));
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
       wordController.add([_createSavedWord(id: 1, word: 'hello')]);
       await tester.pump();
@@ -456,7 +458,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
 
-      await tester.tap(find.text('Words'));
+      await tester.tap(find.text('Vocabulary'));
       await tester.pump();
       bookmarkController.add([]);
       wordController.add([

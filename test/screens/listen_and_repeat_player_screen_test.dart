@@ -169,6 +169,8 @@ Widget _createTestWidget({
 
   return ProviderScope(
     overrides: [
+      analyticsOverride(),
+      ...studyTimeOverrides(),
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
       learningProgressNotifierProvider.overrideWith(
         () => TestLearningProgressNotifier(),

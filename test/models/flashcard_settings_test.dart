@@ -149,20 +149,24 @@ void main() {
   });
 
   group('calculateSmartSeconds', () {
-    test('短词首次学习 → 4s', () {
+    test('短词首次学习 → 3s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 3,
         practiceCount: 0,
       );
-      expect(s, 4);
+      // ratio = (3-4)/(12-4) = -0.125, clamp 到 0
+      // maxTime = 3, minTime = 2, result = 3
+      expect(s, 3);
     });
 
-    test('长词首次学习 → 8s', () {
+    test('长词首次学习 → 6s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 13,
         practiceCount: 0,
       );
-      expect(s, 8);
+      // ratio = (13-4)/(12-4) = 1.125, clamp 到 1
+      // maxTime = 6, minTime = 4, result = 6
+      expect(s, 6);
     });
 
     test('短词练习 5 次 → 2s', () {
@@ -170,51 +174,58 @@ void main() {
         wordLength: 3,
         practiceCount: 5,
       );
+      // ratio = 0, maxTime = 3, minTime = 2
+      // decay = 1.0, result = 3 - 1*(3-2) = 2
       expect(s, 2);
     });
 
-    test('长词练习 5 次 → 5s', () {
+    test('长词练习 5 次 → 4s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 13,
         practiceCount: 5,
       );
-      expect(s, 5);
+      // ratio = 1, maxTime = 6, minTime = 4
+      // decay = 1.0, result = 6 - 1*(6-4) = 4
+      expect(s, 4);
     });
 
-    test('中等词首次 → 约 6s', () {
+    test('中等词首次 → 5s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 8,
         practiceCount: 0,
       );
-      // ratio = (8-4)/(12-4) = 0.5, maxTime = 6.0, minTime = 3.5
-      // decay = 0, result = 6.0 → rounds to 6
-      expect(s, 6);
+      // ratio = (8-4)/(12-4) = 0.5
+      // maxTime = 3 + 0.5*3 = 4.5, minTime = 2 + 0.5*2 = 3
+      // decay = 0, result = 4.5 → rounds to 5
+      expect(s, 5);
     });
 
-    test('中等词练习 5 次 → 约 4s', () {
+    test('中等词练习 5 次 → 3s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 8,
         practiceCount: 5,
       );
-      // ratio = 0.5, maxTime = 6.0, minTime = 3.5
-      // decay = 1.0, result = 6.0 - 1.0*(6.0-3.5) = 3.5 → rounds to 4
-      expect(s, 4);
+      // ratio = 0.5, maxTime = 4.5, minTime = 3
+      // decay = 1.0, result = 4.5 - 1*(4.5-3) = 3.0 → rounds to 3
+      expect(s, 3);
     });
 
-    test('超短词 clamp 到 0 ratio', () {
+    test('超短词 clamp 到 0 ratio → 3s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 1,
         practiceCount: 0,
       );
-      expect(s, 4);
+      // ratio clamp 到 0, result = 3
+      expect(s, 3);
     });
 
-    test('超长词 clamp 到 1 ratio', () {
+    test('超长词 clamp 到 1 ratio → 6s', () {
       final s = FlashcardSettings.calculateSmartSeconds(
         wordLength: 20,
         practiceCount: 0,
       );
-      expect(s, 8);
+      // ratio clamp 到 1, result = 6
+      expect(s, 6);
     });
   });
 

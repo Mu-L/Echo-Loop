@@ -91,6 +91,8 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        analyticsOverride(),
+        ...studyTimeOverrides(),
         audioLibraryProvider.overrideWith(
           () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
         ),
