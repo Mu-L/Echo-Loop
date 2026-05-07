@@ -75,13 +75,18 @@ class ReviewReminderService {
     required FlutterLocalNotificationsPlugin plugin,
     required NotificationTapRouterBridge bridge,
     required ReviewReminderTimeCalculator timeCalculator,
+    bool? supportsSystemNotificationOverride,
   }) : _plugin = plugin,
        _bridge = bridge,
-       _timeCalculator = timeCalculator;
+       _timeCalculator = timeCalculator,
+       _supportsSystemNotificationOverride = supportsSystemNotificationOverride;
 
   final FlutterLocalNotificationsPlugin _plugin;
   final NotificationTapRouterBridge _bridge;
   ReviewReminderTimeCalculator _timeCalculator;
+
+  /// 测试覆盖：指定是否支持系统通知
+  final bool? _supportsSystemNotificationOverride;
 
   bool _initialized = false;
   bool _timezoneReady = false;
@@ -93,6 +98,9 @@ class ReviewReminderService {
   Set<String>? _lastSnapshot;
 
   bool get _supportsSystemNotification {
+    if (_supportsSystemNotificationOverride != null) {
+      return _supportsSystemNotificationOverride!;
+    }
     if (kIsWeb) return false;
     return io.Platform.isIOS || io.Platform.isAndroid || io.Platform.isMacOS;
   }

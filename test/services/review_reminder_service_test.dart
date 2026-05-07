@@ -113,6 +113,7 @@ void main() {
       plugin: mockPlugin,
       bridge: bridge,
       timeCalculator: mockTimeCalc,
+      supportsSystemNotificationOverride: true,  // 强制启用通知支持（CI 在 Ubuntu 上运行）
     );
   }
 
