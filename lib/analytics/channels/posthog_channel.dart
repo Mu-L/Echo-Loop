@@ -2,14 +2,17 @@
 ///
 /// 直接通过 HTTP 上报，不依赖 GMS，中国大陆和境外均可使用。
 ///
-/// **初始化路径**（iOS / macOS）：
-/// - 原生侧：通过 `Info.plist` 配 `com.posthog.posthog.API_KEY` 等 meta-data，
-///   插件在 `register(with:)` 阶段（即 `applicationDidFinishLaunching` 内）自动初始化，
-///   确保能捕获 `Application Opened` / `Application Backgrounded` 等生命周期事件。
-/// - Dart 侧：此处 `Posthog().setup(config)` 注入 Session Replay 等运行时配置。
-///   SDK 二次 setup 是幂等的（仅更新配置，不重置事件队列）。
+/// **初始化路径**：
+/// - iOS：在 `AppDelegate.application(_:didFinishLaunchingWithOptions:)` 中由 Swift 侧
+///   `setupPostHogNative()` 完成 SDK setup（含 sessionReplay=true）。Info.plist 设置
+///   `com.posthog.posthog.AUTO_INIT=false` 关闭插件自动 init，避免插件先用默认配置
+///   抢跑（PostHog iOS SDK 二次 setup 是 no-op，会让 sessionReplay 失效）。
+/// - macOS：通过 Info.plist `com.posthog.posthog.API_KEY` 等 meta-data 由插件
+///   `register(with:)` 阶段自动初始化。macOS 不支持 Session Replay。
+/// - Android：原生侧不预初始化，此处 `Posthog().setup(config)` 是首次也是唯一一次 init。
 ///
-/// Android 无需原生 meta-data（生命周期事件已稳定上报）。
+/// 因此本类 `initialize()` 中的 `setup(config)` 在 iOS 上是 no-op（SDK 已就绪），
+/// 但保留以兼容 Android 路径。
 library;
 
 import 'package:posthog_flutter/posthog_flutter.dart';

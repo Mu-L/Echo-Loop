@@ -140,12 +140,16 @@
 	</array>
 	<key>FirebaseAutomaticScreenReportingEnabled</key>
 	<false/>
-	<!-- PostHog 原生自动初始化：在 application(_:didFinishLaunchingWithOptions:) 阶段
-	     完成 SDK setup，从而能捕获 Application Opened / Application Backgrounded
-	     等生命周期事件。仅靠 Dart 端 Posthog().setup() 时，原生 SDK 注册
-	     NotificationCenter observer 的时机晚于 didBecomeActive 通知，
-	     首次 Opened 必丢；冷启动后立即切后台还会丢 Backgrounded
-	     （iOS observer 不追溯历史通知）。 -->
+	<!-- PostHog 配置：API Key/Host 通过 plist 暴露，由 AppDelegate 读取后手动 setup。
+	     AUTO_INIT=false 关闭 posthog_flutter 插件 register() 阶段的自动 init，
+	     原因：插件 initPlugin 不支持 sessionReplay 配置项，会先用默认配置初始化 SDK，
+	     之后 Dart 端 Posthog().setup(sessionReplay:true) 因 SDK 已初始化而被忽略，
+	     导致 iOS 录制（Session Replay）失效。
+	     手动 setup 在 GeneratedPluginRegistrant.register 之前执行，确保
+	     ① sessionReplay 生效；② NotificationCenter observer 早于 didBecomeActive
+	     注册，不丢首次 Application Opened / Backgrounded 事件。 -->
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
 	<key>com.posthog.posthog.API_KEY</key>
 	<string>phc_s2ZWTJV3n57Tcz16OYZailIJroIUJhWEXmHMothJ5MZ</string>
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
