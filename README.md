@@ -134,18 +134,6 @@ flowchart LR
 
 ---
 
-## 🎬 Demo
-
-<!-- TODO: 录制后替换 -->
-<table>
-  <tr>
-    <td align="center"><img src="assets/demo-gifs/shadowing.gif" alt="跟读评测 Demo" width="320" /><br/><sub>跟读评测：原生 ASR + 命中词高亮</sub></td>
-    <td align="center"><img src="assets/demo-gifs/srs-flashcard.gif" alt="闪卡复习 Demo" width="320" /><br/><sub>闪卡复习：原句上下文配翻转卡片</sub></td>
-  </tr>
-</table>
-
----
-
 ## 📥 下载与试用
 
 <table>
