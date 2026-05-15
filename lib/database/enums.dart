@@ -72,6 +72,19 @@ enum SubStageType {
   }
 }
 
+/// 「复述类」子步骤集合：受全局复述开关控制是否进入学习流程。
+///
+/// 包括首次学习的段落复述、复习的段落复述、以及 R28 的全文复述。
+const Set<SubStageType> kRetellSubStages = {
+  SubStageType.retell,
+  SubStageType.reviewRetellParagraph,
+  SubStageType.reviewRetellSummary,
+};
+
+/// 判断指定子步骤是否属于「复述类」。
+bool isRetellSubStage(SubStageType subStage) =>
+    kRetellSubStages.contains(subStage);
+
 /// 学习大阶段枚举
 ///
 /// 定义音频学习的完整流程：首次学习 → 7 轮间隔复习 → 完成。
@@ -110,8 +123,12 @@ enum LearningStage {
   /// DB 存储用字符串键
   final String key;
 
-  /// 该阶段包含的子步骤（有序列表）
-  List<SubStageType> get subStages => switch (this) {
+  /// 该阶段全量子步骤（有序列表，未过滤）。
+  ///
+  /// 注意：实际学习流以 [LearningPlan] 为单一事实来源，UI/推进/reconcile
+  /// 都应读 `plan.subStagesFor(stage)` 而非本 getter。仅 `LearningPlan`
+  /// 构造、自由练习入口等"需要全量信息"的场景读 [allSubStages]。
+  List<SubStageType> get allSubStages => switch (this) {
     firstLearn => [
       SubStageType.blindListen,
       SubStageType.intensiveListen,
@@ -135,8 +152,8 @@ enum LearningStage {
     ],
   };
 
-  /// 该阶段的子步骤数量（从 subStages 列表推导）
-  int get subStageCount => subStages.length;
+  /// 该阶段的全量子步骤数量（从 [allSubStages] 推导）
+  int get subStageCount => allSubStages.length;
 
   /// 复习间隔（小时）
   int get intervalHours => switch (this) {

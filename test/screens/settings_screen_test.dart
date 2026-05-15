@@ -43,6 +43,7 @@ void main() {
       type: AsrModelType.whisper,
     );
     return [
+      ...learningSettingsOverrides(),
       appSettingsProvider.overrideWith(() => TestAppSettings(settings)),
       showDeveloperOptionsProvider.overrideWith(
         () => _TestDeveloperOptions(showDeveloperOptions),

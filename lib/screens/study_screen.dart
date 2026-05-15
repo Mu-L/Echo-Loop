@@ -7,6 +7,7 @@ import '../analytics/models/event_names.dart';
 import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/new_user_guide_provider.dart';
 import '../providers/study_stats_provider.dart';
@@ -14,6 +15,7 @@ import '../providers/study_task_provider.dart';
 import '../providers/time_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
+import '../widgets/retell_decision_gate.dart';
 import '../widgets/speech_permission_dialog.dart';
 import '../widgets/guide_flow.dart';
 import '../widgets/learning_progress_icon.dart';
@@ -386,12 +388,16 @@ class _TaskCard extends ConsumerWidget {
     final isOverdue = task.isOverdue;
 
     // 获取进度数据
-    final container = ProviderScope.containerOf(context);
-    final progressMap = container
-        .read(learningProgressNotifierProvider)
+    final progressMap = ref
+        .watch(learningProgressNotifierProvider)
         .progressMap;
     final progress = progressMap[task.audioId];
-    final progressPercent = progress?.progressPercent ?? 0.0;
+    final plan = ref.watch(learningPlanProvider);
+    final completedKeys = ref
+        .watch(learningProgressNotifierProvider)
+        .completionsFor(task.audioId);
+    final progressPercent =
+        progress?.progressPercent(plan, completedKeys) ?? 0.0;
 
     // 左侧色条颜色
     final accentColor = isOverdue
@@ -404,7 +410,7 @@ class _TaskCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.s),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
+        onTap: () async {
           ref.read(analyticsServiceProvider).track(
             Events.studyTaskTapped,
             {
@@ -416,6 +422,8 @@ class _TaskCard extends ConsumerWidget {
               EventParams.isOverdue: task.isOverdue ? 1 : 0,
             },
           );
+          final ok = await ensureRetellDecisionMade(context, ref);
+          if (!ok || !context.mounted) return;
           context.push(AppRoutes.audioLearningPlan(task.audioId));
         },
         child: IntrinsicHeight(
@@ -491,6 +499,12 @@ class _TaskCard extends ConsumerWidget {
                                         );
                                     if (!allowed || !context.mounted) return;
 
+                                    final decided =
+                                        await ensureRetellDecisionMade(
+                                          context,
+                                          ref,
+                                        );
+                                    if (!decided || !context.mounted) return;
                                     context.push(
                                       AppRoutes.audioLearningPlan(
                                         task.audioId,
@@ -534,13 +548,13 @@ class _TaskCard extends ConsumerWidget {
 // ============================================================
 
 /// 已完成音频折叠区
-class _CompletedSection extends StatelessWidget {
+class _CompletedSection extends ConsumerWidget {
   final List<({String audioId, String audioName})> completedAudios;
 
   const _CompletedSection({required this.completedAudios});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
@@ -569,8 +583,11 @@ class _CompletedSection extends StatelessWidget {
                 ),
                 title: Text(audio.audioName),
                 contentPadding: EdgeInsets.zero,
-                onTap: () =>
-                    context.push(AppRoutes.audioLearningPlan(audio.audioId)),
+                onTap: () async {
+                  final ok = await ensureRetellDecisionMade(context, ref);
+                  if (!ok || !context.mounted) return;
+                  context.push(AppRoutes.audioLearningPlan(audio.audioId));
+                },
               ),
             )
             .toList(),
@@ -629,8 +646,8 @@ class _RecentCompletionsSection extends StatelessWidget {
   }
 }
 
-/// 单条最近完成记录卡片（样式参考待解锁任务卡片，不可点击）
-class _RecentCompletionTile extends StatelessWidget {
+/// 单条最近完成记录卡片
+class _RecentCompletionTile extends ConsumerWidget {
   final RecentCompletion completion;
   final AppLocalizations l10n;
   final DateTime now;
@@ -642,7 +659,7 @@ class _RecentCompletionTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final stage = LearningStage.fromKey(completion.stage);
     final subStage = SubStageType.fromKey(completion.subStage);
@@ -653,8 +670,11 @@ class _RecentCompletionTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.s),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () =>
-            context.push(AppRoutes.audioLearningPlan(completion.audioId)),
+        onTap: () async {
+          final ok = await ensureRetellDecisionMade(context, ref);
+          if (!ok || !context.mounted) return;
+          context.push(AppRoutes.audioLearningPlan(completion.audioId));
+        },
         child: IntrinsicHeight(
           child: Row(
             children: [
@@ -908,7 +928,7 @@ String _statusText(
   DateTime now,
 ) {
   // 已有进度（当前子阶段不是该阶段的第一个）→ 显示"学习中"
-  final subStages = task.stage.subStages;
+  final subStages = task.stage.allSubStages;
   if (subStages.isNotEmpty && task.subStage != subStages.first) {
     return l10n.learningInProgress;
   }

@@ -212,6 +212,7 @@ void main() {
       overrides: [
         analyticsOverride(),
         ...studyTimeOverrides(),
+        ...learningSettingsOverrides(retellEnabled: true),
         listeningPracticeProvider.overrideWith(
           () => TestListeningPractice(
             ListeningPracticeState(sentences: sentences),

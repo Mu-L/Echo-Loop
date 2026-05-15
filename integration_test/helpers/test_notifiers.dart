@@ -15,6 +15,8 @@ import 'package:echo_loop/analytics/analytics_providers.dart';
 import 'package:echo_loop/analytics/analytics_service.dart';
 import 'package:echo_loop/analytics/consent_manager.dart';
 import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
+import 'package:echo_loop/providers/learning_settings_provider.dart';
+import 'package:echo_loop/providers/offline_asr_settings_provider.dart' show showOfflineAsrSectionProvider;
 import 'package:echo_loop/main.dart';
 import 'package:echo_loop/providers/new_user_guide_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -534,7 +536,7 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
 
     final now = DateTime.now();
     final stage = progress.currentStage;
-    final subStages = stage.subStages;
+    final subStages = stage.allSubStages;
     final currentIdx = subStages.indexOf(progress.currentSubStage);
 
     LearningProgress updated;
@@ -550,7 +552,7 @@ class TestLearningProgressNotifier extends LearningProgressNotifier {
       final nextStage = LearningStage.values[stage.index + 1];
       updated = progress.copyWith(
         currentStage: nextStage,
-        currentSubStage: nextStage.subStages.first,
+        currentSubStage: nextStage.allSubStages.first,
         lastStageCompletedAt: now,
         currentStageStartedAt: now,
         firstLearnCompletedAt: stage == LearningStage.firstLearn
@@ -864,6 +866,8 @@ class TestLearningSession extends LearningSession {
     List<List<Sentence>> paragraphs,
     Map<int, Set<int>> keywordsMap, {
     bool isFreePlay = false,
+    LearningStage? catchUpStage,
+    SubStageType? catchUpSubStage,
   }) async {
     state = state.copyWith(
       learningMode: LearningMode.retell,
@@ -1747,6 +1751,25 @@ List<Override> onboardingTestOverrides() {
   ];
 }
 
+/// 学习设置相关的 provider 测试 override。
+///
+/// 默认 `retellEnabled = true`（保留现有集成测试用例的 4 步首次学习预期）
+/// 且 `setupChoiceMade = true`（避免引导弹窗遮挡 plan 页交互）。
+/// 复述开关流程专项测试时显式传 `retellEnabled: false` / `setupChoiceMade: false`。
+List<Override> learningSettingsTestOverrides({
+  bool retellEnabled = true,
+  bool setupChoiceMade = true,
+}) {
+  return [
+    initialLearningSettingsProvider.overrideWithValue(
+      LearningSettings(
+        retellEnabled: retellEnabled,
+        setupChoiceMade: setupChoiceMade,
+      ),
+    ),
+  ];
+}
+
 // ========== App 工厂 ==========
 
 final _testPackageInfo = PackageInfo(
@@ -1761,6 +1784,9 @@ Widget createTestApp() {
   return ProviderScope(
     overrides: [
       ...onboardingTestOverrides(),
+      ...learningSettingsTestOverrides(),
+      // 集成测试默认隐藏 AI section，避免 ASR Provider 未注入触发 UnimplementedError
+      showOfflineAsrSectionProvider.overrideWithValue(false),
       appSettingsProvider.overrideWith(() => TestAppSettings()),
       audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
       collectionListProvider.overrideWith(() => TestCollectionList()),
@@ -1826,6 +1852,9 @@ Widget createTestAppWithAudio({
   return ProviderScope(
     overrides: [
       ...onboardingTestOverrides(),
+      ...learningSettingsTestOverrides(),
+      // 集成测试默认隐藏 AI section，避免 ASR Provider 未注入触发 UnimplementedError
+      showOfflineAsrSectionProvider.overrideWithValue(false),
       appSettingsProvider.overrideWith(() => TestAppSettings()),
       audioLibraryProvider.overrideWith(() {
         final notifier = TestAudioLibrary();

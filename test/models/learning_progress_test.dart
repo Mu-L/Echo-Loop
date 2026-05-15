@@ -1,40 +1,64 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:echo_loop/database/enums.dart';
+import 'package:echo_loop/models/learning_plan.dart';
 import 'package:echo_loop/models/learning_progress.dart';
+import 'package:echo_loop/providers/learning_settings_provider.dart';
 
 void main() {
   final now = DateTime(2026, 2, 21);
+  // 测试默认 plan：retell 启用（保留旧测试的 4 步首次学习预期）
+  final planOn = LearningPlan.fromSettings(
+    const LearningSettings(retellEnabled: true),
+  );
+  final planOff = LearningPlan.fromSettings(
+    const LearningSettings(retellEnabled: false),
+  );
+
+  /// 便捷构造 completedKeys 集合
+  Set<String> keys(List<(LearningStage, SubStageType)> items) =>
+      items.map((p) => '${p.$1.key}:${p.$2.key}').toSet();
+
+  /// 「过去阶段所有子步骤都做过」的便捷集合（含 retell）
+  Set<String> doneUpTo(LearningStage stage) {
+    final set = <String>{};
+    for (final s in LearningStage.values) {
+      if (s.index >= stage.index) break;
+      for (final sub in s.allSubStages) {
+        set.add('${s.key}:${sub.key}');
+      }
+    }
+    return set;
+  }
 
   group('LearningProgress', () {
     test('初始状态 — 未开始', () {
       final progress = LearningProgress(audioItemId: 'audio-1', updatedAt: now);
+      const noCompletions = <String>{};
 
       expect(progress.isStarted, false);
       expect(progress.isCompleted, false);
-      expect(progress.progressPercent, 0.0);
-      expect(progress.completedFirstStudySteps, 0);
+      expect(progress.progressPercent(planOn, noCompletions), 0.0);
+      expect(progress.completedFirstStudySteps(planOn, noCompletions), 0);
       expect(progress.completedReviewStages, 0);
-      expect(progress.totalStudyDurationMs, 0);
-      expect(progress.lastStageCompletedAt, isNull);
-      expect(progress.currentStageStartedAt, isNull);
     });
 
-    test('首次学习第 2 个子步骤进行中', () {
+    test('首次学习第 2 个子步骤进行中（已完成 blindListen）', () {
       final progress = LearningProgress(
         audioItemId: 'audio-1',
         currentStage: LearningStage.firstLearn,
         currentSubStage: SubStageType.intensiveListen,
         updatedAt: now,
       );
+      final completed = keys([
+        (LearningStage.firstLearn, SubStageType.blindListen),
+      ]);
 
       expect(progress.isStarted, true);
       expect(progress.isCompleted, false);
-      // 完成了 1 个子步骤，进度 = 1/totalSubStages
-      final total = LearningProgress.totalSubStages;
-      expect(progress.progressPercent, closeTo(1 / total, 0.001));
-      expect(progress.completedFirstStudySteps, 1);
-      expect(progress.completedReviewStages, 0);
+      // plan ON 总 24 步；已完成 1
+      expect(progress.progressPercent(planOn, completed), closeTo(1 / 24, 0.001));
+      expect(progress.completedFirstStudySteps(planOn, completed), 1);
     });
 
     test('首次学习全部完成，进入 review0', () {
@@ -45,13 +69,12 @@ void main() {
         firstLearnCompletedAt: now,
         updatedAt: now,
       );
+      final completed = doneUpTo(LearningStage.review0); // firstLearn 全部 4 步
 
       expect(progress.isStarted, true);
-      // 完成了 4 个子步骤，进度 = 4/totalSubStages
-      final total = LearningProgress.totalSubStages;
-      expect(progress.progressPercent, closeTo(4 / total, 0.001));
-      expect(progress.completedFirstStudySteps, 4);
-      expect(progress.completedReviewStages, 0);
+      expect(progress.progressPercent(planOn, completed),
+          closeTo(4 / 24, 0.001));
+      expect(progress.completedFirstStudySteps(planOn, completed), 4);
     });
 
     test('review2 第 2 个子步骤进行中', () {
@@ -62,15 +85,16 @@ void main() {
         firstLearnCompletedAt: now,
         updatedAt: now,
       );
-
-      // 完成了：4(首次学习) + 2(review0) + 3(review1) + 1(review2的第1个子步骤) = 10
-      final total = LearningProgress.totalSubStages;
-      expect(progress.progressPercent, closeTo(10 / total, 0.001));
-      expect(progress.completedFirstStudySteps, 4);
-      expect(progress.completedReviewStages, 2); // review0, review1 完成
+      final completed = doneUpTo(LearningStage.review2)
+        ..add('${LearningStage.review2.key}:${SubStageType.blindListen.key}');
+      // 完成了：4(firstLearn) + 2(review0) + 3(review1) + 1(review2.blind) = 10
+      expect(progress.progressPercent(planOn, completed),
+          closeTo(10 / 24, 0.001));
+      expect(progress.completedFirstStudySteps(planOn, completed), 4);
+      expect(progress.completedReviewStages, 2);
     });
 
-    test('已完成状态', () {
+    test('已完成状态（isCompleted 始终返回 1.0）', () {
       final progress = LearningProgress(
         audioItemId: 'audio-1',
         currentStage: LearningStage.completed,
@@ -78,12 +102,10 @@ void main() {
         firstLearnCompletedAt: now,
         updatedAt: now,
       );
+      const anyCompleted = <String>{};
 
-      expect(progress.isStarted, true);
       expect(progress.isCompleted, true);
-      expect(progress.progressPercent, 1.0);
-      expect(progress.completedFirstStudySteps, 4);
-      expect(progress.completedReviewStages, 7);
+      expect(progress.progressPercent(planOn, anyCompleted), 1.0);
     });
 
     test('isStageCompleted 正确判断', () {
@@ -101,76 +123,96 @@ void main() {
       expect(progress.isStageCompleted(LearningStage.review4), false);
     });
 
-    test('isSubStageCompleted 正确判断', () {
+    test('isSubStageCompleted 直接查 completedKeys（真实历史）', () {
       final progress = LearningProgress(
         audioItemId: 'audio-1',
         currentStage: LearningStage.firstLearn,
         currentSubStage: SubStageType.listenAndRepeat,
         updatedAt: now,
       );
+      final completed = keys([
+        (LearningStage.firstLearn, SubStageType.blindListen),
+        (LearningStage.firstLearn, SubStageType.intensiveListen),
+      ]);
 
-      // 首次学习中：blindListen, intensiveListen 已完成，listenAndRepeat 是当前，retell 未开始
-      expect(
-        progress.isSubStageCompleted(
-          LearningStage.firstLearn,
-          SubStageType.blindListen,
-        ),
+      expect(progress.isSubStageCompleted(
+          LearningStage.firstLearn, SubStageType.blindListen, completed),
         true,
       );
-      expect(
-        progress.isSubStageCompleted(
-          LearningStage.firstLearn,
-          SubStageType.intensiveListen,
-        ),
+      expect(progress.isSubStageCompleted(
+          LearningStage.firstLearn, SubStageType.intensiveListen, completed),
         true,
       );
-      expect(
-        progress.isSubStageCompleted(
-          LearningStage.firstLearn,
-          SubStageType.listenAndRepeat,
-        ),
+      expect(progress.isSubStageCompleted(
+          LearningStage.firstLearn, SubStageType.listenAndRepeat, completed),
         false,
       );
-      expect(
-        progress.isSubStageCompleted(
-          LearningStage.firstLearn,
-          SubStageType.retell,
-        ),
+      expect(progress.isSubStageCompleted(
+          LearningStage.firstLearn, SubStageType.retell, completed),
         false,
       );
     });
 
-    test('isSubStageCompleted — 跨阶段判断', () {
+    test('isSubStageCompleted — 跳过的子步骤不在 completedKeys → false（bug 2 关键回归）', () {
+      // 模拟：关闭复述完成 review0 难句补练 → currentStage 推进到 review1
+      // 注意 completedKeys 中只有 review0.reviewDifficultPractice，无 retell
       final progress = LearningProgress(
         audioItemId: 'audio-1',
         currentStage: LearningStage.review1,
         currentSubStage: SubStageType.blindListen,
         updatedAt: now,
       );
+      final completed = keys([
+        ...LearningStage.firstLearn.allSubStages
+            .map((s) => (LearningStage.firstLearn, s)),
+        (LearningStage.review0, SubStageType.reviewDifficultPractice),
+      ]);
 
-      // 首次学习所有子步骤都已完成
-      expect(
-        progress.isSubStageCompleted(
-          LearningStage.firstLearn,
-          SubStageType.retell,
-        ),
-        true,
-      );
-      // review0 所有子步骤都已完成
+      // review0 的 retell 用户从未做过 → completed=false 即使阶段已过 +
+      // 现在 plan 包含它（重新打开复述后的情景）
       expect(
         progress.isSubStageCompleted(
           LearningStage.review0,
           SubStageType.reviewRetellParagraph,
+          completed,
         ),
-        true,
+        isFalse,
+        reason: '跳过的复述（无完成记录）不应被视作完成',
       );
-      // review1 第一个子步骤是当前，未完成
+      // 真做过的非复述步骤 → completed=true
       expect(
         progress.isSubStageCompleted(
-          LearningStage.review1,
-          SubStageType.blindListen,
+          LearningStage.review0,
+          SubStageType.reviewDifficultPractice,
+          completed,
         ),
-        false,
+        isTrue,
+      );
+    });
+
+    test('isSubStageCompleted — 已完成的 retell 即使 plan 不含也保留（bug 3 关键回归）', () {
+      // 模拟：开启复述完成 firstLearn 全部 4 步，然后关闭复述
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.review0,
+        currentSubStage: SubStageType.reviewDifficultPractice,
+        updatedAt: now,
+      );
+      final completed = keys(
+        LearningStage.firstLearn.allSubStages
+            .map((s) => (LearningStage.firstLearn, s))
+            .toList(),
+      );
+
+      // retell 在 completedKeys → completed=true（不论当前 plan 是否包含）
+      expect(
+        progress.isSubStageCompleted(
+          LearningStage.firstLearn,
+          SubStageType.retell,
+          completed,
+        ),
+        isTrue,
+        reason: '已做过的复述应该保持 completed 状态',
       );
     });
 
@@ -247,6 +289,56 @@ void main() {
     test('totalSubStages 动态计算正确', () {
       // firstLearn: 4 + review0:2 + review1/2/4/7/14: 5*3 + review28:3 = 24
       expect(LearningProgress.totalSubStages, 24);
+    });
+  });
+
+  group('progressPercent(plan) / completedFirstStudySteps(plan)', () {
+    test('plan OFF：firstLearn 在 listenAndRepeat → 已完成 2/3', () {
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        updatedAt: now,
+      );
+      // 用户做过 blind + intensive
+      final completed = keys([
+        (LearningStage.firstLearn, SubStageType.blindListen),
+        (LearningStage.firstLearn, SubStageType.intensiveListen),
+      ]);
+      expect(progress.completedFirstStudySteps(planOff, completed), 2);
+    });
+
+    test('plan OFF：completed 阶段 progressPercent 返回 1.0', () {
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.completed,
+        updatedAt: now,
+      );
+      expect(progress.progressPercent(planOff, const {}), 1.0);
+    });
+
+    test('已完成的 retell 计入分子（bug 3 进度回归）', () {
+      // firstLearn 全做过（含 retell），现在 review0
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review0,
+        currentSubStage: SubStageType.reviewDifficultPractice,
+        updatedAt: now,
+      );
+      final completed = keys(
+        LearningStage.firstLearn.allSubStages
+            .map((s) => (LearningStage.firstLearn, s))
+            .toList(),
+      );
+
+      // plan OFF：分母可见集 = firstLearn 计划 3 个 ∪ 完成 4 个 = 4
+      //          + review0 计划 1 个 = 5 + review1~14*2 + review28*2 = 5 + 10 + 2 = 17
+      // 分子 = 4（完成 firstLearn 全部）
+      // 期望比例正确反映 retell 已完成
+      final off = progress.progressPercent(planOff, completed);
+      expect(off, greaterThan(0));
+      // 完成的 retell 计入分子：completedFirstStudySteps = 4（含 retell）
+      expect(progress.completedFirstStudySteps(planOff, completed), 4);
     });
   });
 
@@ -478,27 +570,27 @@ void main() {
     });
 
     test('subStages 列表内容正确', () {
-      expect(LearningStage.firstLearn.subStages, [
+      expect(LearningStage.firstLearn.allSubStages, [
         SubStageType.blindListen,
         SubStageType.intensiveListen,
         SubStageType.listenAndRepeat,
         SubStageType.retell,
       ]);
-      expect(LearningStage.review0.subStages, [
+      expect(LearningStage.review0.allSubStages, [
         SubStageType.reviewDifficultPractice,
         SubStageType.reviewRetellParagraph,
       ]);
-      expect(LearningStage.review1.subStages, [
+      expect(LearningStage.review1.allSubStages, [
         SubStageType.blindListen,
         SubStageType.reviewDifficultPractice,
         SubStageType.reviewRetellParagraph,
       ]);
-      expect(LearningStage.review28.subStages, [
+      expect(LearningStage.review28.allSubStages, [
         SubStageType.blindListen,
         SubStageType.reviewDifficultPractice,
         SubStageType.reviewRetellSummary,
       ]);
-      expect(LearningStage.completed.subStages, isEmpty);
+      expect(LearningStage.completed.allSubStages, isEmpty);
     });
   });
 

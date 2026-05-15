@@ -16,6 +16,7 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../database/providers.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/intensive_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
@@ -298,47 +299,26 @@ class _IntensiveListenPlayerScreenState
   })
   _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
+    final plan = ref.read(learningPlanProvider);
     final progress = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
 
-    if (progress == null) {
-      final subStages = LearningStage.firstLearn.subStages;
-      final idx = subStages.indexOf(SubStageType.intensiveListen);
-      final isLast = idx >= subStages.length - 1;
-      String? nextName;
-      if (!isLast) {
-        final next = subStages[idx + 1];
-        if (_hasPlayerScreen(next)) {
-          nextName = _getSubStageName(next, l10n);
-        }
-      }
-      return (
-        stepIndex: idx,
-        totalSteps: subStages.length,
-        stageName: reviewStageLabel(l10n, LearningStage.firstLearn),
-        nextStepName: nextName,
-        isLastStep: isLast,
-      );
-    }
+    final stage = progress?.currentStage ?? LearningStage.firstLearn;
+    final currentSub = progress?.currentSubStage ?? SubStageType.intensiveListen;
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(currentSub);
+    final isLast = currentIdx < 0 || currentIdx >= planned.length - 1;
 
-    final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
-    final isLast = currentIdx >= subStages.length - 1;
-
-    // 判断下一步是否有播放器
-    String? nextStepName;
-    if (!isLast) {
-      final nextSubStage = subStages[currentIdx + 1];
-      if (_hasPlayerScreen(nextSubStage)) {
-        nextStepName = _getSubStageName(nextSubStage, l10n);
-      }
-    }
+    // 用 plan 找下一步：plan 末尾 → null（不显示「继续」按钮）
+    final next = plan.nextPlannedAfter(stage, currentSub);
+    final nextStepName = (next != null && _hasPlayerScreen(next.subStage))
+        ? _getSubStageName(next.subStage, l10n)
+        : null;
 
     return (
-      stepIndex: currentIdx,
-      totalSteps: subStages.length,
+      stepIndex: currentIdx >= 0 ? currentIdx : planned.length,
+      totalSteps: planned.length,
       stageName: reviewStageLabel(l10n, stage),
       nextStepName: nextStepName,
       isLastStep: isLast,

@@ -153,4 +153,78 @@ void main() {
       expect(results.first.durationMs, 5000);
     });
   });
+
+  group('getCompletionKeysByAudio', () {
+    test('空表返回空 Map', () async {
+      final result = await db.stageCompletionDao.getCompletionKeysByAudio();
+      expect(result, isEmpty);
+    });
+
+    test('单音频多记录聚合为 Set', () async {
+      await insertAudio('a1', 'Audio One');
+      final now = DateTime(2026, 3, 25, 12, 0);
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'firstLearn',
+        subStage: 'blindListen',
+        completedAt: now,
+      );
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'firstLearn',
+        subStage: 'intensiveListen',
+        completedAt: now.add(const Duration(minutes: 5)),
+      );
+
+      final result = await db.stageCompletionDao.getCompletionKeysByAudio();
+      expect(result['a1'], {
+        'firstLearn:blindListen',
+        'firstLearn:intensiveListen',
+      });
+    });
+
+    test('多音频独立分组', () async {
+      await insertAudio('a1', 'Audio One');
+      await insertAudio('a2', 'Audio Two');
+      final now = DateTime(2026, 3, 25, 12, 0);
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'firstLearn',
+        subStage: 'blindListen',
+        completedAt: now,
+      );
+      await insertCompletion(
+        audioId: 'a2',
+        stage: 'review0',
+        subStage: 'reviewDifficultPractice',
+        completedAt: now,
+      );
+
+      final result = await db.stageCompletionDao.getCompletionKeysByAudio();
+      expect(result['a1'], {'firstLearn:blindListen'});
+      expect(result['a2'], {'review0:reviewDifficultPractice'});
+    });
+
+    test('同一 (stage, subStage) 重复完成事件去重为单一 key', () async {
+      await insertAudio('a1', 'Audio One');
+      final now = DateTime(2026, 3, 25, 12, 0);
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'firstLearn',
+        subStage: 'blindListen',
+        completedAt: now,
+      );
+      // 再次完成同一子步骤（模拟自由练习多次记录）
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'firstLearn',
+        subStage: 'blindListen',
+        completedAt: now.add(const Duration(hours: 1)),
+      );
+
+      final result = await db.stageCompletionDao.getCompletionKeysByAudio();
+      expect(result['a1'], {'firstLearn:blindListen'});
+      expect(result['a1']!.length, 1);
+    });
+  });
 }

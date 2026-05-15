@@ -2812,6 +2812,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playbackSection => '播放';
 
   @override
+  String get learningSection => '学习';
+
+  @override
+  String get learningSettings => '学习设置';
+
+  @override
+  String get speakingPracticeSection => '口语练习';
+
+  @override
+  String get retellEnabledToggle => '启用复述练习';
+
+  @override
+  String get retellEnabledSubtitle => '听后用自己的话复述段落';
+
+  @override
+  String get retellEnabledDescription => '复述是进阶训练，能快速提升口语流利度。建议在听力基础稳定后再开启。';
+
+  @override
+  String get retellPromptTitle => '开启复述练习？';
+
+  @override
+  String get retellPromptBody =>
+      '复述是难度较大的练习方法，能快速提升口语能力。建议在有一定基础后开启。可在「设置 → 学习设置」中随时调整。';
+
+  @override
+  String get retellPromptDismiss => '暂不开启';
+
+  @override
+  String get retellPromptEnable => '现在开启';
+
+  @override
   String get skipSilenceTitle => '自动跳过静音';
 
   @override

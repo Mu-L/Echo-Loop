@@ -17,6 +17,7 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../models/retell_settings.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
@@ -212,38 +213,25 @@ class _BlindListenPlayerScreenState
   })
   _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
+    final plan = ref.read(learningPlanProvider);
     final progress = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
 
-    if (progress == null) {
-      return (
-        stepIndex: 0,
-        totalSteps: LearningStage.firstLearn.subStageCount,
-        stageName: reviewStageLabel(l10n, LearningStage.firstLearn),
-        nextStepName: _hasPlayerScreen(SubStageType.intensiveListen)
-            ? _getSubStageName(SubStageType.intensiveListen, l10n)
-            : null,
-        isLastStep: false,
-      );
-    }
+    final stage = progress?.currentStage ?? LearningStage.firstLearn;
+    final currentSub = progress?.currentSubStage ?? SubStageType.blindListen;
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(currentSub);
+    final isLast = currentIdx < 0 || currentIdx >= planned.length - 1;
 
-    final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
-    final isLast = currentIdx >= subStages.length - 1;
-
-    String? nextStepName;
-    if (!isLast) {
-      final nextSubStage = subStages[currentIdx + 1];
-      if (_hasPlayerScreen(nextSubStage)) {
-        nextStepName = _getSubStageName(nextSubStage, l10n);
-      }
-    }
+    final next = plan.nextPlannedAfter(stage, currentSub);
+    final nextStepName = (next != null && _hasPlayerScreen(next.subStage))
+        ? _getSubStageName(next.subStage, l10n)
+        : null;
 
     return (
-      stepIndex: currentIdx,
-      totalSteps: subStages.length,
+      stepIndex: currentIdx >= 0 ? currentIdx : planned.length,
+      totalSteps: planned.length,
       stageName: reviewStageLabel(l10n, stage),
       nextStepName: nextStepName,
       isLastStep: isLast,

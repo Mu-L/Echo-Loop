@@ -20,6 +20,7 @@ import '../database/enums.dart';
 import '../models/intensive_listen_settings.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/speech/speech_recording_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_controller.dart';
@@ -194,46 +195,25 @@ class _ListenAndRepeatPlayerScreenState
   })
   _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
+    final plan = ref.read(learningPlanProvider);
     final progress = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
 
-    if (progress == null) {
-      final subStages = LearningStage.firstLearn.subStages;
-      final idx = subStages.indexOf(SubStageType.listenAndRepeat);
-      final isLast = idx >= subStages.length - 1;
-      String? nextName;
-      if (!isLast) {
-        final next = subStages[idx + 1];
-        if (_hasPlayerScreen(next)) {
-          nextName = _getSubStageName(next, l10n);
-        }
-      }
-      return (
-        stepIndex: idx,
-        totalSteps: subStages.length,
-        stageName: reviewStageLabel(l10n, LearningStage.firstLearn),
-        nextStepName: nextName,
-        isLastStep: isLast,
-      );
-    }
+    final stage = progress?.currentStage ?? LearningStage.firstLearn;
+    final currentSub = progress?.currentSubStage ?? SubStageType.listenAndRepeat;
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(currentSub);
+    final isLast = currentIdx < 0 || currentIdx >= planned.length - 1;
 
-    final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
-    final isLast = currentIdx >= subStages.length - 1;
-
-    String? nextStepName;
-    if (!isLast) {
-      final nextSubStage = subStages[currentIdx + 1];
-      if (_hasPlayerScreen(nextSubStage)) {
-        nextStepName = _getSubStageName(nextSubStage, l10n);
-      }
-    }
+    final next = plan.nextPlannedAfter(stage, currentSub);
+    final nextStepName = (next != null && _hasPlayerScreen(next.subStage))
+        ? _getSubStageName(next.subStage, l10n)
+        : null;
 
     return (
-      stepIndex: currentIdx,
-      totalSteps: subStages.length,
+      stepIndex: currentIdx >= 0 ? currentIdx : planned.length,
+      totalSteps: planned.length,
       stageName: reviewStageLabel(l10n, stage),
       nextStepName: nextStepName,
       isLastStep: isLast,

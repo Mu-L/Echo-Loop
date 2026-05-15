@@ -7,13 +7,16 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/learning_progress.dart';
+import '../providers/learning_plan_provider.dart';
+import '../providers/learning_progress_provider.dart';
 
 /// 环形学习进度图标组件
 ///
 /// 用于 [AudioListTile] 和学习页面 [_TaskCard] 等位置，
 /// 统一展示音频的学习进度状态。
-class LearningProgressIcon extends StatelessWidget {
+class LearningProgressIcon extends ConsumerWidget {
   /// 学习进度数据，为 null 表示未学习
   final LearningProgress? progress;
 
@@ -38,8 +41,14 @@ class LearningProgressIcon extends StatelessWidget {
   static const completedColor = Color(0xFF4CAF50);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final plan = ref.watch(learningPlanProvider);
+    final completedKeys = progress == null
+        ? const <String>{}
+        : ref
+            .watch(learningProgressNotifierProvider)
+            .completionsFor(progress!.audioItemId);
 
     // 未学习状态
     if (progress == null || !progress!.isStarted) {
@@ -93,7 +102,7 @@ class LearningProgressIcon extends StatelessWidget {
             width: size,
             height: size,
             child: CircularProgressIndicator(
-              value: progress!.progressPercent,
+              value: progress!.progressPercent(plan, completedKeys),
               strokeWidth: strokeWidth,
               color: theme.colorScheme.primary,
               backgroundColor: theme.colorScheme.surfaceContainerHighest,

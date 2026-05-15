@@ -13,6 +13,7 @@ import '../utils/time_format.dart';
 import '../models/learning_progress.dart';
 import '../models/tag.dart';
 import '../providers/audio_library_provider.dart';
+import 'retell_decision_gate.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/tag_provider.dart';
@@ -557,8 +558,13 @@ class AudioListTile extends ConsumerWidget {
       return;
     }
     if (!context.mounted) return;
+    await _pushPlanWithGate(context, ref);
+  }
 
-    // 根据上下文选择路由
+  /// 复述设置 gate + 跳转 plan 页（已决策直接跳转，未决策先弹引导弹窗）
+  Future<void> _pushPlanWithGate(BuildContext context, WidgetRef ref) async {
+    final ok = await ensureRetellDecisionMade(context, ref);
+    if (!ok || !context.mounted) return;
     if (_isCollectionContext) {
       context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
     } else {
@@ -586,11 +592,7 @@ class AudioListTile extends ConsumerWidget {
         audioItem.id,
       );
       if (!context.mounted || completedInForeground != true) return;
-      if (_isCollectionContext) {
-        context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
-      } else {
-        context.push(AppRoutes.audioLearningPlan(audioItem.id));
-      }
+      await _pushPlanWithGate(context, ref);
       return;
     }
 
@@ -606,11 +608,7 @@ class AudioListTile extends ConsumerWidget {
           audioItem.id,
         );
         if (!context.mounted || completedInForeground != true) return;
-        if (_isCollectionContext) {
-          context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
-        } else {
-          context.push(AppRoutes.audioLearningPlan(audioItem.id));
-        }
+        await _pushPlanWithGate(context, ref);
       case StartResult.busy:
         final activeName =
             (ref.read(officialDownloadProvider) as DownloadInProgress?)
@@ -621,11 +619,7 @@ class AudioListTile extends ConsumerWidget {
         );
       case StartResult.alreadyDownloaded:
         // 极端情况：点击间隙被其它路径标记为已下载；按已下载走常规路径
-        if (_isCollectionContext) {
-          context.push(AppRoutes.learningPlan(collectionId!, audioItem.id));
-        } else {
-          context.push(AppRoutes.audioLearningPlan(audioItem.id));
-        }
+        await _pushPlanWithGate(context, ref);
     }
   }
 

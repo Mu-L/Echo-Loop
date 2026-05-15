@@ -23,6 +23,7 @@ import '../router/app_router.dart';
 import '../widgets/speech_permission_dialog.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
 import '../providers/learning_session/review_difficult_practice_provider.dart';
@@ -219,6 +220,7 @@ class _ReviewDifficultPracticeScreenState
   })
   _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
+    final plan = ref.read(learningPlanProvider);
     final progress = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
@@ -234,19 +236,21 @@ class _ReviewDifficultPracticeScreenState
     }
 
     final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
-    final isLast = currentIdx >= subStages.length - 1;
+    final currentSub = progress.currentSubStage;
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(currentSub);
+    final isLast = currentIdx < 0 || currentIdx >= planned.length - 1;
 
-    String? nextStepName;
-    if (!isLast) {
-      final nextSubStage = subStages[currentIdx + 1];
-      nextStepName = _getSubStageName(nextSubStage, l10n);
-    }
+    // 用 plan 找下一步：plan 末尾或不在 plan → null（弹窗只显示「完成」按钮，
+    // 修复 bug 1：关闭复述时 review0 难句补练完成后不再显示「继续：段落复述」）
+    final next = plan.nextPlannedAfter(stage, currentSub);
+    final nextStepName = next == null
+        ? null
+        : _getSubStageName(next.subStage, l10n);
 
     return (
-      stepIndex: currentIdx,
-      totalSteps: subStages.length,
+      stepIndex: currentIdx >= 0 ? currentIdx : planned.length,
+      totalSteps: planned.length,
       stageName: reviewStageLabel(l10n, stage),
       nextStepName: nextStepName,
       isLastStep: isLast,

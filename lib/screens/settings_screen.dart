@@ -16,6 +16,7 @@ import '../providers/backup_provider.dart';
 import '../providers/developer_options_provider.dart';
 import '../providers/offline_asr_settings_provider.dart';
 import '../providers/package_info_provider.dart';
+import '../providers/learning_settings_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../providers/settings_provider.dart';
@@ -39,6 +40,7 @@ import '../services/dictionary_service.dart';
 import '../theme/app_theme.dart';
 import 'asr_settings_screen.dart';
 import 'asr_test_screen.dart';
+import 'learning_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'playback_settings_screen.dart';
 import 'preferences_viewer_screen.dart';
@@ -95,6 +97,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildReminderSection(context, ref, l10n),
           const SizedBox(height: AppSpacing.m),
           _buildPlaybackSection(context, l10n),
+          const SizedBox(height: AppSpacing.m),
+          _buildLearningSection(context, ref, l10n),
           if (ref.watch(showOfflineAsrSectionProvider)) ...[
             const SizedBox(height: AppSpacing.m),
             _buildAiSection(context, ref, l10n),
@@ -197,6 +201,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => const PlaybackSettingsScreen(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 构建学习设置入口
+  Widget _buildLearningSection(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    return _buildSection(
+      context,
+      title: l10n.learningSection,
+      children: [
+        ListTile(
+          leading: _emojiIcon('🎯'),
+          title: Text(l10n.learningSettings),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const LearningSettingsScreen(),
             ),
           ),
         ),

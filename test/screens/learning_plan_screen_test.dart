@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/screens/learning_plan_screen.dart';
 import 'package:echo_loop/models/audio_item.dart';
@@ -21,6 +23,22 @@ import 'package:echo_loop/theme/app_theme.dart';
 import '../helpers/mock_providers.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late SharedPreferences prefs;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({
+      // 引导弹窗预设已展示（避免遮挡 plan 页测试）
+      'retell_setup_choice_at_ms': 1700000000000,
+      // 新手引导 flows 预设已看过（避免 GuideFlow 启动 500ms timer
+      // 在 widget dispose 后还 pending，导致测试报 Timer 错误）
+      'guide_v1_learning_plan_no_transcript_seen': true,
+      'guide_v1_learning_plan_with_transcript_seen': true,
+    });
+    prefs = await SharedPreferences.getInstance();
+  });
+
   final testAudioItem = AudioItem(
     id: 'test-1',
     name: 'Test Audio',
@@ -48,6 +66,47 @@ void main() {
         endTime: Duration(seconds: (i + 1) * 5),
       );
     });
+  }
+
+  /// 构造「截至当前阶段所有过去阶段子步骤都完成」的 completedKeys。
+  ///
+  /// + 当前阶段中位于 currentSubStage 之前的子步骤也算完成。
+  /// 用于把"按 stage.index 推导完成"的老测试预期映射到新签名。
+  Set<String> seedCompletedKeys(
+    LearningStage currentStage,
+    SubStageType currentSub,
+  ) {
+    final set = <String>{};
+    for (final s in LearningStage.values) {
+      if (s.index < currentStage.index) {
+        for (final sub in s.allSubStages) {
+          set.add('${s.key}:${sub.key}');
+        }
+      } else if (s == currentStage) {
+        for (final sub in s.allSubStages) {
+          if (sub == currentSub) break;
+          set.add('${s.key}:${sub.key}');
+        }
+      }
+    }
+    return set;
+  }
+
+  /// 若 progressState 未显式指定 completionsByAudio，按 progressMap 中
+  /// 每条进度的 currentStage/currentSubStage 自动推导（旧测试预期保留）。
+  LearningProgressState _withAutoCompletions(LearningProgressState? state) {
+    final base = state ?? const LearningProgressState();
+    if (base.completionsByAudio.isNotEmpty || base.progressMap.isEmpty) {
+      return base;
+    }
+    final completions = <String, Set<String>>{};
+    for (final entry in base.progressMap.entries) {
+      completions[entry.key] = seedCompletedKeys(
+        entry.value.currentStage,
+        entry.value.currentSubStage,
+      );
+    }
+    return base.copyWith(completionsByAudio: completions);
   }
 
   Widget createTestWidget({
@@ -93,6 +152,12 @@ void main() {
       overrides: [
         analyticsOverride(),
         ...studyTimeOverrides(),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        // 现有用例预设复述开关 ON（4 步首次学习），且已展示引导弹窗（避免遮挡）
+        ...learningSettingsOverrides(
+          retellEnabled: true,
+          setupChoiceMade: true,
+        ),
         audioLibraryProvider.overrideWith(
           () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
         ),
@@ -110,7 +175,7 @@ void main() {
         audioEngineProvider.overrideWith(() => TestAudioEngine()),
         learningProgressNotifierProvider.overrideWith(
           () => TestLearningProgressNotifier(
-            progressState ?? const LearningProgressState(),
+            _withAutoCompletions(progressState),
           ),
         ),
         learningSessionProvider.overrideWith(() => TestLearningSession()),
@@ -362,6 +427,10 @@ void main() {
             updatedAt: DateTime(2026, 1, 1),
           ),
         },
+        // 真实完成历史：blindListen + intensiveListen
+        completionsByAudio: const {
+          'test-1': {'firstLearn:blindListen', 'firstLearn:intensiveListen'},
+        },
       );
 
       await tester.pumpWidget(createTestWidget(progressState: progressState));
@@ -466,6 +535,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            ...learningSettingsOverrides(
+              retellEnabled: true,
+              setupChoiceMade: true,
+            ),
             audioLibraryProvider.overrideWith(
               () => TestAudioLibrary(), // 空音频库
             ),
@@ -533,6 +607,56 @@ void main() {
 
       // 不应弹出简报弹窗（因为没有 onTap），步骤标签仍可见但不会多出弹窗标题
       expect(find.text('Blind Listening'), findsOneWidget);
+    });
+
+    testWidgets('过去阶段跳过的复述可点击进入自由练习（重开复述后补做）', (tester) async {
+      // 模拟：曾关闭复述完成 firstLearn，跳过 retell，currentStage 进入 review0
+      // 用户现在重开复述：retell 卡重新显示在 firstLearn 区，应支持自由练习点击
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            updatedAt: DateTime(2026, 1, 1),
+          ),
+        },
+        // 真实完成历史：blind/intensive/shadow 三个非复述步骤（retell 被跳过）
+        completionsByAudio: const {
+          'test-1': {
+            'firstLearn:blindListen',
+            'firstLearn:intensiveListen',
+            'firstLearn:listenAndRepeat',
+          },
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      // firstLearn 已是过去阶段，section 默认折叠 → 先展开
+      await tester.tap(find.text('Initial Learning'));
+      await tester.pumpAndSettle();
+
+      // 段落复述卡片在 firstLearn 区可见（plan 含 + isPast）。
+      // 注意：review0 也有「Paragraph Retelling」，所以 findsAtLeast(1)。
+      expect(find.text('Paragraph Retelling'), findsAtLeast(1));
+
+      // 找到 firstLearn 区的 _StepCard，验证它的 onTap 非空（可点击进入自由练习）。
+      final stepCardFinder = find.ancestor(
+        of: find.text('Paragraph Retelling').first,
+        matching: find.byType(InkWell),
+      );
+      expect(stepCardFinder, findsAtLeast(1));
+      final inkWell = tester.widgetList<InkWell>(stepCardFinder).firstWhere(
+            (w) => w.onTap != null,
+            orElse: () => const InkWell(),
+          );
+      expect(
+        inkWell.onTap,
+        isNotNull,
+        reason: '过去阶段跳过的复述卡应支持点击进入自由练习',
+      );
     });
 
     testWidgets('无字幕时显示警告横幅且禁用开始按钮', (tester) async {

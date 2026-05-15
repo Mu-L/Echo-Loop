@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -7,8 +9,10 @@ import '../analytics/models/event_names.dart';
 import '../database/enums.dart';
 import '../database/providers.dart';
 import '../database/app_database.dart' as db;
+import '../models/learning_plan.dart';
 import '../models/learning_progress.dart';
 import '../services/app_logger.dart';
+import 'learning_plan_provider.dart';
 import 'time_provider.dart';
 
 part 'learning_progress_provider.g.dart';
@@ -20,23 +24,38 @@ class LearningProgressState {
   /// 按音频 ID 索引的进度 Map
   final Map<String, LearningProgress> progressMap;
 
+  /// 每个音频已完成的子步骤集合（key 格式 `'stage.key:subStage.key'`）。
+  ///
+  /// 真实「完成」事实的内存索引（启动时从 `stage_completions` 表加载，
+  /// `completeCurrentSubStage` 同步更新）。UI 和进度计算用此判定子步骤
+  /// 是否真做过，而不是用 `stage.index < currentStage.index` 推导。
+  /// 跳过的子步骤永远不会出现在此集合内。
+  final Map<String, Set<String>> completionsByAudio;
+
   /// 是否正在加载
   final bool isLoading;
 
   const LearningProgressState({
     this.progressMap = const {},
+    this.completionsByAudio = const {},
     this.isLoading = false,
   });
 
   LearningProgressState copyWith({
     Map<String, LearningProgress>? progressMap,
+    Map<String, Set<String>>? completionsByAudio,
     bool? isLoading,
   }) {
     return LearningProgressState(
       progressMap: progressMap ?? this.progressMap,
+      completionsByAudio: completionsByAudio ?? this.completionsByAudio,
       isLoading: isLoading ?? this.isLoading,
     );
   }
+
+  /// 指定音频的完成集合（不存在返回空集合）。
+  Set<String> completionsFor(String audioItemId) =>
+      completionsByAudio[audioItemId] ?? const {};
 }
 
 /// 学习进度管理 Provider
@@ -47,10 +66,89 @@ class LearningProgressState {
 class LearningProgressNotifier extends _$LearningProgressNotifier {
   @override
   LearningProgressState build() {
+    // 监听学习计划变化：plan 变化时（由 learningSettings 派生）reconcile
+    // 所有「currentSubStage 已不在 plan 内」或「currentStage planned 为空」
+    // 的进度，直接修改 currentStage / currentSubStage（不写 stage_completions、
+    // 不递增 passCount）。单向数据流：settings → plan → progress。
+    ref.listen<LearningPlan>(learningPlanProvider, (_, next) {
+      unawaited(_reconcileForSettingsChange(next));
+    });
+
     // 初始态标记为 loading：用于区分"尚未加载"与"加载完为空"。
     // loadAll() 读完 DB 后会把 isLoading 置回 false，此后才可用于判断
     // "用户真的没有学习进度"（例如新装首启的引导 gate）。
     return const LearningProgressState(isLoading: true);
+  }
+
+  /// 学习计划变更时（设置切换驱动）reconcile 所有进度。
+  ///
+  /// 规则：
+  /// - 当前阶段 planned 为空 → 推进到首个 planned 非空的下一阶段
+  /// - currentSubStage 不在 plan 内（如关闭复述时正卡在 retell）→ 同上推进
+  /// - 否则不动（用户当前还在 plan 内的子步骤）
+  ///
+  /// 「跳过」≠「完成」：reconcile **不写** stage_completions、**不递增**
+  /// retellPassCount，仅直接修改 currentStage/currentSubStage。
+  Future<void> _reconcileForSettingsChange(LearningPlan plan) async {
+    final snapshot = List<LearningProgress>.from(state.progressMap.values);
+    final analytics = ref.read(analyticsServiceProvider);
+    for (final progress in snapshot) {
+      if (progress.isCompleted) continue;
+      final stage = progress.currentStage;
+      final planned = plan.subStagesFor(stage);
+      final needAdvance = planned.isEmpty || !planned.contains(progress.currentSubStage);
+      if (!needAdvance) continue;
+      try {
+        final fromStage = stage;
+        final advanced = _advanceToNextPlannedStage(progress, plan);
+        if (advanced == null) continue;
+        await _persistProgress(advanced);
+        final newMap = Map<String, LearningProgress>.from(state.progressMap);
+        newMap[advanced.audioItemId] = advanced;
+        state = state.copyWith(progressMap: newMap);
+        analytics.track(Events.retellAutoStageAdvance, {
+          EventParams.audioId: progress.audioItemId,
+          EventParams.fromStage: fromStage.name,
+          EventParams.toStage: advanced.currentStage.name,
+        });
+      } catch (e) {
+        AppLogger.log(
+          'LearningProgress',
+          'reconcileForSettingsChange failed for ${progress.audioItemId}: $e',
+        );
+      }
+    }
+  }
+
+  /// 推进到「首个 planned 非空的下一大阶段」，返回新 LearningProgress。
+  ///
+  /// 若已到 [LearningStage.completed]，返回标记为完成的 progress。
+  /// **不写** stage_completions、**不**累加耗时、**不**清断点索引（跳过路径
+  /// 与完成路径语义分离）。
+  LearningProgress? _advanceToNextPlannedStage(
+    LearningProgress progress,
+    LearningPlan plan,
+  ) {
+    final now = DateTime.now();
+    var nextStage = LearningStage.values[progress.currentStage.index + 1];
+    while (nextStage != LearningStage.completed &&
+        plan.subStagesFor(nextStage).isEmpty) {
+      nextStage = LearningStage.values[nextStage.index + 1];
+    }
+    final nextPlanned = plan.subStagesFor(nextStage);
+    return progress.copyWith(
+      currentStage: nextStage,
+      currentSubStage: nextPlanned.isNotEmpty
+          ? nextPlanned.first
+          : SubStageType.blindListen,
+      lastStageCompletedAt: now,
+      currentStageStartedAt: now,
+      updatedAt: now,
+      firstLearnCompletedAt:
+          progress.currentStage == LearningStage.firstLearn
+              ? now
+              : progress.firstLearnCompletedAt,
+    );
   }
 
   /// 启动时加载所有学习进度
@@ -63,13 +161,19 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(isLoading: true);
     try {
       final dao = ref.read(learningProgressDaoProvider);
+      final stageCompletionDao = ref.read(stageCompletionDaoProvider);
       final rows = await dao.getAll();
+      final completions = await stageCompletionDao.getCompletionKeysByAudio();
 
       final map = <String, LearningProgress>{
         for (final row in rows) row.audioItemId: _fromDbRow(row),
       };
 
-      state = LearningProgressState(progressMap: map, isLoading: false);
+      state = LearningProgressState(
+        progressMap: map,
+        completionsByAudio: completions,
+        isLoading: false,
+      );
     } catch (e, st) {
       AppLogger.log('LearningProgress', 'loadAll failed: $e\n$st');
       state = state.copyWith(isLoading: false);
@@ -157,7 +261,11 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
   /// 完成当前子步骤，自动推进到下一步
   ///
-  /// 同时写入 stage_completions 历史记录，计算耗时并累加总学习时长。
+  /// 通过 [learningPlanProvider] 读取计划：以 `plan.subStagesFor(stage)`
+  /// 为推进序列。同阶段内推进 → planned 列表下一项；推进到下一大阶段时
+  /// 跳过 planned 为空的阶段。
+  ///
+  /// 写入 stage_completions（真实完成事件，用户已做完此步）+ 累加耗时。
   Future<void> completeCurrentSubStage(String audioItemId) async {
     final progress = state.progressMap[audioItemId];
     if (progress == null || progress.isCompleted) return;
@@ -167,16 +275,16 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     // 持久化时间始终用真实时间，避免 debug 偏移导致复习链断裂
     final now = DateTime.now();
 
+    final plan = ref.read(learningPlanProvider);
     final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(progress.currentSubStage);
 
-    // 计算本步耗时
     final durationMs = progress.currentStageStartedAt != null
         ? now.difference(progress.currentStageStartedAt!).inMilliseconds
         : 0;
 
-    // 写入 stage_completions 历史记录
+    // 写入 stage_completions（用户真做完此步）
     final stageCompletionDao = ref.read(stageCompletionDaoProvider);
     await stageCompletionDao.insertRecord(
       db.StageCompletionsCompanion(
@@ -188,6 +296,17 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
       ),
     );
 
+    // 同步更新内存完成集合（真实历史）
+    final completionKey =
+        '${progress.currentStage.key}:${progress.currentSubStage.key}';
+    final updatedCompletions =
+        Map<String, Set<String>>.from(state.completionsByAudio);
+    updatedCompletions[audioItemId] = {
+      ...?updatedCompletions[audioItemId],
+      completionKey,
+    };
+    state = state.copyWith(completionsByAudio: updatedCompletions);
+
     final newTotalDuration = progress.totalStudyDurationMs + durationMs;
 
     // 完成当前子步骤时，清除该步骤对应的断点索引
@@ -197,17 +316,15 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     final clearShadowing = completedSubStage == SubStageType.listenAndRepeat;
     final clearDifficult =
         completedSubStage == SubStageType.reviewDifficultPractice;
-    final clearRetell =
-        completedSubStage == SubStageType.retell ||
-        completedSubStage == SubStageType.reviewRetellParagraph ||
-        completedSubStage == SubStageType.reviewRetellSummary;
+    final clearRetell = isRetellSubStage(completedSubStage);
 
     LearningProgress updated;
+    bool advancedToNextStage;
 
-    if (currentIdx + 1 < subStages.length) {
+    if (currentIdx >= 0 && currentIdx + 1 < planned.length) {
       // 同阶段内推进子步骤
       updated = progress.copyWith(
-        currentSubStage: subStages[currentIdx + 1],
+        currentSubStage: planned[currentIdx + 1],
         currentStageStartedAt: now,
         totalStudyDurationMs: newTotalDuration,
         updatedAt: now,
@@ -217,13 +334,19 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         clearDifficultPracticeSentenceIndex: clearDifficult,
         clearRetellParagraphIndex: clearRetell,
       );
+      advancedToNextStage = false;
     } else {
-      // 进入下一个大阶段
-      final nextStage = LearningStage.values[stage.index + 1];
+      // 进入下一个大阶段：planned 为空的阶段直接跳过
+      var nextStage = LearningStage.values[stage.index + 1];
+      while (nextStage != LearningStage.completed &&
+          plan.subStagesFor(nextStage).isEmpty) {
+        nextStage = LearningStage.values[nextStage.index + 1];
+      }
+      final nextPlanned = plan.subStagesFor(nextStage);
       updated = progress.copyWith(
         currentStage: nextStage,
-        currentSubStage: nextStage.subStages.isNotEmpty
-            ? nextStage.subStages.first
+        currentSubStage: nextPlanned.isNotEmpty
+            ? nextPlanned.first
             : SubStageType.blindListen,
         lastStageCompletedAt: now,
         currentStageStartedAt: now,
@@ -238,12 +361,13 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
         clearDifficultPracticeSentenceIndex: clearDifficult,
         clearRetellParagraphIndex: clearRetell,
       );
+      advancedToNextStage = true;
     }
 
     await _persistProgress(updated);
 
     // 埋点：阶段推进（最后一个子步骤完成时触发）
-    if (currentIdx + 1 >= subStages.length) {
+    if (advancedToNextStage) {
       final analytics = ref.read(analyticsServiceProvider);
       final nextStage = updated.currentStage;
       final audioParams = ref.audioEventParams(audioItemId);
@@ -343,6 +467,40 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
     state = state.copyWith(progressMap: newMap);
   }
 
+  /// 幂等记录一次「子步骤完成」事件。
+  ///
+  /// 用途：用户从过去阶段的「跳过」复述卡片进入自由练习并完成时，把该
+  /// (stage, subStage) 写入 `stage_completions` 表 + 同步更新
+  /// [LearningProgressState.completionsByAudio]，让 UI 把卡片从「灰色未完成」
+  /// 切到 ✅。已记录过的子步骤直接跳过（不重复写表、不增加分子）。
+  ///
+  /// 不推进 `currentStage` / `currentSubStage`，与 [completeCurrentSubStage]
+  /// 路径互补：自由练习的"补做"语义不应影响线性学习流程。
+  Future<void> recordCompletionIfNew(
+    String audioItemId,
+    LearningStage stage,
+    SubStageType subStage,
+  ) async {
+    final key = '${stage.key}:${subStage.key}';
+    final currentSet = state.completionsByAudio[audioItemId] ?? const {};
+    if (currentSet.contains(key)) return;
+
+    final stageCompletionDao = ref.read(stageCompletionDaoProvider);
+    await stageCompletionDao.insertRecord(
+      db.StageCompletionsCompanion(
+        audioItemId: Value(audioItemId),
+        stage: Value(stage.key),
+        subStage: Value(subStage.key),
+        completedAt: Value(DateTime.now()),
+        durationMs: const Value(0), // 自由练习"补做"不计入耗时
+      ),
+    );
+
+    final updated = Map<String, Set<String>>.from(state.completionsByAudio);
+    updated[audioItemId] = {...currentSet, key};
+    state = state.copyWith(completionsByAudio: updated);
+  }
+
   /// 删除指定音频的学习进度（音频删除时调用）
   Future<void> deleteProgress(String audioItemId) async {
     final dao = ref.read(learningProgressDaoProvider);
@@ -352,7 +510,14 @@ class LearningProgressNotifier extends _$LearningProgressNotifier {
 
     final newMap = Map<String, LearningProgress>.from(state.progressMap);
     newMap.remove(audioItemId);
-    state = state.copyWith(progressMap: newMap);
+    final newCompletions = Map<String, Set<String>>.from(
+      state.completionsByAudio,
+    );
+    newCompletions.remove(audioItemId);
+    state = state.copyWith(
+      progressMap: newMap,
+      completionsByAudio: newCompletions,
+    );
   }
 
   /// 保存跟读断点句子索引

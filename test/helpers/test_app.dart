@@ -39,6 +39,7 @@ Widget createTestApp(
   final defaultOverrides = <Override>[
     analyticsOverride(),
     ...studyTimeOverrides(),
+    ...learningSettingsOverrides(),
     appSettingsProvider.overrideWith(
       () => TestAppSettings(
         AppSettingsState(themeMode: themeMode, locale: locale),

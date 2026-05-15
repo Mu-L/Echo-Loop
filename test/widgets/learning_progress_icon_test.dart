@@ -1,16 +1,26 @@
 // 环形学习进度图标测试
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/widgets/learning_progress_icon.dart';
+import 'package:echo_loop/models/learning_plan.dart';
 import 'package:echo_loop/models/learning_progress.dart';
 import 'package:echo_loop/database/enums.dart';
+import 'package:echo_loop/providers/learning_settings_provider.dart';
 
 void main() {
   Widget createTestWidget(LearningProgress? progress) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: LearningProgressIcon(progress: progress),
+    return ProviderScope(
+      overrides: [
+        initialLearningSettingsProvider.overrideWithValue(
+          const LearningSettings(),
+        ),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: LearningProgressIcon(progress: progress),
+          ),
         ),
       ),
     );
@@ -46,7 +56,14 @@ void main() {
       final indicator = tester.widget<CircularProgressIndicator>(
         find.byType(CircularProgressIndicator),
       );
-      expect(indicator.value, progress.progressPercent);
+      // 默认 retellEnabled=false（与生产默认一致），未做过任何子步骤
+      final defaultPlan = LearningPlan.fromSettings(
+        const LearningSettings(retellEnabled: false),
+      );
+      expect(
+        indicator.value,
+        progress.progressPercent(defaultPlan, const <String>{}),
+      );
       // 应显示 graphic_eq 图标
       expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
     });

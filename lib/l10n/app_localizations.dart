@@ -5180,6 +5180,66 @@ abstract class AppLocalizations {
   /// **'Playback'**
   String get playbackSection;
 
+  /// No description provided for @learningSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning'**
+  String get learningSection;
+
+  /// No description provided for @learningSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning settings'**
+  String get learningSettings;
+
+  /// No description provided for @speakingPracticeSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking practice'**
+  String get speakingPracticeSection;
+
+  /// No description provided for @retellEnabledToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable speaking practice'**
+  String get retellEnabledToggle;
+
+  /// No description provided for @retellEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retell paragraphs in your own words'**
+  String get retellEnabledSubtitle;
+
+  /// No description provided for @retellEnabledDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking practice is an advanced exercise that quickly improves fluency. We recommend enabling it after your listening skills feel comfortable.'**
+  String get retellEnabledDescription;
+
+  /// No description provided for @retellPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable speaking practice?'**
+  String get retellPromptTitle;
+
+  /// No description provided for @retellPromptBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking practice is challenging but rapidly builds oral skills. We suggest enabling it once you have some foundation. Adjust anytime under Settings → Learning.'**
+  String get retellPromptBody;
+
+  /// No description provided for @retellPromptDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get retellPromptDismiss;
+
+  /// No description provided for @retellPromptEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable now'**
+  String get retellPromptEnable;
+
   /// No description provided for @skipSilenceTitle.
   ///
   /// In en, this message translates to:

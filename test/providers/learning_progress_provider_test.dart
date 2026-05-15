@@ -8,6 +8,7 @@ import 'package:echo_loop/database/enums.dart';
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/models/learning_progress.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
+import 'package:echo_loop/providers/learning_settings_provider.dart';
 import 'package:echo_loop/providers/time_provider.dart';
 import 'package:mocktail/mocktail.dart';
 import '../helpers/mock_providers.dart';
@@ -18,14 +19,43 @@ class MockLearningProgressDao extends Mock implements LearningProgressDao {}
 
 class MockStageCompletionDao extends Mock implements StageCompletionDao {}
 
-/// 测试用 Notifier：继承真实逻辑，仅覆盖 build() 注入初始状态
+/// 测试用 Notifier：继承真实逻辑，覆盖 build() 注入初始状态，
+/// 同时保留生产 build() 中安装的 settings → reconcile 监听器。
 class _TestLearningProgressNotifier extends LearningProgressNotifier {
   final LearningProgressState _initialState;
 
   _TestLearningProgressNotifier(this._initialState);
 
   @override
-  LearningProgressState build() => _initialState;
+  LearningProgressState build() {
+    super.build();
+    return _initialState;
+  }
+}
+
+/// 测试用学习设置 Notifier：不依赖 SP，纯内存状态。
+///
+/// 用于在 reconcile 测试中通过 `setRetellEnabled` 直接触发 settings 变化。
+class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
+    implements LearningSettingsNotifier {
+  final LearningSettings _initial;
+
+  _TestLearningSettingsNotifier(this._initial);
+
+  @override
+  LearningSettings build() => _initial;
+
+  @override
+  Future<void> setRetellEnabled(bool enabled) async {
+    if (state.retellEnabled == enabled) return;
+    state = state.copyWith(retellEnabled: enabled);
+  }
+
+  @override
+  Future<void> markSetupChoiceMade() async {
+    if (state.setupChoiceMade) return;
+    state = state.copyWith(setupChoiceMade: true);
+  }
 }
 
 void main() {
@@ -75,6 +105,7 @@ void main() {
   ProviderContainer createContainer(
     LearningProgressState initialState, {
     NowGetter? nowGetter,
+    bool retellEnabled = true,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -85,6 +116,12 @@ void main() {
         stageCompletionDaoProvider.overrideWithValue(mockStageCompletionDao),
         if (nowGetter != null) nowProvider.overrideWithValue(nowGetter),
         analyticsOverride(),
+        ...learningSettingsOverrides(retellEnabled: retellEnabled),
+        learningSettingsProvider.overrideWith(
+          () => _TestLearningSettingsNotifier(
+            LearningSettings(retellEnabled: retellEnabled),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -491,6 +528,92 @@ void main() {
       expect(after.currentSubStage, initialProgress.currentSubStage);
       expect(after.totalStudyDurationMs, initialProgress.totalStudyDurationMs);
     });
+
+    // ========== T3: 复述开关关闭时的推进行为 ==========
+
+    test(
+      'retellEnabled=false：firstLearn 跟读完成 → review0（跳过 retell）',
+      () async {
+        final now = DateTime(2026, 3, 1, 10, 0);
+        final progress = LearningProgress(
+          audioItemId: 'a1',
+          currentStage: LearningStage.firstLearn,
+          currentSubStage: SubStageType.listenAndRepeat,
+          currentStageStartedAt: now,
+          updatedAt: now,
+        );
+
+        final container = createContainer(
+          LearningProgressState(progressMap: {'a1': progress}),
+          nowGetter: () => now,
+          retellEnabled: false,
+        );
+
+        await notifier(container).completeCurrentSubStage('a1');
+
+        final after = readProgress(container, 'a1')!;
+        expect(after.currentStage, LearningStage.review0);
+        expect(after.currentSubStage, SubStageType.reviewDifficultPractice);
+        expect(after.firstLearnCompletedAt, isNotNull);
+      },
+    );
+
+    test(
+      'retellEnabled=false：review0 难句补练完成 → review1（跳过段落复述）',
+      () async {
+        final now = DateTime(2026, 3, 5, 10, 0);
+        final completedAt = now.subtract(const Duration(days: 1));
+        final progress = LearningProgress(
+          audioItemId: 'a1',
+          currentStage: LearningStage.review0,
+          currentSubStage: SubStageType.reviewDifficultPractice,
+          lastStageCompletedAt: completedAt,
+          currentStageStartedAt: now,
+          updatedAt: now,
+        );
+
+        final container = createContainer(
+          LearningProgressState(progressMap: {'a1': progress}),
+          nowGetter: () => now,
+          retellEnabled: false,
+        );
+
+        await notifier(container).completeCurrentSubStage('a1');
+
+        final after = readProgress(container, 'a1')!;
+        expect(after.currentStage, LearningStage.review1);
+        expect(after.currentSubStage, SubStageType.blindListen);
+      },
+    );
+
+    test(
+      'retellEnabled=false：review28 难句补练完成 → completed（跳过全文复述）',
+      () async {
+        final now = DateTime(2026, 4, 1, 10, 0);
+        // review28 间隔 28 天，必须超过该时长才可推进
+        final completedAt = now.subtract(const Duration(days: 30));
+        final progress = LearningProgress(
+          audioItemId: 'a1',
+          currentStage: LearningStage.review28,
+          currentSubStage: SubStageType.reviewDifficultPractice,
+          lastStageCompletedAt: completedAt,
+          currentStageStartedAt: now,
+          updatedAt: now,
+        );
+
+        final container = createContainer(
+          LearningProgressState(progressMap: {'a1': progress}),
+          nowGetter: () => now,
+          retellEnabled: false,
+        );
+
+        await notifier(container).completeCurrentSubStage('a1');
+
+        final after = readProgress(container, 'a1')!;
+        expect(after.currentStage, LearningStage.completed);
+      },
+    );
+
   });
 
   // ========== Group 2: 断点保存与清除 ==========
@@ -908,6 +1031,226 @@ void main() {
     });
   });
 
+  // ========== T14: reconcileForSettingsChange（plan 变更触发自动推进） ==========
+
+  group('reconcileForSettingsChange', () {
+    /// 切换 settings 触发 reconcile 的便捷调用。
+    ///
+    /// 先 eager-read progress notifier 触发 `build()` 安装 listener，
+    /// 否则在调用方第一次 read 之前 settings 变更不会触发 reconcile。
+    Future<void> disableRetell(ProviderContainer container) async {
+      container.read(learningProgressNotifierProvider.notifier);
+      await container
+          .read(learningSettingsProvider.notifier)
+          .setRetellEnabled(false);
+      // 给 listen 回调一个 microtask 窗口完成
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    test('(a) firstLearn 当前在 listenAndRepeat（非复述）→ 不推进', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.firstLearn);
+      expect(after.currentSubStage, SubStageType.listenAndRepeat);
+      // 不写 stage_completions
+      verifyNever(() => mockStageCompletionDao.insertRecord(any()));
+    });
+
+    test('(b) firstLearn 当前是 retell → 推进至 review0，不写 stage_completions', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        currentStageStartedAt: now,
+        retellPassCount: 0,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.review0);
+      expect(after.firstLearnCompletedAt, isNotNull);
+      // 静默推进：不写 stage_completions、不递增 retellPassCount
+      verifyNever(() => mockStageCompletionDao.insertRecord(any()));
+      expect(after.retellPassCount, 0);
+    });
+
+    test('(c) review0 当前是 reviewRetellParagraph → 推进至 review1', () async {
+      final now = DateTime(2026, 3, 5, 10, 0);
+      final completedAt = now.subtract(const Duration(hours: 12));
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review0,
+        currentSubStage: SubStageType.reviewRetellParagraph,
+        lastStageCompletedAt: completedAt,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.review1);
+    });
+
+    test('(d) review28 当前是 reviewRetellSummary → 推进至 completed', () async {
+      final now = DateTime(2026, 4, 30, 10, 0);
+      final completedAt = now.subtract(const Duration(days: 30));
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.review28,
+        currentSubStage: SubStageType.reviewRetellSummary,
+        lastStageCompletedAt: completedAt,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.completed);
+    });
+
+    test('(e) 已 completed → 不动', () async {
+      final now = DateTime(2026, 5, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.completed,
+        currentSubStage: SubStageType.blindListen,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.completed);
+    });
+
+    test('(f) 多条进度同时推进互不影响', () async {
+      final now = DateTime(2026, 3, 10, 10, 0);
+      final firstLearnProgress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.retell,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+      final review1Progress = LearningProgress(
+        audioItemId: 'a2',
+        currentStage: LearningStage.review1,
+        currentSubStage: SubStageType.reviewRetellParagraph,
+        lastStageCompletedAt: now.subtract(const Duration(days: 2)),
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+      final nonRetellProgress = LearningProgress(
+        audioItemId: 'a3',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.intensiveListen,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {
+          'a1': firstLearnProgress,
+          'a2': review1Progress,
+          'a3': nonRetellProgress,
+        }),
+        nowGetter: () => now,
+        retellEnabled: true,
+      );
+
+      await disableRetell(container);
+
+      expect(
+        readProgress(container, 'a1')!.currentStage,
+        LearningStage.review0,
+      );
+      expect(
+        readProgress(container, 'a2')!.currentStage,
+        LearningStage.review2,
+      );
+      expect(
+        readProgress(container, 'a3')!.currentStage,
+        LearningStage.firstLearn,
+      );
+      expect(
+        readProgress(container, 'a3')!.currentSubStage,
+        SubStageType.intensiveListen,
+      );
+    });
+
+    test('开启复述（false→true）不触发任何推进', () async {
+      final now = DateTime(2026, 3, 1, 10, 0);
+      final progress = LearningProgress(
+        audioItemId: 'a1',
+        currentStage: LearningStage.firstLearn,
+        currentSubStage: SubStageType.listenAndRepeat,
+        currentStageStartedAt: now,
+        updatedAt: now,
+      );
+
+      final container = createContainer(
+        LearningProgressState(progressMap: {'a1': progress}),
+        nowGetter: () => now,
+        retellEnabled: false,
+      );
+
+      container.read(learningProgressNotifierProvider.notifier);
+      await container
+          .read(learningSettingsProvider.notifier)
+          .setRetellEnabled(true);
+      await Future<void>.delayed(Duration.zero);
+
+      final after = readProgress(container, 'a1')!;
+      expect(after.currentStage, LearningStage.firstLearn);
+      expect(after.currentSubStage, SubStageType.listenAndRepeat);
+    });
+  });
+
   group('setDifficulty', () {
     test('更新难度等级', () async {
       final progress = LearningProgress(
@@ -933,6 +1276,73 @@ void main() {
         container,
       ).setDifficulty('nonexistent', DifficultyLevel.hard);
       verifyNever(() => mockDao.upsert(any()));
+    });
+  });
+
+  group('recordCompletionIfNew', () {
+    test('未记录过的 (stage, sub) → 写 DB + 更新内存集合', () async {
+      final container = createContainer(
+        const LearningProgressState(
+          progressMap: {},
+          completionsByAudio: {},
+        ),
+        retellEnabled: true,
+      );
+
+      await notifier(container).recordCompletionIfNew(
+        'a1',
+        LearningStage.firstLearn,
+        SubStageType.retell,
+      );
+
+      verify(() => mockStageCompletionDao.insertRecord(any())).called(1);
+      final completions = container
+          .read(learningProgressNotifierProvider)
+          .completionsFor('a1');
+      expect(completions, contains('firstLearn:retell'));
+    });
+
+    test('已记录过的 (stage, sub) → 幂等 no-op，不重复写 DB', () async {
+      final container = createContainer(
+        const LearningProgressState(
+          progressMap: {},
+          completionsByAudio: {
+            'a1': {'firstLearn:retell'},
+          },
+        ),
+        retellEnabled: true,
+      );
+
+      await notifier(container).recordCompletionIfNew(
+        'a1',
+        LearningStage.firstLearn,
+        SubStageType.retell,
+      );
+
+      verifyNever(() => mockStageCompletionDao.insertRecord(any()));
+    });
+
+    test('不同子步骤独立写入，不影响已有集合', () async {
+      final container = createContainer(
+        const LearningProgressState(
+          progressMap: {},
+          completionsByAudio: {
+            'a1': {'firstLearn:blindListen'},
+          },
+        ),
+        retellEnabled: true,
+      );
+
+      await notifier(container).recordCompletionIfNew(
+        'a1',
+        LearningStage.firstLearn,
+        SubStageType.retell,
+      );
+
+      final completions = container
+          .read(learningProgressNotifierProvider)
+          .completionsFor('a1');
+      expect(completions, {'firstLearn:blindListen', 'firstLearn:retell'});
     });
   });
 

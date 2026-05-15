@@ -91,4 +91,29 @@ class StageCompletionDao extends DatabaseAccessor<AppDatabase>
       stageCompletions,
     )..where((t) => t.audioItemId.equals(audioItemId))).go();
   }
+
+  /// 查询所有完成事件，按音频 ID 分组返回 `(stage, sub_stage)` 字符串集合。
+  ///
+  /// 返回的 Set 元素格式为 `'stage.key:subStage.key'`，用作真实"完成"事实
+  /// 的内存索引：UI/进度计算用此判定子步骤是否真正做过，而非用
+  /// `stage.index < currentStage.index` 推导。
+  ///
+  /// 启动时一次性加载所有音频的完成集合，比逐音频查询性能更好。
+  Future<Map<String, Set<String>>> getCompletionKeysByAudio() async {
+    final query = selectOnly(stageCompletions, distinct: true)
+      ..addColumns([
+        stageCompletions.audioItemId,
+        stageCompletions.stage,
+        stageCompletions.subStage,
+      ]);
+    final rows = await query.get();
+    final result = <String, Set<String>>{};
+    for (final row in rows) {
+      final audioId = row.read(stageCompletions.audioItemId)!;
+      final stage = row.read(stageCompletions.stage)!;
+      final subStage = row.read(stageCompletions.subStage)!;
+      result.putIfAbsent(audioId, () => <String>{}).add('$stage:$subStage');
+    }
+    return result;
+  }
 }

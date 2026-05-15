@@ -13,6 +13,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../analytics/analytics_providers.dart';
 import '../../analytics/audio_event_params.dart';
 import '../../analytics/models/event_names.dart';
+import '../../database/enums.dart';
 import '../../models/blind_listen_settings.dart';
 import '../../models/playback_settings.dart';
 import '../../models/sentence.dart';
@@ -87,6 +88,17 @@ class LearningSessionState {
   /// 跟读目标遍数
   final int shadowingTargetPlayCount;
 
+  /// 自由练习时用户点击的目标大阶段（用于"补做跳过的复述"语义）。
+  ///
+  /// 仅 [isFreePlay] == true 且从过去阶段的复述卡片进入时设置。
+  /// 自由练习完成时若该 (stage, subStage) 还未在 completedKeys 内，则写入
+  /// stage_completions（[LearningProgressNotifier.recordCompletionIfNew]）
+  /// 让 UI 把"跳过"卡切到 ✅。
+  final LearningStage? retellCatchUpStage;
+
+  /// 自由练习时用户点击的目标子步骤（与 [retellCatchUpStage] 配套）。
+  final SubStageType? retellCatchUpSubStage;
+
   const LearningSessionState({
     this.learningMode,
     this.blindListenCompleted = false,
@@ -98,6 +110,8 @@ class LearningSessionState {
     this.shadowingSentences,
     this.shadowingStartIndex = 0,
     this.shadowingTargetPlayCount = 3,
+    this.retellCatchUpStage,
+    this.retellCatchUpSubStage,
   });
 
   /// 是否处于学习模式中
@@ -120,10 +134,13 @@ class LearningSessionState {
     List<Sentence>? shadowingSentences,
     int? shadowingStartIndex,
     int? shadowingTargetPlayCount,
+    LearningStage? retellCatchUpStage,
+    SubStageType? retellCatchUpSubStage,
     bool clearLearningMode = false,
     bool clearSavedSettings = false,
     bool clearAudioItemId = false,
     bool clearShadowingSentences = false,
+    bool clearRetellCatchUp = false,
   }) {
     return LearningSessionState(
       learningMode: clearLearningMode
@@ -145,6 +162,12 @@ class LearningSessionState {
           shadowingStartIndex ?? this.shadowingStartIndex,
       shadowingTargetPlayCount:
           shadowingTargetPlayCount ?? this.shadowingTargetPlayCount,
+      retellCatchUpStage: clearRetellCatchUp
+          ? null
+          : (retellCatchUpStage ?? this.retellCatchUpStage),
+      retellCatchUpSubStage: clearRetellCatchUp
+          ? null
+          : (retellCatchUpSubStage ?? this.retellCatchUpSubStage),
     );
   }
 }
@@ -549,6 +572,8 @@ class LearningSession extends _$LearningSession {
     List<List<Sentence>> paragraphs,
     Map<int, Set<int>> keywordsMap, {
     bool isFreePlay = false,
+    LearningStage? catchUpStage,
+    SubStageType? catchUpSubStage,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -572,6 +597,9 @@ class LearningSession extends _$LearningSession {
       audioItemId: audioItemId,
       savedSettings: currentSettings,
       isFreePlay: isFreePlay,
+      retellCatchUpStage: catchUpStage,
+      retellCatchUpSubStage: catchUpSubStage,
+      clearRetellCatchUp: catchUpStage == null,
     );
 
     // 暂停 LP 的 stream 监听

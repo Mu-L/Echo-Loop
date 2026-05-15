@@ -19,8 +19,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/mock_providers.dart';
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late SharedPreferences prefs;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({
+      // 默认预设已做过复述设置选择，避免每个测试都被 gate 弹窗拦截
+      'retell_setup_choice_at_ms': 1700000000000,
+    });
+    prefs = await SharedPreferences.getInstance();
   });
 
   Widget createTestWidget({
@@ -83,6 +90,7 @@ void main() {
 
     return ProviderScope(
       overrides: [
+        ...learningSettingsOverrides(prefs: prefs),
         audioLibraryProvider.overrideWith(
           () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
         ),

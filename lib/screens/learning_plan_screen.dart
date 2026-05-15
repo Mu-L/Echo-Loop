@@ -13,6 +13,7 @@ import '../models/audio_item.dart';
 import '../models/learning_progress.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/audio_library_provider.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/time_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
@@ -138,6 +139,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           }
         },
       );
+
     });
   }
 
@@ -950,7 +952,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
 }
 
 /// 顶部进度卡片 — 圆环进度 + 状态文字 + 逾期徽章 + 音频元信息
-class _ProgressCard extends StatelessWidget {
+class _ProgressCard extends ConsumerWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
   final AudioItem? audioItem;
@@ -964,9 +966,13 @@ class _ProgressCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final percent = progress?.progressPercent ?? 0.0;
+    final plan = ref.watch(learningPlanProvider);
+    final completedKeys = audioItem == null
+        ? const <String>{}
+        : ref.watch(learningProgressNotifierProvider).completionsFor(audioItem!.id);
+    final percent = progress?.progressPercent(plan, completedKeys) ?? 0.0;
     final percentText = '${(percent * 100).round()}%';
 
     final isInProgress = _isInProgress();
@@ -1241,7 +1247,12 @@ class _FirstStudySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final completedCount = progress?.completedFirstStudySteps ?? 0;
+    final plan = ref.watch(learningPlanProvider);
+    final completedKeys = ref
+        .watch(learningProgressNotifierProvider)
+        .completionsFor(audioItemId);
+    final completedCount =
+        progress?.completedFirstStudySteps(plan, completedKeys) ?? 0;
     final firstLearnStage = LearningStage.firstLearn;
     final isFirstLearnCompleted =
         progress?.isStageCompleted(LearningStage.firstLearn) ?? false;
@@ -1274,7 +1285,13 @@ class _FirstStudySection extends ConsumerWidget {
       ),
     };
 
-    final subStages = firstLearnStage.subStages;
+    // 学习计划页 iterate 全量子步骤，但跳过 skipped（不在 plan 内 + 未完成）。
+    // 已完成的子步骤即使不在当前 plan 内也要显示 ✅（保留历史可见，bug 3 修复）。
+    final subStages = firstLearnStage.allSubStages.where((s) {
+      final inPlan = plan.includes(firstLearnStage, s);
+      final isDone = completedKeys.contains('${firstLearnStage.key}:${s.key}');
+      return inPlan || isDone;
+    }).toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1351,7 +1368,7 @@ class _FirstStudySection extends ConsumerWidget {
               final subStage = subStages[index];
               final stepData = stepDataMap[subStage]!;
               final isCompleted =
-                  progress?.isSubStageCompleted(firstLearnStage, subStage) ??
+                  progress?.isSubStageCompleted(firstLearnStage, subStage, completedKeys) ??
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(firstLearnStage, subStage) ??
@@ -1366,7 +1383,7 @@ class _FirstStudySection extends ConsumerWidget {
                 if (passCount > 0) {
                   parts.add(l10n.blindListenPassInfo(passCount));
                 }
-                if (progress?.isSubStageCompleted(firstLearnStage, subStage) ??
+                if (progress?.isSubStageCompleted(firstLearnStage, subStage, completedKeys) ??
                     false) {
                   parts.add(
                     l10n.difficultyLabel(
@@ -1401,14 +1418,18 @@ class _FirstStudySection extends ConsumerWidget {
                 }
               }
 
-              // 已完成步骤支持点击进入自由练习
+              // 已完成或过去阶段跳过的步骤都支持点击进入自由练习。
+              // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
+              final isPast = progress != null &&
+                  firstLearnStage.index < progress!.currentStage.index;
+              final canFreePlay = isCompleted || isPast;
               VoidCallback? onTap;
-              if (isCompleted && subStage == SubStageType.blindListen) {
+              if (canFreePlay && subStage == SubStageType.blindListen) {
                 onTap = () => _startFreePlayBlindListen(context, ref);
-              } else if (isCompleted &&
+              } else if (canFreePlay &&
                   subStage == SubStageType.intensiveListen) {
                 onTap = () => _startFreePlayIntensiveListen(context, ref);
-              } else if (isCompleted &&
+              } else if (canFreePlay &&
                   subStage == SubStageType.listenAndRepeat) {
                 // 无难句自动完成的跟读步骤：点击只显示提示
                 final bookmarkCount =
@@ -1425,7 +1446,7 @@ class _FirstStudySection extends ConsumerWidget {
                 } else {
                   onTap = () => _startFreePlayListenAndRepeat(context, ref);
                 }
-              } else if (isCompleted && subStage == SubStageType.retell) {
+              } else if (canFreePlay && subStage == SubStageType.retell) {
                 onTap = () => _startFreePlayRetell(context, ref);
               }
 
@@ -1625,6 +1646,8 @@ class _FirstStudySection extends ConsumerWidget {
               paragraphs,
               keywordsMap,
               isFreePlay: true,
+              catchUpStage: LearningStage.firstLearn,
+              catchUpSubStage: SubStageType.retell,
             );
         if (pauseMultiplier >= 0) {
           final player = ref.read(retellPlayerProvider.notifier);
@@ -1878,29 +1901,27 @@ class _ReviewRoundSection extends ConsumerWidget {
     required this.onToggle,
   });
 
-  /// 计算当前轮次已完成子阶段数
-  int _completedSubStageCount() {
-    if (progress == null) return 0;
-    if (progress!.isStageCompleted(review.stage)) {
-      return review.stage.subStageCount;
+  /// 计算本轮次「已完成」子步骤数（基于真实完成历史 [completedKeys]）。
+  int _completedSubStageCount(Set<String> completedKeys) {
+    int count = 0;
+    for (final sub in review.stage.allSubStages) {
+      if (completedKeys.contains('${review.stage.key}:${sub.key}')) count += 1;
     }
-    if (progress!.isCurrentStage(review.stage)) {
-      return progress!.currentSubStageIndex
-          .clamp(0, review.stage.subStageCount)
-          .toInt();
-    }
-    return 0;
+    return count;
   }
 
   /// 当前复习轮次时间文案（仅当前轮次显示）。
   ///
   /// 展示优先级：已有进度→"学习中" > 未到时间倒计时 > 逾期提示 > 可复习。
-  String? _reviewTimingText(BuildContext context) {
+  String? _reviewTimingText(
+    BuildContext context, {
+    required Set<String> completedKeys,
+  }) {
     if (progress == null) return null;
     if (!progress!.isCurrentStage(review.stage)) return null;
 
     // 已有进度（至少完成 1 个子阶段）→ 显示"学习中"
-    if (_completedSubStageCount() > 0) {
+    if (_completedSubStageCount(completedKeys) > 0) {
       return l10n.learningInProgress;
     }
 
@@ -2100,6 +2121,10 @@ class _ReviewRoundSection extends ConsumerWidget {
     final lpState = ref.read(listeningPracticeProvider);
     if (lpState.sentences.isEmpty) return;
 
+    final catchUpSub = isSummary
+        ? SubStageType.reviewRetellSummary
+        : SubStageType.reviewRetellParagraph;
+
     if (isSummary) {
       // 全文复述：全文作为单个段落，无需选择时长
       final keywordsMap = extractKeywords(
@@ -2113,6 +2138,8 @@ class _ReviewRoundSection extends ConsumerWidget {
             [lpState.sentences],
             keywordsMap,
             isFreePlay: true,
+            catchUpStage: review.stage,
+            catchUpSubStage: catchUpSub,
           );
       if (context.mounted) {
         context.push(AppRoutes.retellPlayer(collectionId, audioItemId));
@@ -2141,6 +2168,8 @@ class _ReviewRoundSection extends ConsumerWidget {
               paragraphs,
               keywordsMap,
               isFreePlay: true,
+              catchUpStage: review.stage,
+              catchUpSubStage: catchUpSub,
             );
         if (pauseMultiplier >= 0) {
           final player = ref.read(retellPlayerProvider.notifier);
@@ -2162,9 +2191,19 @@ class _ReviewRoundSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final subStages = review.stage.subStages;
-    final completedCount = _completedSubStageCount();
-    final timingText = _reviewTimingText(context);
+    final plan = ref.watch(learningPlanProvider);
+    final completedKeys = ref
+        .watch(learningProgressNotifierProvider)
+        .completionsFor(audioItemId);
+    // iterate 全量；保留已完成（✅）+ planned；跳过 skipped（不在 plan 且未完成）。
+    final subStages = review.stage.allSubStages.where((s) {
+      final inPlan = plan.includes(review.stage, s);
+      final isDone = completedKeys.contains('${review.stage.key}:${s.key}');
+      return inPlan || isDone;
+    }).toList(growable: false);
+    final completedCount = _completedSubStageCount(completedKeys);
+    final timingText =
+        _reviewTimingText(context, completedKeys: completedKeys);
     final unlockText = _unlockStatusText();
     // 当前轮次显示实时状态，其余轮次显示解锁状态，都没有则显示固定间隔
     final statusText = timingText ?? unlockText ?? review.interval;
@@ -2263,7 +2302,7 @@ class _ReviewRoundSection extends ConsumerWidget {
               final subStage = subStages[index];
               final subStageData = _subStageData(context, subStage);
               final isCompleted =
-                  progress?.isSubStageCompleted(review.stage, subStage) ??
+                  progress?.isSubStageCompleted(review.stage, subStage, completedKeys) ??
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(review.stage, subStage) ?? false;
@@ -2283,9 +2322,13 @@ class _ReviewRoundSection extends ConsumerWidget {
                 }
               }
 
-              // 已完成的复习子步骤支持点击进入自由练习
+              // 已完成或过去阶段跳过的子步骤都支持点击进入自由练习。
+              // （过去阶段跳过的复述：用户当时关掉了复述、现在重开后想补做）
+              final isPast = progress != null &&
+                  review.stage.index < progress!.currentStage.index;
+              final canFreePlay = isCompleted || isPast;
               VoidCallback? onTap;
-              if (isCompleted) {
+              if (canFreePlay) {
                 // 无难句自动完成的补练步骤：点击只显示提示
                 final bookmarkCount =
                     ref

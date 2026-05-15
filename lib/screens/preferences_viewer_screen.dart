@@ -1,7 +1,8 @@
 /// 开发者选项：偏好设置查看页
 ///
-/// 只读展示当前 [SharedPreferences] 中保存的所有 key-value，
-/// 方便排查用户设置相关的问题。支持关键字过滤、长按复制、整体复制。
+/// 展示当前 [SharedPreferences] 中保存的所有 key-value，
+/// 方便排查用户设置相关的问题。支持关键字过滤、长按复制、整体复制，
+/// 以及向左滑动单条 key 进行删除（仅供测试场景使用）。
 library;
 
 import 'dart:convert';
@@ -69,6 +70,51 @@ class _PreferencesViewerScreenState extends State<PreferencesViewerScreen> {
         .toList();
   }
 
+  /// 弹出二次确认对话框，询问是否删除指定 [key]。
+  ///
+  /// 仅用于开发者测试场景。返回 `true` 时调用方应执行删除。
+  Future<bool> _confirmDelete(String key) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: const Text('删除偏好设置？'),
+          content: Text('key: $key\n此操作不可撤销，仅用于测试。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+              ),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  /// 从 [SharedPreferences] 中删除 [key]，并同步更新内存快照与 UI 提示。
+  ///
+  /// 直接增量更新 [_entries]，避免重新走 [_load] 引起的列表抖动。
+  Future<void> _deleteKey(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(key);
+    if (!mounted) return;
+    setState(() {
+      _entries = _entries.where((e) => e.key != key).toList();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已删除 $key')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -126,8 +172,27 @@ class _PreferencesViewerScreenState extends State<PreferencesViewerScreen> {
                     : ListView.separated(
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) =>
-                            _PrefTile(entry: filtered[index]),
+                        itemBuilder: (context, index) {
+                          final entry = filtered[index];
+                          final theme = Theme.of(context);
+                          return Dismissible(
+                            key: ValueKey('pref-${entry.key}'),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              color: theme.colorScheme.error,
+                              alignment: Alignment.centerRight,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              child: Icon(
+                                Icons.delete,
+                                color: theme.colorScheme.onError,
+                              ),
+                            ),
+                            confirmDismiss: (_) => _confirmDelete(entry.key),
+                            onDismissed: (_) => _deleteKey(entry.key),
+                            child: _PrefTile(entry: entry),
+                          );
+                        },
                       ),
           ),
         ],

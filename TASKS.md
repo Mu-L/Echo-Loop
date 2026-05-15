@@ -1,7 +1,123 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-04-27
-> 当前焦点：跟读权限前置阻塞弹窗
+> 最后更新：2026-05-14
+> 当前焦点：复述功能开关
+
+## 已完成：完成历史驱动的三态判定（V2.1 修复 3 个 V2 bug）
+
+V2 重构后暴露 3 个 bug，根因都是 `isSubStageCompleted` 用 `stage.index + plan.includes` 推导「完成」，没查真实历史：
+
+1. **完成弹窗「继续：XX」按钮不看 plan**：review0 复述关闭，做完难句补练，弹窗显示「继续：段落复述」（plan 实际不含）
+2. **跳过的子步骤被误判为完成**：关闭复述完成 review0 → 重开复述 → 段落复述卡显示 ✅（用户从未做过）
+3. **已完成的复述被隐藏**：开启复述完成 retell → 关闭复述 → retell 卡完全消失（用户真做过的历史被丢失）
+
+### 架构变更
+- [x] `lib/database/daos/stage_completion_dao.dart` 新增 `getCompletionKeysByAudio` — 一次性加载所有音频的完成事件集合（key 格式 `'stage.key:subStage.key'`）
+- [x] `LearningProgressState` 加 `completionsByAudio: Map<String, Set<String>>` 字段；`completionsFor(audioId)` 便捷访问
+- [x] `LearningProgressNotifier.loadAll` 同时加载 stage_completions 到内存集合
+- [x] `LearningProgressNotifier.completeCurrentSubStage` 写入 stage_completions 后同步更新内存集合
+- [x] `LearningProgressNotifier.deleteProgress` 清理对应条目
+- [x] `LearningProgress.isSubStageCompleted` / `progressPercent` / `completedFirstStudySteps` 签名改为接收 `Set<String> completedKeys`（真实完成历史，不依赖 stage.index）
+- [x] `LearningPlan.nextPlannedAfter(stage, sub)` — 找当前阶段 plan 内下一项，末尾返回 null（修 bug 1）
+
+### UI 层
+- [x] 学习计划页 iterate `stage.allSubStages`，渲染条件 = `completed || inPlan`（跳过的 skipped 完全不渲染）
+- [x] 进度比例分子分母都用 `completedKeys`（保留已完成的历史可见性，bug 3 修复）
+- [x] `_ProgressCard` / `_FirstStudySection` / `_ReviewRoundSection` 都 watch `learningProgressNotifierProvider` 取 completionsByAudio
+- [x] `study_screen` / `learning_progress_icon` 同样接 completedKeys
+- [x] 5 个 player screen（blind_listen / intensive_listen / listen_and_repeat / retell / review_difficult_practice）的 `_getStepContext` 改用 `plan.subStagesFor(stage)` 派生 stepIndex/totalSteps；nextStepName 用 `plan.nextPlannedAfter` 计算，末尾返回 null（弹窗只显示「完成」按钮，bug 1 修复）
+
+### 测试覆盖
+- [x] DAO 测试 + 4 个 `getCompletionKeysByAudio` 边界
+- [x] LearningProgress 三态判定单测含 bug 2/3 关键回归
+- [x] `LearningPlan.nextPlannedAfter` 4 个边界（含 plan OFF + review0 难句补练 → null 修 bug 1）
+- [x] plan screen / 5 个 player screen 测试 ProviderScope 增加 `learningSettingsOverrides`
+- [x] plan screen test 引入 `_withAutoCompletions` 兼容旧测试预期（按 currentStage/currentSubStage 自动推导 completedKeys）
+
+### 验证
+- flutter analyze 0 error
+- 2054 个 unit/widget 测试全过
+
+  **完成时间**: 2026-05-14（V2.1）
+
+---
+
+## 已完成：复述跳过 vs 完成语义修正 + 全局学习计划对象（V2 重构）
+
+V1 实现暴露两个语义缺陷：
+1. 「跳过」与「完成」混淆：`silentSkip=true` 推进后 `isSubStageCompleted` 仍按 `stage.index` 判定为 true → UI 上跳过的复述也显示 ✅
+2. 判定散落多处：`subStagesWith` / `visibleSubStagesForPlanView` / `progressPercentWith` / `_completedSubStageCount` / `completeCurrentSubStage` 各自读 `retellEnabled` 实时计算
+
+引入**全局 `LearningPlan` 值对象**作为「每个大阶段计划做哪些子步骤」的单一事实来源，从 settings 派生。UI / 推进 / reconcile / 进度计算只读 `plan.subStagesFor(stage)`，`retellEnabled` 只在 plan 构造时被读一次。
+
+### 架构变更
+- [x] `lib/models/learning_plan.dart` 新增不可变 `LearningPlan` 值对象（`subStagesFor` / `includes` / `indexOf` / `totalPlannedCount` API）
+- [x] `lib/providers/learning_plan_provider.dart` 派生自 `learningSettingsProvider`
+- [x] `lib/database/enums.dart`：`LearningStage.subStages` 重命名 `allSubStages`；删除 `subStagesWith`
+- [x] `lib/models/learning_progress.dart`：新增 `isSubStageCompleted(stage, sub, plan)` / `progressPercent(plan)` / `completedFirstStudySteps(plan)`；**删除** `visibleSubStagesForPlanView` / `progressPercentWith` / `progressPercent` getter / `completedFirstStudyStepsWith` / `completedFirstStudySteps` getter / `needsAdvanceWhenRetellDisabled` / 旧无参 `isSubStageCompleted`
+- [x] `lib/providers/learning_progress_provider.dart`：`ref.listen` 改监听 `learningPlanProvider`；`completeCurrentSubStage` 删除 `silentSkip` 参数改读 plan；`_reconcileForRetellDisabled` → `_reconcileForSettingsChange` 重写为「直接修改 currentStage/currentSubStage，**不写** stage_completions」
+- [x] UI 切到 plan：`learning_plan_screen` / `study_screen` / `learning_progress_icon` 删除 `retellEnabled` 传参，改 `ref.watch(learningPlanProvider)`，iterate `plan.subStagesFor(stage)`（跳过的子步骤自动不渲染）
+
+### 关键回归修复
+- **跳过 ≠ 完成**：reconcile 推进时不写 `stage_completions`、不递增 retellPassCount，过去阶段中不在 plan 内的复述子步骤 `isSubStageCompleted` 返回 false
+- **跳过卡片完全不显示**：UI iterate plan 而非 allSubStages
+- **进度比例正确**：分子/分母都从 plan 派生（跳过既不计入也不显示）
+
+### 测试覆盖
+- [x] `test/models/learning_plan_test.dart`（6 个）：fromSettings / subStagesFor / includes / indexOf / totalPlannedCount
+- [x] `test/database/enums_test.dart` 简化为 `allSubStages` + `kRetellSubStages` + `isRetellSubStage`（11 个）
+- [x] `test/models/learning_progress_test.dart` 扩展：三态判定 + 关键回归（过去阶段 + 不在 plan → completed=false）+ progressPercent(plan) / completedFirstStudySteps(plan)
+- [x] `test/providers/learning_progress_provider_test.dart` 更新：reconcileForSettingsChange 6 边界 + completeCurrentSubStage 推进
+- [x] `test/widgets/learning_progress_icon_test.dart` / `test/helpers/mock_providers.dart` 同步
+- [x] `integration_test/groups/retell_toggle_tests.dart` 端到端验证
+
+### 验证
+- flutter analyze 0 error
+- 2046 个 unit/widget 测试全过
+- 集成测试 retell_toggle 通过
+
+  **完成时间**: 2026-05-14（V2）
+
+---
+
+## 已完成：复述功能开关（Retell Toggle）
+
+新增「我的设置 → 学习设置 → 启用复述练习」全局开关，默认关闭。用户首次进入任意音频学习计划页时一次性弹窗询问是否启用。关闭时复述类子阶段从「按计划学习」流中过滤掉，且自动推进卡在复述子阶段的进度。已完成的大阶段不受影响，自由练习入口不受影响。
+
+### 数据层
+- [x] `lib/providers/learning_settings_provider.dart`：`LearningSettings` 不可变值对象（`retellEnabled` + `introDialogShown`）+ `LearningSettingsNotifier`（手动 Notifier 模式）+ SP 持久化（`learning_retell_enabled` + `retell_intro_dialog_shown_at_ms`）+ `initialLearningSettingsProvider` 同步预读注入
+- [x] `lib/main.dart` 启动期 `LearningSettings.fromPrefsSync(prefs)` 注入 override
+- [x] `lib/database/enums.dart` 新增 `LearningStage.subStagesWith({retellEnabled})` + `kRetellSubStages` 常量 + `isRetellSubStage()` 工具
+- [x] `lib/models/learning_progress.dart` 新增 `needsAdvanceWhenRetellDisabled` getter + `progressPercentWith` / `completedFirstStudyStepsWith` 过滤版方法
+
+### 推进与 reconcile
+- [x] `lib/providers/learning_progress_provider.dart`：`completeCurrentSubStage` 接入 `subStagesWith`；`currentIdx == -1` 边界处理 reconcile 路径；进入下一阶段后 while 循环跳过空可见列表；新增 `silentSkip` 参数跳过 `stage_completions` 写入和耗时累加
+- [x] `LearningProgressNotifier.build()` 内 `ref.listen(learningSettingsProvider)` 监听 `true → false` 触发 `_reconcileForRetellDisabled`：遍历所有进度调用 `completeCurrentSubStage(silentSkip: true)`，单向数据流避免 Notifier 双向耦合
+- [x] Reconcile 入口埋点 `retell_auto_stage_advance`（含 from_stage / to_stage）
+
+### UI 层
+- [x] `lib/screens/learning_plan_screen.dart`：`_ProgressCard` / `_FirstStudySection` / `_ReviewRoundSection` 全部接入 `subStagesWith` + 过滤版进度方法；`_completedSubStageCount` / `_reviewTimingText` / `progressPercent` / `completedFirstStudySteps` 等所有 `subStages` 引用按开关过滤；`initState` 触发 `maybeShowRetellIntroDialog`
+- [x] `lib/screens/study_screen.dart` `_TaskCard` 接入 `progressPercentWith`
+- [x] `lib/widgets/learning_progress_icon.dart` 改为 ConsumerWidget 接入 `progressPercentWith`
+- [x] `lib/screens/settings_screen.dart` 新增「学习」section + 「学习设置」入口（🎯 emoji + 已开启状态文字）
+- [x] `lib/screens/learning_settings_screen.dart` 子页面（参考 reminder_settings 样式，SwitchListTile + 副标题 + 说明文字）
+- [x] `lib/widgets/retell_intro_dialog.dart` 引导弹窗（Material 3 AlertDialog + Hero icon + 双按钮 + barrierDismissible:false）+ `maybeShowRetellIntroDialog` 内存 flag + SP 双 gate 防双弹
+
+### 埋点（4 个新事件）
+- [x] `retell_intro_dialog_shown` / `retell_intro_dialog_choice` / `retell_toggle_changed` / `retell_auto_stage_advance` + 参数 `enabled` / `source` / `choice` / `trigger`
+
+### 国际化（11 个 key）
+- [x] `learningSection` / `learningSettings` / `learningSettingsEnabled` / `speakingPracticeSection` / `retellEnabledToggle` / `retellEnabledSubtitle` / `retellEnabledDescription` / `retellPromptTitle` / `retellPromptBody` / `retellPromptDismiss` / `retellPromptEnable`（中英文）
+
+### 测试覆盖
+- [x] 单元测试：`learning_settings_provider_test.dart`（11 个）/ `enums_test.dart`（11 个）/ `learning_progress_test.dart`（+10 个）/ `learning_progress_provider_test.dart`（+12 个 T3/T5 边界）/ `event_names_test.dart`（+2 个）
+- [x] Widget 测试：`learning_settings_screen_test.dart`（3 个）/ `retell_intro_dialog_test.dart`（5 个）
+- [x] Integration：`retell_toggle_tests.dart`（设置入口可达 + 开关切换 state 翻转）
+- [x] Provider 默认 mock + screen 测试 helper 同步更新
+
+  **完成时间**: 2026-05-14
+
+---
 
 ## 已完成：跟读权限前置阻塞弹窗
 

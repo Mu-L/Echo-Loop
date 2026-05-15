@@ -16,6 +16,7 @@ import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../models/retell_settings.dart';
 import '../models/sentence.dart';
+import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
@@ -529,29 +530,21 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     if (mounted) context.pop();
   }
 
-  /// 获取当前步骤的上下文信息
+  /// 获取当前步骤的上下文信息（按 plan 派生）
   ({int stepIndex, int totalSteps, String stageName}) _getStepContext() {
     final l10n = AppLocalizations.of(context)!;
+    final plan = ref.read(learningPlanProvider);
     final progress = ref
         .read(learningProgressNotifierProvider)
         .progressMap[widget.audioItemId];
 
-    if (progress == null) {
-      final subStages = LearningStage.firstLearn.subStages;
-      final idx = subStages.indexOf(SubStageType.retell);
-      return (
-        stepIndex: idx,
-        totalSteps: subStages.length,
-        stageName: reviewStageLabel(l10n, LearningStage.firstLearn),
-      );
-    }
-
-    final stage = progress.currentStage;
-    final subStages = stage.subStages;
-    final currentIdx = subStages.indexOf(progress.currentSubStage);
+    final stage = progress?.currentStage ?? LearningStage.firstLearn;
+    final currentSub = progress?.currentSubStage ?? SubStageType.retell;
+    final planned = plan.subStagesFor(stage);
+    final currentIdx = planned.indexOf(currentSub);
     return (
-      stepIndex: currentIdx,
-      totalSteps: subStages.length,
+      stepIndex: currentIdx >= 0 ? currentIdx : planned.length,
+      totalSteps: planned.length,
       stageName: reviewStageLabel(l10n, stage),
     );
   }
@@ -570,6 +563,20 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .incrementRetellPassCount(widget.audioItemId);
+
+      // 「补做」语义：用户从过去阶段的跳过卡片进入自由练习并完成 → 写入
+      // stage_completions（幂等，已记录则 no-op）。让 UI 把灰色卡切到 ✅。
+      final catchUpStage = sessionState.retellCatchUpStage;
+      final catchUpSub = sessionState.retellCatchUpSubStage;
+      if (catchUpStage != null && catchUpSub != null) {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .recordCompletionIfNew(
+              widget.audioItemId,
+              catchUpStage,
+              catchUpSub,
+            );
+      }
 
       if (!mounted) {
         _isShowingDialog = false;

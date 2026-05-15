@@ -26,6 +26,7 @@ import 'package:echo_loop/providers/tag_provider.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
+import 'package:echo_loop/providers/learning_settings_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/learning_session/blind_listen_player_provider.dart';
 import 'package:echo_loop/providers/learning_session/intensive_listen_player_provider.dart';
@@ -177,6 +178,30 @@ Override analyticsOverride() {
   return analyticsServiceProvider.overrideWithValue(
     createTestAnalyticsServiceSync(),
   );
+}
+
+/// 返回学习设置 Provider 系列的 override 列表（用于测试默认/自定义初值）。
+///
+/// 测试默认 retellEnabled=false（与生产默认值一致）；
+/// 显式打开复述用 `retellEnabled: true`。
+///
+/// [prefs] 可选 SharedPreferences 实例：如果传入，会同时 override
+/// `sharedPreferencesProvider`，让 `ensureRetellDecisionMade` 直接读到测试
+/// 期望的 SP key 状态。不传则 gate 行为依赖各测试自行 override。
+List<Override> learningSettingsOverrides({
+  bool retellEnabled = false,
+  bool setupChoiceMade = false,
+  SharedPreferences? prefs,
+}) {
+  return [
+    initialLearningSettingsProvider.overrideWithValue(
+      LearningSettings(
+        retellEnabled: retellEnabled,
+        setupChoiceMade: setupChoiceMade,
+      ),
+    ),
+    if (prefs != null) sharedPreferencesProvider.overrideWithValue(prefs),
+  ];
 }
 
 /// 返回 dictionaryProvider 的 override，状态为已下载

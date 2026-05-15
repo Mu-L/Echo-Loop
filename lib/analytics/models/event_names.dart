@@ -173,6 +173,19 @@ abstract class Events {
   /// 清除缓存成功
   static const cacheCleared = 'cache_cleared';
 
+  // ── 复述功能开关 ──
+  /// 首次进入音频学习计划页时的引导弹窗展示
+  static const retellIntroDialogShown = 'retell_intro_dialog_shown';
+
+  /// 用户在引导弹窗中的选择（enable / dismiss）
+  static const retellIntroDialogChoice = 'retell_intro_dialog_choice';
+
+  /// 复述开关切换（设置页或引导弹窗）
+  static const retellToggleChanged = 'retell_toggle_changed';
+
+  /// 关闭复述时静默推进大阶段（每条进度一次）
+  static const retellAutoStageAdvance = 'retell_auto_stage_advance';
+
   // ── Onboarding 问卷（首启 2 题，只采集不消费） ──
   /// 进入问卷页
   static const onboardingSurveyShown = 'onboarding_survey_shown';
@@ -235,6 +248,19 @@ abstract class EventParams {
   static const totalDurationMs = 'total_duration_ms';
   static const fromStage = 'from_stage';
   static const toStage = 'to_stage';
+
+  /// 阶段推进触发来源（如 'retell_disabled'，仅复述静默推进时附带）
+  static const trigger = 'trigger';
+
+  // ── 复述开关 ──
+  /// 复述开关当前值
+  static const enabled = 'enabled';
+
+  /// 复述开关切换来源：'intro_dialog' 或 'settings_page'
+  static const source = 'source';
+
+  /// 引导弹窗用户选择：'enable' / 'dismiss'
+  static const choice = 'choice';
 
   // ── 录音评估 ──
   /// 录音来源界面：listen_repeat / retell / difficult_practice

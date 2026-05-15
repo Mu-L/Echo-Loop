@@ -23,6 +23,7 @@ import 'groups/retell_tests.dart';
 import 'groups/review_sub_stage_tests.dart';
 import 'groups/manage_subtitles_tests.dart';
 import 'groups/flashcard_tests.dart';
+import 'groups/retell_toggle_tests.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -46,4 +47,5 @@ void main() {
   reviewSubStageTests();
   manageSubtitlesTests();
   flashcardTests();
+  retellToggleTests();
 }

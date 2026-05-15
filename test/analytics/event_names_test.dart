@@ -129,6 +129,20 @@ void main() {
             reason: '"$name" 不符合小写下划线命名规范');
       }
     });
+
+    test('复述功能开关 4 个事件常量正确', () {
+      expect(Events.retellIntroDialogShown, 'retell_intro_dialog_shown');
+      expect(Events.retellIntroDialogChoice, 'retell_intro_dialog_choice');
+      expect(Events.retellToggleChanged, 'retell_toggle_changed');
+      expect(Events.retellAutoStageAdvance, 'retell_auto_stage_advance');
+    });
+
+    test('复述参数常量正确', () {
+      expect(EventParams.trigger, 'trigger');
+      expect(EventParams.enabled, 'enabled');
+      expect(EventParams.source, 'source');
+      expect(EventParams.choice, 'choice');
+    });
   });
 
   group('EventParams 常量', () {

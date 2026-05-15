@@ -171,6 +171,7 @@ Widget _createTestWidget({
     overrides: [
       analyticsOverride(),
       ...studyTimeOverrides(),
+      ...learningSettingsOverrides(retellEnabled: true),
       audioEngineProvider.overrideWith(() => TestAudioEngine()),
       learningProgressNotifierProvider.overrideWith(
         () => TestLearningProgressNotifier(),

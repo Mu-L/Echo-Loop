@@ -1,4 +1,5 @@
 import '../database/enums.dart';
+import 'learning_plan.dart';
 
 /// 学习进度模型
 ///
@@ -119,7 +120,7 @@ class LearningProgress {
 
   /// 当前子步骤在所属阶段中的索引
   int get currentSubStageIndex =>
-      currentStage.subStages.indexOf(currentSubStage);
+      currentStage.allSubStages.indexOf(currentSubStage);
 
   /// 是否已开始学习
   bool get isStarted =>
@@ -206,28 +207,44 @@ class LearningProgress {
     return now.difference(windowEnd);
   }
 
-  /// 总完成进度（0.0 ~ 1.0）
-  double get progressPercent {
+  /// 总完成进度（0.0 ~ 1.0）。
+  ///
+  /// 分母 = 可见子步骤总数（plan 内 ∪ 已真实完成的子步骤，跨所有阶段）。
+  /// 分子 = 已真实完成的子步骤数（[completedKeys] 中存在）。
+  /// 跳过的子步骤（不在 plan 也未完成）既不计分子也不计分母。
+  double progressPercent(LearningPlan plan, Set<String> completedKeys) {
     if (isCompleted) return 1.0;
+    int total = 0;
     int completed = 0;
-    for (int s = 0; s < currentStage.index; s++) {
-      completed += LearningStage.values[s].subStageCount;
+    for (final s in LearningStage.values) {
+      for (final sub in s.allSubStages) {
+        final key = '${s.key}:${sub.key}';
+        final isDone = completedKeys.contains(key);
+        final inPlan = plan.includes(s, sub);
+        if (!isDone && !inPlan) continue; // skipped
+        total += 1;
+        if (isDone) completed += 1;
+      }
     }
-    completed += currentSubStageIndex.clamp(0, currentStage.subStageCount);
-    return completed / totalSubStages;
+    if (total == 0) return 0.0;
+    return completed / total;
   }
 
   /// 指定阶段是否已完成
   bool isStageCompleted(LearningStage stage) =>
       stage.index < currentStage.index;
 
-  /// 指定子步骤是否已完成
-  bool isSubStageCompleted(LearningStage stage, SubStageType subStage) {
-    if (stage.index < currentStage.index) return true;
-    if (stage.index == currentStage.index) {
-      return stage.subStages.indexOf(subStage) < currentSubStageIndex;
-    }
-    return false;
+  /// 指定子步骤是否**真做过**（基于 stage_completions 真实历史）。
+  ///
+  /// [completedKeys] 由 `LearningProgressState.completionsFor(audioId)` 提供，
+  /// 是该音频已写入 `stage_completions` 表的 `'stage.key:subStage.key'` 集合。
+  /// 跳过（reconcile 推进但未真做）的子步骤不会出现在该集合内 → 返回 false。
+  bool isSubStageCompleted(
+    LearningStage stage,
+    SubStageType subStage,
+    Set<String> completedKeys,
+  ) {
+    return completedKeys.contains('${stage.key}:${subStage.key}');
   }
 
   /// 指定阶段是否为当前活跃阶段
@@ -237,12 +254,17 @@ class LearningProgress {
   bool isCurrentSubStage(LearningStage stage, SubStageType subStage) =>
       stage == currentStage && subStage == currentSubStage;
 
-  /// 已完成的首次学习步骤数
-  int get completedFirstStudySteps {
-    if (currentStage == LearningStage.firstLearn) {
-      return currentSubStageIndex.clamp(0, currentStage.subStageCount);
+  /// 已完成的首次学习步骤数（按真实完成历史 [completedKeys] 派生）。
+  ///
+  /// 分母 = firstLearn 阶段可见子步骤（plan 内 ∪ 已完成），分子 = 已完成数。
+  int completedFirstStudySteps(LearningPlan plan, Set<String> completedKeys) {
+    int count = 0;
+    for (final sub in LearningStage.firstLearn.allSubStages) {
+      if (completedKeys.contains('${LearningStage.firstLearn.key}:${sub.key}')) {
+        count += 1;
+      }
     }
-    return LearningStage.firstLearn.subStageCount;
+    return count;
   }
 
   /// 已完成的复习阶段数（review0 ~ review28 共 7 个）

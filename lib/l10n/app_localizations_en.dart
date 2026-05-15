@@ -2913,6 +2913,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackSection => 'Playback';
 
   @override
+  String get learningSection => 'Learning';
+
+  @override
+  String get learningSettings => 'Learning settings';
+
+  @override
+  String get speakingPracticeSection => 'Speaking practice';
+
+  @override
+  String get retellEnabledToggle => 'Enable speaking practice';
+
+  @override
+  String get retellEnabledSubtitle => 'Retell paragraphs in your own words';
+
+  @override
+  String get retellEnabledDescription =>
+      'Speaking practice is an advanced exercise that quickly improves fluency. We recommend enabling it after your listening skills feel comfortable.';
+
+  @override
+  String get retellPromptTitle => 'Enable speaking practice?';
+
+  @override
+  String get retellPromptBody =>
+      'Speaking practice is challenging but rapidly builds oral skills. We suggest enabling it once you have some foundation. Adjust anytime under Settings → Learning.';
+
+  @override
+  String get retellPromptDismiss => 'Not now';
+
+  @override
+  String get retellPromptEnable => 'Enable now';
+
+  @override
   String get skipSilenceTitle => 'Auto-skip Silence';
 
   @override
