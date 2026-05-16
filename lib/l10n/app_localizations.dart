@@ -4640,6 +4640,30 @@ abstract class AppLocalizations {
   /// **'Tap here to follow the learning plan step by step. Echo Loop will guide you and remind you to review at the right time.'**
   String get guidePlanStartLearningDescription;
 
+  /// No description provided for @guidePlanPauseLearningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause learning'**
+  String get guidePlanPauseLearningTitle;
+
+  /// No description provided for @guidePlanPauseLearningDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'If you no longer want to study this audio, tap here to pause anytime. Review reminders will stop, and you can resume with one tap later.'**
+  String get guidePlanPauseLearningDescription;
+
+  /// No description provided for @guideRetellSkipTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this retell'**
+  String get guideRetellSkipTitle;
+
+  /// No description provided for @guideRetellSkipDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'If it is not a good time to speak out loud, tap here to skip this retell. You can always practice it later in Free Practice.'**
+  String get guideRetellSkipDescription;
+
   /// No description provided for @learningProgressLoadFailed.
   ///
   /// In en, this message translates to:

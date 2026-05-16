@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../database/enums.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/sentence.dart';
+import '../../providers/new_user_guide_provider.dart';
 import '../../utils/retell_duration_estimator.dart';
 import '../common/paragraph_selection_sheet.dart';
 
@@ -77,5 +78,11 @@ Future<void> showRetellBriefingSheet({
     onStartPractice: onStartPractice,
     skipLabel: onSkip != null ? l10n.retellSkip : null,
     onSkip: onSkip,
+    // 仅按计划学习路径才显示「跳过」按钮 + 配套新手引导。
+    skipGuideFlowId:
+        onSkip != null ? GuideFlowIds.retellBriefingSkip : null,
+    skipGuideTitle: onSkip != null ? l10n.guideRetellSkipTitle : null,
+    skipGuideDescription:
+        onSkip != null ? l10n.guideRetellSkipDescription : null,
   );
 }

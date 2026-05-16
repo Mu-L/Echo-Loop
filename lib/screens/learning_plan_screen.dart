@@ -98,6 +98,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   final _keyFreePlay = GlobalKey();
   final _keyStartLearning = GlobalKey();
   final _keyAddSubtitle = GlobalKey();
+  final _keyPauseLearning = GlobalKey();
 
   @override
   void initState() {
@@ -797,6 +798,17 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       title: l10n.guidePlanAddSubtitleTitle,
       description: l10n.guidePlanAddSubtitleDescription,
     );
+    final stepPauseLearning = GuideStep(
+      key: _keyPauseLearning,
+      title: l10n.guidePlanPauseLearningTitle,
+      description: l10n.guidePlanPauseLearningDescription,
+    );
+
+    // 暂停学习按钮仅在已开始学习且当前未暂停时才会渲染，引导也只在此时
+    // 触发；和「自由练习 / 按计划学习」flow 隔离，让用户开始学习后再看到。
+    final showPauseLearningGuide = hasTranscript &&
+        (progress?.isStarted ?? false) &&
+        !(progress?.isPaused ?? false);
 
     final flows = <GuideFlow>[
       GuideFlow(
@@ -808,6 +820,11 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
         flowId: GuideFlowIds.learningPlanNoTranscript,
         shouldRun: !hasTranscript,
         steps: [stepAddSubtitle],
+      ),
+      GuideFlow(
+        flowId: GuideFlowIds.learningPlanPauseLearning,
+        shouldRun: showPauseLearningGuide,
+        steps: [stepPauseLearning],
       ),
     ];
 
@@ -904,7 +921,10 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
               l10n: l10n,
               progress: progress,
               audioItemId: widget.audioItemId,
+              audioItemName: audioItem.name,
               startLearningStep: hasTranscript ? stepStartLearning : null,
+              pauseLearningStep:
+                  showPauseLearningGuide ? stepPauseLearning : null,
               onPressed: hasTranscript && !isLockedReview
                   ? () => _handleStartLearning(context, progress)
                   : null,
@@ -2547,19 +2567,24 @@ class _NoTranscriptBanner extends StatelessWidget {
 /// - 进行中（未暂停）：Row[Expanded 1:暂停学习 | Expanded 2:继续学习]，比例 1:2。
 /// - 进行中（已暂停）：单按钮「恢复学习」，点击直接恢复（不弹窗），随后 UI 自动
 ///   回到 Row 形态。
+/// - 已学完：单按钮「重置学习进度」，点击弹窗确认后清除全部进度。
 class _BottomButton extends ConsumerWidget {
   final AppLocalizations l10n;
   final LearningProgress? progress;
   final String audioItemId;
+  final String audioItemName;
   final VoidCallback? onPressed;
   final GuideStep? startLearningStep;
+  final GuideStep? pauseLearningStep;
 
   const _BottomButton({
     required this.l10n,
     required this.audioItemId,
+    required this.audioItemName,
     this.progress,
     required this.onPressed,
     this.startLearningStep,
+    this.pauseLearningStep,
   });
 
   Future<void> _confirmAndPause(BuildContext context, WidgetRef ref) async {
@@ -2593,6 +2618,40 @@ class _BottomButton extends ConsumerWidget {
         .resumeProgress(audioItemId);
   }
 
+  /// 已学完状态：重置学习进度（与音频列表菜单的「重置学习进度」逻辑一致）
+  Future<void> _confirmAndReset(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.resetLearningProgressConfirmTitle),
+        content: Text(l10n.resetLearningProgressConfirmMessage(audioItemName)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref
+          .read(learningProgressNotifierProvider.notifier)
+          .deleteProgress(audioItemId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.resetLearningProgressDone)),
+        );
+      }
+    }
+  }
+
   Widget _wrap(BuildContext context, Widget body) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.m),
@@ -2614,6 +2673,31 @@ class _BottomButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasProgress = progress?.isStarted ?? false;
     final isPaused = progress?.isPaused ?? false;
+    final isCompleted = progress?.isCompleted ?? false;
+
+    // 已学完：只显示「重置学习进度」按钮，不再提供暂停/继续。
+    if (isCompleted) {
+      final theme = Theme.of(context);
+      return _wrap(
+        context,
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: () => _confirmAndReset(context, ref),
+            icon: Icon(Icons.restart_alt, color: theme.colorScheme.error),
+            label: Text(
+              l10n.resetLearningProgress,
+              style: TextStyle(color: theme.colorScheme.error),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            ),
+          ),
+        ),
+      );
+    }
 
     // 暂停态：单按钮，文案合并「已暂停 · 恢复学习」，点击直接恢复。
     // 用 tonal 灰底突出当前是暂停态，与正常态的主色「继续学习」区分。
@@ -2648,27 +2732,28 @@ class _BottomButton extends ConsumerWidget {
       final guidedContinue = startLearningStep != null
           ? GuideTarget(step: startLearningStep!, child: continueButton)
           : continueButton;
+      final pauseButton = FilledButton.tonal(
+        onPressed: () => _confirmAndPause(context, ref),
+        style: FilledButton.styleFrom(
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
+          foregroundColor:
+              Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        child: Text(
+          l10n.pauseLearning,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+      final guidedPause = pauseLearningStep != null
+          ? GuideTarget(step: pauseLearningStep!, child: pauseButton)
+          : pauseButton;
       return _wrap(
         context,
         Row(
           children: [
-            Expanded(
-              flex: 1,
-              child: FilledButton.tonal(
-                onPressed: () => _confirmAndPause(context, ref),
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
-                  foregroundColor:
-                      Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                child: Text(
-                  l10n.pauseLearning,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
+            Expanded(flex: 1, child: guidedPause),
             const SizedBox(width: AppSpacing.m),
             Expanded(flex: 2, child: guidedContinue),
           ],

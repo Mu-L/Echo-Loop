@@ -2523,6 +2523,20 @@ class AppLocalizationsZh extends AppLocalizations {
       '点击这里即可按照学习计划逐步学习。Echo Loop 会自动引导你学习，并及时提醒你复习。';
 
   @override
+  String get guidePlanPauseLearningTitle => '暂停学习';
+
+  @override
+  String get guidePlanPauseLearningDescription =>
+      '如果你不想继续学这段音频，可以随时在这里暂停。该音频将停止复习提醒，之后可一键恢复。';
+
+  @override
+  String get guideRetellSkipTitle => '跳过本次复述';
+
+  @override
+  String get guideRetellSkipDescription =>
+      '如果暂时不方便开口说话，可以点这里跳过本次复述。之后可以随时在自由练习中补练。';
+
+  @override
   String get learningProgressLoadFailed => '学习进度加载失败，请稍后重试';
 
   @override

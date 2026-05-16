@@ -2602,6 +2602,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap here to follow the learning plan step by step. Echo Loop will guide you and remind you to review at the right time.';
 
   @override
+  String get guidePlanPauseLearningTitle => 'Pause learning';
+
+  @override
+  String get guidePlanPauseLearningDescription =>
+      'If you no longer want to study this audio, tap here to pause anytime. Review reminders will stop, and you can resume with one tap later.';
+
+  @override
+  String get guideRetellSkipTitle => 'Skip this retell';
+
+  @override
+  String get guideRetellSkipDescription =>
+      'If it is not a good time to speak out loud, tap here to skip this retell. You can always practice it later in Free Practice.';
+
+  @override
   String get learningProgressLoadFailed =>
       'Failed to load learning progress. Please try again later.';
 

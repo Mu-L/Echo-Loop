@@ -78,7 +78,9 @@ abstract final class GuideFlowIds {
   static const collectionDetailAudioList = 'collection_detail_audio_list';
   static const learningPlanNoTranscript = 'learning_plan_no_transcript';
   static const learningPlanWithTranscript = 'learning_plan_with_transcript';
+  static const learningPlanPauseLearning = 'learning_plan_pause_learning';
   static const subtitleSheetTranscription = 'subtitle_sheet_transcription';
+  static const retellBriefingSkip = 'retell_briefing_skip';
   static const studyTasksOverview = 'study_tasks_overview';
   static const studyStatsStreak = 'study_stats_streak';
   static const favoritesSentencesReview = 'favorites_sentences_review';
@@ -95,7 +97,9 @@ abstract final class GuideFlowIds {
     collectionDetailAudioList,
     learningPlanNoTranscript,
     learningPlanWithTranscript,
+    learningPlanPauseLearning,
     subtitleSheetTranscription,
+    retellBriefingSkip,
     studyTasksOverview,
     studyStatsStreak,
     favoritesSentencesReview,

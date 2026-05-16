@@ -10,6 +10,7 @@ import '../../models/blind_listen_settings.dart';
 import '../../models/sentence.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/paragraph_grouping.dart';
+import '../guide_flow.dart';
 import '../review/review_briefing_sheet.dart' show formatEstimatedDuration;
 
 /// 目标段落时长选项（秒）
@@ -46,6 +47,9 @@ Future<void> showParagraphSelectionSheet({
       onStartPractice,
   String? skipLabel,
   VoidCallback? onSkip,
+  String? skipGuideFlowId,
+  String? skipGuideTitle,
+  String? skipGuideDescription,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -67,6 +71,9 @@ Future<void> showParagraphSelectionSheet({
       onStartPractice: onStartPractice,
       skipLabel: skipLabel,
       onSkip: onSkip,
+      skipGuideFlowId: skipGuideFlowId,
+      skipGuideTitle: skipGuideTitle,
+      skipGuideDescription: skipGuideDescription,
     ),
   );
 }
@@ -87,6 +94,9 @@ class _ParagraphSelectionSheet extends StatefulWidget {
       onStartPractice;
   final String? skipLabel;
   final VoidCallback? onSkip;
+  final String? skipGuideFlowId;
+  final String? skipGuideTitle;
+  final String? skipGuideDescription;
 
   const _ParagraphSelectionSheet({
     required this.icon,
@@ -102,6 +112,9 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     required this.onStartPractice,
     this.skipLabel,
     this.onSkip,
+    this.skipGuideFlowId,
+    this.skipGuideTitle,
+    this.skipGuideDescription,
   });
 
   @override
@@ -113,6 +126,9 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
   late int _targetSeconds = widget.defaultSeconds;
   /// -1.0 = 自动（智能模式）
   double _pauseMultiplier = -1.0;
+
+  /// 用于「跳过」按钮新手引导的 showcase key；仅在调用方传入 flow id 时使用。
+  final GlobalKey _skipGuideKey = GlobalKey();
 
   int get _paragraphCount {
     if (_targetSeconds == 0) return widget.sentences.length;
@@ -128,7 +144,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return SafeArea(
+    final body = SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.l, AppSpacing.s, AppSpacing.l, AppSpacing.l,
@@ -324,6 +340,33 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
         ),
       ),
     );
+
+    // 仅在调用方为「跳过」按钮配置了新手引导时，挂载 GuideFlowSequenceHost。
+    // 引导 key 与按钮上的 GuideTarget.key 共用同一 [_skipGuideKey] 实例，保证
+    // showcaseview 能在 tree 内通过 key 定位到目标。
+    final skipFlowId = widget.skipGuideFlowId;
+    final skipDescription = widget.skipGuideDescription;
+    if (widget.onSkip != null &&
+        skipFlowId != null &&
+        skipDescription != null) {
+      return GuideFlowSequenceHost(
+        flows: [
+          GuideFlow(
+            flowId: skipFlowId,
+            shouldRun: true,
+            steps: [
+              GuideStep(
+                key: _skipGuideKey,
+                title: widget.skipGuideTitle,
+                description: skipDescription,
+              ),
+            ],
+          ),
+        ],
+        child: body,
+      );
+    }
+    return body;
   }
 
   /// 底部按钮区：
@@ -350,26 +393,38 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
       return SizedBox(width: double.infinity, child: startButton);
     }
 
+    final skipButton = FilledButton.tonal(
+      onPressed: () {
+        Navigator.of(context).pop();
+        onSkip();
+      },
+      style: FilledButton.styleFrom(
+        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+        foregroundColor: theme.colorScheme.onSurfaceVariant,
+      ),
+      child: Text(
+        skipLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    final skipDescription = widget.skipGuideDescription;
+    final guidedSkip =
+        widget.skipGuideFlowId != null && skipDescription != null
+            ? GuideTarget(
+                step: GuideStep(
+                  key: _skipGuideKey,
+                  title: widget.skipGuideTitle,
+                  description: skipDescription,
+                ),
+                child: skipButton,
+              )
+            : skipButton;
+
     return Row(
       children: [
-        Expanded(
-          flex: 1,
-          child: FilledButton.tonal(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onSkip();
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              foregroundColor: theme.colorScheme.onSurfaceVariant,
-            ),
-            child: Text(
-              skipLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        Expanded(flex: 1, child: guidedSkip),
         const SizedBox(width: AppSpacing.m),
         Expanded(flex: 2, child: startButton),
       ],
