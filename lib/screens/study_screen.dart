@@ -15,7 +15,6 @@ import '../providers/study_task_provider.dart';
 import '../providers/time_provider.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
-import '../widgets/retell_decision_gate.dart';
 import '../widgets/speech_permission_dialog.dart';
 import '../widgets/guide_flow.dart';
 import '../widgets/learning_progress_icon.dart';
@@ -422,8 +421,7 @@ class _TaskCard extends ConsumerWidget {
               EventParams.isOverdue: task.isOverdue ? 1 : 0,
             },
           );
-          final ok = await ensureRetellDecisionMade(context, ref);
-          if (!ok || !context.mounted) return;
+          if (!context.mounted) return;
           context.push(AppRoutes.audioLearningPlan(task.audioId));
         },
         child: IntrinsicHeight(
@@ -498,13 +496,6 @@ class _TaskCard extends ConsumerWidget {
                                           task.subStage,
                                         );
                                     if (!allowed || !context.mounted) return;
-
-                                    final decided =
-                                        await ensureRetellDecisionMade(
-                                          context,
-                                          ref,
-                                        );
-                                    if (!decided || !context.mounted) return;
                                     context.push(
                                       AppRoutes.audioLearningPlan(
                                         task.audioId,
@@ -583,9 +574,7 @@ class _CompletedSection extends ConsumerWidget {
                 ),
                 title: Text(audio.audioName),
                 contentPadding: EdgeInsets.zero,
-                onTap: () async {
-                  final ok = await ensureRetellDecisionMade(context, ref);
-                  if (!ok || !context.mounted) return;
+                onTap: () {
                   context.push(AppRoutes.audioLearningPlan(audio.audioId));
                 },
               ),
@@ -670,9 +659,7 @@ class _RecentCompletionTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.s),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () async {
-          final ok = await ensureRetellDecisionMade(context, ref);
-          if (!ok || !context.mounted) return;
+        onTap: () {
           context.push(AppRoutes.audioLearningPlan(completion.audioId));
         },
         child: IntrinsicHeight(

@@ -458,6 +458,12 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           AppRoutes.retellPlayer(widget.collectionId, widget.audioItemId),
         );
       },
+      // 按计划学习路径才显示「跳过」按钮；自由练习路径无此回调
+      onSkip: () async {
+        await ref
+            .read(learningProgressNotifierProvider.notifier)
+            .skipCurrentSubStage(widget.audioItemId);
+      },
     );
   }
 
@@ -1285,12 +1291,14 @@ class _FirstStudySection extends ConsumerWidget {
       ),
     };
 
-    // 学习计划页 iterate 全量子步骤，但跳过 skipped（不在 plan 内 + 未完成）。
-    // 已完成的子步骤即使不在当前 plan 内也要显示 ✅（保留历史可见，bug 3 修复）。
+    // 学习计划页 iterate 全量子步骤；plan 静态后 inPlan 永远 true，但保留
+    // 三态判定语义：completed / userSkipped / planned 都显示，其它跳过。
     final subStages = firstLearnStage.allSubStages.where((s) {
       final inPlan = plan.includes(firstLearnStage, s);
       final isDone = completedKeys.contains('${firstLearnStage.key}:${s.key}');
-      return inPlan || isDone;
+      final isSkipped =
+          progress?.isSubStageSkipped(firstLearnStage, s) ?? false;
+      return inPlan || isDone || isSkipped;
     }).toList(growable: false);
 
     return Column(
@@ -1372,6 +1380,9 @@ class _FirstStudySection extends ConsumerWidget {
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(firstLearnStage, subStage) ??
+                  false;
+              final isSkipped =
+                  progress?.isSubStageSkipped(firstLearnStage, subStage) ??
                   false;
 
               // 各步骤显示完成统计
@@ -1458,6 +1469,7 @@ class _FirstStudySection extends ConsumerWidget {
                 description: stepData.description,
                 isCompleted: isCompleted,
                 isCurrent: isCurrent,
+                isSkipped: isSkipped,
                 isFirst: index == 0,
                 isLast: index == subStages.length - 1,
                 subtitle: subtitle,
@@ -1694,6 +1706,10 @@ class _StepCard extends StatelessWidget {
   final bool isFirst;
   final bool isLast;
 
+  /// 已跳过状态：与 [isCompleted] 互斥（持久化层保证）；显示 ⏭ 灰色图标，
+  /// 文案后缀「已跳过」。
+  final bool isSkipped;
+
   /// 可选的附加信息（如"已听 X 遍"）
   final String? subtitle;
 
@@ -1710,6 +1726,7 @@ class _StepCard extends StatelessWidget {
     required this.isCurrent,
     required this.isFirst,
     required this.isLast,
+    this.isSkipped = false,
     this.subtitle,
     this.onTap,
   });
@@ -1744,6 +1761,8 @@ class _StepCard extends StatelessWidget {
                         ? (theme.brightness == Brightness.dark
                               ? Colors.transparent
                               : Colors.green.shade50)
+                        : isSkipped
+                        ? theme.colorScheme.surfaceContainerHighest
                         : isCurrent
                         ? null
                         : theme.colorScheme.surfaceContainerHighest,
@@ -1754,7 +1773,7 @@ class _StepCard extends StatelessWidget {
                                 : Colors.green,
                             width: 1.5,
                           )
-                        : isCurrent
+                        : isCurrent && !isSkipped
                         ? Border.all(color: theme.colorScheme.primary, width: 2)
                         : null,
                     shape: BoxShape.circle,
@@ -1767,6 +1786,13 @@ class _StepCard extends StatelessWidget {
                             color: theme.brightness == Brightness.dark
                                 ? Colors.green.shade300
                                 : Colors.green.shade700,
+                          )
+                        : isSkipped
+                        ? Icon(
+                            Icons.remove,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                           )
                         : Text(
                             '$stepNumber',
@@ -1808,6 +1834,8 @@ class _StepCard extends StatelessWidget {
                           color: isCompleted
                               ? (iconColor ?? theme.colorScheme.primary)
                                     .withAlpha(100)
+                              : isSkipped
+                              ? theme.colorScheme.outline
                               : iconColor ?? theme.colorScheme.primary,
                           size: 24,
                         ),
@@ -1817,10 +1845,12 @@ class _StepCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                name,
+                                isSkipped
+                                    ? '$name · ${AppLocalizations.of(context)!.retellSkippedSuffix}'
+                                    : name,
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: isCompleted
+                                  color: isCompleted || isSkipped
                                       ? theme.colorScheme.outline
                                       : null,
                                 ),
@@ -2195,11 +2225,13 @@ class _ReviewRoundSection extends ConsumerWidget {
     final completedKeys = ref
         .watch(learningProgressNotifierProvider)
         .completionsFor(audioItemId);
-    // iterate 全量；保留已完成（✅）+ planned；跳过 skipped（不在 plan 且未完成）。
+    // iterate 全量；plan 静态后 inPlan 永远 true；三态判定：
+    // completed / userSkipped / planned 都显示，其它跳过。
     final subStages = review.stage.allSubStages.where((s) {
       final inPlan = plan.includes(review.stage, s);
       final isDone = completedKeys.contains('${review.stage.key}:${s.key}');
-      return inPlan || isDone;
+      final isSkipped = progress?.isSubStageSkipped(review.stage, s) ?? false;
+      return inPlan || isDone || isSkipped;
     }).toList(growable: false);
     final completedCount = _completedSubStageCount(completedKeys);
     final timingText =
@@ -2306,6 +2338,8 @@ class _ReviewRoundSection extends ConsumerWidget {
                   false;
               final isCurrent =
                   progress?.isCurrentSubStage(review.stage, subStage) ?? false;
+              final isSkipped =
+                  progress?.isSubStageSkipped(review.stage, subStage) ?? false;
 
               // 难句补练步骤：显示难句数量或自动完成提示
               String? subtitle;
@@ -2370,6 +2404,7 @@ class _ReviewRoundSection extends ConsumerWidget {
                 description: subStageData.description,
                 isCompleted: isCompleted,
                 isCurrent: isCurrent,
+                isSkipped: isSkipped,
                 isFirst: index == 0,
                 isLast: index == subStages.length - 1,
                 subtitle: subtitle,

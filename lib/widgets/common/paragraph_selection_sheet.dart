@@ -44,6 +44,8 @@ Future<void> showParagraphSelectionSheet({
       estimateDurationBuilder,
   required void Function(Duration targetDuration, double pauseMultiplier)
       onStartPractice,
+  String? skipLabel,
+  VoidCallback? onSkip,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -63,6 +65,8 @@ Future<void> showParagraphSelectionSheet({
       estimatedDurationText: estimatedDurationText,
       estimateDurationBuilder: estimateDurationBuilder,
       onStartPractice: onStartPractice,
+      skipLabel: skipLabel,
+      onSkip: onSkip,
     ),
   );
 }
@@ -81,6 +85,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
       estimateDurationBuilder;
   final void Function(Duration targetDuration, double pauseMultiplier)
       onStartPractice;
+  final String? skipLabel;
+  final VoidCallback? onSkip;
 
   const _ParagraphSelectionSheet({
     required this.icon,
@@ -94,6 +100,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     this.estimatedDurationText,
     this.estimateDurationBuilder,
     required this.onStartPractice,
+    this.skipLabel,
+    this.onSkip,
   });
 
   @override
@@ -310,24 +318,51 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
 
             const SizedBox(height: AppSpacing.l),
 
-            // 开始练习按钮
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  final duration = _targetSeconds < 0
-                      ? const Duration(hours: 24)
-                      : Duration(seconds: _targetSeconds);
-                  widget.onStartPractice(duration, _pauseMultiplier);
-                },
-                icon: const Icon(Icons.play_arrow),
-                label: Text(l10n.startPractice),
-              ),
-            ),
+            // 跳过 + 开始练习按钮（宽度 1:2，仅当 onSkip 提供时显示跳过）
+            _buildActionButtons(context, l10n),
           ],
         ),
       ),
+    );
+  }
+
+  /// 底部按钮区：
+  /// - onSkip == null：原"开始练习"满宽路径（盲听弹窗等共用组件不受影响）
+  /// - onSkip != null：左侧 OutlinedButton「跳过」(flex:1) + 右侧 FilledButton「开始练习」(flex:2)
+  Widget _buildActionButtons(BuildContext context, AppLocalizations l10n) {
+    final startButton = FilledButton.icon(
+      onPressed: () {
+        Navigator.of(context).pop();
+        final duration = _targetSeconds < 0
+            ? const Duration(hours: 24)
+            : Duration(seconds: _targetSeconds);
+        widget.onStartPractice(duration, _pauseMultiplier);
+      },
+      icon: const Icon(Icons.play_arrow),
+      label: Text(l10n.startPractice),
+    );
+
+    final skipLabel = widget.skipLabel;
+    final onSkip = widget.onSkip;
+    if (onSkip == null || skipLabel == null) {
+      return SizedBox(width: double.infinity, child: startButton);
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              onSkip();
+            },
+            child: Text(skipLabel),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.m),
+        Expanded(flex: 2, child: startButton),
+      ],
     );
   }
 }

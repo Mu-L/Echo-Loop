@@ -28,7 +28,6 @@ import '../providers/saved_word_provider.dart';
 import '../services/dictionary_service.dart';
 import '../router/app_router.dart';
 import '../theme/app_theme.dart';
-import '../widgets/retell_decision_gate.dart';
 import '../widgets/speech_permission_dialog.dart';
 import '../widgets/favorites/sentence_recycle_bin_sheet.dart';
 import '../widgets/favorites/vocabulary_recycle_bin_sheet.dart';
@@ -1113,12 +1112,7 @@ class _SavedPhraseTileState extends ConsumerState<_SavedPhraseTile> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: GestureDetector(
-                          onTap: () async {
-                            final ok = await ensureRetellDecisionMade(
-                              context,
-                              ref,
-                            );
-                            if (!ok || !context.mounted) return;
+                          onTap: () {
                             context.push(
                               AppRoutes.audioLearningPlan(phrase.audioItemId!),
                             );
@@ -1473,12 +1467,7 @@ class _SavedWordTileState extends ConsumerState<_SavedWordTile> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: GestureDetector(
-                          onTap: () async {
-                            final ok = await ensureRetellDecisionMade(
-                              context,
-                              ref,
-                            );
-                            if (!ok || !context.mounted) return;
+                          onTap: () {
                             context.push(
                               AppRoutes.audioLearningPlan(word.audioItemId!),
                             );

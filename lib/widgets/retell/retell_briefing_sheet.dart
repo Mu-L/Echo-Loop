@@ -33,6 +33,9 @@ int retellDefaultSeconds(LearningStage? stage) {
 /// [stageLabel] 可选的阶段名（如"第三轮复习"），显示在标题下方
 /// [onStartPractice] 点击"开始练习"时回调，传递选中的目标时长和停顿倍数
 /// pauseMultiplier: -1.0 = 自动（智能模式），>0 = 段长倍数
+/// [onSkip] 可选，提供时在"开始练习"左侧显示「跳过」按钮（宽度比例 1:2）。
+///   仅按计划学习触发的入口传入；自由练习入口不传（用户既然主动点开练习，
+///   再让他点跳过没意义）。
 ///
 /// 预估时长由 [estimateRetellSessionDuration] 按真实播放+停顿公式动态计算，
 /// 随段落时长 / 停顿倍数下拉框选择实时刷新。不接受静态文本参数。
@@ -43,6 +46,7 @@ Future<void> showRetellBriefingSheet({
       onStartPractice,
   int defaultSeconds = 30,
   String? stageLabel,
+  VoidCallback? onSkip,
 }) {
   final l10n = AppLocalizations.of(context)!;
   return showParagraphSelectionSheet(
@@ -62,5 +66,7 @@ Future<void> showRetellBriefingSheet({
       pauseMultiplier: pauseMultiplier,
     ),
     onStartPractice: onStartPractice,
+    skipLabel: onSkip != null ? l10n.retellSkip : null,
+    onSkip: onSkip,
   );
 }
