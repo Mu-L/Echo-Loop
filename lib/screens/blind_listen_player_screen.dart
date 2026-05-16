@@ -17,10 +17,13 @@ import '../database/enums.dart';
 import '../utils/wakelock_mixin.dart';
 import '../l10n/app_localizations.dart';
 import '../models/retell_settings.dart';
+import '../models/sentence.dart';
 import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_session/blind_listen_player_provider.dart';
 import '../providers/learning_session/learning_session_provider.dart';
+import '../providers/listening_practice/listening_practice_provider.dart';
+import 'sentence_detail_screen.dart';
 import '../services/app_logger.dart';
 import '../theme/app_theme.dart';
 import '../widgets/speech_permission_dialog.dart';
@@ -61,6 +64,9 @@ class _BlindListenPlayerScreenState
 
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
+
+  /// 是否正在跳转句子详情页，防止快速点击重复 push
+  bool _isNavigatingToDetail = false;
   ProviderSubscription<BlindListenPlayerState>? _playerSubscription;
   StreamSubscription<Duration>? _silenceSkipSub;
 
@@ -108,6 +114,40 @@ class _BlindListenPlayerScreenState
           duration: const Duration(seconds: 2),
         ),
       );
+  }
+
+  // ========== 句子点击 ==========
+
+  /// 点击句子 → 暂停播放 → 进入句子详情页
+  ///
+  /// 与复述任务行为一致：导航前停止音频，返回后由用户手动恢复播放。
+  Future<void> _handleSentenceTap(Sentence sentence) async {
+    if (_isNavigatingToDetail) return;
+    _isNavigatingToDetail = true;
+
+    await ref.read(blindListenPlayerProvider.notifier).pause();
+
+    if (!mounted) {
+      _isNavigatingToDetail = false;
+      return;
+    }
+
+    final lpState = ref.read(listeningPracticeProvider);
+    final audioName = lpState.currentAudioItem?.name ?? '';
+
+    await context.push(
+      AppRoutes.sentenceDetail,
+      extra: SentenceDetailArgs(
+        audioItemId: widget.audioItemId,
+        audioName: audioName,
+        sentenceText: sentence.text,
+        sentenceIndex: sentence.index,
+        startTimeMs: sentence.startTime.inMilliseconds,
+        endTimeMs: sentence.endTime.inMilliseconds,
+      ),
+    );
+
+    _isNavigatingToDetail = false;
   }
 
   // ========== 完成处理 ==========
@@ -475,6 +515,7 @@ class _BlindListenPlayerScreenState
                 : RetellDisplayMode.hideAll,
             keywordMap: const {},
             playingSentenceIndex: playerState.playingSentenceIndex,
+            onSentenceTap: _handleSentenceTap,
           ),
           contentControls: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 44),
@@ -563,10 +604,8 @@ class _BlindListenPlayerScreenState
                                     total: s.total,
                                     isPaused: s.paused,
                                     isFastForward: s.fastForward,
-                                    onPause: () =>
-                                        player.pauseCountdown(),
-                                    onResume: () =>
-                                        player.resumeCountdown(),
+                                    onPause: () => player.pauseCountdown(),
+                                    onResume: () => player.resumeCountdown(),
                                   ),
                                 ),
                               ),
@@ -578,9 +617,7 @@ class _BlindListenPlayerScreenState
                                 child: Center(
                                   child: AnimatedOpacity(
                                     opacity: hasFF ? 1.0 : 0.0,
-                                    duration: const Duration(
-                                      milliseconds: 200,
-                                    ),
+                                    duration: const Duration(milliseconds: 200),
                                     child: IgnorePointer(
                                       ignoring: !hasFF,
                                       child: hasFF
@@ -588,14 +625,12 @@ class _BlindListenPlayerScreenState
                                               onTap: player
                                                   .toggleCountdownFastForward,
                                               child: Icon(
-                                                Icons
-                                                    .fast_forward_rounded,
+                                                Icons.fast_forward_rounded,
                                                 size: 32,
-                                                color: theme.colorScheme
+                                                color: theme
+                                                    .colorScheme
                                                     .onSurface
-                                                    .withValues(
-                                                      alpha: 0.6,
-                                                    ),
+                                                    .withValues(alpha: 0.6),
                                               ),
                                             )
                                           : const SizedBox.shrink(),
@@ -607,10 +642,7 @@ class _BlindListenPlayerScreenState
                           );
                         },
                       )
-                    : Center(
-                        child:
-                            _buildManualHint(playerState, l10n, theme),
-                      ),
+                    : Center(child: _buildManualHint(playerState, l10n, theme)),
               ),
             ],
           ),
