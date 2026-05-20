@@ -36,7 +36,9 @@ class AppUpdate extends _$AppUpdate {
 
   @override
   AppUpdateState build() {
-    _checker = AppUpdateChecker();
+    // bundleId 仅 iOS 路径使用（Lookup API），其他平台忽略
+    final bundleId = ref.read(packageInfoProvider).packageName;
+    _checker = AppUpdateChecker(bundleId: bundleId);
     ref.onDispose(() => _checker?.dispose());
     // build() 返回前 state 未初始化，checkInBackground 第一行就读 state 会抛
     // "Tried to read the state of an uninitialized provider"。延迟到下一个 microtask 执行。
