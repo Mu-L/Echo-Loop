@@ -232,6 +232,10 @@ class _StepCompleteDialogState extends State<StepCompleteDialog> {
   }
 
   /// 构建 5 档难度选择器
+  ///
+  /// 风格与 App 整体协调：上方一根极细绿→红渐变线提示难度递进，
+  /// 下方 5 个等宽中性按钮；选中态使用主色（navy）实底白字，
+  /// 未选中为浅灰描边 + 主文字色。
   Widget _buildDifficultySelector(AppLocalizations l10n) {
     final difficultyLabels = {
       DifficultyLevel.veryEasy: l10n.difficultyVeryEasy,
@@ -240,30 +244,60 @@ class _StepCompleteDialogState extends State<StepCompleteDialog> {
       DifficultyLevel.hard: l10n.difficultyHard,
       DifficultyLevel.veryHard: l10n.difficultyVeryHard,
     };
+    // 选中时按档位使用对应渐变色，与上方指示条颜色对齐
+    final difficultyColors = {
+      DifficultyLevel.veryEasy: const Color(0xFF43A047),
+      DifficultyLevel.easy: const Color(0xFF9CCC65),
+      DifficultyLevel.medium: const Color(0xFFFFB300),
+      DifficultyLevel.hard: const Color(0xFFFB8C00),
+      DifficultyLevel.veryHard: const Color(0xFFE53935),
+    };
 
-    return Wrap(
-      spacing: AppSpacing.s,
-      runSpacing: AppSpacing.s,
-      children: DifficultyLevel.values.map((level) {
-        final isSelected = _selectedDifficulty == level;
-        return ChoiceChip(
-          label: Text(difficultyLabels[level]!),
-          selected: isSelected,
-          showCheckmark: false,
-          side: isSelected
-              ? BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              : BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 极细渐变指示条：绿→红，提示难度从易到难
+        Container(
+          height: 3,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(2),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF43A047), // 绿
+                Color(0xFF9CCC65),
+                Color(0xFFFFB300), // 黄
+                Color(0xFFFB8C00),
+                Color(0xFFE53935), // 红
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s),
+        // 5 等宽中性按钮
+        Row(
+          children: [
+            for (var i = 0; i < DifficultyLevel.values.length; i++) ...[
+              if (i > 0) const SizedBox(width: 3),
+              Expanded(
+                child: _DifficultyButton(
+                  label: difficultyLabels[DifficultyLevel.values[i]]!,
+                  selectedColor: difficultyColors[DifficultyLevel.values[i]]!,
+                  selected: _selectedDifficulty == DifficultyLevel.values[i],
+                  onTap: () {
+                    setState(() {
+                      final level = DifficultyLevel.values[i];
+                      _selectedDifficulty = _selectedDifficulty == level
+                          ? null
+                          : level;
+                    });
+                  },
                 ),
-          onSelected: (selected) {
-            setState(() {
-              _selectedDifficulty = selected ? level : null;
-            });
-          },
-        );
-      }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
@@ -349,5 +383,56 @@ class _StepCompleteDialogState extends State<StepCompleteDialog> {
         ),
       ];
     }
+  }
+}
+
+/// 单个难度按钮：中性配色，选中态使用对应档位颜色实底白字
+class _DifficultyButton extends StatelessWidget {
+  final String label;
+  final Color selectedColor;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DifficultyButton({
+    required this.label,
+    required this.selectedColor,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? selectedColor : scheme.outlineVariant,
+              width: selected ? 1.8 : 1,
+            ),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? selectedColor : scheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
