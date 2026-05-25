@@ -36,48 +36,6 @@ class LearningSettingsScreen extends ConsumerWidget {
           vertical: AppSpacing.s,
         ),
         children: [
-          _SectionHeader(title: l10n.speakingPracticeSection),
-          Card(
-            child: SwitchListTile(
-              secondary: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.chat,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-              ),
-              title: Text(l10n.autoSkipRetellToggle),
-              subtitle: Text(l10n.autoSkipRetellSubtitle),
-              value: settings.autoSkipRetell,
-              onChanged: (value) async {
-                await ref
-                    .read(learningSettingsProvider.notifier)
-                    .setAutoSkipRetell(value);
-                // 开启时显式触发一次扫描（与 progress 端 ref.listen 互为冗余，
-                // 防止边缘场景下监听窗口被错过）。关闭无需触发。
-                if (value) {
-                  await ref
-                      .read(learningProgressNotifierProvider.notifier)
-                      .triggerAutoSkipScan();
-                }
-                ref.read(analyticsServiceProvider).track(
-                  Events.retellToggleChanged,
-                  {
-                    EventParams.enabled: value,
-                    EventParams.source: 'settings_page',
-                  },
-                );
-              },
-            ),
-          ),
-          _DescriptionText(text: l10n.autoSkipRetellDescription),
-          const SizedBox(height: AppSpacing.m),
           Card(
             child: SwitchListTile(
               secondary: Container(
@@ -94,12 +52,60 @@ class LearningSettingsScreen extends ConsumerWidget {
                 ),
               ),
               title: Text(l10n.autoExpandCachedAnnotationToggle),
-              subtitle: Text(l10n.autoExpandCachedAnnotationSubtitle),
+              subtitle: Text(
+                l10n.autoExpandCachedAnnotationSubtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
               value: settings.autoExpandCachedAnnotation,
               onChanged: (value) async {
                 await ref
                     .read(learningSettingsProvider.notifier)
                     .setAutoExpandCachedAnnotation(value);
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.m),
+          Card(
+            child: SwitchListTile(
+              secondary: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.chat,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+              ),
+              title: Text(l10n.autoSkipRetellToggle),
+              subtitle: Text(
+                l10n.autoSkipRetellSubtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              value: settings.autoSkipRetell,
+              onChanged: (value) async {
+                await ref
+                    .read(learningSettingsProvider.notifier)
+                    .setAutoSkipRetell(value);
+                if (value) {
+                  await ref
+                      .read(learningProgressNotifierProvider.notifier)
+                      .triggerAutoSkipScan();
+                }
+                ref.read(analyticsServiceProvider).track(
+                  Events.retellToggleChanged,
+                  {
+                    EventParams.enabled: value,
+                    EventParams.source: 'settings_page',
+                  },
+                );
               },
             ),
           ),
@@ -153,7 +159,7 @@ class _DescriptionText extends StatelessWidget {
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: Theme.of(
             context,
-          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
         ),
       ),
     );
