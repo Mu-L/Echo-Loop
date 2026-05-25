@@ -47,6 +47,7 @@ int retellDefaultSeconds(LearningStage? stage) {
 ///   `onStartPractice` 回调会带回最终选定的档位。
 /// [onStartPractice] 点击"开始练习"时回调，传递选中的目标时长、停顿倍数、可见词比例
 ///   pauseMultiplier: -1.0 = 自动（智能模式），>0 = 段长倍数
+///   playbackSpeed: 本次复述会话使用的播放速度
 /// [onSkip] 可选，提供时在"开始练习"左侧显示「跳过」按钮（宽度比例 1:2）。
 ///   仅按计划学习触发的入口传入；自由练习入口不传（用户既然主动点开练习，
 ///   再让他点跳过没意义）。
@@ -60,10 +61,13 @@ Future<void> showRetellBriefingSheet({
     Duration targetDuration,
     double pauseMultiplier,
     KeywordRatio? keywordRatio,
-  ) onStartPractice,
+    double playbackSpeed,
+  )
+  onStartPractice,
   int defaultSeconds = 30,
   String? stageLabel,
   KeywordRatio? defaultKeywordRatio,
+  double defaultPlaybackSpeed = 1.0,
   VoidCallback? onSkip,
 }) {
   final l10n = AppLocalizations.of(context)!;
@@ -75,23 +79,35 @@ Future<void> showRetellBriefingSheet({
     sentences: sentences,
     defaultSeconds: defaultSeconds,
     showPauseMultiplier: true,
+    showPlaybackSpeed: true,
+    playbackSpeedOptions: RetellSettings.briefingPlaybackSpeedOptions,
+    defaultPlaybackSpeed: defaultPlaybackSpeed,
     pauseMultiplierOptions: const [1.0, 2.0, 3.0, 4.0, 5.0],
     stageLabel: stageLabel,
     estimateDurationBuilder: (targetSeconds, pauseMultiplier) =>
         estimateRetellSessionDuration(
-      sentences: sentences,
-      targetSeconds: targetSeconds,
-      pauseMultiplier: pauseMultiplier,
-    ),
+          sentences: sentences,
+          targetSeconds: targetSeconds,
+          pauseMultiplier: pauseMultiplier,
+        ),
     defaultKeywordRatio: defaultKeywordRatio,
-    onStartPractice: onStartPractice,
+    onStartPractice: (_, _, _) {},
+    onStartPracticeWithPlaybackSpeed:
+        (targetDuration, pauseMultiplier, keywordRatio, playbackSpeed) {
+          onStartPractice(
+            targetDuration,
+            pauseMultiplier,
+            keywordRatio,
+            playbackSpeed,
+          );
+        },
     skipLabel: onSkip != null ? l10n.retellSkip : null,
     onSkip: onSkip,
     // 仅按计划学习路径才显示「跳过」按钮 + 配套新手引导。
-    skipGuideFlowId:
-        onSkip != null ? GuideFlowIds.retellBriefingSkip : null,
+    skipGuideFlowId: onSkip != null ? GuideFlowIds.retellBriefingSkip : null,
     skipGuideTitle: onSkip != null ? l10n.guideRetellSkipTitle : null,
-    skipGuideDescription:
-        onSkip != null ? l10n.guideRetellSkipDescription : null,
+    skipGuideDescription: onSkip != null
+        ? l10n.guideRetellSkipDescription
+        : null,
   );
 }

@@ -42,6 +42,29 @@ class IntensiveListenSettings {
   /// 控制模式（默认 auto，跟读/精听共用）
   final ShadowingControlMode controlMode;
 
+  /// 播放速度（0.5x-2.0x，默认 1.0x）
+  ///
+  /// 当前仅"难句跟读"在用；逐句精听虽然共用本模型，未读取此字段。
+  final double playbackSpeed;
+
+  /// 入口弹窗使用的离散速度选项
+  ///
+  /// 与 [BlindListenSettings.briefingPlaybackSpeedOptions] / [RetellSettings.briefingPlaybackSpeedOptions] 保持一致。
+  static const List<double> briefingPlaybackSpeedOptions = [
+    0.5,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+    1.1,
+    1.3,
+    1.5,
+    2.0,
+  ];
+
   /// 固定间隔可选值
   static const List<int> fixedPauseOptions = [
     1,
@@ -78,6 +101,7 @@ class IntensiveListenSettings {
     this.fixedPauseSeconds = 5,
     this.pauseMultiplier = 2.0,
     this.controlMode = ShadowingControlMode.auto,
+    this.playbackSpeed = 1.0,
   });
 
   /// 是否为手动控制模式
@@ -89,6 +113,7 @@ class IntensiveListenSettings {
     int? fixedPauseSeconds,
     double? pauseMultiplier,
     ShadowingControlMode? controlMode,
+    double? playbackSpeed,
   }) {
     return IntensiveListenSettings(
       repeatCount: repeatCount ?? this.repeatCount,
@@ -96,6 +121,7 @@ class IntensiveListenSettings {
       fixedPauseSeconds: fixedPauseSeconds ?? this.fixedPauseSeconds,
       pauseMultiplier: pauseMultiplier ?? this.pauseMultiplier,
       controlMode: controlMode ?? this.controlMode,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 
@@ -105,6 +131,7 @@ class IntensiveListenSettings {
     'fixedPauseSeconds': fixedPauseSeconds,
     'pauseMultiplier': pauseMultiplier,
     'controlMode': controlMode.name,
+    'playbackSpeed': playbackSpeed,
   };
 
   /// 防御性解析：非法值回退默认
@@ -115,7 +142,16 @@ class IntensiveListenSettings {
       fixedPauseSeconds: _parseFixedPauseSeconds(json['fixedPauseSeconds']),
       pauseMultiplier: _parsePauseMultiplier(json['pauseMultiplier']),
       controlMode: _parseControlMode(json['controlMode']),
+      playbackSpeed: _parsePlaybackSpeed(json['playbackSpeed']),
     );
+  }
+
+  /// 解析播放速度：范围 0.5–2.0，否则回退 1.0
+  static double _parsePlaybackSpeed(dynamic raw) {
+    if (raw is! num) return 1.0;
+    final value = raw.toDouble();
+    if (value < 0.5 || value > 2.0) return 1.0;
+    return value;
   }
 
   /// 解析循环次数：范围 1-10
@@ -149,7 +185,9 @@ class IntensiveListenSettings {
   /// 解析控制模式：非法值回退 auto
   static ShadowingControlMode _parseControlMode(dynamic raw) {
     if (raw is! String) return ShadowingControlMode.auto;
-    return ShadowingControlMode.values.where((e) => e.name == raw).firstOrNull ??
+    return ShadowingControlMode.values
+            .where((e) => e.name == raw)
+            .firstOrNull ??
         ShadowingControlMode.auto;
   }
 }

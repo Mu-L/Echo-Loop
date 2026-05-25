@@ -521,6 +521,7 @@ class LearningSession extends _$LearningSession {
     String audioItemId,
     List<Sentence> allSentences, {
     bool isFreePlay = false,
+    double playbackSpeed = 1.0,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -597,6 +598,7 @@ class LearningSession extends _$LearningSession {
     LearningStage? catchUpStage,
     SubStageType? catchUpSubStage,
     KeywordRatio? overrideKeywordRatio,
+    double playbackSpeed = 1.0,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -651,6 +653,7 @@ class LearningSession extends _$LearningSession {
       paragraphs,
       startSentenceIndex: startSentenceIndex,
       autoRatio: autoRatio,
+      playbackSpeed: playbackSpeed,
     );
     _trackSessionStart();
   }
@@ -665,6 +668,7 @@ class LearningSession extends _$LearningSession {
     String audioItemId,
     List<Sentence> allSentences, {
     bool isFreePlay = false,
+    double playbackSpeed = 1.0,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -714,9 +718,13 @@ class LearningSession extends _$LearningSession {
           : null,
     );
 
-    // 初始化难句补练播放器（传入断点索引）
+    // 初始化难句补练播放器（传入断点索引 + 入口选择的播放速度）
     final player = ref.read(reviewDifficultPracticeProvider.notifier);
-    player.initialize(difficultSentences, startIndex: startIndex);
+    player.initialize(
+      difficultSentences,
+      startIndex: startIndex,
+      playbackSpeed: playbackSpeed,
+    );
     _trackSessionStart();
   }
 

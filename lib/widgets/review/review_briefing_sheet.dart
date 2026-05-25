@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../database/enums.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/difficult_practice_settings.dart';
 import '../../theme/app_theme.dart';
 
 /// 复习步骤提示弹窗。
 ///
 /// 交互与首次学习保持一致：先展示当前步骤说明，再点击“开始练习”进入页面。
+/// [defaultPlaybackSpeed] 默认播放速度（按难度+轮次映射），用户可在弹窗里改。
+/// [onStartPractice] 点击"开始练习"时回调，参数为用户最终选定的速度。
 Future<void> showReviewBriefingSheet({
   required BuildContext context,
   required LearningStage stage,
   required SubStageType subStage,
   Duration? estimatedDuration,
-  required VoidCallback onStartPractice,
+  double defaultPlaybackSpeed = 1.0,
+  required void Function(double playbackSpeed) onStartPractice,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -24,27 +28,46 @@ Future<void> showReviewBriefingSheet({
       stage: stage,
       subStage: subStage,
       estimatedDuration: estimatedDuration,
+      defaultPlaybackSpeed: defaultPlaybackSpeed,
       onStartPractice: onStartPractice,
     ),
   );
 }
 
-class _ReviewBriefingSheet extends StatelessWidget {
+class _ReviewBriefingSheet extends StatefulWidget {
   final LearningStage stage;
   final SubStageType subStage;
   final Duration? estimatedDuration;
-  final VoidCallback onStartPractice;
+  final double defaultPlaybackSpeed;
+  final void Function(double playbackSpeed) onStartPractice;
 
   const _ReviewBriefingSheet({
     required this.stage,
     required this.subStage,
     this.estimatedDuration,
+    required this.defaultPlaybackSpeed,
     required this.onStartPractice,
   });
+
+  @override
+  State<_ReviewBriefingSheet> createState() => _ReviewBriefingSheetState();
+}
+
+class _ReviewBriefingSheetState extends State<_ReviewBriefingSheet> {
+  late double _playbackSpeed = widget.defaultPlaybackSpeed;
 
   /// 格式化预估时长
   String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
     return formatEstimatedDuration(l10n, duration);
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 
   @override
@@ -73,20 +96,20 @@ class _ReviewBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.l),
           Icon(
-            _iconForSubStage(subStage),
+            _iconForSubStage(widget.subStage),
             size: 56,
             color: theme.colorScheme.primary,
           ),
           const SizedBox(height: AppSpacing.m),
           Text(
-            _titleForSubStage(l10n, isZh, subStage),
+            _titleForSubStage(l10n, isZh, widget.subStage),
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            reviewStageLabel(l10n, stage),
+            reviewStageLabel(l10n, widget.stage),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -109,7 +132,7 @@ class _ReviewBriefingSheet extends StatelessWidget {
                 const SizedBox(width: AppSpacing.s),
                 Expanded(
                   child: Text(
-                    _tipForSubStage(isZh, subStage),
+                    _tipForSubStage(isZh, widget.subStage),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface,
                     ),
@@ -118,7 +141,41 @@ class _ReviewBriefingSheet extends StatelessWidget {
               ],
             ),
           ),
-          if (estimatedDuration != null) ...[
+          const SizedBox(height: AppSpacing.m),
+          // 播放速度（与盲听/复述对齐）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.playbackSpeed,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(
+                width: 80,
+                child: DropdownButton<double>(
+                  value: _playbackSpeed,
+                  isExpanded: true,
+                  isDense: true,
+                  elevation: 0,
+                  underline: const SizedBox.shrink(),
+                  items: DifficultPracticeSettings.briefingPlaybackSpeedOptions
+                      .map(
+                        (speed) => DropdownMenuItem(
+                          value: speed,
+                          child: Text(_formatSpeed(speed)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _playbackSpeed = v);
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (widget.estimatedDuration != null) ...[
             const SizedBox(height: AppSpacing.m),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -130,7 +187,7 @@ class _ReviewBriefingSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  _formatEstimatedDuration(l10n, widget.estimatedDuration!),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -144,7 +201,7 @@ class _ReviewBriefingSheet extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                onStartPractice();
+                widget.onStartPractice(_playbackSpeed);
               },
               icon: const Icon(Icons.play_arrow),
               label: Text(l10n.startPractice),

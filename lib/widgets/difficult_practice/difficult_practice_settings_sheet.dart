@@ -119,6 +119,10 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
 
               // 控制模式
               _buildControlModeSection(l10n, theme, settings, ref),
+              const SizedBox(height: AppSpacing.l),
+
+              // 播放速度（手动/自动都生效）
+              _buildPlaybackSpeedSection(l10n, theme, settings, ref),
 
               // 自动模式才显示循环次数和停顿设置
               if (!settings.isManualMode) ...[
@@ -171,6 +175,59 @@ class _DifficultPracticeSettingsSheet extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// 播放速度滑块
+  ///
+  /// 速度仅对当前会话生效，步进为 0.05x，覆盖 0.5x-2.0x。
+  Widget _buildPlaybackSpeedSection(
+    AppLocalizations l10n,
+    ThemeData theme,
+    DifficultPracticeSettings settings,
+    WidgetRef ref,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.playbackSpeed,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              _formatSpeed(settings.playbackSpeed),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: settings.playbackSpeed.clamp(0.5, 2.0),
+          min: 0.5,
+          max: 2.0,
+          divisions: 30,
+          label: _formatSpeed(settings.playbackSpeed),
+          onChanged: (value) {
+            final speed = (value * 20).round() / 20;
+            onUpdate(ref, settings.copyWith(playbackSpeed: speed));
+          },
+        ),
+      ],
+    );
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 
   /// 控制模式选择区域（自动/手动）

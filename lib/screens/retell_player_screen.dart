@@ -290,8 +290,9 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
         '自动开始录音: 段落${latestState.currentParagraphIndex + 1}',
       );
       _updateRecordingThresholds();
-      final paragraphDuration =
-          ref.read(retellPlayerProvider.notifier).currentParagraphDuration;
+      final paragraphDuration = ref
+          .read(retellPlayerProvider.notifier)
+          .currentParagraphDuration;
       unawaited(
         ref
             .read(retellRecordingControllerProvider.notifier)
@@ -637,11 +638,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
     if (result != null) {
       await ref
           .read(learningProgressNotifierProvider.notifier)
-          .saveRetellSentenceIndex(
-            widget.audioItemId,
-            null,
-            isFreePlay: false,
-          );
+          .saveRetellSentenceIndex(widget.audioItemId, null, isFreePlay: false);
       await ref
           .read(learningProgressNotifierProvider.notifier)
           .completeCurrentSubStage(widget.audioItemId);
@@ -946,6 +943,7 @@ class _RetellPlayerScreenState extends ConsumerState<RetellPlayerScreen>
               state.currentRepeatCount,
               state.settings.repeatCount,
             ),
+            statusSuffixText: _formatSpeed(state.settings.playbackSpeed),
             l10n: l10n,
             theme: theme,
           ),
@@ -1003,6 +1001,15 @@ String _buildProgressText(
     paragraphTotal,
   );
   return '$paragraphPart · $sentencePart';
+}
+
+/// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+String _formatSpeed(double speed) {
+  if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+  if ((speed * 10).roundToDouble() == speed * 10) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  return '${speed.toStringAsFixed(2)}x';
 }
 
 bool _isRetellMainPlaybackActive(RetellPlayerState state) {

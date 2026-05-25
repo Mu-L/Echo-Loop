@@ -27,6 +27,7 @@ const paragraphDurationOptions = [0, 10, 15, 20, 25, 30, 45, 60, 90, -1];
 /// [defaultSeconds] 默认段落时长（秒）
 /// [showPauseMultiplier] 是否显示段间停顿行
 /// [showPlaybackSpeed] 是否显示播放速度行（盲听专用，会话内生效）
+/// [playbackSpeedOptions] 播放速度离散选项，不传时使用盲听默认档位
 /// [stageLabel] 标题下方显示的阶段名（如"第三轮复习"），可选
 /// [estimatedDurationText] 说明下方显示的预估时长文本，可选（静态文案，不随选项变化）
 /// [estimateDurationBuilder] 动态预估时长 builder，根据当前选中的段落时长 + 停顿倍数实时计算；
@@ -42,6 +43,8 @@ Future<void> showParagraphSelectionSheet({
   int defaultSeconds = 30,
   bool showPauseMultiplier = false,
   bool showPlaybackSpeed = false,
+  List<double>? playbackSpeedOptions,
+  double defaultPlaybackSpeed = 1.0,
   List<double>? pauseMultiplierOptions,
   String? stageLabel,
   String? estimatedDurationText,
@@ -81,6 +84,8 @@ Future<void> showParagraphSelectionSheet({
       defaultSeconds: defaultSeconds,
       showPauseMultiplier: showPauseMultiplier,
       showPlaybackSpeed: showPlaybackSpeed,
+      playbackSpeedOptions: playbackSpeedOptions,
+      defaultPlaybackSpeed: defaultPlaybackSpeed,
       pauseMultiplierOptions: pauseMultiplierOptions,
       stageLabel: stageLabel,
       estimatedDurationText: estimatedDurationText,
@@ -105,6 +110,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
   final int defaultSeconds;
   final bool showPauseMultiplier;
   final bool showPlaybackSpeed;
+  final List<double>? playbackSpeedOptions;
+  final double defaultPlaybackSpeed;
   final List<double>? pauseMultiplierOptions;
   final String? stageLabel;
   final String? estimatedDurationText;
@@ -138,6 +145,8 @@ class _ParagraphSelectionSheet extends StatefulWidget {
     required this.defaultSeconds,
     required this.showPauseMultiplier,
     required this.showPlaybackSpeed,
+    this.playbackSpeedOptions,
+    required this.defaultPlaybackSpeed,
     this.pauseMultiplierOptions,
     this.stageLabel,
     this.estimatedDurationText,
@@ -162,7 +171,7 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
 
   /// -1.0 = 自动（智能模式）
   double _pauseMultiplier = -1.0;
-  double _playbackSpeed = 1.0;
+  late double _playbackSpeed = widget.defaultPlaybackSpeed;
   late KeywordRatio? _keywordRatio = widget.defaultKeywordRatio;
 
   /// 用于「跳过」按钮新手引导的 showcase key；仅在调用方传入 flow id 时使用。
@@ -344,14 +353,17 @@ class _ParagraphSelectionSheetState extends State<_ParagraphSelectionSheet> {
                       isDense: true,
                       elevation: 0,
                       underline: const SizedBox.shrink(),
-                      items: BlindListenSettings.briefingPlaybackSpeedOptions
-                          .map(
-                            (speed) => DropdownMenuItem(
-                              value: speed,
-                              child: Text(_formatSpeed(speed)),
-                            ),
-                          )
-                          .toList(),
+                      items:
+                          (widget.playbackSpeedOptions ??
+                                  BlindListenSettings
+                                      .briefingPlaybackSpeedOptions)
+                              .map(
+                                (speed) => DropdownMenuItem(
+                                  value: speed,
+                                  child: Text(_formatSpeed(speed)),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (v) {
                         if (v != null) {
                           setState(() => _playbackSpeed = v);

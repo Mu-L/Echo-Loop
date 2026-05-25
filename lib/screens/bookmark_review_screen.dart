@@ -426,6 +426,9 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
                   onCenter: _handleCenter,
                   isManualMode: playerState.isManualMode,
                   playCountText: _buildPlayCountText(playerState, l10n),
+                  statusSuffixText: _formatSpeed(
+                    playerState.settings.playbackSpeed,
+                  ),
                   l10n: l10n,
                   theme: theme,
                 ),
@@ -602,4 +605,13 @@ class _BookmarkReviewScreenState extends ConsumerState<BookmarkReviewScreen>
       unawaited(player.resume());
     }
   }
+}
+
+/// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+String _formatSpeed(double speed) {
+  if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+  if ((speed * 10).roundToDouble() == speed * 10) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  return '${speed.toStringAsFixed(2)}x';
 }

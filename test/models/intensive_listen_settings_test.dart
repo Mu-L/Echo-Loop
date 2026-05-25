@@ -11,6 +11,41 @@ void main() {
       expect(settings.pauseMode, PauseMode.smart);
       expect(settings.fixedPauseSeconds, 5);
       expect(settings.pauseMultiplier, 2.0);
+      expect(settings.playbackSpeed, 1.0);
+    });
+
+    test('copyWith 可更新播放速度', () {
+      const settings = IntensiveListenSettings();
+      final updated = settings.copyWith(playbackSpeed: 1.3);
+
+      expect(updated.playbackSpeed, 1.3);
+      expect(updated.repeatCount, 1);
+    });
+
+    test('入口播放速度选项符合跟读要求（含 0.75/0.85/0.95 难度档位）', () {
+      expect(IntensiveListenSettings.briefingPlaybackSpeedOptions, const [
+        0.5,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+        1.0,
+        1.1,
+        1.3,
+        1.5,
+        2.0,
+      ]);
+    });
+
+    test('fromJson 解析超出范围的速度回退 1.0', () {
+      final s = IntensiveListenSettings.fromJson({'playbackSpeed': 3.0});
+      expect(s.playbackSpeed, 1.0);
+      final s2 = IntensiveListenSettings.fromJson({'playbackSpeed': 0.1});
+      expect(s2.playbackSpeed, 1.0);
+      final s3 = IntensiveListenSettings.fromJson({'playbackSpeed': 1.25});
+      expect(s3.playbackSpeed, 1.25);
     });
 
     test('copyWith 更新单个字段', () {
@@ -238,9 +273,7 @@ void main() {
           ShadowingControlMode.auto,
         );
         expect(
-          IntensiveListenSettings.fromJson({
-            'controlMode': 123,
-          }).controlMode,
+          IntensiveListenSettings.fromJson({'controlMode': 123}).controlMode,
           ShadowingControlMode.auto,
         );
       });

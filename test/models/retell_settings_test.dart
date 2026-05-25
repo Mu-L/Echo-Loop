@@ -5,6 +5,40 @@ import 'package:echo_loop/models/retell_settings.dart';
 import 'package:echo_loop/widgets/retell/retell_briefing_sheet.dart';
 
 void main() {
+  group('RetellSettings', () {
+    test('默认播放速度为 1x', () {
+      const settings = RetellSettings();
+
+      expect(settings.playbackSpeed, 1.0);
+    });
+
+    test('copyWith 可更新播放速度', () {
+      const settings = RetellSettings();
+
+      final updated = settings.copyWith(playbackSpeed: 1.3);
+
+      expect(updated.playbackSpeed, 1.3);
+      expect(updated.repeatCount, settings.repeatCount);
+    });
+
+    test('入口播放速度选项符合复述要求（含 0.75/0.85/0.95 难度档位）', () {
+      expect(RetellSettings.briefingPlaybackSpeedOptions, [
+        0.5,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        0.9,
+        0.95,
+        1.0,
+        1.1,
+        1.3,
+        1.5,
+        2.0,
+      ]);
+    });
+  });
+
   group('retellDefaultSeconds', () {
     test('null 阶段返回 10', () {
       expect(retellDefaultSeconds(null), 10);
@@ -90,10 +124,7 @@ void main() {
     test('smart 模式：最短 3 秒', () {
       const settings = RetellSettings(pauseMode: PauseMode.smart);
       // 段落 0 秒，perfect → 2 + 0 = 2 秒，clamp 到 3 秒
-      final result = settings.calculatePauseDuration(
-        Duration.zero,
-        score: 1.0,
-      );
+      final result = settings.calculatePauseDuration(Duration.zero, score: 1.0);
       expect(result, const Duration(seconds: 3));
     });
 

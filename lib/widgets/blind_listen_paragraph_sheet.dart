@@ -18,6 +18,7 @@ Future<void> showBlindListenParagraphSheet({
   required List<Sentence> sentences,
   String? stageLabel,
   String? estimatedDurationText,
+  double defaultPlaybackSpeed = 1.0,
   required void Function(
     Duration targetDuration,
     double pauseMultiplier,
@@ -35,6 +36,7 @@ Future<void> showBlindListenParagraphSheet({
     defaultSeconds: -1,
     showPauseMultiplier: true,
     showPlaybackSpeed: true,
+    defaultPlaybackSpeed: defaultPlaybackSpeed,
     pauseMultiplierOptions: const [0.5, 1.0, 1.5, 2.0, 3.0],
     stageLabel: stageLabel,
     estimatedDurationText: estimatedDurationText,

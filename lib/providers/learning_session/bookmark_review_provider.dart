@@ -135,10 +135,12 @@ class BookmarkReview extends _$BookmarkReview {
       _repeatEngine?.dispose();
       _periodicSaveTimer?.cancel();
       if (_sentences.isNotEmpty) {
-        ref.read(analyticsServiceProvider).track(Events.bookmarkReviewComplete, {
-          EventParams.totalSentencesCount: _sentences.length,
-          EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
-        });
+        ref
+            .read(analyticsServiceProvider)
+            .track(Events.bookmarkReviewComplete, {
+              EventParams.totalSentencesCount: _sentences.length,
+              EventParams.durationMs: _studyStopwatch.elapsedMilliseconds,
+            });
       }
       _saveAndRefreshStudyTime();
       _lifecycleListener.dispose();
@@ -264,8 +266,27 @@ class BookmarkReview extends _$BookmarkReview {
 
   /// 更新练习设置（仅会话内生效）
   ///
-  /// 设置更新后立即应用到当前句。
+  /// 设置更新后立即应用到当前句。速度变化只推给 AudioEngine，不重启会话。
   Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
+    final old = state.settings;
+    final speedOnly =
+        newSettings.playbackSpeed != old.playbackSpeed &&
+        newSettings.controlMode == old.controlMode &&
+        newSettings.blindListenRepeatCount == old.blindListenRepeatCount &&
+        newSettings.shadowReadingRepeatCount == old.shadowReadingRepeatCount &&
+        newSettings.pauseMode == old.pauseMode &&
+        newSettings.fixedPauseSeconds == old.fixedPauseSeconds &&
+        newSettings.pauseMultiplier == old.pauseMultiplier;
+    if (speedOnly) {
+      state = state.copyWith(settings: newSettings);
+      unawaited(
+        ref
+            .read(audioEngineProvider.notifier)
+            .setSpeed(newSettings.playbackSpeed),
+      );
+      return;
+    }
+
     final wasAnnotation = state.isAnnotationMode;
     final annotationWaitingForUser =
         state.repeatFlowState?.phase is WaitingForUser ||
@@ -878,6 +899,7 @@ class BookmarkReview extends _$BookmarkReview {
   Future<bool> _playSentenceForBlind(Sentence sentence, int flowToken) async {
     final engine = ref.read(audioEngineProvider.notifier);
     final sessionId = engine.newSession();
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     return true;
   }
@@ -947,6 +969,7 @@ class BookmarkReview extends _$BookmarkReview {
 
     final engine = ref.read(audioEngineProvider.notifier);
     final sessionId = engine.newSession();
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     unawaited(_addOutputWords(countWords(sentence.text)));
   }

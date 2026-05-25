@@ -244,7 +244,9 @@ class RetellPlayer extends _$RetellPlayer {
           next.currentAttempt != null) {
         final attempt = next.currentAttempt!;
         ref.read(analyticsServiceProvider).track(Events.recordingComplete, {
-          ...ref.audioEventParams(ref.read(learningSessionProvider).audioItemId),
+          ...ref.audioEventParams(
+            ref.read(learningSessionProvider).audioItemId,
+          ),
           EventParams.mode: 'retell',
           if (attempt.score != null) EventParams.score: attempt.score!,
         });
@@ -301,6 +303,7 @@ class RetellPlayer extends _$RetellPlayer {
     List<List<Sentence>> paragraphs, {
     int? startSentenceIndex,
     KeywordRatio? autoRatio,
+    double playbackSpeed = 1.0,
   }) {
     _cleanup();
     _paragraphs = paragraphs;
@@ -329,7 +332,7 @@ class RetellPlayer extends _$RetellPlayer {
     state = RetellPlayerState(
       currentParagraphIndex: safeIndex,
       totalParagraphs: paragraphs.length,
-      settings: initialSettings,
+      settings: initialSettings.copyWith(playbackSpeed: playbackSpeed),
     );
 
     // 按 settings.keywordRatio 生成关键词映射
@@ -362,10 +365,7 @@ class RetellPlayer extends _$RetellPlayer {
   /// 从数据库加载收藏状态（初始化后异步调用）
   Future<void> initializeBookmarks(String audioItemId) async {
     final dao = ref.read(bookmarkDaoProvider);
-    final indices = await BookmarkManager.loadBookmarks(
-      audioItemId,
-      dao: dao,
-    );
+    final indices = await BookmarkManager.loadBookmarks(audioItemId, dao: dao);
     // 同步到句子对象
     BookmarkManager.updateSentenceBookmarkStatus(_allSentences, indices);
     state = state.copyWith(bookmarkedSentenceIndices: indices);
@@ -381,11 +381,9 @@ class RetellPlayer extends _$RetellPlayer {
     );
 
     if (isCurrentlyBookmarked) {
-      await BookmarkManager.removeBookmarksFromDb(
-        audioItemId,
-        {sentence.index},
-        dao: dao,
-      );
+      await BookmarkManager.removeBookmarksFromDb(audioItemId, {
+        sentence.index,
+      }, dao: dao);
     } else {
       await BookmarkManager.addBookmarkToDb(audioItemId, sentence, dao: dao);
     }
@@ -411,9 +409,7 @@ class RetellPlayer extends _$RetellPlayer {
     // 价值锚点：只在「添加收藏」时尝试触发通知权限 pre-prompt
     if (!isCurrentlyBookmarked) {
       unawaited(
-        ref
-            .read(notificationPermissionServiceProvider)
-            .maybeTriggerPrompt(),
+        ref.read(notificationPermissionServiceProvider).maybeTriggerPrompt(),
       );
     }
   }
@@ -438,8 +434,7 @@ class RetellPlayer extends _$RetellPlayer {
       : [];
 
   /// 全部段落的句子总数（用于以句子粒度展示进度）
-  int get totalSentenceCount =>
-      _paragraphs.fold(0, (sum, p) => sum + p.length);
+  int get totalSentenceCount => _paragraphs.fold(0, (sum, p) => sum + p.length);
 
   /// 所有段落的累计时长（各段首尾相加）
   Duration get totalDuration {
@@ -732,10 +727,20 @@ class RetellPlayer extends _$RetellPlayer {
     final modeChanged = newSettings.isManualMode != state.settings.isManualMode;
     final ratioChanged =
         newSettings.keywordRatio != state.settings.keywordRatio;
+    final speedChanged =
+        newSettings.playbackSpeed != state.settings.playbackSpeed;
     final shouldKeepWaiting =
         state.isWaitingForUser || _waitAfterCurrentParagraph;
 
     state = state.copyWith(settings: newSettings);
+
+    if (speedChanged) {
+      unawaited(
+        ref
+            .read(audioEngineProvider.notifier)
+            .setSpeed(newSettings.playbackSpeed),
+      );
+    }
 
     if (shouldKeepWaiting) {
       if (ratioChanged) {
@@ -833,6 +838,7 @@ class RetellPlayer extends _$RetellPlayer {
     final start = sentences[startLocalIdx].startTime;
     final end = sentences.last.endTime;
 
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playRangeOnce(start, end, sid);
 
     // 播放完成后进入复述阶段（用局部变量检查）
@@ -900,11 +906,7 @@ class RetellPlayer extends _$RetellPlayer {
   ///
   /// 仅在 listening 阶段触发；段落 clip 范围 = [first.start, last.end]，
   /// 因此 detector 的末尾分支永远不会命中——这里只会在中间 gap 触发。
-  void _maybeSkipSilence(
-    List<Sentence> sentences,
-    Duration position,
-    int idx,
-  ) {
+  void _maybeSkipSilence(List<Sentence> sentences, Duration position, int idx) {
     final settings = ref.read(appSettingsProvider);
     if (!settings.skipSilenceEnabled) return;
 

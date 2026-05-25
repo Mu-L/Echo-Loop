@@ -1,7 +1,7 @@
 /// 复述设置面板
 ///
 /// 底部弹窗，即时生效，仅本次会话。
-/// 设置项：控制模式 + 重复次数 + 段间停顿 + 可见词生成方式 + 可见词比例
+/// 设置项：控制模式 + 重复次数 + 段间停顿 + 播放速度 + 可见词生成方式 + 可见词比例
 /// UI 风格与跟读设置面板保持一致。
 library;
 
@@ -108,6 +108,10 @@ class _RetellSettingsSheet extends ConsumerWidget {
             ],
             const SizedBox(height: AppSpacing.l),
 
+            // ── 播放速度 ──
+            _buildPlaybackSpeedSection(l10n, theme, settings, ref),
+            const SizedBox(height: AppSpacing.l),
+
             // ── 可见词生成方式 ──
             Text(
               l10n.retellKeywordMethod,
@@ -166,10 +170,7 @@ class _RetellSettingsSheet extends ConsumerWidget {
                   showSelectedIcon: false,
                   segments: [
                     for (final r in KeywordRatio.values)
-                      ButtonSegment(
-                        value: r,
-                        label: Text('${r.percent}%'),
-                      ),
+                      ButtonSegment(value: r, label: Text('${r.percent}%')),
                   ],
                   selected: {settings.keywordRatio},
                   onSelectionChanged: (selected) => ref
@@ -183,6 +184,52 @@ class _RetellSettingsSheet extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// 播放速度滑块。
+  ///
+  /// 复述速度仅对当前会话生效，步进为 0.05x，覆盖 0.5x-2.0x。
+  Widget _buildPlaybackSpeedSection(
+    AppLocalizations l10n,
+    ThemeData theme,
+    RetellSettings settings,
+    WidgetRef ref,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.playbackSpeed,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              _formatSpeed(settings.playbackSpeed),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: settings.playbackSpeed.clamp(0.5, 2.0),
+          min: 0.5,
+          max: 2.0,
+          divisions: 30,
+          label: _formatSpeed(settings.playbackSpeed),
+          onChanged: (value) {
+            final speed = (value * 20).round() / 20;
+            ref
+                .read(retellPlayerProvider.notifier)
+                .updateSettings(settings.copyWith(playbackSpeed: speed));
+          },
+        ),
+      ],
     );
   }
 
@@ -452,5 +499,14 @@ class _RetellSettingsSheet extends ConsumerWidget {
         );
       }),
     );
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 }

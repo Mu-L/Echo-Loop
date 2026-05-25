@@ -31,6 +31,27 @@ class DifficultPracticeSettings {
   /// 句长倍数（默认 2.0）
   final double pauseMultiplier;
 
+  /// 播放速度（0.5x-2.0x，默认 1.0x），难句补练和收藏复习共用。
+  final double playbackSpeed;
+
+  /// 入口弹窗使用的离散速度选项
+  ///
+  /// 与 [BlindListenSettings.briefingPlaybackSpeedOptions] / [RetellSettings.briefingPlaybackSpeedOptions] 保持一致。
+  static const List<double> briefingPlaybackSpeedOptions = [
+    0.5,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+    1.1,
+    1.3,
+    1.5,
+    2.0,
+  ];
+
   const DifficultPracticeSettings({
     this.controlMode = ShadowingControlMode.auto,
     this.blindListenRepeatCount = 1,
@@ -38,6 +59,7 @@ class DifficultPracticeSettings {
     this.pauseMode = PauseMode.smart,
     this.fixedPauseSeconds = 5,
     this.pauseMultiplier = 2.0,
+    this.playbackSpeed = 1.0,
   });
 
   /// 是否为手动控制模式
@@ -50,6 +72,7 @@ class DifficultPracticeSettings {
     PauseMode? pauseMode,
     int? fixedPauseSeconds,
     double? pauseMultiplier,
+    double? playbackSpeed,
   }) {
     return DifficultPracticeSettings(
       controlMode: controlMode ?? this.controlMode,
@@ -60,6 +83,7 @@ class DifficultPracticeSettings {
       pauseMode: pauseMode ?? this.pauseMode,
       fixedPauseSeconds: fixedPauseSeconds ?? this.fixedPauseSeconds,
       pauseMultiplier: pauseMultiplier ?? this.pauseMultiplier,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 
@@ -89,6 +113,7 @@ class DifficultPracticeSettings {
     'pauseMode': pauseMode.name,
     'fixedPauseSeconds': fixedPauseSeconds,
     'pauseMultiplier': pauseMultiplier,
+    'playbackSpeed': playbackSpeed,
   };
 
   /// 防御性解析：非法值回退默认
@@ -105,12 +130,23 @@ class DifficultPracticeSettings {
       pauseMode: _parsePauseMode(json['pauseMode']),
       fixedPauseSeconds: _parseFixedPause(json['fixedPauseSeconds']),
       pauseMultiplier: _parseMultiplier(json['pauseMultiplier']),
+      playbackSpeed: _parsePlaybackSpeed(json['playbackSpeed']),
     );
+  }
+
+  /// 解析播放速度：范围 0.5–2.0，否则回退 1.0
+  static double _parsePlaybackSpeed(dynamic raw) {
+    if (raw is! num) return 1.0;
+    final value = raw.toDouble();
+    if (value < 0.5 || value > 2.0) return 1.0;
+    return value;
   }
 
   static ShadowingControlMode _parseControlMode(dynamic raw) {
     if (raw is! String) return ShadowingControlMode.auto;
-    return ShadowingControlMode.values.where((e) => e.name == raw).firstOrNull ??
+    return ShadowingControlMode.values
+            .where((e) => e.name == raw)
+            .firstOrNull ??
         ShadowingControlMode.auto;
   }
 

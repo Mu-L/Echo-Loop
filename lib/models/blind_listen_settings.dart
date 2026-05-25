@@ -30,11 +30,17 @@ class BlindListenSettings {
   bool get isManualMode => controlMode == ShadowingControlMode.manual;
 
   /// 入口弹窗使用的离散速度选项
+  ///
+  /// 包含 0.75 / 0.85 / 0.95 这几个"按难度+轮次回升映射"会落到的档位，
+  /// 保证下拉默认值在选项列表中可被命中。
   static const List<double> briefingPlaybackSpeedOptions = [
     0.5,
     0.7,
+    0.75,
     0.8,
+    0.85,
     0.9,
+    0.95,
     1.0,
     1.1,
     1.3,

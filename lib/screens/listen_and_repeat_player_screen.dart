@@ -25,6 +25,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/speech/speech_recording_controller.dart';
+import '../providers/audio_engine/audio_engine_provider.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_controller.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_phase.dart';
 import '../providers/listen_and_repeat/listen_and_repeat_settings_provider.dart';
@@ -124,6 +125,22 @@ class _ListenAndRepeatPlayerScreenState
     IntensiveListenSettings next,
   ) {
     if (prev == null || _isExiting) return;
+    // 速度变化无需重启当前句：直接把新速度推给 AudioEngine 即可。
+    // 其它字段变化仍走 applySettingsChange（会重建当前句配置）。
+    // IntensiveListenSettings 无 == 重载，逐字段比对（除 speed 外全相等即"仅速度变了"）。
+    final speedOnly =
+        next.playbackSpeed != prev.playbackSpeed &&
+        next.repeatCount == prev.repeatCount &&
+        next.pauseMode == prev.pauseMode &&
+        next.fixedPauseSeconds == prev.fixedPauseSeconds &&
+        next.pauseMultiplier == prev.pauseMultiplier &&
+        next.controlMode == prev.controlMode;
+    if (speedOnly) {
+      unawaited(
+        ref.read(audioEngineProvider.notifier).setSpeed(next.playbackSpeed),
+      );
+      return;
+    }
     unawaited(
       ref
           .read(listenAndRepeatControllerProvider.notifier)
@@ -191,7 +208,8 @@ class _ListenAndRepeatPlayerScreenState
         .progressMap[widget.audioItemId];
 
     final stage = progress?.currentStage ?? LearningStage.firstLearn;
-    final currentSub = progress?.currentSubStage ?? SubStageType.listenAndRepeat;
+    final currentSub =
+        progress?.currentSubStage ?? SubStageType.listenAndRepeat;
     final planned = plan.subStagesFor(stage);
     final currentIdx = planned.indexOf(currentSub);
     final isLast = currentIdx < 0 || currentIdx >= planned.length - 1;
@@ -580,6 +598,9 @@ class _ListenAndRepeatPlayerScreenState
                     ctrlState.repeatIndex + 1,
                     ctrlState.totalRepeats,
                   ),
+                  statusSuffixText: _formatSpeed(
+                    ref.watch(listenAndRepeatSettingsProvider).playbackSpeed,
+                  ),
                   l10n: l10n,
                   theme: theme,
                 ),
@@ -590,6 +611,15 @@ class _ListenAndRepeatPlayerScreenState
       ),
     );
   }
+}
+
+/// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+String _formatSpeed(double speed) {
+  if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+  if ((speed * 10).roundToDouble() == speed * 10) {
+    return '${speed.toStringAsFixed(1)}x';
+  }
+  return '${speed.toStringAsFixed(2)}x';
 }
 
 /// 判断子步骤是否有专用播放器页面

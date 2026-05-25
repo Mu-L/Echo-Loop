@@ -240,7 +240,13 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   }
 
   /// 初始化
-  void initialize(List<Sentence> sentences, {int startIndex = 0}) {
+  ///
+  /// [playbackSpeed] 入口 briefing 中用户选择的初始播放速度，默认 1.0x。
+  void initialize(
+    List<Sentence> sentences, {
+    int startIndex = 0,
+    double playbackSpeed = 1.0,
+  }) {
     _engine.cleanup();
     _blindEngine.dispose();
     _blindEngine = _createBlindEngine();
@@ -255,6 +261,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
     state = ReviewDifficultPracticeState(
       currentSentenceIndex: validIndex,
       totalSentences: _sentences.length,
+      settings: DifficultPracticeSettings(playbackSpeed: playbackSpeed),
     );
     _prepareBlindFlow(startIndex: validIndex);
     ref.read(analyticsServiceProvider).track(Events.difficultPracticeStart, {
@@ -270,6 +277,27 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
 
   /// 更新设置并重新开始当前句
   Future<void> updateSettings(DifficultPracticeSettings newSettings) async {
+    // 速度变化无需重启会话：直接推给 AudioEngine 即可。
+    // 其它字段变化沿用现有重启逻辑。
+    final old = state.settings;
+    final speedOnly =
+        newSettings.playbackSpeed != old.playbackSpeed &&
+        newSettings.controlMode == old.controlMode &&
+        newSettings.blindListenRepeatCount == old.blindListenRepeatCount &&
+        newSettings.shadowReadingRepeatCount == old.shadowReadingRepeatCount &&
+        newSettings.pauseMode == old.pauseMode &&
+        newSettings.fixedPauseSeconds == old.fixedPauseSeconds &&
+        newSettings.pauseMultiplier == old.pauseMultiplier;
+    if (speedOnly) {
+      state = state.copyWith(settings: newSettings);
+      unawaited(
+        ref
+            .read(audioEngineProvider.notifier)
+            .setSpeed(newSettings.playbackSpeed),
+      );
+      return;
+    }
+
     final wasAnnotation = state.isAnnotationMode;
     final annotationWaitingForUser =
         state.repeatFlowState?.phase is WaitingForUser ||
@@ -707,6 +735,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   Future<void> _playSentenceForRepeat(Sentence sentence, int flowToken) async {
     final engine = ref.read(audioEngineProvider.notifier);
     final sessionId = engine.newSession();
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
   }
 
@@ -825,6 +854,7 @@ class ReviewDifficultPractice extends _$ReviewDifficultPractice {
   Future<bool> _playSentenceForBlind(Sentence sentence, int flowToken) async {
     final engine = ref.read(audioEngineProvider.notifier);
     final sessionId = engine.newSession();
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     return true;
   }

@@ -1,6 +1,6 @@
 /// 复述设置模型
 ///
-/// 控制段落复述播放器的重复次数、停顿模式和文本显示模式。
+/// 控制段落复述播放器的播放速度、重复次数、停顿模式和文本显示模式。
 /// 仅在会话内生效，不持久化。
 library;
 
@@ -147,8 +147,30 @@ class RetellSettings {
   /// 控制模式（自动/手动，默认 auto）
   final ShadowingControlMode controlMode;
 
+  /// 播放速度（0.5x-2.0x，默认 1.0x）
+  final double playbackSpeed;
+
   /// 是否为手动控制模式
   bool get isManualMode => controlMode == ShadowingControlMode.manual;
+
+  /// 入口弹窗使用的离散速度选项
+  ///
+  /// 包含 0.75 / 0.85 / 0.95 这几个"按难度+轮次回升映射"会落到的档位，
+  /// 保证下拉默认值在选项列表中可被命中。
+  static const List<double> briefingPlaybackSpeedOptions = [
+    0.5,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+    1.1,
+    1.3,
+    1.5,
+    2.0,
+  ];
 
   /// 固定间隔可选值（秒）
   static const List<int> fixedPauseOptions = [10, 20, 30, 45, 60, 90, 120, 180];
@@ -173,6 +195,7 @@ class RetellSettings {
     this.keywordMethod = KeywordMethod.random,
     this.keywordRatio = KeywordRatio.medium,
     this.controlMode = ShadowingControlMode.auto,
+    this.playbackSpeed = 1.0,
   });
 
   RetellSettings copyWith({
@@ -183,6 +206,7 @@ class RetellSettings {
     KeywordMethod? keywordMethod,
     KeywordRatio? keywordRatio,
     ShadowingControlMode? controlMode,
+    double? playbackSpeed,
   }) {
     return RetellSettings(
       repeatCount: repeatCount ?? this.repeatCount,
@@ -192,6 +216,7 @@ class RetellSettings {
       keywordMethod: keywordMethod ?? this.keywordMethod,
       keywordRatio: keywordRatio ?? this.keywordRatio,
       controlMode: controlMode ?? this.controlMode,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 

@@ -1,20 +1,25 @@
 /// 跟读简报底部弹窗
 ///
-/// 进入跟读前显示，告知用户难句数量、每句遍数和操作提示。
-/// 参照 intensive_listen_briefing_sheet.dart 实现。
+/// 进入跟读前显示，告知用户难句数量、每句遍数和操作提示，
+/// 同时让用户在弹窗里选择本次会话的初始播放速度（与盲听/复述对齐）。
 library;
 
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/intensive_listen_settings.dart';
 import '../../theme/app_theme.dart';
 
 /// 显示跟读简报底部弹窗
+///
+/// [defaultPlaybackSpeed] 默认播放速度（按难度+轮次映射），用户可在弹窗里改。
+/// [onStartPractice] 点击"开始练习"时回调，参数为用户最终选定的速度。
 Future<void> showListenAndRepeatBriefingSheet({
   required BuildContext context,
   required int difficultCount,
   required int playCount,
   Duration? estimatedDuration,
-  required VoidCallback onStartPractice,
+  double defaultPlaybackSpeed = 1.0,
+  required void Function(double playbackSpeed) onStartPractice,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -26,13 +31,14 @@ Future<void> showListenAndRepeatBriefingSheet({
       difficultCount: difficultCount,
       playCount: playCount,
       estimatedDuration: estimatedDuration,
+      defaultPlaybackSpeed: defaultPlaybackSpeed,
       onStartPractice: onStartPractice,
     ),
   );
 }
 
 /// 跟读简报弹窗内容
-class ListenAndRepeatBriefingSheet extends StatelessWidget {
+class ListenAndRepeatBriefingSheet extends StatefulWidget {
   /// 难句总数
   final int difficultCount;
 
@@ -42,22 +48,44 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
   /// 预估练习时长
   final Duration? estimatedDuration;
 
-  /// 开始练习回调
-  final VoidCallback onStartPractice;
+  /// 默认播放速度
+  final double defaultPlaybackSpeed;
+
+  /// 开始练习回调（带回最终选定的速度）
+  final void Function(double playbackSpeed) onStartPractice;
 
   const ListenAndRepeatBriefingSheet({
     super.key,
     required this.difficultCount,
     required this.playCount,
     this.estimatedDuration,
+    this.defaultPlaybackSpeed = 1.0,
     required this.onStartPractice,
   });
+
+  @override
+  State<ListenAndRepeatBriefingSheet> createState() =>
+      _ListenAndRepeatBriefingSheetState();
+}
+
+class _ListenAndRepeatBriefingSheetState
+    extends State<ListenAndRepeatBriefingSheet> {
+  late double _playbackSpeed = widget.defaultPlaybackSpeed;
 
   /// 格式化预估时长
   String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
     final minutes = (duration.inSeconds / 60).ceil();
     if (minutes < 1) return l10n.estimatedLessThanOneMinute;
     return l10n.estimatedMinutes(minutes);
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 
   @override
@@ -141,13 +169,50 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
 
+          // 播放速度（与盲听/复述对齐）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.playbackSpeed,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(
+                width: 80,
+                child: DropdownButton<double>(
+                  value: _playbackSpeed,
+                  isExpanded: true,
+                  isDense: true,
+                  elevation: 0,
+                  underline: const SizedBox.shrink(),
+                  items: IntensiveListenSettings.briefingPlaybackSpeedOptions
+                      .map(
+                        (speed) => DropdownMenuItem(
+                          value: speed,
+                          child: Text(_formatSpeed(speed)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _playbackSpeed = v);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.m),
+
           // 难句数量 + 遍数 + 预估时长
           Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                l10n.listenAndRepeatBriefingDifficultCount(difficultCount),
+                l10n.listenAndRepeatBriefingDifficultCount(
+                  widget.difficultCount,
+                ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -162,12 +227,12 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
                 ),
               ),
               Text(
-                l10n.listenAndRepeatBriefingPlayCount(playCount),
+                l10n.listenAndRepeatBriefingPlayCount(widget.playCount),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              if (estimatedDuration != null) ...[
+              if (widget.estimatedDuration != null) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
                   child: Text(
@@ -184,7 +249,7 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  _formatEstimatedDuration(l10n, widget.estimatedDuration!),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -200,7 +265,7 @@ class ListenAndRepeatBriefingSheet extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                onStartPractice();
+                widget.onStartPractice(_playbackSpeed);
               },
               icon: const Icon(Icons.play_arrow),
               label: Text(l10n.startPractice),
