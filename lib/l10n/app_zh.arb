@@ -270,8 +270,7 @@
   "exitIntensiveListenTitle": "退出精听？",
   "exitIntensiveListenMessage": "进度已保存，下次可从断点继续。",
   "intensiveListenBriefingTitle": "逐句精听",
-  "intensiveListenBriefingSubtitle": "首次学习 - 逐句精听",
-  "intensiveListenBriefingTip": "逐句盲听，听不懂时点击「听不懂」查看文本并标记难句。",
+  "intensiveListenBriefingTip": "逐句盲听，听不懂时点击「听不懂」查看文本和讲解。",
   "intensiveListenBriefingSentenceCount": "共 {count} 个句子",
   "intensiveListenNoSubtitle": "无字幕",
   "intensiveListenNoSubtitleMessage": "该音频没有字幕，请先上传字幕文件。",
@@ -412,7 +411,6 @@
   "exitListenAndRepeatTitle": "退出跟读？",
   "exitListenAndRepeatMessage": "进度已保存，下次可从断点继续。",
   "listenAndRepeatBriefingTitle": "难句跟读",
-  "listenAndRepeatBriefingSubtitle": "首次学习 - 难句跟读",
   "listenAndRepeatBriefingTip": "先听原句，在停顿期间跟读。",
   "listenAndRepeatBriefingDifficultCount": "{count} 个难句",
   "@listenAndRepeatBriefingDifficultCount": {

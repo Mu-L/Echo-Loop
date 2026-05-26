@@ -415,8 +415,7 @@
   "exitIntensiveListenTitle": "Exit Intensive Listening?",
   "exitIntensiveListenMessage": "Your progress will be saved. You can continue from where you left off.",
   "intensiveListenBriefingTitle": "Intensive Listening",
-  "intensiveListenBriefingSubtitle": "Initial Learning - Intensive Listening",
-  "intensiveListenBriefingTip": "Listen sentence by sentence. Tap 'Unclear' to reveal text and mark difficult sentences.",
+  "intensiveListenBriefingTip": "Listen sentence by sentence. Tap 'Unclear' to reveal text and explanations.",
   "intensiveListenBriefingSentenceCount": "{count} sentences",
   "@intensiveListenBriefingSentenceCount": {
     "placeholders": {
@@ -569,7 +568,6 @@
   "exitListenAndRepeatTitle": "Exit Listen & Repeat?",
   "exitListenAndRepeatMessage": "Your progress will be saved. You can continue from where you left off.",
   "listenAndRepeatBriefingTitle": "Listen & Repeat",
-  "listenAndRepeatBriefingSubtitle": "Initial Learning - Listen & Repeat",
   "listenAndRepeatBriefingTip": "Listen first, then repeat during the pause.",
   "listenAndRepeatBriefingDifficultCount": "{count} difficult sentences",
   "@listenAndRepeatBriefingDifficultCount": {

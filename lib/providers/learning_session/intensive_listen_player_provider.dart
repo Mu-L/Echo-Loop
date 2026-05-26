@@ -219,6 +219,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
   Future<void> initialize(
     List<Sentence> sentences, {
     int startIndex = 0,
+    double playbackSpeed = 1.0,
   }) async {
     _blindEngine.dispose();
     _blindEngine = _createBlindEngine();
@@ -237,6 +238,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       currentSentenceIndex: safeIndex,
       totalSentences: _sentences.length,
       difficultSentences: preBookmarked,
+      settings: IntensiveListenSettings(playbackSpeed: playbackSpeed),
     );
     _prepareBlindFlow(startIndex: safeIndex);
     ref.read(analyticsServiceProvider).track(Events.intensiveListenStart, {
@@ -368,6 +370,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     final sessionId = _currentSessionId;
     state = state.copyWith(isPlaying: true);
 
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     if (!engine.isActiveSession(sessionId)) {
       state = state.copyWith(isPlaying: false);
@@ -412,6 +415,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
       isPlaying: true,
     );
 
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playRangeOnce(start, end, sessionId);
     if (!engine.isActiveSession(sessionId)) return;
 
@@ -432,6 +436,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     _annotationCountdown.cancel();
 
     state = state.copyWith(isPlaying: true);
+    await engine.setSpeed(state.settings.playbackSpeed);
     for (var i = 0; i < timings.length; i++) {
       if (!engine.isActiveSession(sessionId)) return;
 
@@ -705,6 +710,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     _persistCurrentSentenceIndexAsync();
     final engine = ref.read(audioEngineProvider.notifier);
     final sessionId = engine.newSession();
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     return true;
   }
@@ -757,6 +763,7 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer {
     _currentSessionId = engine.newSession();
     final sessionId = _currentSessionId;
 
+    await engine.setSpeed(state.settings.playbackSpeed);
     await engine.playClipOnce(sentence, sessionId);
     if (!engine.isActiveSession(sessionId)) {
       state = state.copyWith(isPlaying: false);

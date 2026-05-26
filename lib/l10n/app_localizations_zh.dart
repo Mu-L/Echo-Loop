@@ -830,10 +830,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get intensiveListenBriefingTitle => '逐句精听';
 
   @override
-  String get intensiveListenBriefingSubtitle => '首次学习 - 逐句精听';
-
-  @override
-  String get intensiveListenBriefingTip => '逐句盲听，听不懂时点击「听不懂」查看文本并标记难句。';
+  String get intensiveListenBriefingTip => '逐句盲听，听不懂时点击「听不懂」查看文本和讲解。';
 
   @override
   String intensiveListenBriefingSentenceCount(int count) {
@@ -1064,9 +1061,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get listenAndRepeatBriefingTitle => '难句跟读';
-
-  @override
-  String get listenAndRepeatBriefingSubtitle => '首次学习 - 难句跟读';
 
   @override
   String get listenAndRepeatBriefingTip => '先听原句，在停顿期间跟读。';

@@ -615,10 +615,15 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       context: context,
       sentenceCount: lpState.sentences.length,
       estimatedDuration: intensiveEstimate,
-      onStartPractice: () async {
+      defaultPlaybackSpeed: 1.0,
+      onStartPractice: (playbackSpeed) async {
         await ref
             .read(learningSessionProvider.notifier)
-            .enterIntensiveListenMode(widget.audioItemId, lpState.sentences);
+            .enterIntensiveListenMode(
+              widget.audioItemId,
+              lpState.sentences,
+              playbackSpeed: playbackSpeed,
+            );
         if (!context.mounted) return;
         context.push(
           AppRoutes.intensiveListenPlayer(
@@ -1752,7 +1757,7 @@ class _FirstStudySection extends ConsumerWidget {
     );
   }
 
-  /// 进入自由练习精听模式（直接进入，不弹 briefing sheet）
+  /// 进入自由练习精听模式（与按计划学习一致：先弹 briefing 含速度下拉）
   Future<void> _startFreePlayIntensiveListen(
     BuildContext context,
     WidgetRef ref,
@@ -1760,16 +1765,34 @@ class _FirstStudySection extends ConsumerWidget {
     final lpState = ref.read(listeningPracticeProvider);
     if (lpState.sentences.isEmpty) return;
 
-    await ref
-        .read(learningSessionProvider.notifier)
-        .enterIntensiveListenMode(
-          audioItemId,
-          lpState.sentences,
-          isFreePlay: true,
-        );
-    if (context.mounted) {
-      context.push(AppRoutes.intensiveListenPlayer(collectionId, audioItemId));
-    }
+    // 预估时长：每句 = 句子时长 × 2（听 + 停顿处理）
+    final totalSentenceDuration = lpState.sentences.fold<Duration>(
+      Duration.zero,
+      (sum, s) => sum + s.duration,
+    );
+    final intensiveEstimate = totalSentenceDuration * 2;
+
+    showIntensiveListenBriefingSheet(
+      context: context,
+      sentenceCount: lpState.sentences.length,
+      estimatedDuration: intensiveEstimate,
+      defaultPlaybackSpeed: 1.0,
+      onStartPractice: (playbackSpeed) async {
+        await ref
+            .read(learningSessionProvider.notifier)
+            .enterIntensiveListenMode(
+              audioItemId,
+              lpState.sentences,
+              isFreePlay: true,
+              playbackSpeed: playbackSpeed,
+            );
+        if (context.mounted) {
+          context.push(
+            AppRoutes.intensiveListenPlayer(collectionId, audioItemId),
+          );
+        }
+      },
+    );
   }
 
   /// 进入自由练习跟读模式（与按计划学习一致：先弹 briefing 含速度下拉）

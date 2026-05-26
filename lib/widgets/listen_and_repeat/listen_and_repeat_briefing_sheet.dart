@@ -129,15 +129,6 @@ class _ListenAndRepeatBriefingSheetState
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-
-          // 副标题
-          Text(
-            l10n.listenAndRepeatBriefingSubtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
           const SizedBox(height: AppSpacing.l),
 
           // 练习提示

@@ -1628,16 +1628,10 @@ abstract class AppLocalizations {
   /// **'Intensive Listening'**
   String get intensiveListenBriefingTitle;
 
-  /// No description provided for @intensiveListenBriefingSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Initial Learning - Intensive Listening'**
-  String get intensiveListenBriefingSubtitle;
-
   /// No description provided for @intensiveListenBriefingTip.
   ///
   /// In en, this message translates to:
-  /// **'Listen sentence by sentence. Tap \'Unclear\' to reveal text and mark difficult sentences.'**
+  /// **'Listen sentence by sentence. Tap \'Unclear\' to reveal text and explanations.'**
   String get intensiveListenBriefingTip;
 
   /// No description provided for @intensiveListenBriefingSentenceCount.
@@ -2035,12 +2029,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Listen & Repeat'**
   String get listenAndRepeatBriefingTitle;
-
-  /// No description provided for @listenAndRepeatBriefingSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Initial Learning - Listen & Repeat'**
-  String get listenAndRepeatBriefingSubtitle;
 
   /// No description provided for @listenAndRepeatBriefingTip.
   ///

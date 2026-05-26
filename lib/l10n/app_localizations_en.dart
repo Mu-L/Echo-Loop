@@ -844,12 +844,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intensiveListenBriefingTitle => 'Intensive Listening';
 
   @override
-  String get intensiveListenBriefingSubtitle =>
-      'Initial Learning - Intensive Listening';
-
-  @override
   String get intensiveListenBriefingTip =>
-      'Listen sentence by sentence. Tap \'Unclear\' to reveal text and mark difficult sentences.';
+      'Listen sentence by sentence. Tap \'Unclear\' to reveal text and explanations.';
 
   @override
   String intensiveListenBriefingSentenceCount(int count) {
@@ -1091,10 +1087,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get listenAndRepeatBriefingTitle => 'Listen & Repeat';
-
-  @override
-  String get listenAndRepeatBriefingSubtitle =>
-      'Initial Learning - Listen & Repeat';
 
   @override
   String get listenAndRepeatBriefingTip =>

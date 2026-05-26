@@ -462,6 +462,7 @@ class LearningSession extends _$LearningSession {
     String audioItemId,
     List<Sentence> sentences, {
     bool isFreePlay = false,
+    double playbackSpeed = 1.0,
   }) async {
     _startStudyTimer();
     final practice = ref.read(listeningPracticeProvider.notifier);
@@ -503,7 +504,11 @@ class LearningSession extends _$LearningSession {
 
     // 初始化精听播放器
     final intensivePlayer = ref.read(intensiveListenPlayerProvider.notifier);
-    await intensivePlayer.initialize(sentences, startIndex: startIndex);
+    await intensivePlayer.initialize(
+      sentences,
+      startIndex: startIndex,
+      playbackSpeed: playbackSpeed,
+    );
     _trackSessionStart();
   }
 

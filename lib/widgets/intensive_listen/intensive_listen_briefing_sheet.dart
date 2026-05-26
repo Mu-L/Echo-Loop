@@ -1,19 +1,24 @@
 /// 精听简报底部弹窗
 ///
-/// 进入精听前显示，告知用户句子总数和操作提示。
-/// 参照 blind_listen_briefing_sheet.dart 实现。
+/// 进入精听前显示，告知用户句子总数和操作提示，
+/// 同时让用户在弹窗里选择本次会话的初始播放速度（与盲听/复述/跟读对齐）。
 library;
 
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/intensive_listen_settings.dart';
 import '../../theme/app_theme.dart';
 
 /// 显示精听简报底部弹窗
+///
+/// [defaultPlaybackSpeed] 默认播放速度（默认 1.0），用户可在弹窗里改。
+/// [onStartPractice] 点击"开始练习"时回调，参数为用户最终选定的速度。
 Future<void> showIntensiveListenBriefingSheet({
   required BuildContext context,
   required int sentenceCount,
   Duration? estimatedDuration,
-  required VoidCallback onStartPractice,
+  double defaultPlaybackSpeed = 1.0,
+  required void Function(double playbackSpeed) onStartPractice,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -24,34 +29,57 @@ Future<void> showIntensiveListenBriefingSheet({
     builder: (context) => IntensiveListenBriefingSheet(
       sentenceCount: sentenceCount,
       estimatedDuration: estimatedDuration,
+      defaultPlaybackSpeed: defaultPlaybackSpeed,
       onStartPractice: onStartPractice,
     ),
   );
 }
 
 /// 精听简报弹窗内容
-class IntensiveListenBriefingSheet extends StatelessWidget {
+class IntensiveListenBriefingSheet extends StatefulWidget {
   /// 句子总数
   final int sentenceCount;
 
   /// 预估练习时长
   final Duration? estimatedDuration;
 
-  /// 开始练习回调
-  final VoidCallback onStartPractice;
+  /// 默认播放速度
+  final double defaultPlaybackSpeed;
+
+  /// 开始练习回调（带回最终选定的速度）
+  final void Function(double playbackSpeed) onStartPractice;
 
   const IntensiveListenBriefingSheet({
     super.key,
     required this.sentenceCount,
     this.estimatedDuration,
+    this.defaultPlaybackSpeed = 1.0,
     required this.onStartPractice,
   });
+
+  @override
+  State<IntensiveListenBriefingSheet> createState() =>
+      _IntensiveListenBriefingSheetState();
+}
+
+class _IntensiveListenBriefingSheetState
+    extends State<IntensiveListenBriefingSheet> {
+  late double _playbackSpeed = widget.defaultPlaybackSpeed;
 
   /// 格式化预估时长
   String _formatEstimatedDuration(AppLocalizations l10n, Duration duration) {
     final minutes = (duration.inSeconds / 60).ceil();
     if (minutes < 1) return l10n.estimatedLessThanOneMinute;
     return l10n.estimatedMinutes(minutes);
+  }
+
+  /// 统一显示速度标签：整数速度显示为 1x，0.05 步进保留必要小数。
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) return '${speed.toInt()}x';
+    if ((speed * 10).roundToDouble() == speed * 10) {
+      return '${speed.toStringAsFixed(1)}x';
+    }
+    return '${speed.toStringAsFixed(2)}x';
   }
 
   @override
@@ -91,15 +119,6 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-
-          // 副标题
-          Text(
-            l10n.intensiveListenBriefingSubtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
           const SizedBox(height: AppSpacing.l),
 
           // 练习提示
@@ -131,17 +150,52 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
 
+          // 播放速度（与盲听/复述/跟读对齐）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.playbackSpeed,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(
+                width: 80,
+                child: DropdownButton<double>(
+                  value: _playbackSpeed,
+                  isExpanded: true,
+                  isDense: true,
+                  elevation: 0,
+                  underline: const SizedBox.shrink(),
+                  items: IntensiveListenSettings.briefingPlaybackSpeedOptions
+                      .map(
+                        (speed) => DropdownMenuItem(
+                          value: speed,
+                          child: Text(_formatSpeed(speed)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _playbackSpeed = v);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.m),
+
           // 句子总数 + 预估时长
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                l10n.intensiveListenBriefingSentenceCount(sentenceCount),
+                l10n.intensiveListenBriefingSentenceCount(widget.sentenceCount),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              if (estimatedDuration != null) ...[
+              if (widget.estimatedDuration != null) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
                   child: Text(
@@ -158,7 +212,7 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _formatEstimatedDuration(l10n, estimatedDuration!),
+                  _formatEstimatedDuration(l10n, widget.estimatedDuration!),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -174,7 +228,7 @@ class IntensiveListenBriefingSheet extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                onStartPractice();
+                widget.onStartPractice(_playbackSpeed);
               },
               icon: const Icon(Icons.play_arrow),
               label: Text(l10n.startPractice),
