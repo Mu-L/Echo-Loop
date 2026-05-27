@@ -119,12 +119,20 @@ class _AiContentSectionState extends State<AiContentSection> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isExpanded = _state != AiContentState.collapsed;
+    // 纯黑深色主题下：半透明底色会叠出雾蒙蒙的朦胧块且边界不清，
+    // 改用不透明实底 + 细描边让卡片清晰浮起。浅色保持原半透明。
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHigh
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
+        border: isDark
+            ? Border.all(color: theme.colorScheme.outlineVariant, width: 1)
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

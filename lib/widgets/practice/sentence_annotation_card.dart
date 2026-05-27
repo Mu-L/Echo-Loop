@@ -788,12 +788,19 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     required String? content,
     Widget Function(String)? contentBuilder,
   }) {
+    // 纯黑深色主题下：半透明底色会显朦胧且边界不清，改用不透明实底 + 细描边。
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.m),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHigh
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
+        border: isDark
+            ? Border.all(color: theme.colorScheme.outlineVariant, width: 1)
+            : null,
       ),
       child: switch (state) {
         ContentLoadState.loading => const ShimmerPlaceholder(),

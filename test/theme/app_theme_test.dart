@@ -41,11 +41,30 @@ void main() {
       expect(dark.colorScheme.primary, isNot(Colors.white));
       expect(dark.colorScheme.brightness, Brightness.dark);
     });
+
+    test('BottomSheet 背景抬高到 #1E1E20，浮于纯黑之上', () {
+      expect(
+        dark.bottomSheetTheme.modalBackgroundColor,
+        const Color(0xFF1E1E20),
+      );
+      expect(dark.bottomSheetTheme.backgroundColor, const Color(0xFF1E1E20));
+    });
+
+    test('下拉/弹出菜单背景抬高到 #1E1E20，避免菜单贴黑看不清', () {
+      // 经典 DropdownButton 菜单走 canvasColor
+      expect(dark.canvasColor, const Color(0xFF1E1E20));
+      // PopupMenuButton 走 popupMenuTheme
+      expect(dark.popupMenuTheme.color, const Color(0xFF1E1E20));
+    });
   });
 
   group('AppTheme.light — 回归保护', () {
     test('浅色页面背景保持浅灰，不受纯黑改造影响', () {
       expect(AppTheme.light().scaffoldBackgroundColor, const Color(0xFFF5F6FA));
+    });
+
+    test('浅色 BottomSheet 不强制背景色（沿用 M3 默认）', () {
+      expect(AppTheme.light().bottomSheetTheme.modalBackgroundColor, isNull);
     });
   });
 }

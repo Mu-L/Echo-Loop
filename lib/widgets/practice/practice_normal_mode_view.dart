@@ -95,7 +95,7 @@ class PracticeNormalModeView extends StatelessWidget {
                         ? l10n.intensiveListenMarkedDifficult
                         : l10n.intensiveListenNotDifficult,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

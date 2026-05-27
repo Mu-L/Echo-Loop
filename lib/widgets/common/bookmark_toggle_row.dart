@@ -53,7 +53,7 @@ class BookmarkToggleRow extends StatelessWidget {
             child: Text(
               labelText,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               overflow: TextOverflow.ellipsis,
             ),

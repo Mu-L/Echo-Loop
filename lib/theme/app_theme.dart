@@ -24,6 +24,7 @@ class AppTheme {
   static const Color _pureBlack = Color(0xFF000000); // 页面背景
   static const Color _surfaceBlack = Color(0xFF0B0B0B); // 卡片 / AppBar / 底栏
   static const Color _surfaceBorder = Color(0xFF1F1F1F); // 卡片描边
+  static const Color _sheetBlack = Color(0xFF1E1E20); // 弹出层（BottomSheet）
 
   /// 导航栏选中态颜色：明亮蓝
   static const Color navActiveColor = Color(0xFF3AA0FF);
@@ -77,6 +78,10 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: isLight ? _scaffoldBg : _pureBlack,
+
+      // 经典 DropdownButton 的下拉菜单背景取自 canvasColor（默认=surface #0B0B0B），
+      // 在纯黑/弹出层上几乎不可见。深色抬高到 #1E1E20 让菜单清晰浮起；浅色用默认。
+      canvasColor: isLight ? null : _sheetBlack,
 
       // Card 主题：
       // - 浅色：去边框 + 微弱阴影，白色浮于灰底
@@ -170,6 +175,29 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
+
+      // BottomSheet 主题：
+      // 纯黑深色下，sheet 默认背景（surfaceContainerLow #0B0B0B）几乎贴页面纯黑，
+      // scrim 又压不暗已全黑的背景，导致弹窗与主界面无边界。
+      // 显式抬高弹出层背景到 #1E1E20，让它清晰浮于纯黑之上。浅色保持默认。
+      bottomSheetTheme: isLight
+          ? null
+          : const BottomSheetThemeData(
+              backgroundColor: _sheetBlack,
+              modalBackgroundColor: _sheetBlack,
+            ),
+
+      // 弹出菜单（PopupMenuButton）主题：
+      // 默认背景在纯黑上边界不清，深色抬高背景 + 加细描边让菜单浮起。浅色用默认。
+      popupMenuTheme: isLight
+          ? null
+          : PopupMenuThemeData(
+              color: _sheetBlack,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+              ),
+            ),
 
       // 列表项主题：圆角 + 宽松间距
       listTileTheme: ListTileThemeData(

@@ -13,7 +13,15 @@ import '../common/text_context_menu.dart';
 const _groupColorLight = Color(0xFFE3F2FD); // 浅蓝
 
 /// 意群 badge 背景色（暗色主题）
-const _groupColorDark = Color(0xFF1A3A5C); // 深蓝
+///
+/// 纯黑主题下用更深、更低饱和的蓝，避免饱和蓝块漂浮在纯黑上显得突兀。
+const _groupColorDark = Color(0xFF13283D); // 深蓝（空闲）
+
+/// 播放中意群背景色（暗色主题）
+///
+/// 比空闲态更亮一档的实色蓝，凸显"正在播放"；替代 M3 primaryContainer
+/// （低饱和灰蓝在纯黑上发雾），与空闲态保持同色系。
+const _playingColorDark = Color(0xFF1E4A70); // 亮蓝（播放中）
 
 /// 已收藏意群背景色（亮色主题）
 final _savedColorLight = Colors.orange.shade50;
@@ -129,7 +137,7 @@ class _SenseGroupTextState extends State<SenseGroupText> {
     // 背景色优先级：播放中 > 已收藏 > 默认
     final Color bgColor;
     if (isPlaying) {
-      bgColor = colorScheme.primaryContainer;
+      bgColor = isDark ? _playingColorDark : colorScheme.primaryContainer;
     } else if (isSaved) {
       bgColor = isDark ? _savedColorDark : _savedColorLight;
     } else {

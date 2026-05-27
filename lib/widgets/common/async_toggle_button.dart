@@ -7,6 +7,12 @@ library;
 
 import 'package:flutter/material.dart';
 
+/// 选中态填充色（纯黑深色主题专用）
+///
+/// M3 primaryContainer 是低饱和灰蓝，在纯黑上显朦胧；改用实色深蓝，
+/// 与意群 badge 同色系，清爽不发雾。浅色仍用 primaryContainer。
+const _activeFillDark = Color(0xFF1A3A5C);
+
 /// 异步 toggle 按钮
 ///
 /// 按钮高度 36dp，圆角 8dp，图标 16dp + labelMedium 文字。
@@ -85,7 +91,7 @@ class _AsyncToggleButtonState extends State<AsyncToggleButton> {
             )
           : null;
     } else if (widget.isActive || _isLoading) {
-      backgroundColor = colorScheme.primaryContainer;
+      backgroundColor = isDark ? _activeFillDark : colorScheme.primaryContainer;
       foregroundColor = colorScheme.primary;
       border = Border.all(
         color: isDark
