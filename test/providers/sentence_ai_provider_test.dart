@@ -397,11 +397,11 @@ void main() {
 
       // 归一化后与 "hello world." 和 "  HELLO   WORLD.  " 相同
       final hash1 = hashText('Hello World.');
-      final hash2 = hashText('  HELLO   WORLD  ');
+      final hash2 = hashText('  HELLO   WORLD.  ');
       expect(hash1, hash2);
 
       // L1 缓存应命中
-      final cached = notifier.getCachedTranslation('  HELLO   WORLD  ');
+      final cached = notifier.getCachedTranslation('  HELLO   WORLD.  ');
       expect(cached?.translation, 'x');
     });
   });
