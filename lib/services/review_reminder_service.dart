@@ -6,6 +6,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:universal_io/io.dart' as io;
 
+import 'app_logger.dart';
 import 'notification_tap_router_bridge.dart';
 import 'review_reminder_time_calculator.dart';
 
@@ -17,6 +18,7 @@ const String _savedReviewChannelName = 'Saved Review Reminder';
 const String _savedReviewChannelDescription =
     'Reminder to review saved sentences and words';
 const String _openFavoritesPayload = 'open_favorites';
+const String _logTag = 'ReviewReminder';
 
 /// 建议性文案池，按天轮换，不对用户行为做判断
 const List<String> _savedReviewBodies = [
@@ -99,7 +101,7 @@ class ReviewReminderService {
 
   bool get _supportsSystemNotification {
     if (_supportsSystemNotificationOverride != null) {
-      return _supportsSystemNotificationOverride!;
+      return _supportsSystemNotificationOverride;
     }
     if (kIsWeb) return false;
     return io.Platform.isIOS || io.Platform.isAndroid || io.Platform.isMacOS;
@@ -115,8 +117,16 @@ class ReviewReminderService {
   /// 真正的权限请求由 [NotificationPermissionReporter.requestAuthorization] 在 in-app
   /// pre-prompt 取得用户同意后显式发起。
   Future<void> initPlugin() async {
-    if (_initialized) return;
-    if (!_supportsSystemNotification) return;
+    if (_initialized) {
+      return;
+    }
+    if (!_supportsSystemNotification) {
+      AppLogger.log(
+        _logTag,
+        'initPlugin skipped reason=unsupported platform=${_platformName()}',
+      );
+      return;
+    }
 
     try {
       await _ensureTimezoneReady();
@@ -146,11 +156,14 @@ class ReviewReminderService {
 
       final launchDetails = await _plugin.getNotificationAppLaunchDetails();
       final payload = launchDetails?.notificationResponse?.payload;
+      if (payload != null) {
+        AppLogger.log(_logTag, 'launch payload=$payload');
+      }
       _handlePayload(payload);
     } on MissingPluginException {
-      debugPrint('ReviewReminderService: plugin unavailable on this runtime');
-    } catch (e) {
-      debugPrint('ReviewReminderService.initPlugin error: $e');
+      AppLogger.log(_logTag, 'initPlugin failed reason=missingPlugin');
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'initPlugin failed error=$e\n$st');
     }
   }
 
@@ -159,10 +172,18 @@ class ReviewReminderService {
   /// [hasSavedContent] 为 false 时取消所有已调度的收藏复习提醒。
   /// 每次调用先 cancel 旧的 15 个，再重新调度。
   Future<void> syncSavedReviewReminder({required bool hasSavedContent}) async {
-    if (!_supportsSystemNotification) return;
+    if (!_supportsSystemNotification) {
+      AppLogger.log(
+        _logTag,
+        'syncSavedReviewReminder skipped reason=unsupported',
+      );
+      return;
+    }
 
     await initPlugin();
-    if (!_initialized) return;
+    if (!_initialized) {
+      return;
+    }
 
     if (!hasSavedContent) {
       await cancelSavedReviewReminder();
@@ -172,9 +193,11 @@ class ReviewReminderService {
     final now = DateTime.now();
     final firstTrigger = _timeCalculator.nextTriggerAt(now);
 
-    debugPrint(
-      'ReviewReminderService: scheduling $_savedReviewDays saved review '
-      'reminders starting at $firstTrigger (now=$now)',
+    AppLogger.log(
+      _logTag,
+      'syncSavedReviewReminder scheduling count=$_savedReviewDays '
+      'firstTrigger=$firstTrigger now=$now '
+      'androidMode=${AndroidScheduleMode.inexactAllowWhileIdle.name}',
     );
 
     try {
@@ -205,14 +228,22 @@ class ReviewReminderService {
             iOS: DarwinNotificationDetails(),
             macOS: DarwinNotificationDetails(),
           ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: _openFavoritesPayload,
         );
       }
+      AppLogger.log(
+        _logTag,
+        'syncSavedReviewReminder success count=$_savedReviewDays',
+      );
+      await _logPendingSnapshot('savedReviewScheduled');
     } on MissingPluginException {
-      debugPrint('ReviewReminderService: plugin unavailable during schedule');
-    } catch (e) {
-      debugPrint('ReviewReminderService.syncSavedReviewReminder error: $e');
+      AppLogger.log(
+        _logTag,
+        'syncSavedReviewReminder failed reason=missingPlugin',
+      );
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'syncSavedReviewReminder failed error=$e\n$st');
     }
   }
 
@@ -223,22 +254,37 @@ class ReviewReminderService {
   Future<void> syncPerAudioReminders(
     List<PerAudioReminderInfo> reminders,
   ) async {
-    if (!_supportsSystemNotification) return;
+    if (!_supportsSystemNotification) {
+      AppLogger.log(
+        _logTag,
+        'syncPerAudioReminders skipped reason=unsupported',
+      );
+      return;
+    }
 
     await initPlugin();
-    if (!_initialized) return;
+    if (!_initialized) {
+      return;
+    }
 
     // 构建快照
     final newSnapshot = <String>{
       for (final r in reminders)
         '${r.audioId}|${r.triggerAt.millisecondsSinceEpoch}',
     };
-    if (_lastSnapshot != null && setEquals(newSnapshot, _lastSnapshot)) return;
+    if (_lastSnapshot != null && setEquals(newSnapshot, _lastSnapshot)) {
+      return;
+    }
     _lastSnapshot = newSnapshot;
 
     try {
       // cancel 旧通知（含跨重启残留的 per-audio 通知）
       await _cancelStalePerAudioNotifications(reminders);
+      AppLogger.log(
+        _logTag,
+        'syncPerAudioReminders scheduling count=${reminders.length} '
+        'androidMode=${AndroidScheduleMode.inexactAllowWhileIdle.name}',
+      );
 
       // 调度新通知
       for (final r in reminders) {
@@ -261,17 +307,23 @@ class ReviewReminderService {
             iOS: DarwinNotificationDetails(),
             macOS: DarwinNotificationDetails(),
           ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: '$_openAudioPrefix${r.audioId}',
         );
         _scheduledPerAudioIds.add(nid);
       }
-    } on MissingPluginException {
-      debugPrint(
-        'ReviewReminderService: plugin unavailable during per-audio schedule',
+      AppLogger.log(
+        _logTag,
+        'syncPerAudioReminders success count=${reminders.length}',
       );
-    } catch (e) {
-      debugPrint('ReviewReminderService.syncPerAudioReminders error: $e');
+      await _logPendingSnapshot('perAudioScheduled');
+    } on MissingPluginException {
+      AppLogger.log(
+        _logTag,
+        'syncPerAudioReminders failed reason=missingPlugin',
+      );
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'syncPerAudioReminders failed error=$e\n$st');
     }
   }
 
@@ -285,41 +337,73 @@ class ReviewReminderService {
   /// 关闭 perAudio 开关时调用，清除系统中所有 per-audio 范围内的通知
   /// 和内存快照，确保重新开启时能重新调度。
   Future<void> cancelAllPerAudioReminders() async {
-    if (!_supportsSystemNotification) return;
+    if (!_supportsSystemNotification) {
+      AppLogger.log(
+        _logTag,
+        'cancelAllPerAudioReminders skipped reason=unsupported',
+      );
+      return;
+    }
 
     try {
       // 查询系统中所有 pending 通知，cancel per-audio 范围内的
       final pending = await _plugin.pendingNotificationRequests();
+      var canceledFromPending = 0;
       for (final n in pending) {
         if (n.id >= _perAudioIdMin && n.id <= _perAudioIdMax) {
           await _plugin.cancel(n.id);
+          canceledFromPending++;
         }
       }
 
       // 清理内存状态
+      var canceledFromMemory = 0;
       for (final id in _scheduledPerAudioIds.toList()) {
         await _plugin.cancel(id);
+        canceledFromMemory++;
       }
       _scheduledPerAudioIds.clear();
       _lastSnapshot = null;
+      AppLogger.log(
+        _logTag,
+        'cancelAllPerAudioReminders success pending=$canceledFromPending '
+        'memory=$canceledFromMemory',
+      );
     } on MissingPluginException {
-      debugPrint('ReviewReminderService: plugin unavailable during cancelAll');
-    } catch (e) {
-      debugPrint('ReviewReminderService.cancelAllPerAudioReminders error: $e');
+      AppLogger.log(
+        _logTag,
+        'cancelAllPerAudioReminders failed reason=missingPlugin',
+      );
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'cancelAllPerAudioReminders failed error=$e\n$st');
     }
   }
 
   /// 取消所有已调度的收藏复习提醒（15 天）
   Future<void> cancelSavedReviewReminder() async {
-    if (!_supportsSystemNotification) return;
+    if (!_supportsSystemNotification) {
+      AppLogger.log(
+        _logTag,
+        'cancelSavedReviewReminder skipped reason=unsupported',
+      );
+      return;
+    }
     try {
       for (var i = 0; i < _savedReviewDays; i++) {
         await _plugin.cancel(_savedReviewIdBase + i);
       }
+      AppLogger.log(
+        _logTag,
+        'cancelSavedReviewReminder success ids=$_savedReviewIdBase..'
+        '${_savedReviewIdBase + _savedReviewDays - 1}',
+      );
     } on MissingPluginException {
-      debugPrint('ReviewReminderService: plugin unavailable during cancel');
-    } catch (e) {
-      debugPrint('ReviewReminderService.cancelSavedReviewReminder error: $e');
+      AppLogger.log(
+        _logTag,
+        'cancelSavedReviewReminder failed reason=missingPlugin',
+      );
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'cancelSavedReviewReminder failed error=$e\n$st');
     }
   }
 
@@ -359,13 +443,40 @@ class ReviewReminderService {
     try {
       final localName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(localName));
-    } catch (e) {
-      debugPrint('ReviewReminderService: fallback timezone due to $e');
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'timezone fallback error=$e\n$st');
     }
     _timezoneReady = true;
   }
 
+  /// 记录系统 pending notification 摘要，确认调度请求已进入平台队列。
+  Future<void> _logPendingSnapshot(String reason) async {
+    try {
+      final pending = await _plugin.pendingNotificationRequests();
+      final savedCount = pending
+          .where(
+            (n) =>
+                n.id >= _savedReviewIdBase &&
+                n.id < _savedReviewIdBase + _savedReviewDays,
+          )
+          .length;
+      final perAudioCount = pending
+          .where((n) => n.id >= _perAudioIdMin && n.id <= _perAudioIdMax)
+          .length;
+      AppLogger.log(
+        _logTag,
+        'pending snapshot reason=$reason total=${pending.length} '
+        'saved=$savedCount perAudio=$perAudioCount',
+      );
+    } on MissingPluginException {
+      AppLogger.log(_logTag, 'pending snapshot skipped reason=missingPlugin');
+    } catch (e, st) {
+      AppLogger.log(_logTag, 'pending snapshot failed error=$e\n$st');
+    }
+  }
+
   void _onNotificationTap(NotificationResponse response) {
+    AppLogger.log(_logTag, 'notification tapped payload=${response.payload}');
     _handlePayload(response.payload);
   }
 
@@ -374,15 +485,27 @@ class ReviewReminderService {
     if (payload == null) return;
     // 兼容旧版本 payload，旧"每日提醒"已重命名为"收藏复习提醒"
     if (payload == _openFavoritesPayload || payload == 'open_study_tasks') {
+      AppLogger.log(_logTag, 'route payload=$payload intent=openFavorites');
       _bridge.emit(const OpenFavorites());
       return;
     }
     if (payload.startsWith(_openAudioPrefix)) {
       final audioId = payload.substring(_openAudioPrefix.length);
       if (audioId.isNotEmpty) {
+        AppLogger.log(_logTag, 'route payload=$payload intent=openAudio');
         _bridge.emit(OpenAudioLearningPlan(audioId));
       }
     }
+  }
+
+  String _platformName() {
+    if (kIsWeb) return 'web';
+    if (io.Platform.isAndroid) return 'android';
+    if (io.Platform.isIOS) return 'ios';
+    if (io.Platform.isMacOS) return 'macos';
+    if (io.Platform.isLinux) return 'linux';
+    if (io.Platform.isWindows) return 'windows';
+    return 'unknown';
   }
 
   /// 为 audioId 生成确定性通知 ID（FNV-1a hash，范围 2000~901999）

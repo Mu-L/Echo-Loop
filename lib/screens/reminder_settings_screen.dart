@@ -18,12 +18,11 @@ import '../models/reminder_settings.dart';
 import '../providers/notification_permission_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../services/app_logger.dart';
-import '../services/notification_permission_reporter.dart';
 import '../services/notification_permission_service.dart';
 import '../theme/app_theme.dart';
 
-/// 分钟可选值（15 分钟间隔）
-const _minuteOptions = [0, 15, 30, 45];
+/// 分钟可选值（5 分钟间隔，兼顾日常使用和真机调试）。
+final _minuteOptions = List<int>.generate(12, (index) => index * 5);
 
 /// 提醒设置页面
 class ReminderSettingsScreen extends ConsumerStatefulWidget {
@@ -60,7 +59,6 @@ class _ReminderSettingsScreenState extends ConsumerState<ReminderSettingsScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    AppLogger.log('NotifPerm', 'settings: lifecycle -> ${state.name}');
     // resumed (app 拿回焦点) / inactive (macOS 窗口部分活跃) 都触发刷新。
     // hidden / paused 不刷新（无意义）。
     if (state == AppLifecycleState.resumed ||
@@ -88,7 +86,6 @@ class _ReminderSettingsScreenState extends ConsumerState<ReminderSettingsScreen>
       final s = await ref
           .read(notificationPermissionServiceProvider)
           .getCurrentState();
-      AppLogger.log('NotifPerm', 'settings: _refreshStatus -> ${s.name}');
       if (!mounted) return;
       setState(() => _notificationState = s);
     } catch (e) {
@@ -221,7 +218,7 @@ class _ReminderSettingsScreenState extends ConsumerState<ReminderSettingsScreen>
     ref.read(reminderSettingsNotifierProvider.notifier).update(settings);
   }
 
-  /// 底部弹窗时间选择器（双列滚轮：小时 0-23 + 分钟 0/15/30/45）
+  /// 底部弹窗时间选择器（双列滚轮：小时 0-23 + 分钟 0/5/.../55）
   Future<void> _showTimePickerSheet(
     BuildContext context,
     WidgetRef ref,

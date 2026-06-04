@@ -373,6 +373,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   /// 先手动同步 timeCalculator（避免与 ref.listen 的执行顺序竞争），
   /// 再根据开关状态调度或取消通知。
   Future<void> _onReminderSettingsChanged(ReminderSettings settings) async {
+    AppLogger.log(
+      'ReviewReminder',
+      'settings changed savedEnabled=${settings.savedReviewReminderEnabled} '
+          'time=${settings.formattedTime} '
+          'perAudioEnabled=${settings.perAudioReminderEnabled}',
+    );
     final service = ref.read(reviewReminderServiceProvider);
 
     // 确保 service 使用最新时间，不依赖 ref.listen 的执行顺序
@@ -396,6 +402,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     } else {
       await _syncPerAudioReminders(service);
     }
+    AppLogger.log(
+      'ReviewReminder',
+      'settings changed resync complete time=${settings.formattedTime}',
+    );
   }
 
   /// 查询收藏数据并调度收藏复习提醒

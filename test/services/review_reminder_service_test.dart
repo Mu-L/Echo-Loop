@@ -33,7 +33,7 @@ void main() {
     registerFallbackValue(FakeInitializationSettings());
     registerFallbackValue(FakeNotificationDetails());
     registerFallbackValue(FakeTZDateTime());
-    registerFallbackValue(AndroidScheduleMode.exactAllowWhileIdle);
+    registerFallbackValue(AndroidScheduleMode.inexactAllowWhileIdle);
     registerFallbackValue(DateTimeComponents.time);
   });
 
@@ -157,6 +157,59 @@ void main() {
           payload: any(named: 'payload'),
         ),
       ).called(2);
+    });
+
+    test('使用非精确 Android 调度，避免复习提醒依赖 exact alarm 权限', () async {
+      final service = createService();
+
+      await service.syncPerAudioReminders([
+        PerAudioReminderInfo(
+          audioId: 'audio-1',
+          audioName: 'Test Audio',
+          triggerAt: DateTime.now().add(const Duration(hours: 6)),
+          reviewRound: 1,
+        ),
+      ]);
+
+      verify(
+        () => mockPlugin.zonedSchedule(
+          any(),
+          any(),
+          any(),
+          any(),
+          any(),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: any(named: 'payload'),
+        ),
+      ).called(1);
+    });
+
+    test('保留 iOS 通知详情，避免 Android 调度调整影响 iOS', () async {
+      final service = createService();
+
+      await service.syncPerAudioReminders([
+        PerAudioReminderInfo(
+          audioId: 'audio-ios',
+          audioName: 'iOS Audio',
+          triggerAt: DateTime.now().add(const Duration(hours: 6)),
+          reviewRound: 1,
+        ),
+      ]);
+
+      final captured = verify(
+        () => mockPlugin.zonedSchedule(
+          any(),
+          any(),
+          any(),
+          any(),
+          captureAny(),
+          androidScheduleMode: any(named: 'androidScheduleMode'),
+          payload: any(named: 'payload'),
+        ),
+      ).captured;
+      final details = captured.single as NotificationDetails;
+      expect(details.iOS, isA<DarwinNotificationDetails>());
+      expect(details.macOS, isA<DarwinNotificationDetails>());
     });
 
     test('快照不变时跳过调度', () async {
@@ -482,6 +535,53 @@ void main() {
           payload: any(named: 'payload'),
         ),
       ).called(30);
+    });
+  });
+
+  group('syncSavedReviewReminder', () {
+    test('收藏复习提醒使用非精确 Android 调度', () async {
+      final service = createService();
+      when(
+        () => mockTimeCalc.nextTriggerAt(any()),
+      ).thenReturn(DateTime(2026, 3, 22, 20, 0));
+
+      await service.syncSavedReviewReminder(hasSavedContent: true);
+
+      verify(
+        () => mockPlugin.zonedSchedule(
+          any(),
+          any(),
+          any(),
+          any(),
+          any(),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: any(named: 'payload'),
+        ),
+      ).called(15);
+    });
+
+    test('收藏复习提醒保留 iOS 通知详情', () async {
+      final service = createService();
+      when(
+        () => mockTimeCalc.nextTriggerAt(any()),
+      ).thenReturn(DateTime(2026, 3, 22, 20, 0));
+
+      await service.syncSavedReviewReminder(hasSavedContent: true);
+
+      final captured = verify(
+        () => mockPlugin.zonedSchedule(
+          any(),
+          any(),
+          any(),
+          any(),
+          captureAny(),
+          androidScheduleMode: any(named: 'androidScheduleMode'),
+          payload: any(named: 'payload'),
+        ),
+      ).captured;
+      final details = captured.first as NotificationDetails;
+      expect(details.iOS, isA<DarwinNotificationDetails>());
+      expect(details.macOS, isA<DarwinNotificationDetails>());
     });
   });
 

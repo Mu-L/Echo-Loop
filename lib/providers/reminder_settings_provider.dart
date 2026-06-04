@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
 import '../models/reminder_settings.dart';
+import '../services/app_logger.dart';
 
 part 'reminder_settings_provider.g.dart';
 
@@ -52,7 +53,14 @@ class ReminderSettingsNotifier extends _$ReminderSettingsNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_spKey, json.encode(settings.toJson()));
+      AppLogger.log(
+        'ReminderSettings',
+        'saved savedEnabled=${settings.savedReviewReminderEnabled} '
+            'time=${settings.formattedTime} '
+            'perAudioEnabled=${settings.perAudioReminderEnabled}',
+      );
     } catch (e) {
+      AppLogger.log('ReminderSettings', 'update persist failed error=$e');
       debugPrint('ReminderSettings: 保存设置失败: $e');
     }
     ref.read(analyticsServiceProvider).track(Events.reminderUpdated, {
