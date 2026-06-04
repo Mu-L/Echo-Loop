@@ -125,6 +125,22 @@ void main() {
     expect(find.text('Send Code'), findsOneWidget);
   });
 
+  testWidgets('邮箱 OTP 页面进入后自动聚焦邮箱输入框并打开输入法', (tester) async {
+    await tester.pumpWidget(_app(_authRouter()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Email Code'));
+    await tester.pumpAndSettle();
+
+    final emailField = find.byType(TextFormField);
+    final emailEditableText = tester.widget<EditableText>(
+      find.descendant(of: emailField, matching: find.byType(EditableText)),
+    );
+
+    expect(emailEditableText.focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
   testWidgets('邮箱 OTP 页面保留品牌 logo 和协议文案', (tester) async {
     await tester.pumpWidget(_app(_authRouter()));
     await tester.pumpAndSettle();
@@ -162,8 +178,34 @@ void main() {
 
     expect(submittedEmail, 'user@example.com');
     expect(find.text('Check your email'), findsOneWidget);
-    expect(find.text('We sent a 6-digit code to user@example.com.'), findsOneWidget);
+    expect(
+      find.text('We sent a 6-digit code to user@example.com.'),
+      findsOneWidget,
+    );
     expect(find.text('60s until resend'), findsOneWidget);
+  });
+
+  testWidgets('邮箱 OTP 页面点击输入框外部会释放邮箱输入焦点', (tester) async {
+    await tester.pumpWidget(_app(_authRouter()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Email Code'));
+    await tester.pumpAndSettle();
+
+    final emailField = find.byType(TextFormField);
+    await tester.showKeyboard(emailField);
+    await tester.pump();
+
+    final emailEditableText = tester.widget<EditableText>(
+      find.descendant(of: emailField, matching: find.byType(EditableText)),
+    );
+    expect(emailEditableText.focusNode.hasFocus, isTrue);
+
+    await tester.tap(
+      find.text('Enter your email and we will send a one-time code.'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(emailEditableText.focusNode.hasFocus, isFalse);
   });
 
   testWidgets('邮箱 OTP 页面会把未配置认证的底层异常映射为用户文案', (tester) async {
@@ -193,7 +235,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Check your email'), findsOneWidget);
-    expect(find.text('We sent a 6-digit code to hello@example.com.'), findsOneWidget);
+    expect(
+      find.text('We sent a 6-digit code to hello@example.com.'),
+      findsOneWidget,
+    );
     expect(find.text('6-digit code'), findsOneWidget);
     expect(find.text('60s until resend'), findsOneWidget);
     expect(find.text('Use another email'), findsNothing);
@@ -281,7 +326,10 @@ void main() {
     await _tapVisible(tester, find.text('Send Code'));
 
     expect(find.text('Check your email'), findsOneWidget);
-    expect(find.text('We sent a 6-digit code to first@example.com.'), findsOneWidget);
+    expect(
+      find.text('We sent a 6-digit code to first@example.com.'),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'first@example.com'),
@@ -292,7 +340,10 @@ void main() {
     expect(find.text('Check your email'), findsNothing);
     expect(find.text('Send Code'), findsOneWidget);
     expect(find.text('60s until resend'), findsNothing);
-    expect(find.text('We sent a 6-digit code to first@example.com.'), findsNothing);
+    expect(
+      find.text('We sent a 6-digit code to first@example.com.'),
+      findsNothing,
+    );
   });
 
   testWidgets('OTP 阶段不显示更换邮箱入口', (tester) async {

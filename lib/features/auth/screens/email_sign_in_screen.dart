@@ -72,6 +72,12 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
           _tokenFocusNode.requestFocus();
         }
       });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _emailFocusNode.requestFocus();
+        }
+      });
     }
   }
 
@@ -182,10 +188,12 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
       if (action != null) {
         await action(_trimmedEmail, _tokenController.text.trim());
       } else {
-        await ref.read(authControllerProvider).verifyEmailOtp(
-          email: _trimmedEmail,
-          token: _tokenController.text.trim(),
-        );
+        await ref
+            .read(authControllerProvider)
+            .verifyEmailOtp(
+              email: _trimmedEmail,
+              token: _tokenController.text.trim(),
+            );
       }
 
       if (!mounted) return;
@@ -249,6 +257,11 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
     await launchUrl(Uri.parse('https://www.echo-loop.top$path'));
   }
 
+  /// 点击输入框外部时释放焦点，避免软键盘遮挡后续主操作按钮。
+  void _dismissKeyboardOnTapOutside(PointerDownEvent event) {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   void _handleBack() {
     if (context.canPop()) {
       context.pop();
@@ -279,13 +292,16 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
               TextFormField(
                 controller: _emailController,
                 focusNode: _emailFocusNode,
-                decoration: buildAuthInputDecoration(labelText: l10n.authEmailLabel),
+                decoration: buildAuthInputDecoration(
+                  labelText: l10n.authEmailLabel,
+                ),
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: _step == _EmailOtpStep.emailEntry
                     ? TextInputAction.go
                     : TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
                 enabled: !_isBusy,
+                onTapOutside: _dismissKeyboardOnTapOutside,
                 onChanged: (value) {
                   if (_step == _EmailOtpStep.otpEntry &&
                       value.trim() != (_otpRequestedEmail ?? '')) {
@@ -333,6 +349,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
                           autofillHints: const [AutofillHints.oneTimeCode],
                           enabled: !_isBusy,
                           maxLength: 6,
+                          onTapOutside: _dismissKeyboardOnTapOutside,
                           onChanged: (value) {
                             if (value.trim().length == 6 && !_isBusy) {
                               _verifyOtp();
@@ -447,10 +464,7 @@ class _OtpEntryBlock extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.mark_email_read_outlined,
-                color: colorScheme.primary,
-              ),
+              Icon(Icons.mark_email_read_outlined, color: colorScheme.primary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -464,9 +478,9 @@ class _OtpEntryBlock extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      AppLocalizations.of(context)!.authCheckEmailMessage(
-                        emailSummary,
-                      ),
+                      AppLocalizations.of(
+                        context,
+                      )!.authCheckEmailMessage(emailSummary),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         height: 1.4,
@@ -482,9 +496,9 @@ class _OtpEntryBlock extends StatelessWidget {
         otpField,
         Text(
           helpText,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 14),
