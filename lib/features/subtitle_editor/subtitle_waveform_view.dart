@@ -323,9 +323,11 @@ class _SubtitleWaveformViewState extends State<SubtitleWaveformView> {
                           );
                           final offset = _resolveOffset(metrics, painted);
                           _renderOffset = offset; // 供指针回调使用
-                          final playheadX = metrics
-                              .screenX(painted, offset)
-                              .clamp(0.0, metrics.viewport);
+                          final playheadX = widget.isPlaying
+                              ? metrics
+                                    .screenX(painted, offset)
+                                    .clamp(0.0, metrics.viewport)
+                              : null;
                           return Stack(
                             fit: StackFit.expand,
                             children: [
@@ -350,14 +352,15 @@ class _SubtitleWaveformViewState extends State<SubtitleWaveformView> {
                                   ),
                                 ),
                               ),
-                              RepaintBoundary(
-                                child: CustomPaint(
-                                  painter: _PlayheadLayerPainter(
-                                    x: playheadX.toDouble(),
-                                    color: SubtitleWaveformView.playheadColor,
+                              if (playheadX != null)
+                                RepaintBoundary(
+                                  child: CustomPaint(
+                                    painter: _PlayheadLayerPainter(
+                                      x: playheadX.toDouble(),
+                                      color: SubtitleWaveformView.playheadColor,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           );
                         },

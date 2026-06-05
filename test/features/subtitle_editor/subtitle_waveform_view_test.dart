@@ -282,14 +282,51 @@ void main() {
       await tester.pump();
       // zoom=1 铺满不滚动，焦点 12s 屏幕 x = 16 + 768*0.1 = 92.8。
       expect(_viewOffset(tester), 0);
-      expect(_playheadX(tester), closeTo(92.8, 1));
+      expect(_hasPlayhead(tester), isFalse);
 
       await tester.pumpWidget(build(8));
       await tester.pump();
       // zoom=8 后内容变宽，焦点 12s 屏幕位置保持 92.8 不变。
       // 偏移 = timeToContentX_8(12s) - 92.8 = 630.4 - 92.8 = 537.6。
       expect(_viewOffset(tester), closeTo(537.6, 1));
-      expect(_playheadX(tester), closeTo(92.8, 1));
+      expect(_hasPlayhead(tester), isFalse);
+    });
+
+    testWidgets('暂停和轻点定位时不显示播放头红线', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 240));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      Duration? endedAt;
+      await tester.pumpWidget(
+        createTestApp(
+          SubtitleWaveformView(
+            waveform: _waveform(),
+            extractionProgress: 1,
+            duration: const Duration(seconds: 10),
+            sentences: _sentences(),
+            activeSentence: null,
+            selectedIndex: null,
+            selectionEpoch: 0,
+            playbackPosition: Duration.zero,
+            isPlaying: false,
+            zoomScale: 1,
+            onZoomChanged: (_) {},
+            onScrub: (_) {},
+            onScrubEnd: (position) => endedAt = position,
+            onAdjustBoundary: (_, _, _) {},
+            onAdjustEnd: () {},
+          ),
+        ),
+      );
+
+      expect(_hasPlayhead(tester), isFalse);
+
+      final rect = tester.getRect(find.byType(SubtitleWaveformView));
+      await tester.tapAt(Offset(rect.left + 400, rect.center.dy));
+      await tester.pump();
+
+      expect(endedAt, isNotNull);
+      expect(_hasPlayhead(tester), isFalse);
     });
 
     testWidgets('双指张开会按指距比例放大波形', (tester) async {
@@ -507,6 +544,16 @@ double _playheadX(WidgetTester tester) {
     }
   }
   fail('找不到播放头 overlay');
+}
+
+bool _hasPlayhead(WidgetTester tester) {
+  for (final cp in tester.widgetList<CustomPaint>(find.byType(CustomPaint))) {
+    final p = cp.painter;
+    if (p != null && p.runtimeType.toString() == '_PlayheadLayerPainter') {
+      return true;
+    }
+  }
+  return false;
 }
 
 List<Sentence> _sentences({Duration duration = const Duration(seconds: 10)}) {

@@ -6,11 +6,11 @@ import 'package:just_waveform/just_waveform.dart';
 
 import '../../helpers/test_app.dart';
 
-/// 回归：播放结束、停止后，波形与播放头红线都不得跳变/闪烁。
+/// 回归：播放结束、停止后，波形不得跳变/闪烁。
 ///
 /// 单一坐标系（[WaveformMetrics] + viewOffset）下，play→stop 只翻转 isPlaying，
-/// playbackPosition 被冻结，viewOffset 由「保持」分支取到与播放中完全相同的值，
-/// 红线 screenX = timeToContentX(pos) - viewOffset 不变 —— 结构性零跳变。
+/// playbackPosition 被冻结，viewOffset 由「保持」分支取到与播放中完全相同的值。
+/// 停止态不再绘制播放头红线，避免蓝线常驻干扰字幕边界编辑。
 void main() {
   group('字幕波形：播放停止不跳变/不闪烁', () {
     final waveform = _waveform(length: 1200);
@@ -53,7 +53,7 @@ void main() {
       ),
     );
 
-    testWidgets('播放到句尾后停止：viewOffset 与红线 x 跨 play→stop 完全不变', (tester) async {
+    testWidgets('播放到句尾后停止：viewOffset 不变且红线消失', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 240));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -84,9 +84,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
 
-      // 结构性零跳变：偏移与红线像素级不变。
+      // 结构性零跳变：偏移像素级不变；停止态隐藏红线。
       expect(_viewOffset(tester), closeTo(offsetPlaying, 0.001));
-      expect(_playheadX(tester), closeTo(linePlaying, 0.001));
+      expect(_hasPlayhead(tester), isFalse);
     });
 
     testWidgets('用户显式点选（epoch 自增）才把该句居中', (tester) async {
@@ -139,6 +139,16 @@ double _playheadX(WidgetTester tester) {
     }
   }
   fail('找不到播放头 overlay');
+}
+
+bool _hasPlayhead(WidgetTester tester) {
+  for (final cp in tester.widgetList<CustomPaint>(find.byType(CustomPaint))) {
+    final p = cp.painter;
+    if (p != null && p.runtimeType.toString() == '_PlayheadLayerPainter') {
+      return true;
+    }
+  }
+  return false;
 }
 
 Waveform _waveform({int length = 100}) {

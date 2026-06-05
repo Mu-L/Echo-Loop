@@ -1,7 +1,24 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-05
-> 当前焦点：字幕编辑器移除主播放按钮（已完成）
+> 当前焦点：字幕编辑器播放位置指示条按单句播放显示（已完成）
+
+## 已完成：字幕编辑器播放位置指示条按单句播放显示
+
+调整字幕编辑页波形中的蓝色当前播放位置指示条：仅在播放某一句字幕时显示；停止播放、暂停态和鼠标点击定位播放头时不再常驻显示，减少对边界手柄和句子文本的视觉干扰。
+
+### 实现
+- [x] 波形视图只在 `isPlaying` 为 true 时绘制 `_PlayheadLayerPainter`
+- [x] 字幕编辑页传给波形的播放态收窄为“单句播放中”，范围播放/非播放态不显示蓝线
+- [x] 更新停止不跳变测试：停止后保持波形偏移不变，同时断言蓝线消失
+- [x] 新增暂停与轻点定位不显示蓝线的 widget 测试
+
+### 验证
+- [x] `dart format lib/features/subtitle_editor/subtitle_simple_editor_screen.dart lib/features/subtitle_editor/subtitle_waveform_view.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart test/features/subtitle_editor/subtitle_waveform_stop_no_jump_test.dart`
+- [x] `flutter analyze lib/features/subtitle_editor/subtitle_simple_editor_screen.dart lib/features/subtitle_editor/subtitle_waveform_view.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart test/features/subtitle_editor/subtitle_waveform_stop_no_jump_test.dart`：No issues found
+- [x] `flutter test test/features/subtitle_editor/subtitle_waveform_view_test.dart test/features/subtitle_editor/subtitle_waveform_stop_no_jump_test.dart`：14 tests passed
+
+**完成时间**: 2026-06-05 23:35 +0800
 
 ## 已完成：字幕编辑器移除主播放按钮
 

@@ -107,7 +107,10 @@ class _SubtitleSimpleEditorScreenState
                     selectedIndex: state.selectedSentenceIndex,
                     selectionEpoch: state.selectionEpoch,
                     playbackPosition: state.playbackPosition,
-                    isPlaying: state.isPlaying,
+                    isPlaying:
+                        state.isPlaying &&
+                        state.playbackMode ==
+                            SubtitleEditorPlaybackMode.sentence,
                     zoomScale: state.waveformZoomScale,
                     onZoomChanged: controller.setWaveformZoomScale,
                     onScrub: controller.scrubTo,
