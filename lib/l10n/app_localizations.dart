@@ -260,6 +260,12 @@ abstract class AppLocalizations {
   /// **'Playback Settings'**
   String get playbackSettings;
 
+  /// No description provided for @waveformZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom'**
+  String get waveformZoom;
+
   /// No description provided for @playbackSpeed.
   ///
   /// In en, this message translates to:

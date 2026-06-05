@@ -1,7 +1,26 @@
 # Echo Loop 任务清单
 
 > 最后更新：2026-06-05
-> 当前焦点：字幕编辑器播放位置指示条按单句播放显示（已完成）
+> 当前焦点：字幕编辑器波形控制区标签优化（已完成）
+
+## 已完成：字幕编辑器波形控制区标签优化
+
+在字幕编辑页波形下方控制区增加明确文字标签，让用户能直接识别缩放滑块和倍速菜单的用途；同时移除缩放滑块两侧的放大/缩小图标，减少重复视觉元素。
+
+### 实现
+- [x] 缩放滑块左侧新增 `Zoom / 缩放` 标签
+- [x] 倍速菜单左侧新增 `Playback Speed / 播放速度` 标签
+- [x] 删除缩放滑块两侧 `zoom_out` / `zoom_in` 图标
+- [x] 新增 `waveformZoom` 本地化 key 并重新生成 l10n 代码
+- [x] 更新字幕编辑器 widget 测试，覆盖标签显示与缩放图标移除
+
+### 验证
+- [x] `flutter gen-l10n`
+- [x] `dart format lib/features/subtitle_editor/subtitle_simple_editor_screen.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart`
+- [x] `flutter analyze lib/features/subtitle_editor/subtitle_simple_editor_screen.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart`：No issues found
+- [x] `flutter test test/features/subtitle_editor/subtitle_waveform_view_test.dart`：12 tests passed
+
+**完成时间**: 2026-06-05 23:47 +0800
 
 ## 已完成：字幕编辑器播放位置指示条按单句播放显示
 

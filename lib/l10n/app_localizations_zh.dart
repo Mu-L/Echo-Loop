@@ -92,6 +92,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playbackSettings => '播放设置';
 
   @override
+  String get waveformZoom => '缩放';
+
+  @override
   String get playbackSpeed => '播放速度';
 
   @override

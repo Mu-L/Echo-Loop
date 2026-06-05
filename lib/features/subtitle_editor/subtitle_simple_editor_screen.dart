@@ -268,28 +268,36 @@ class _WaveformControls extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.zoom_out,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
+            Text(
+              l10n.waveformZoom,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
+            const SizedBox(width: AppSpacing.s),
             Expanded(
               // 缩放语义：最左 1.0 = 不缩放（时间轴铺满屏宽），向右拉长时间轴；
               // 上限按音频长度计算，长音频也能放大到看清一句话。
-              // 压缩内边距让两侧图标紧贴轨道，并把轨道调细、圆点调小，更精致。
+              // 轨道调细、圆点调小，和紧凑控制条保持一致。
               child: SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   trackHeight: 2,
                   thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+                    enabledThumbRadius: 7,
                   ),
                   overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 12,
+                    overlayRadius: 16,
                   ),
                 ),
                 child: Slider(
                   key: const ValueKey('subtitle-waveform-zoom-slider'),
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+                  // 触控目标：横向 padding ≥ overlay 半径，保证圆点在两端也有完整可
+                  // 抓取区域（否则外侧被裁，端点最难点中）；纵向留白补回足够高度的
+                  // 命中区，避免触摸/鼠标难以抓住小圆点。
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.m,
+                    vertical: AppSpacing.s,
+                  ),
                   min: 1.0,
                   max: _canZoom ? maxZoomScale : 2.0,
                   value: zoomScale.clamp(1.0, _canZoom ? maxZoomScale : 2.0),
@@ -297,12 +305,14 @@ class _WaveformControls extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(
-              Icons.zoom_in,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
             const SizedBox(width: AppSpacing.l),
+            Text(
+              l10n.playbackSpeed,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s),
             PopupMenuButton<double>(
               tooltip: l10n.playbackSpeed,
               onSelected: onSpeedChanged,

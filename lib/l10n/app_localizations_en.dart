@@ -92,6 +92,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackSettings => 'Playback Settings';
 
   @override
+  String get waveformZoom => 'Zoom';
+
+  @override
   String get playbackSpeed => 'Playback Speed';
 
   @override

@@ -470,10 +470,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byIcon(Icons.play_arrow), findsNothing);
+      expect(find.text('Zoom'), findsOneWidget);
+      expect(find.byIcon(Icons.zoom_out), findsNothing);
+      expect(find.byIcon(Icons.zoom_in), findsNothing);
       expect(
         find.byKey(const ValueKey('subtitle-waveform-zoom-slider')),
         findsOneWidget,
       );
+      expect(find.text('Playback Speed'), findsOneWidget);
       expect(find.byTooltip('Playback Speed'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Playback Speed'));
