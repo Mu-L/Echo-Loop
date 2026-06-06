@@ -195,10 +195,7 @@ void main() {
     expect(answers?.goal, equals(OnboardingGoal.exam));
     expect(answers?.examType, equals(OnboardingExamType.ielts));
     expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m20));
-    expect(
-      answers?.referralSource,
-      equals(OnboardingReferralSource.appStore),
-    );
+    expect(answers?.referralSource, equals(OnboardingReferralSource.appStore));
   });
 
   testWidgets('其他分支：选其他 → 时长 → 渠道 → summary → 开始学习', (tester) async {
@@ -228,10 +225,7 @@ void main() {
     expect(answers?.goal, equals(OnboardingGoal.other));
     expect(answers?.goalOtherText, isNull);
     expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m10));
-    expect(
-      answers?.referralSource,
-      equals(OnboardingReferralSource.friend),
-    );
+    expect(answers?.referralSource, equals(OnboardingReferralSource.friend));
   });
 
   testWidgets('影视播客分支：目标 → 时长 → 渠道 → summary → 开始学习', (tester) async {
@@ -257,10 +251,7 @@ void main() {
     final answers = OnboardingSurveyStorage(prefs).loadAnswers();
     expect(answers?.goal, equals(OnboardingGoal.content));
     expect(answers?.dailyMinutes, equals(OnboardingDailyMinutes.m20));
-    expect(
-      answers?.referralSource,
-      equals(OnboardingReferralSource.bilibili),
-    );
+    expect(answers?.referralSource, equals(OnboardingReferralSource.bilibili));
   });
 
   testWidgets('summary 页可通过"上一步"返回渠道页修改答案', (tester) async {
@@ -393,8 +384,9 @@ void main() {
     );
 
     // 完成事件应携带 referral_source
-    final completed = analytics.events
-        .firstWhere((event) => event.name == Events.onboardingSurveyCompleted);
+    final completed = analytics.events.firstWhere(
+      (event) => event.name == Events.onboardingSurveyCompleted,
+    );
     expect(
       completed.params?[EventParams.referralSource],
       OnboardingReferralSource.xiaohongshu,
@@ -464,9 +456,6 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
     final answers = OnboardingSurveyStorage(prefs).loadAnswers();
-    expect(
-      answers?.referralSource,
-      equals(OnboardingReferralSource.reddit),
-    );
+    expect(answers?.referralSource, equals(OnboardingReferralSource.reddit));
   });
 }

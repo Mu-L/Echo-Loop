@@ -111,7 +111,10 @@ void main() {
 
       // 找到 "Auto-skip speaking practice" 的 SwitchListTile 并切换
       final autoSkipSwitch = find.byWidgetPredicate(
-        (w) => w is SwitchListTile && w.title is Text && (w.title as Text).data == 'Auto-skip speaking practice',
+        (w) =>
+            w is SwitchListTile &&
+            w.title is Text &&
+            (w.title as Text).data == 'Auto-skip speaking practice',
       );
       await tester.tap(autoSkipSwitch);
       await tester.pump(const Duration(milliseconds: 300));

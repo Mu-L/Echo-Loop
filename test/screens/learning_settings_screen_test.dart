@@ -52,7 +52,10 @@ void main() {
 
     // 找到 "Auto-skip" label 所在的 SwitchListTile
     final autoSkipFinder = find.byWidgetPredicate(
-      (w) => w is SwitchListTile && w.title is Text && (w.title as Text).data == 'Auto-skip speaking practice',
+      (w) =>
+          w is SwitchListTile &&
+          w.title is Text &&
+          (w.title as Text).data == 'Auto-skip speaking practice',
     );
     final switchTile = tester.widget<SwitchListTile>(autoSkipFinder);
     expect(switchTile.value, isFalse);
@@ -65,7 +68,10 @@ void main() {
 
     // 找到 "Auto-skip Retell" 的 SwitchListTile 并点击
     final autoSkipFinder = find.byWidgetPredicate(
-      (w) => w is SwitchListTile && w.title is Text && (w.title as Text).data == 'Auto-skip speaking practice',
+      (w) =>
+          w is SwitchListTile &&
+          w.title is Text &&
+          (w.title as Text).data == 'Auto-skip speaking practice',
     );
     await tester.tap(autoSkipFinder);
     await tester.pumpAndSettle();
@@ -83,7 +89,10 @@ void main() {
 
     // 找到 "Auto-skip Retell" 的 SwitchListTile
     final autoSkipFinder = find.byWidgetPredicate(
-      (w) => w is SwitchListTile && w.title is Text && (w.title as Text).data == 'Auto-skip speaking practice',
+      (w) =>
+          w is SwitchListTile &&
+          w.title is Text &&
+          (w.title as Text).data == 'Auto-skip speaking practice',
     );
     final switchTile = tester.widget<SwitchListTile>(autoSkipFinder);
     expect(switchTile.value, isTrue);

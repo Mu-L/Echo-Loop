@@ -46,11 +46,12 @@ class _FakeSpeechPermissionService implements SpeechPermissionService {
       );
 
   @override
-  Future<SpeechPracticePermissionState> request({required bool onlyMic}) async =>
-      const SpeechPracticePermissionState(
-        microphone: SpeechPracticePermissionStatus.granted,
-        speech: SpeechPracticePermissionStatus.granted,
-      );
+  Future<SpeechPracticePermissionState> request({
+    required bool onlyMic,
+  }) async => const SpeechPracticePermissionState(
+    microphone: SpeechPracticePermissionStatus.granted,
+    speech: SpeechPracticePermissionStatus.granted,
+  );
 
   @override
   Future<void> openAppSettings() async {}

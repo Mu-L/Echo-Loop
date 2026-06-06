@@ -441,10 +441,7 @@ void main() {
       await tester.pump();
 
       expect(trackingPlayer.seekCalls, 1);
-      expect(
-        trackingPlayer.lastSeekGlobalIndex,
-        testParagraphs[0][1].index,
-      );
+      expect(trackingPlayer.lastSeekGlobalIndex, testParagraphs[0][1].index);
     });
   });
 }

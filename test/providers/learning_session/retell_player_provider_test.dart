@@ -928,14 +928,8 @@ void main() {
 
       // 模拟用户在播放中进入"等待用户操作"，phase 切到 retelling
       notifier.enterWaitingForUser(stopImmediately: true);
-      expect(
-        container.read(retellPlayerProvider).phase,
-        RetellPhase.retelling,
-      );
-      expect(
-        container.read(retellPlayerProvider).isWaitingForUser,
-        true,
-      );
+      expect(container.read(retellPlayerProvider).phase, RetellPhase.retelling);
+      expect(container.read(retellPlayerProvider).isWaitingForUser, true);
 
       await notifier.seekToSentence(3);
       await Future<void>.delayed(const Duration(milliseconds: 30));

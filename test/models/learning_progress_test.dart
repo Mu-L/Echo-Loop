@@ -46,8 +46,10 @@ void main() {
     test('canSkipCurrentSubStage — 仅首次学习的第一个盲听不可跳过', () {
       // 首次学习盲听 → 不可跳过
       expect(
-        LearningProgress(audioItemId: 'a1', updatedAt: now)
-            .canSkipCurrentSubStage,
+        LearningProgress(
+          audioItemId: 'a1',
+          updatedAt: now,
+        ).canSkipCurrentSubStage,
         false,
       );
       // 首次学习其余子步骤 → 可跳过

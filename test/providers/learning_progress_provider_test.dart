@@ -861,35 +861,38 @@ void main() {
       );
     });
 
-    test('复习阶段的盲听可跳过：review1 v1 blindListen → reviewDifficultPractice', () async {
-      final now = DateTime(2026, 3, 5, 10, 0);
-      final completedAt = now.subtract(const Duration(days: 2));
-      // 显式 stamp review1=1 → v1 plan = [blindListen, difficult, retellPara]
-      final progress = LearningProgress(
-        audioItemId: 'a1',
-        currentStage: LearningStage.review1,
-        currentSubStage: SubStageType.blindListen,
-        lastStageCompletedAt: completedAt,
-        currentStageStartedAt: now,
-        updatedAt: now,
-        planVersionsByStage: const {LearningStage.review1: 1},
-      );
+    test(
+      '复习阶段的盲听可跳过：review1 v1 blindListen → reviewDifficultPractice',
+      () async {
+        final now = DateTime(2026, 3, 5, 10, 0);
+        final completedAt = now.subtract(const Duration(days: 2));
+        // 显式 stamp review1=1 → v1 plan = [blindListen, difficult, retellPara]
+        final progress = LearningProgress(
+          audioItemId: 'a1',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          lastStageCompletedAt: completedAt,
+          currentStageStartedAt: now,
+          updatedAt: now,
+          planVersionsByStage: const {LearningStage.review1: 1},
+        );
 
-      final container = createContainer(
-        LearningProgressState(progressMap: {'a1': progress}),
-        nowGetter: () => now,
-      );
+        final container = createContainer(
+          LearningProgressState(progressMap: {'a1': progress}),
+          nowGetter: () => now,
+        );
 
-      await notifier(container).skipCurrentSubStage('a1');
+        await notifier(container).skipCurrentSubStage('a1');
 
-      final after = readProgress(container, 'a1')!;
-      expect(after.currentStage, LearningStage.review1);
-      expect(after.currentSubStage, SubStageType.reviewDifficultPractice);
-      expect(
-        after.skippedSubStageKeys.contains('review1:blindListen'),
-        isTrue,
-      );
-    });
+        final after = readProgress(container, 'a1')!;
+        expect(after.currentStage, LearningStage.review1);
+        expect(after.currentSubStage, SubStageType.reviewDifficultPractice);
+        expect(
+          after.skippedSubStageKeys.contains('review1:blindListen'),
+          isTrue,
+        );
+      },
+    );
   });
 
   // ========== Group 2: 断点保存与清除 ==========

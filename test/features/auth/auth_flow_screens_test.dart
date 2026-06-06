@@ -233,9 +233,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'Google services are outdated. Please update and try again.',
-      ),
+      find.text('Google services are outdated. Please update and try again.'),
       findsOneWidget,
     );
     expect(

@@ -38,10 +38,7 @@ void main() {
       expect(loaded, isNotNull);
       expect(loaded!.goal, equals(OnboardingGoal.work));
       expect(loaded.dailyMinutes, equals(OnboardingDailyMinutes.m20));
-      expect(
-        loaded.referralSource,
-        equals(OnboardingReferralSource.friend),
-      );
+      expect(loaded.referralSource, equals(OnboardingReferralSource.friend));
       expect(loaded.examType, isNull);
       expect(loaded.goalOtherText, isNull);
     });
@@ -185,8 +182,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         OnboardingSurveyKeys.goal: 'unknown_goal',
         OnboardingSurveyKeys.dailyMinutes: '99',
-        OnboardingSurveyKeys.referralSource:
-            OnboardingReferralSource.appStore,
+        OnboardingSurveyKeys.referralSource: OnboardingReferralSource.appStore,
         OnboardingSurveyKeys.completedAtMs: 1000,
       });
       final prefs = await SharedPreferences.getInstance();
@@ -200,8 +196,7 @@ void main() {
         OnboardingSurveyKeys.goal: OnboardingGoal.exam,
         OnboardingSurveyKeys.examType: 'unknown_exam',
         OnboardingSurveyKeys.dailyMinutes: OnboardingDailyMinutes.m10,
-        OnboardingSurveyKeys.referralSource:
-            OnboardingReferralSource.appStore,
+        OnboardingSurveyKeys.referralSource: OnboardingReferralSource.appStore,
         OnboardingSurveyKeys.completedAtMs: 1000,
       });
       final prefs = await SharedPreferences.getInstance();
@@ -343,10 +338,7 @@ void main() {
       );
       expect(updated.goal, equals(OnboardingGoal.exam));
       expect(updated.dailyMinutes, equals(OnboardingDailyMinutes.m20));
-      expect(
-        updated.referralSource,
-        equals(OnboardingReferralSource.appStore),
-      );
+      expect(updated.referralSource, equals(OnboardingReferralSource.appStore));
     });
 
     test('copyWith.clearExamType 把 examType 置回 null', () {

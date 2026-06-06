@@ -315,10 +315,7 @@ void main() {
 
       // 手动写入 currentRepeatCount=2 模拟第 2 遍中段（state 是 immutable，借助 seek 不会动它）
       // 这里直接读取并比较：startPlaying 完成后应为 1，seek 后仍为 1
-      expect(
-        container.read(blindListenPlayerProvider).currentRepeatCount,
-        1,
-      );
+      expect(container.read(blindListenPlayerProvider).currentRepeatCount, 1);
 
       // 跳到全局 idx=3（同段）
       await notifier.seekToSentence(3);
@@ -412,7 +409,9 @@ void main() {
 
       progressNotifier.savedIndices.clear();
       await notifier.seekToSentence(4);
-      await Future<void>.delayed(const Duration(milliseconds: 10)); // 段 1 的第 1 句
+      await Future<void>.delayed(
+        const Duration(milliseconds: 10),
+      ); // 段 1 的第 1 句
       await Future<void>.delayed(const Duration(milliseconds: 1));
 
       expect(progressNotifier.savedIndices, contains(4));
@@ -420,50 +419,52 @@ void main() {
   });
 
   group('BlindListenPlayer pause 快照', () {
-    test('pause 把 playingSentenceIndex 写入 _resumeStartLocalSentenceIndex（不调写盘）',
-        () async {
-      final progressNotifier = _RecordingBlindProgressNotifier(
-        LearningProgressState(
-          progressMap: {
-            'audio-1': LearningProgress(
-              audioItemId: 'audio-1',
-              currentStage: LearningStage.firstLearn,
-              currentSubStage: SubStageType.blindListen,
-              updatedAt: DateTime(2026, 3, 11),
-            ),
-          },
-        ),
-      );
-      final engine = _FastTestAudioEngine();
-      final container = _buildContainer(
-        engine: engine,
-        progressNotifier: progressNotifier,
-      );
-      addTearDown(container.dispose);
-      final notifier = container.read(blindListenPlayerProvider.notifier);
+    test(
+      'pause 把 playingSentenceIndex 写入 _resumeStartLocalSentenceIndex（不调写盘）',
+      () async {
+        final progressNotifier = _RecordingBlindProgressNotifier(
+          LearningProgressState(
+            progressMap: {
+              'audio-1': LearningProgress(
+                audioItemId: 'audio-1',
+                currentStage: LearningStage.firstLearn,
+                currentSubStage: SubStageType.blindListen,
+                updatedAt: DateTime(2026, 3, 11),
+              ),
+            },
+          ),
+        );
+        final engine = _FastTestAudioEngine();
+        final container = _buildContainer(
+          engine: engine,
+          progressNotifier: progressNotifier,
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(blindListenPlayerProvider.notifier);
 
-      final paragraphs = _buildParagraphs(
-        paragraphCount: 1,
-        sentencesPerParagraph: 5,
-      );
-      notifier.initializeParagraphs(paragraphs, const BlindListenSettings());
+        final paragraphs = _buildParagraphs(
+          paragraphCount: 1,
+          sentencesPerParagraph: 5,
+        );
+        notifier.initializeParagraphs(paragraphs, const BlindListenSettings());
 
-      // 通过 seekToSentence 进入第 3 句的播放状态
-      await notifier.seekToSentence(3);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-      await Future<void>.delayed(const Duration(milliseconds: 1));
+        // 通过 seekToSentence 进入第 3 句的播放状态
+        await notifier.seekToSentence(3);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await Future<void>.delayed(const Duration(milliseconds: 1));
 
-      progressNotifier.savedIndices.clear();
-      await notifier.pause();
+        progressNotifier.savedIndices.clear();
+        await notifier.pause();
 
-      // pause 本身不调 saveBlindListenSentenceIndex
-      expect(progressNotifier.savedIndices, isEmpty);
+        // pause 本身不调 saveBlindListenSentenceIndex
+        expect(progressNotifier.savedIndices, isEmpty);
 
-      // resume 应从同一句（globalIdx=3）开播，验证 _resumeStartLocalSentenceIndex 写入
-      engine.playRangeOnceCallCount = 0;
-      await notifier.resume();
-      expect(engine.lastPlayStart, paragraphs[0][3].startTime);
-    });
+        // resume 应从同一句（globalIdx=3）开播，验证 _resumeStartLocalSentenceIndex 写入
+        engine.playRangeOnceCallCount = 0;
+        await notifier.resume();
+        expect(engine.lastPlayStart, paragraphs[0][3].startTime);
+      },
+    );
 
     test('pause → resume 从当前句开头开播（短段也生效，forceOffset 路径）', () async {
       final engine = _FastTestAudioEngine();
