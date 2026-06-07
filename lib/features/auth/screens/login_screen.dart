@@ -8,6 +8,8 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../analytics/analytics_providers.dart';
+import '../../../analytics/models/event_names.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../router/app_router.dart';
 import '../../../services/app_logger.dart';
@@ -186,6 +188,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _signInWithApple() async {
     if (_isBusy) return;
 
+    _trackLoginMethod('apple');
     setState(() => _isBusy = true);
     try {
       final action = widget.onAppleSignIn;
@@ -215,6 +218,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _signInWithGoogle() async {
     if (_isBusy) return;
 
+    _trackLoginMethod('google');
     setState(() => _isBusy = true);
     try {
       final action = widget.onGoogleSignIn;
@@ -267,9 +271,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _openEmailSignIn() async {
+    _trackLoginMethod('email');
     final result = await context.push<AuthAttemptResult>(AppRoutes.emailSignIn);
     if (!mounted || result == null) return;
     _finishAuthAttempt(result);
+  }
+
+  /// 仅记录用户选择的认证入口，不采集认证结果或表单操作。
+  void _trackLoginMethod(String method) {
+    ref.read(analyticsServiceProvider).track(Events.loginMethodSelected, {
+      EventParams.method: method,
+    });
   }
 
   void _goBack(BuildContext context) {

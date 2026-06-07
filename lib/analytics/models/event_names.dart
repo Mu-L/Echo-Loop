@@ -10,6 +10,10 @@ abstract class Events {
   /// 页面切换（使用 PostHog 官方 Mobile 保留名，兼容官方 Dashboard 模板）
   static const screenView = r'$screen';
 
+  // ── 认证 ──
+  /// 用户选择登录方式
+  static const loginMethodSelected = 'login_method_selected';
+
   // ── 学习会话 ──
   /// 进入学习页面（避免 Firebase 保留名 session_start）
   static const learningStart = 'learning_start';
@@ -94,6 +98,9 @@ abstract class Events {
 
   /// AI 转录任务完成
   static const transcriptionComplete = 'transcription_complete';
+
+  /// 进入字幕编辑器
+  static const subtitleEditorOpened = 'subtitle_editor_opened';
 
   // ── 复习会话 ──
   /// 收藏句子复习开始
@@ -252,6 +259,10 @@ abstract class EventParams {
   /// PostHog 官方保留属性名，用于填充 Activity 流的 URL/Screen 列
   static const screenName = r'$screen_name';
   static const previousScreen = 'previous_screen';
+
+  // ── 认证 ──
+  /// 登录方式：apple / google / email
+  static const method = 'method';
 
   // ── 学习会话 ──
   static const isFreePractice = 'is_free_practice';

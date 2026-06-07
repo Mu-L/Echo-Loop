@@ -3,6 +3,24 @@
 > 最后更新：2026-06-07
 > 当前焦点：字幕编辑器词级编辑（任务 1/7 已完成）
 
+## 已完成：登录方式与字幕编辑器入口埋点
+
+补齐登录和字幕编辑功能的粗粒度行为埋点，不采集验证码、登录结果或字幕编辑细节操作。
+
+### 实现
+- [x] 进入登录页继续复用统一 `$screen` 路由埋点
+- [x] 用户选择 Apple / Google / 邮箱登录入口时上报 `login_method_selected`
+- [x] 每次进入字幕编辑器时上报一次 `subtitle_editor_opened`
+- [x] 字幕编辑器事件仅附带 `audio_id`，登录事件仅附带 `method`
+
+### 验证
+- [x] `flutter analyze`：通过（仅仓库既有 101 条 warning/info）
+- [x] 定向 `flutter test`：59 passed
+- [x] 全量 `flutter test`：2568 passed、11 skip
+- [ ] `flutter test integration_test -d macos`：已启动构建，但工具会话结束前未取得最终汇总
+
+**完成时间**: 2026-06-07 10:16 +0800
+
 ## 已完成：账号入口按本次登录方式展示
 
 修复同一账号关联 Google 后改用邮箱 OTP 登录，设置页仍显示“已通过 Google 登录”的问题；账号入口现在优先读取当前 Supabase Session 的认证方法。

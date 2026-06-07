@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:echo_loop/analytics/analytics_providers.dart';
+import 'package:echo_loop/analytics/analytics_service.dart';
+import 'package:echo_loop/analytics/models/event_names.dart';
 import 'package:echo_loop/features/auth/screens/email_sign_in_screen.dart';
 import 'package:echo_loop/features/auth/screens/login_screen.dart';
 import 'package:echo_loop/features/auth/screens/account_screen.dart';
@@ -13,10 +16,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-Widget _app(GoRouter router) {
+import '../../helpers/mock_providers.dart';
+
+class _MockAnalyticsService extends Mock implements AnalyticsService {}
+
+Widget _app(GoRouter router, {AnalyticsService? analytics}) {
   return ProviderScope(
+    overrides: [
+      analyticsServiceProvider.overrideWithValue(
+        analytics ?? createTestAnalyticsServiceSync(),
+      ),
+    ],
     child: MaterialApp.router(
       locale: const Locale('en'),
       supportedLocales: const [Locale('en'), Locale('zh')],
@@ -109,6 +122,81 @@ Finder _otpField() {
 }
 
 void main() {
+  testWidgets('选择登录入口时记录登录方式', (tester) async {
+    final analytics = _MockAnalyticsService();
+    when(() => analytics.track(any(), any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _app(
+        _authRouter(
+          isAppleSignInSupported: true,
+          isGoogleSignInSupported: true,
+          onAppleSignIn: () async {},
+          onGoogleSignIn: () async {},
+        ),
+        analytics: analytics,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Continue with Email Code'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => analytics.track(Events.loginMethodSelected, {
+        EventParams.method: 'email',
+      }),
+    ).called(1);
+  });
+
+  testWidgets('Apple 和 Google 登录入口记录对应方式', (tester) async {
+    final analytics = _MockAnalyticsService();
+    when(() => analytics.track(any(), any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _app(
+        _authRouter(
+          isAppleSignInSupported: true,
+          onAppleSignIn: () async {
+            throw const AuthException('failed');
+          },
+        ),
+        analytics: analytics,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Apple'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => analytics.track(Events.loginMethodSelected, {
+        EventParams.method: 'apple',
+      }),
+    ).called(1);
+
+    await tester.pumpWidget(
+      _app(
+        _authRouter(
+          isAppleSignInSupported: false,
+          isGoogleSignInSupported: true,
+          onGoogleSignIn: () async {
+            throw const AuthException('failed');
+          },
+        ),
+        analytics: analytics,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => analytics.track(Events.loginMethodSelected, {
+        EventParams.method: 'google',
+      }),
+    ).called(1);
+  });
+
   testWidgets('登录入口默认只显示登录方式，不显示邮箱表单', (tester) async {
     await tester.pumpWidget(_app(_authRouter()));
     await tester.pumpAndSettle();

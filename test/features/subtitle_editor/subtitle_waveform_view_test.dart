@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:echo_loop/analytics/analytics_providers.dart';
+import 'package:echo_loop/analytics/analytics_service.dart';
+import 'package:echo_loop/analytics/models/event_names.dart';
 import 'package:echo_loop/features/subtitle_editor/subtitle_edit_engine.dart';
 import 'package:echo_loop/features/subtitle_editor/subtitle_editor_controller.dart';
 import 'package:echo_loop/features/subtitle_editor/subtitle_simple_editor_screen.dart';
@@ -16,10 +19,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' as ja;
 import 'package:just_waveform/just_waveform.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/mock_providers.dart';
 import '../../helpers/test_app.dart';
+
+class _MockAnalyticsService extends Mock implements AnalyticsService {}
 
 void main() {
   group('SubtitleWaveformView', () {
@@ -596,6 +602,37 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'guide_v1_subtitle_editor_sentence_actions_seen': true,
       });
+    });
+
+    testWidgets('进入页面时记录一次字幕编辑器打开事件', (tester) async {
+      final analytics = _MockAnalyticsService();
+      when(() => analytics.track(any(), any())).thenAnswer((_) async {});
+      final audioItem = createTestAudioItem();
+      final audioEngine = _ScreenTestAudioEngine(
+        duration: const Duration(seconds: 10),
+        sentences: _sentences(),
+      );
+
+      await tester.pumpWidget(
+        createTestScreen(
+          SubtitleSimpleEditorScreen(audioItem: audioItem),
+          overrides: [
+            analyticsServiceProvider.overrideWithValue(analytics),
+            audioEngineProvider.overrideWith(() => audioEngine),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      verify(
+        () => analytics.track(Events.subtitleEditorOpened, {
+          EventParams.audioId: audioItem.id,
+        }),
+      ).called(1);
+
+      await tester.pump();
+      verifyNoMoreInteractions(analytics);
+      audioEngine.disposeController();
     });
 
     testWidgets('句子行显示完整起止时间和句长', (tester) async {

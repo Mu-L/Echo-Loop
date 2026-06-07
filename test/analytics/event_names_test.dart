@@ -6,6 +6,7 @@ void main() {
     test('所有事件名不为空', () {
       const events = [
         Events.screenView,
+        Events.loginMethodSelected,
         Events.learningStart,
         Events.learningEnd,
         Events.blindListenStart,
@@ -29,6 +30,7 @@ void main() {
         Events.subtitleUploaded,
         Events.transcriptionStarted,
         Events.transcriptionComplete,
+        Events.subtitleEditorOpened,
         Events.bookmarkReviewStart,
         Events.bookmarkReviewComplete,
         Events.flashcardStart,
@@ -48,6 +50,7 @@ void main() {
     test('所有事件名不重复', () {
       const events = [
         Events.screenView,
+        Events.loginMethodSelected,
         Events.learningStart,
         Events.learningEnd,
         Events.blindListenStart,
@@ -71,6 +74,7 @@ void main() {
         Events.subtitleUploaded,
         Events.transcriptionStarted,
         Events.transcriptionComplete,
+        Events.subtitleEditorOpened,
         Events.bookmarkReviewStart,
         Events.bookmarkReviewComplete,
         Events.flashcardStart,
@@ -90,6 +94,7 @@ void main() {
       // 排除 PostHog 官方保留名（$screen 等以 $ 开头）
       const events = [
         Events.learningStart,
+        Events.loginMethodSelected,
         Events.learningEnd,
         Events.blindListenStart,
         Events.blindListenComplete,
@@ -112,6 +117,7 @@ void main() {
         Events.subtitleUploaded,
         Events.transcriptionStarted,
         Events.transcriptionComplete,
+        Events.subtitleEditorOpened,
         Events.bookmarkReviewStart,
         Events.bookmarkReviewComplete,
         Events.flashcardStart,
@@ -148,6 +154,7 @@ void main() {
         EventParams.durationMs,
         EventParams.screenName,
         EventParams.previousScreen,
+        EventParams.method,
         EventParams.isFreePractice,
         EventParams.difficulty,
         EventParams.passNumber,
@@ -180,6 +187,7 @@ void main() {
         EventParams.durationMs,
         EventParams.screenName,
         EventParams.previousScreen,
+        EventParams.method,
         EventParams.isFreePractice,
         EventParams.difficulty,
         EventParams.passNumber,

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../analytics/analytics_providers.dart';
+import '../../analytics/models/event_names.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/audio_item.dart';
 import '../../models/sentence.dart';
@@ -39,6 +41,9 @@ class _SubtitleSimpleEditorScreenState
   @override
   void initState() {
     super.initState();
+    ref.read(analyticsServiceProvider).track(Events.subtitleEditorOpened, {
+      EventParams.audioId: widget.audioItem.id,
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(
