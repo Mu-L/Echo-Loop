@@ -1487,6 +1487,8 @@
   "officialBadge": "Curated",
   "officialDeprecatedBadge": "Removed",
   "addToMyCollections": "Add to My Collections",
+  "officialCollectionSignInRequiredTitle": "Sign in to add collections",
+  "officialCollectionSignInRequiredMessage": "Sign in to add curated collections to My Collections and keep your learning content in sync.",
   "goLearn": "Go Learn",
   "removeFromMyCollections": "Remove from My Collections",
   "enrollNeededTitle": "Add Collection First",

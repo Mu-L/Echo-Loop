@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:echo_loop/features/auth/providers/auth_providers.dart';
 import 'package:echo_loop/features/official_collections/data/official_catalog_service.dart';
 import 'package:echo_loop/features/official_collections/models/catalog.dart';
 import 'package:echo_loop/features/official_collections/screens/official_collection_detail_screen.dart';
@@ -76,5 +77,76 @@ void main() {
 
     final listView = tester.widget<ListView>(find.byType(ListView));
     expect(listView.physics, isA<AlwaysScrollableScrollPhysics>());
+  });
+
+  testWidgets('未登录点击详情页添加按钮时先显示登录提示', (tester) async {
+    final snapshot = makeSnapshot(
+      collections: [
+        makeCatalogCollection(
+          id: 'official-1',
+          name: 'Official Collection',
+          audios: [makeCatalogAudio()],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      createTestApp(
+        const OfficialCollectionDetailScreen(remoteId: 'official-1'),
+        overrides: [
+          officialCatalogServiceProvider.overrideWithValue(
+            _FakeCatalogService(snapshot),
+          ),
+          isAuthenticatedProvider.overrideWithValue(false),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add to My Collections'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in to add collections'), findsOneWidget);
+    expect(
+      find.textContaining('Sign in to add curated collections'),
+      findsOneWidget,
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('未登录从详情音频确认添加时使用相同登录提示', (tester) async {
+    final snapshot = makeSnapshot(
+      collections: [
+        makeCatalogCollection(
+          id: 'official-1',
+          name: 'Official Collection',
+          audios: [makeCatalogAudio(title: 'Track 1')],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      createTestApp(
+        const OfficialCollectionDetailScreen(remoteId: 'official-1'),
+        overrides: [
+          officialCatalogServiceProvider.overrideWithValue(
+            _FakeCatalogService(snapshot),
+          ),
+          isAuthenticatedProvider.overrideWithValue(false),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Track 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Collection First'), findsOneWidget);
+
+    await tester.tap(find.text('Add to My Collections').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in to add collections'), findsOneWidget);
+    expect(find.text('Add Collection First'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 }

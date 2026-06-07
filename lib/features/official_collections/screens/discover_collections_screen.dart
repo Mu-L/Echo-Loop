@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/sign_in_required_dialog.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/collection_provider.dart';
 import '../../../router/app_router.dart';
@@ -154,6 +155,14 @@ class _DiscoverCollectionsScreenState
 
   Future<void> _handleEnroll(CatalogCollection item) async {
     final l10n = AppLocalizations.of(context)!;
+    final canEnroll = await ensureSignedInForAction(
+      context: context,
+      ref: ref,
+      title: l10n.officialCollectionSignInRequiredTitle,
+      message: l10n.officialCollectionSignInRequiredMessage,
+    );
+    if (!mounted || !canEnroll) return;
+
     final messenger = ScaffoldMessenger.of(context);
     AppLogger.log(
       _logTag,

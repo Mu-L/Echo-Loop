@@ -10,11 +10,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_providers.dart';
-import '../../features/onboarding_survey/providers/onboarding_survey_provider.dart'
-    show sharedPreferencesProvider;
+import '../../features/auth/sign_in_required_dialog.dart';
 import '../../features/usage/usage_event.dart';
 import '../../features/usage/usage_providers.dart';
 import '../../database/providers.dart';
@@ -35,7 +33,6 @@ import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing_notice_store.dart';
 import '../../utils/sense_group_timing.dart';
 import '../../providers/new_user_guide_provider.dart';
-import '../../router/app_router.dart';
 import '../guide_flow.dart';
 import 'sentence_annotation_card.dart';
 import 'sense_group_action_bar.dart';
@@ -306,31 +303,16 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 已缓存的 L1/L2 结果不会触发登录门槛。
   Future<void> _showAiFeatureSignInDialog() async {
     final l10n = AppLocalizations.of(context);
-    final shouldOpenLogin = await showDialog<bool>(
+    await ensureSignedInForAction(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
+      ref: ref,
+      title:
           l10n?.senseGroupSignInRequiredTitle ??
-              'Sign in to use sense group splitting',
-        ),
-        content: Text(
+          'Sign in to use sense group splitting',
+      message:
           l10n?.senseGroupSignInRequiredMessage ??
-              'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n?.authSignInButton ?? 'Sign In'),
-          ),
-        ],
-      ),
+          'AI translation, analysis, and sense group splitting use the cloud AI service. Sign in to generate new results. Cached results remain available.',
     );
-    if (!mounted || shouldOpenLogin != true) return;
-    context.push(AppRoutes.login);
   }
 
   /// 意群粒度切换回调

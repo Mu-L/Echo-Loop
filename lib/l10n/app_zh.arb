@@ -1121,6 +1121,8 @@
   "officialBadge": "精选",
   "officialDeprecatedBadge": "已下架",
   "addToMyCollections": "添加到我的合集",
+  "officialCollectionSignInRequiredTitle": "登录后添加合集",
+  "officialCollectionSignInRequiredMessage": "登录后可以将精选合集添加到我的合集，并同步后续学习内容。",
   "goLearn": "去学习",
   "removeFromMyCollections": "从我的合集移除",
   "enrollNeededTitle": "需要先添加合集",

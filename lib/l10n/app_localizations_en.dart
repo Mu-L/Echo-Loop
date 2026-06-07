@@ -2862,6 +2862,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToMyCollections => 'Add to My Collections';
 
   @override
+  String get officialCollectionSignInRequiredTitle =>
+      'Sign in to add collections';
+
+  @override
+  String get officialCollectionSignInRequiredMessage =>
+      'Sign in to add curated collections to My Collections and keep your learning content in sync.';
+
+  @override
   String get goLearn => 'Go Learn';
 
   @override

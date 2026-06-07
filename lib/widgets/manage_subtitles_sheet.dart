@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:universal_io/io.dart';
 import '../analytics/models/event_names.dart';
 import '../features/auth/providers/auth_providers.dart';
+import '../features/auth/sign_in_required_dialog.dart';
 import '../features/usage/usage_event.dart';
 import '../features/usage/usage_providers.dart';
 import '../models/audio_item.dart';
@@ -1069,31 +1070,16 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   /// 本地上传字幕和已有本地字幕不受影响。
   Future<void> _showTranscriptionSignInDialog(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
-    final shouldOpenLogin = await showDialog<bool>(
+    await ensureSignedInForAction(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
+      ref: ref,
+      title:
           l10n?.transcriptionSignInRequiredTitle ??
-              'Sign in to use AI transcription',
-        ),
-        content: Text(
+          'Sign in to use AI transcription',
+      message:
           l10n?.transcriptionSignInRequiredMessage ??
-              'AI transcription uses the cloud transcription service. Sign in to transcribe audio with AI.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n?.authSignInButton ?? 'Sign In'),
-          ),
-        ],
-      ),
+          'AI transcription uses the cloud transcription service. Sign in to transcribe audio with AI.',
     );
-    if (!mounted || !context.mounted || shouldOpenLogin != true) return;
-    context.push(AppRoutes.login);
   }
 
   /// 处理删除字幕

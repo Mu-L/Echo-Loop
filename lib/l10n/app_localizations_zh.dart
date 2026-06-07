@@ -2760,6 +2760,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addToMyCollections => '添加到我的合集';
 
   @override
+  String get officialCollectionSignInRequiredTitle => '登录后添加合集';
+
+  @override
+  String get officialCollectionSignInRequiredMessage =>
+      '登录后可以将精选合集添加到我的合集，并同步后续学习内容。';
+
+  @override
   String get goLearn => '去学习';
 
   @override

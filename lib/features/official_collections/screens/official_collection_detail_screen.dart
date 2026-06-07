@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../analytics/analytics_providers.dart';
 import '../../../analytics/models/event_names.dart';
+import '../../auth/sign_in_required_dialog.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/audio_item.dart';
 import '../../../providers/audio_library_provider.dart';
@@ -305,6 +306,14 @@ class _OfficialCollectionDetailScreenState
 
   Future<void> _doEnroll(CatalogCollection detail) async {
     final l10n = AppLocalizations.of(context)!;
+    final canEnroll = await ensureSignedInForAction(
+      context: context,
+      ref: ref,
+      title: l10n.officialCollectionSignInRequiredTitle,
+      message: l10n.officialCollectionSignInRequiredMessage,
+    );
+    if (!mounted || !canEnroll) return;
+
     final messenger = ScaffoldMessenger.of(context);
     AppLogger.log(_logTag, 'tap add-to-my-collections remoteId=${detail.id}');
     setState(() => _enrolling = true);

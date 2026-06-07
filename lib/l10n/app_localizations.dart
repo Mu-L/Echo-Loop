@@ -5072,6 +5072,18 @@ abstract class AppLocalizations {
   /// **'Add to My Collections'**
   String get addToMyCollections;
 
+  /// No description provided for @officialCollectionSignInRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to add collections'**
+  String get officialCollectionSignInRequiredTitle;
+
+  /// No description provided for @officialCollectionSignInRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to add curated collections to My Collections and keep your learning content in sync.'**
+  String get officialCollectionSignInRequiredMessage;
+
   /// No description provided for @goLearn.
   ///
   /// In en, this message translates to:
