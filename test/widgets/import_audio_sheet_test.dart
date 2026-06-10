@@ -91,6 +91,40 @@ void main() {
     expect(find.text('Import from Link'), findsOneWidget);
   });
 
+  testWidgets('导入方式入口使用独立边框分隔', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.tap(find.text('Open Import'));
+    await tester.pumpAndSettle();
+
+    final localOption = find.byKey(const ValueKey('import-option-local-file'));
+    final linkOption = find.byKey(const ValueKey('import-option-direct-url'));
+    expect(localOption, findsOneWidget);
+    expect(linkOption, findsOneWidget);
+
+    final localMaterial = tester.widget<Material>(
+      find.descendant(of: localOption, matching: find.byType(Material)),
+    );
+    final linkMaterial = tester.widget<Material>(
+      find.descendant(of: linkOption, matching: find.byType(Material)),
+    );
+    final localShape = localMaterial.shape;
+    final linkShape = linkMaterial.shape;
+    expect(localShape, isA<RoundedRectangleBorder>());
+    expect(linkShape, isA<RoundedRectangleBorder>());
+    expect(
+      (localShape! as RoundedRectangleBorder).side.style,
+      BorderStyle.solid,
+    );
+    expect(
+      (linkShape! as RoundedRectangleBorder).side.style,
+      BorderStyle.solid,
+    );
+
+    final localBottom = tester.getBottomLeft(localOption).dy;
+    final linkTop = tester.getTopLeft(linkOption).dy;
+    expect(linkTop - localBottom, 12);
+  });
+
   testWidgets('链接入口显示 URL 表单且空输入禁用提交', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.tap(find.text('Open Import'));
@@ -105,6 +139,36 @@ void main() {
       find.widgetWithText(FilledButton, 'Download and Import'),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('本地文件入口使用全宽次级按钮', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.tap(find.text('Open Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import from File'));
+    await tester.pumpAndSettle();
+
+    final selectButton = find.byKey(const ValueKey('select-audio-file-button'));
+    expect(selectButton, findsOneWidget);
+    expect(
+      find.widgetWithText(ElevatedButton, 'Select Audio File'),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: selectButton,
+        matching: find.byIcon(Icons.audio_file_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(FilledButton, 'Select Audio File'),
+      findsOneWidget,
+    );
+
+    final sheetWidth = tester.getSize(find.byType(ImportAudioFlowSheet)).width;
+    final selectWidth = tester.getSize(selectButton).width;
+    expect(selectWidth, greaterThan(sheetWidth - 40));
   });
 
   testWidgets('链接导入页可从剪切板粘贴链接并启用提交', (tester) async {

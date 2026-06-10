@@ -203,13 +203,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(
-          child: ElevatedButton.icon(
-            onPressed: _isLoading ? null : _pickAudioFiles,
-            icon: const Icon(Icons.audiotrack),
-            label: Text(l10n.selectAudioFile),
-          ),
-        ),
+        _buildSelectAudioFileButton(l10n, colorScheme),
         // 内联错误提示（淡入 + 上滑，6 秒自动消失）
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
@@ -294,6 +288,37 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
           _buildCollectionDropdown(l10n),
         ],
       ],
+    );
+  }
+
+  /// 构建本地音频选择入口，保留明确按钮语义并弱化相对底部主操作的层级。
+  Widget _buildSelectAudioFileButton(
+    AppLocalizations l10n,
+    ColorScheme colorScheme,
+  ) {
+    return SizedBox(
+      key: const ValueKey('select-audio-file-button'),
+      width: double.infinity,
+      height: 56,
+      child: FilledButton.tonalIcon(
+        onPressed: _isLoading ? null : _pickAudioFiles,
+        style: FilledButton.styleFrom(
+          foregroundColor: colorScheme.onSecondaryContainer,
+          backgroundColor: colorScheme.secondaryContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        icon: const Icon(Icons.audio_file_outlined),
+        label: Text(
+          l10n.selectAudioFile,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     );
   }
 

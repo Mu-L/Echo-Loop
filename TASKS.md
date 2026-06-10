@@ -78,6 +78,8 @@
 - [x] 优化链接导入粘贴流程：进入页面不再自动弹出键盘，新增“粘贴链接”按钮，剪切板为空或不是 `http/https` 链接时显示内联提示，粘贴成功后仍由用户确认下载
 - [x] 优化“粘贴链接”视觉样式：从突兀的大号描边按钮改为输入框下方右侧轻量文本操作，降低表单噪音并保留图标提示
 - [x] 抽取通用 `SecondaryActionButton`：统一底部操作区弱化按钮样式，本地导入和链接导入复用同一组件
+- [x] 优化本地导入“选择音频文件”按钮：从居中的胶囊按钮改为全宽次级按钮，保留明确点击语义并与底部主操作区分层
+- [x] 优化导入方式选择页分隔：本地文件和链接导入入口增加独立描边与更明确间距，暗色模式下边界更清晰
 
 ### 验证
 - [x] `flutter analyze lib/features/audio_import lib/widgets/add_audio_dialog.dart lib/widgets/import_audio_sheet.dart test/features/audio_import/audio_import_service_test.dart test/widgets/import_audio_sheet_test.dart`：No issues found
@@ -99,9 +101,15 @@
 - [x] `dart format lib/widgets/common/secondary_action_button.dart lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`
 - [x] `flutter analyze lib/widgets/common/secondary_action_button.dart lib/widgets/import_audio_sheet.dart lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`：No issues found
 - [x] `flutter test test/widgets/import_audio_sheet_test.dart`：8 passed
+- [x] `dart format lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`
+- [x] `flutter analyze lib/widgets/add_audio_dialog.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：9 passed
+- [x] `dart format lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart`
+- [x] `flutter analyze lib/widgets/import_audio_sheet.dart test/widgets/import_audio_sheet_test.dart`：No issues found
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：10 passed
 - [x] `scripts/check.sh`：`flutter analyze` 通过（仅仓库既有 warning/info）；全量 `flutter test` 2623 passed、11 skip；macOS integration 中 `native_audio_decoder_integration_test.dart` 通过，`asr_engine_test.dart` / `app_test.dart` 失败在本地 debug connection 启动失败（`The log reader stopped unexpectedly, or never started`），与本次链接导入和导入 UI 改动无直接关联
 
-**完成时间**: 2026-06-10 09:37 +0800
+**完成时间**: 2026-06-10 10:39 +0800
 
 ## 已完成：修复 Android 首次学习完成后通知权限弹窗不出现
 

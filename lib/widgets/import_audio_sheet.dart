@@ -267,13 +267,15 @@ class _ChooseSourcePanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ImportOptionTile(
+          key: const ValueKey('import-option-local-file'),
           icon: Icons.audio_file_outlined,
           title: l10n.importAudioFromFile,
           description: l10n.importAudioFromFileDescription,
           onTap: onLocalFile,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _ImportOptionTile(
+          key: const ValueKey('import-option-direct-url'),
           icon: Icons.link,
           title: l10n.importAudioFromUrl,
           description: l10n.importAudioFromUrlDescription,
@@ -286,6 +288,7 @@ class _ChooseSourcePanel extends StatelessWidget {
 
 class _ImportOptionTile extends StatelessWidget {
   const _ImportOptionTile({
+    super.key,
     required this.icon,
     required this.title,
     required this.description,
@@ -302,8 +305,12 @@ class _ImportOptionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Material(
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(8),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.36),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
