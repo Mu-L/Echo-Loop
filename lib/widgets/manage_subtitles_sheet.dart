@@ -960,8 +960,8 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   /// AI 转录文件大小上限（50MB）
   static const _maxFileSize = 50 * 1024 * 1024;
 
-  /// AI 转录时长上限（15 分钟）
-  static const _maxDurationSeconds = 15 * 60;
+  /// AI 转录时长上限（30 分钟）
+  static const _maxDurationSeconds = 30 * 60;
 
   /// 处理 AI 转录
   Future<void> _handleAiTranscription(
@@ -983,7 +983,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       _showInlineError(
         _InlineError(
           _UploadErrorKind.generic,
-          l10n.transcriptionErrorTooLong(15),
+          l10n.transcriptionErrorTooLong(30),
         ),
       );
       return;
