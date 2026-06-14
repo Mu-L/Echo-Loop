@@ -368,6 +368,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createCollection => 'Create Collection';
 
   @override
+  String get newCollectionOptionTitle => 'New Collection';
+
+  @override
+  String get newCollectionOptionDescription =>
+      'Add audio or practice materials manually';
+
+  @override
   String get collectionName => 'Collection Name';
 
   @override
@@ -3684,6 +3691,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subscribePodcast => 'Subscribe Podcast';
+
+  @override
+  String get subscribePodcastOptionDescription =>
+      'Add with Apple Podcasts or RSS';
 
   @override
   String get podcastUrlLabel => 'Apple Podcasts or RSS URL';

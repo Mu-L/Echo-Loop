@@ -3,6 +3,19 @@
 > 最后更新：2026-06-14
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：创建合集类型选择文案优化
+
+**完成时间**: 2026-06-14 22:23 +0800
+
+创建合集底部弹窗的类型选择页改用更明确的入口文案：本地合集入口为「新建合集 / 手动添加音频或练习材料」，Podcast 入口为「订阅 Podcast / 通过 Apple Podcasts 或 RSS 添加」。表单内的合集名称输入提示与 Podcast URL 标签保持不变，避免入口说明和输入字段语义混用。
+
+- [x] `collection_screen.dart`：类型选择卡片改用独立 i18n 文案，不再复用输入框 hint/label
+- [x] `app_zh.arb` / `app_en.arb` / generated l10n：新增中英文入口标题与副标题 key
+- [x] `collection_screen_test.dart`：补充类型选择页四行文案回归断言
+- [x] `flutter analyze lib/screens/collection_screen.dart lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart lib/l10n/app_localizations_zh.dart test/screens/collection_screen_test.dart`：No issues found
+- [x] `flutter test test/screens/collection_screen_test.dart`：14 passed
+- [ ] `scripts/check.sh`：未跑；本次为合集页底部弹窗局部文案调整，按规范仅运行直接相关检查
+
 ## 已完成：学习社群入口视觉对齐发现入口
 
 **完成时间**: 2026-06-14 22:09 +0800

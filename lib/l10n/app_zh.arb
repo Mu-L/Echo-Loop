@@ -128,6 +128,8 @@
   "collections": "合集",
   "collection": "合集",
   "createCollection": "创建合集",
+  "newCollectionOptionTitle": "新建合集",
+  "newCollectionOptionDescription": "手动添加音频或练习材料",
   "collectionName": "合集名称",
   "enterCollectionName": "请输入合集名称",
   "noCollectionsYet": "还没有合集",
@@ -1423,6 +1425,7 @@
   "cancelDownload": "取消下载",
 
   "subscribePodcast": "订阅 Podcast",
+  "subscribePodcastOptionDescription": "通过 Apple Podcasts 或 RSS 添加",
   "podcastUrlLabel": "Apple Podcasts 或 RSS 链接",
   "podcastUrlHint": "https://podcasts.apple.com/... 或 https://…/feed.xml",
   "podcastSubscribing": "正在获取 Podcast Feed…",

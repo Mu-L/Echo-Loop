@@ -169,6 +169,13 @@ void main() {
           find.byKey(const ValueKey('collection-option-podcast')),
           findsOneWidget,
         );
+        expect(find.text('New Collection'), findsOneWidget);
+        expect(
+          find.text('Add audio or practice materials manually'),
+          findsOneWidget,
+        );
+        expect(find.text('Subscribe Podcast'), findsOneWidget);
+        expect(find.text('Add with Apple Podcasts or RSS'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('collection-option-local')));
         await tester.pumpAndSettle();

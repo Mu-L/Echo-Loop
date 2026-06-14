@@ -156,6 +156,8 @@
   "collections": "Collections",
   "collection": "Collection",
   "createCollection": "Create Collection",
+  "newCollectionOptionTitle": "New Collection",
+  "newCollectionOptionDescription": "Add audio or practice materials manually",
   "collectionName": "Collection Name",
   "enterCollectionName": "Enter collection name",
   "noCollectionsYet": "No collections yet",
@@ -1796,6 +1798,7 @@
   "cancelDownload": "Cancel Download",
 
   "subscribePodcast": "Subscribe Podcast",
+  "subscribePodcastOptionDescription": "Add with Apple Podcasts or RSS",
   "podcastUrlLabel": "Apple Podcasts or RSS URL",
   "podcastUrlHint": "https://podcasts.apple.com/... or https://…/feed.xml",
   "podcastSubscribing": "Fetching podcast feed…",

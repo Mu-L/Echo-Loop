@@ -364,6 +364,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createCollection => '创建合集';
 
   @override
+  String get newCollectionOptionTitle => '新建合集';
+
+  @override
+  String get newCollectionOptionDescription => '手动添加音频或练习材料';
+
+  @override
   String get collectionName => '合集名称';
 
   @override
@@ -3534,6 +3540,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get subscribePodcast => '订阅 Podcast';
+
+  @override
+  String get subscribePodcastOptionDescription => '通过 Apple Podcasts 或 RSS 添加';
 
   @override
   String get podcastUrlLabel => 'Apple Podcasts 或 RSS 链接';

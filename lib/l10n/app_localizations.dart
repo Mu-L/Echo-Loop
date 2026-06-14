@@ -782,6 +782,18 @@ abstract class AppLocalizations {
   /// **'Create Collection'**
   String get createCollection;
 
+  /// No description provided for @newCollectionOptionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New Collection'**
+  String get newCollectionOptionTitle;
+
+  /// No description provided for @newCollectionOptionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Add audio or practice materials manually'**
+  String get newCollectionOptionDescription;
+
   /// No description provided for @collectionName.
   ///
   /// In en, this message translates to:
@@ -6565,6 +6577,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subscribe Podcast'**
   String get subscribePodcast;
+
+  /// No description provided for @subscribePodcastOptionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Add with Apple Podcasts or RSS'**
+  String get subscribePodcastOptionDescription;
 
   /// No description provided for @podcastUrlLabel.
   ///
