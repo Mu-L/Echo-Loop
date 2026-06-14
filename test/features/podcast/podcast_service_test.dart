@@ -171,6 +171,33 @@ void main() {
       );
     });
 
+    test('清洗 description 中的 HTML 标签和实体', () {
+      const xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>BBC Learning English</title>
+    <description><![CDATA[<p>Learn and practise useful English&nbsp;with clips from the BBC.</p><p>Each week, we talk about &amp; explain phrases.</p>]]></description>
+    <item>
+      <guid>ep-html</guid>
+      <title>How advertisers make us spend money</title>
+      <description><![CDATA[<p>What was the last thing you bought?<br/>And why?</p>]]></description>
+      <enclosure url="https://example.com/ep.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>''';
+
+      final result = parser.parse(xml, feedUrl: feedUrl);
+
+      expect(
+        result.meta.description,
+        'Learn and practise useful English with clips from the BBC. Each week, we talk about & explain phrases.',
+      );
+      expect(
+        result.episodes.single.description,
+        'What was the last thing you bought? And why?',
+      );
+    });
+
     test('无 guid 的 episode 被跳过', () {
       const xml = '''<?xml version="1.0"?>
 <rss><channel><title>Test</title>

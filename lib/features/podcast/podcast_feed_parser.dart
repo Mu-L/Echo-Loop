@@ -26,7 +26,7 @@ class PodcastFeedParser {
     final title = _text(channel, 'title') ?? '';
     final author =
         _text(channel, 'itunes:author') ?? _text(channel, 'managingEditor');
-    final description = _text(channel, 'description');
+    final description = _cleanText(_text(channel, 'description'));
     // RSS 2.0 image url 在 <image><url>；iTunes 在 <itunes:image href="...">
     final imageUrl =
         channel
@@ -44,9 +44,7 @@ class PodcastFeedParser {
       title: title,
       feedUrl: feedUrl,
       author: author?.trim().isEmpty == true ? null : author?.trim(),
-      description: description?.trim().isEmpty == true
-          ? null
-          : description?.trim(),
+      description: description?.trim().isEmpty == true ? null : description,
       imageUrl: imageUrl?.trim().isEmpty == true ? null : imageUrl?.trim(),
     );
   }
@@ -95,7 +93,31 @@ class PodcastFeedParser {
 
   String? _cleanText(String? raw) {
     final text = raw?.trim();
-    return text == null || text.isEmpty ? null : text;
+    if (text == null || text.isEmpty) return null;
+
+    // RSS 的 description 常混入 HTML 片段或 CDATA。这里在数据入口统一转成
+    // 纯文本，避免发现预览、本地合集详情和单集列表分别做 UI 层补丁。
+    final decodedText = _decodeHtmlEntities(text);
+    final withBreaks = decodedText
+        .replaceAll(RegExp(r'<\s*br\s*/?\s*>', caseSensitive: false), ' ')
+        .replaceAll(RegExp(r'<\s*/\s*p\s*>', caseSensitive: false), ' ')
+        .replaceAll(RegExp(r'<\s*/\s*div\s*>', caseSensitive: false), ' ')
+        .replaceAll(RegExp(r'<[^>]+>'), ' ');
+    final unescaped = _decodeHtmlEntities(withBreaks);
+    final normalized = unescaped.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  String _decodeHtmlEntities(String text) {
+    return text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&#160;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&apos;', "'");
   }
 
   DateTime? _parseDate(String? raw) {
