@@ -16,6 +16,7 @@
 - [x] 后续修复：Podcast RSS `description` / `itunes:summary` 清洗 HTML 标签和常见实体，避免预览页显示 `<p>...</p>`
 - [x] 后续修复：精选播客预览页“更多”详情复用现有 Podcast 详情底部弹窗样式，与已订阅合集详情保持一致
 - [x] 后续修复（2026-06-14 13:16 +0800）：发现页“精选播客”入口图标改为 `https://i.postimg.cc/tRPzG4zX/podcast.jpg`，加载失败保留原播客图标兜底
+- [x] 后续修复（2026-06-14 13:31 +0800）：精选播客预览页 episode 列表项强化标题字重与主色，meta/简介弱化为次级文字，提升标题和其它文字的区分度
 - [x] `app_router.dart`：新增 `/discover/podcasts` 与 `/discover/podcasts/:podcastId`
 - [x] i18n：中英文新增精选播客入口、预览错误、先添加提示等文案
 - [x] 测试：catalog 解析/缓存兼容、发现页入口、preview service 成功/失败、未添加 episode 提示、播客列表布局回归、路由常量
@@ -25,6 +26,8 @@
 - [x] `flutter test test/features/podcast/podcast_service_test.dart`：18 passed
 - [x] `flutter analyze lib/features/podcast/podcast_info_sheet.dart lib/features/official_collections/screens/official_podcast_preview_screen.dart test/features/official_collections/podcast_preview_provider_test.dart test/screens/collection_detail_screen_podcast_test.dart`：No issues found
 - [x] `flutter test test/features/official_collections/podcast_preview_provider_test.dart test/screens/collection_detail_screen_podcast_test.dart`：6 passed
+- [x] `flutter analyze lib/features/official_collections/screens/official_podcast_preview_screen.dart test/features/official_collections/podcast_preview_provider_test.dart`：No issues found
+- [x] `flutter test test/features/official_collections/podcast_preview_provider_test.dart`：6 passed
 - [ ] `scripts/check.sh`：未跑；本次为发现页 + Podcast 预览的局部功能接入，按规范仅运行直接相关检查
 
 ## 已完成：修复 CI 中 AI 转录过长测试 fixture

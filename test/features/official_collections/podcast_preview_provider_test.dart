@@ -163,6 +163,52 @@ void main() {
     expect(find.byType(AlertDialog), findsOneWidget);
   });
 
+  testWidgets('预览页 episode 标题比描述文字更突出', (tester) async {
+    final snapshot = makeSnapshot(
+      collections: const [],
+      podcastCatalogs: [makeCatalogPodcast(id: 'podcast-1')],
+    );
+
+    await tester.pumpWidget(
+      createTestApp(
+        const OfficialPodcastPreviewScreen(podcastId: 'podcast-1'),
+        overrides: [
+          officialCatalogServiceProvider.overrideWithValue(
+            _FakeCatalogService(snapshot),
+          ),
+          collectionListProvider.overrideWith(() => TestCollectionList()),
+          podcastPreviewProvider('podcast-1').overrideWith(
+            (ref) async => const PodcastPreviewData(
+              meta: PodcastFeedMeta(
+                title: '6 Minute English',
+                feedUrl: 'https://example.com/rss',
+              ),
+              episodes: [
+                PodcastEpisode(
+                  guid: 'ep-1',
+                  title: 'Episode One',
+                  enclosureUrl: 'https://example.com/ep1.mp3',
+                  enclosureType: 'audio/mpeg',
+                  description: 'Episode summary',
+                  durationSeconds: 360,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final theme = Theme.of(tester.element(find.text('Episode One')));
+    final title = tester.widget<Text>(find.text('Episode One'));
+    final description = tester.widget<Text>(find.text('Episode summary'));
+
+    expect(title.style?.fontWeight, FontWeight.w700);
+    expect(title.style?.color, theme.colorScheme.onSurface);
+    expect(description.style?.color, theme.colorScheme.onSurfaceVariant);
+  });
+
   testWidgets('预览页更多详情复用 Podcast 详情弹窗样式', (tester) async {
     final snapshot = makeSnapshot(
       collections: const [],

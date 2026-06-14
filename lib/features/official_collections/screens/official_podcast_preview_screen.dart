@@ -382,24 +382,45 @@ class _EpisodePreviewTile extends StatelessWidget {
     ].join(' · ');
     return ListTile(
       leading: Icon(Icons.graphic_eq, color: theme.colorScheme.outline),
-      title: Text(episode.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Column(
+      title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            episode.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              height: 1.18,
+            ),
+          ),
           if (meta.isNotEmpty)
-            Text(
-              meta,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                meta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                  height: 1.15,
+                ),
               ),
             ),
           if ((episode.description ?? '').isNotEmpty)
-            Text(
-              episode.description!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                episode.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.22,
+                ),
+              ),
             ),
         ],
       ),
