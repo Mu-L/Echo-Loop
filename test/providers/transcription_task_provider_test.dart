@@ -401,6 +401,84 @@ void main() {
       container.dispose();
     });
 
+    test('提交转录时使用 AudioItem.name 作为后端文件名', () async {
+      final audioItem = _testAudioItem(
+        name: 'Original Lecture.mp3',
+        audioPath: 'audios/imported/abc123def456.m4a',
+        audioSha256: 'abc123',
+      );
+
+      when(() => mockFileOps.getFileSize(any())).thenAnswer((_) async => 1024);
+      when(
+        () => mockApi.getUploadUrl(
+          sha256: any(named: 'sha256'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          accessToken: any(named: 'accessToken'),
+        ),
+      ).thenAnswer(
+        (_) async => const UploadUrlResponse(
+          audioExists: true,
+          objectName: 'user-audio/abc123.m4a',
+          publicUrl: 'https://example.com/abc123.m4a',
+        ),
+      );
+      when(
+        () => mockApi.submitTranscription(
+          sha256: any(named: 'sha256'),
+          fileName: any(named: 'fileName'),
+          objectName: any(named: 'objectName'),
+          publicUrl: any(named: 'publicUrl'),
+          mimeType: any(named: 'mimeType'),
+          fileSize: any(named: 'fileSize'),
+          language: any(named: 'language'),
+          accessToken: any(named: 'accessToken'),
+        ),
+      ).thenAnswer(
+        (_) async => SubmitTranscriptionResponse(
+          cached: true,
+          transcript: TranscriptResult(
+            sentences: [
+              TranscriptSentence(
+                text: 'Hello world',
+                startTime: Duration.zero,
+                endTime: const Duration(seconds: 2),
+              ),
+            ],
+            fullText: 'Hello world',
+          ),
+        ),
+      );
+
+      final container = _createContainer(
+        mockApi: mockApi,
+        mockFileOps: mockFileOps,
+        database: database,
+        audioItems: [audioItem],
+      );
+      await _seedAudioRows(database, [audioItem]);
+      final notifier = container.read(
+        transcriptionTaskManagerProvider.notifier,
+      );
+
+      await notifier.startTranscription(audioItem, 'en', accessToken: 'token');
+
+      verify(
+        () => mockApi.submitTranscription(
+          sha256: 'abc123',
+          fileName: 'Original Lecture.mp3',
+          objectName: 'user-audio/abc123.m4a',
+          publicUrl: 'https://example.com/abc123.m4a',
+          mimeType: 'audio/mp4',
+          fileSize: 1024,
+          language: 'en',
+          accessToken: 'token',
+        ),
+      ).called(1);
+
+      container.dispose();
+    });
+
     test('音频已缓存但字幕未缓存 — 跳过上传，创建 job', () async {
       final audioItem = _testAudioItem(audioSha256: 'abc123');
 

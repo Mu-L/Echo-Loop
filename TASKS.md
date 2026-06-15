@@ -3,6 +3,18 @@
 > 最后更新：2026-06-15
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：AI 转录提交原始音频名称
+
+**完成时间**: 2026-06-15 12:49 +0800
+
+AI 转录提交任务时不再把沙盒里的 `audios/imported/<hash>.m4a` basename 作为后端文件名，而是优先使用用户可见的 `AudioItem.name`；当名称异常为空时仍回退到实际路径 basename，避免后端缺少文件名。
+
+- [x] `transcription_task_provider.dart`：提交转录时使用 `AudioItem.name` 作为 `fileName`，空名称回退路径 basename
+- [x] `transcription_task_provider_test.dart`：覆盖 hash 沙盒路径下提交给后端的是原始音频名称
+- [x] `flutter analyze lib/providers/transcription_task_provider.dart test/providers/transcription_task_provider_test.dart`：No issues found
+- [x] `flutter test test/providers/transcription_task_provider_test.dart`：19 passed
+- [ ] `scripts/check.sh`：未跑；本次为 AI 转录提交参数局部修复，按规范仅运行直接相关检查
+
 ## 已完成：Podcast 合集列表展示刷新失败标记并统一详情状态
 
 **完成时间**: 2026-06-15 12:05 +0800

@@ -201,7 +201,7 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
 
       final submitResp = await api.submitTranscription(
         sha256: sha256,
-        fileName: p.basename(fullPath),
+        fileName: _displayFileNameForTranscription(audioItem, fullPath),
         objectName: uploadResp.objectName,
         publicUrl: uploadResp.publicUrl,
         mimeType: mimeType,
@@ -496,6 +496,18 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
 
     final dataDir = await fileOps.getDataDir();
     return p.join(dataDir.path, audioPath);
+  }
+
+  /// AI 转录提交给后端的文件名优先使用用户可见的音频名称。
+  ///
+  /// 本地导入/下载后的沙盒文件名可能是 SHA256，不能代表用户原始音频名称；
+  /// 异常空名称则回退到实际路径 basename，保证后端仍收到可用文件名。
+  String _displayFileNameForTranscription(
+    AudioItem audioItem,
+    String fullPath,
+  ) {
+    final displayName = audioItem.name.trim();
+    return displayName.isNotEmpty ? displayName : p.basename(fullPath);
   }
 
   /// 测试入口：根据文件扩展名推断 MIME 类型
