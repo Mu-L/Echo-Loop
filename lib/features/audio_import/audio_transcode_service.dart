@@ -55,8 +55,13 @@ class AudioTranscodeService {
     final output = File(outputPath);
 
     try {
+      // 全局选项（-nostdin/-y/-loglevel）必须在 -i 之前；放到 output 之后部分
+      // ffmpeg 版本会解析不到或当成下一个 output 的选项，行为不可靠。
       final session = await FFmpegKit.executeWithArguments([
+        '-nostdin',
         '-y',
+        '-loglevel',
+        'error',
         '-i',
         source.path,
         '-map',
@@ -74,9 +79,6 @@ class AudioTranscodeService {
         '-ar',
         '44100',
         output.path,
-        '-loglevel',
-        'error',
-        '-nostdin',
       ]);
       final returnCode = await session.getReturnCode();
       if (!ReturnCode.isSuccess(returnCode) || !await output.exists()) {
