@@ -7,7 +7,7 @@ import Foundation
 
 import app_links
 import audio_session
-import ffmpeg_kit_flutter_new_audio
+import ffmpeg_kit_flutter_new_min
 import file_picker
 import firebase_analytics
 import firebase_core
