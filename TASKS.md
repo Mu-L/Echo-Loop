@@ -3,6 +3,93 @@
 > 最后更新：2026-06-15
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：Podcast 合集列表展示刷新失败标记并统一详情状态
+
+**完成时间**: 2026-06-15 12:05 +0800
+
+Podcast 合集最近一次刷新失败时，合集列表 item 现在直接显示「刷新失败 / Refresh failed」标记，不再必须进入详情才知道 RSS 刷新异常；从合集列表菜单打开的详情弹窗也复用同一套刷新状态文案，与合集详情页顶部“更多”入口保持一致。
+
+- [x] `podcast_info_sheet.dart`：抽取 Podcast 刷新状态文案、刷新错误判断和列表失败短标记 helper
+- [x] `collection_screen.dart`：Podcast 合集 item 显示刷新失败 chip；列表菜单详情传入持久化刷新状态
+- [x] `collection_detail_screen.dart`：复用共享刷新状态 helper，避免不同入口文案漂移
+- [x] `collection_screen_test.dart`：覆盖刷新失败时列表显示标记，以及菜单详情展示失败状态和刷新时间
+- [x] `flutter analyze lib/features/podcast/podcast_info_sheet.dart lib/screens/collection_detail_screen.dart lib/screens/collection_screen.dart test/screens/collection_screen_test.dart test/screens/collection_detail_screen_podcast_test.dart`：No issues found
+- [x] `flutter test test/screens/collection_screen_test.dart test/screens/collection_detail_screen_podcast_test.dart`：20 passed
+- [x] 后续修复（2026-06-15 12:11 +0800）：将详情里的刷新状态收紧为单行显示，失败态只展示“失败 · 时间”，成功态仍保留原“上次刷新”显示
+- [ ] `scripts/check.sh`：未跑；本次为 Podcast 合集列表/详情局部 UI 状态修复，按规范仅运行直接相关检查
+
+## 已完成：Podcast 详情弹窗展示刷新状态
+
+**完成时间**: 2026-06-15 11:42 +0800
+
+Podcast 合集手动下拉强刷失败时，不再只依赖短暂 snackbar。`podcast_last_refreshed_at` 现在表示最后一次真实刷新时间（成功/失败都会写），新增 `podcast_last_refresh_error` 持久化最近刷新状态；详情底部弹窗展示最近刷新状态和刷新时间。
+
+- [x] `collections` schema v40：新增 `podcast_last_refresh_error`，并重新生成 Drift 代码
+- [x] `Collection` / `collection_provider.dart`：映射并写回 Podcast 最近刷新错误状态
+- [x] `podcast_repository.dart`：真实刷新成功时更新 `podcastLastRefreshedAt` 并清空错误，失败时同样更新 `podcastLastRefreshedAt` 并记录错误
+- [x] `collection_detail_screen.dart` / `podcast_info_sheet.dart`：详情弹窗展示持久化刷新状态；手动刷新进行中用页面内瞬时状态展示
+- [x] `collection_detail_screen_podcast_test.dart`：覆盖强刷失败后详情弹窗展示失败状态和刷新时间
+- [x] `podcast_service_test.dart`：覆盖刷新成功清空错误、刷新失败写入最后刷新时间和错误
+- [x] `dart run build_runner build --delete-conflicting-outputs`：成功生成 Drift/Riverpod 代码
+- [x] `flutter analyze lib/database/app_database.dart lib/database/app_database.g.dart lib/database/tables/collections.dart lib/models/collection.dart lib/providers/collection_provider.dart lib/features/podcast/podcast_repository.dart lib/features/podcast/podcast_info_sheet.dart lib/screens/collection_detail_screen.dart test/features/podcast/podcast_service_test.dart test/screens/collection_detail_screen_podcast_test.dart`：No issues found
+- [x] `flutter test test/features/podcast/podcast_service_test.dart test/screens/collection_detail_screen_podcast_test.dart`：27 passed
+- [ ] `scripts/check.sh`：未跑；本次为 Podcast 合集详情局部 UI 状态修复，按规范仅运行直接相关检查
+
+## 已完成：Podcast RSS 失效时 Apple lookup 兜底刷新
+
+**完成时间**: 2026-06-15 10:57 +0800
+
+已订阅 Podcast 刷新时仍优先使用本地保存的 `podcast_feed_url`，避免每次刷新都额外 lookup；当该 RSS 请求失败或解析失败，且 `podcast_input_url` 是 Apple Podcasts 链接时，会重新通过 Apple lookup 解析真实 RSS，并用新 RSS 重试一次。重试成功后更新合集的 `podcast_feed_url`，后续刷新直接使用新地址。
+
+- [x] `podcast_repository.dart`：刷新链路新增 Apple 输入 URL fallback，覆盖 RSS 请求失败和解析失败两类失效场景
+- [x] `podcast_service_test.dart`：补充旧 RSS 失败、Apple lookup 返回新 RSS、刷新成功并更新 `podcastFeedUrl` 的回归测试
+- [x] `flutter analyze lib/features/podcast/podcast_repository.dart test/features/podcast/podcast_service_test.dart`：No issues found
+- [x] `flutter test test/features/podcast/podcast_service_test.dart`：22 passed
+- [ ] `scripts/check.sh`：未跑；本次为 Podcast 刷新失败兜底的局部增强，按规范仅运行直接相关检查
+
+## 已完成：精选 Podcast 订阅保留 Apple 输入 URL
+
+**完成时间**: 2026-06-15 10:23 +0800
+
+从 `/api/v1/catalog` 的 `podcastCatalogs` 添加精选播客时，如果 catalog 同时提供 `applePodcastUrl` 与 `rssUrl`，订阅输入现在优先使用 Apple Podcasts 链接，RSS 链接仍由通用 Podcast 导入流程解析后写入 `podcast_feed_url`，避免 `podcast_input_url` 被错误保存成 RSS。
+
+- [x] `CatalogPodcast.subscriptionInputUrl`：集中封装 Apple 优先、RSS 兜底的订阅输入 URL 规则
+- [x] `official_podcast_list_screen.dart` / `official_podcast_preview_screen.dart`：精选播客列表页和预览页订阅入口统一使用该规则
+- [x] `official_catalog_service_test.dart`：覆盖 catalog 订阅输入 URL 选择逻辑
+- [x] `podcast_service_test.dart`：覆盖 Apple 输入创建合集时 `podcastInputUrl` 保留 Apple 链接、`podcastFeedUrl` 写入解析后的 RSS
+- [x] `flutter analyze lib/features/official_collections/models/catalog.dart lib/features/official_collections/screens/official_podcast_list_screen.dart lib/features/official_collections/screens/official_podcast_preview_screen.dart test/features/official_collections/official_catalog_service_test.dart test/features/podcast/podcast_service_test.dart`：No issues found
+- [x] `flutter test test/features/official_collections/official_catalog_service_test.dart test/features/podcast/podcast_service_test.dart`：30 passed
+- [ ] `scripts/check.sh`：未跑；本次为精选 Podcast 订阅 URL 选择的局部修复，按规范仅运行直接相关检查
+
+## 已完成：用户音频统一转码为 m4a
+
+**完成时间**: 2026-06-15 10:00 +0800
+
+用户本地导入、链接导入和 Podcast 单集下载都先尝试转码为 mono 44.1kHz AAC 64k `.m4a` 再保存；转码失败时会自动回退到原始音频文件，不阻断导入流程。
+
+- [x] 新增 `AudioTranscodeService`，使用 `ffmpeg_kit_flutter_new_audio` 按 `convert-to-m4a` 默认参数转码
+- [x] 本地导入、链接导入和 Podcast 下载链路接入统一转码，失败时回退原始音频
+- [x] Android 最低版本提升到 API 24，iOS 最低版本提升到 14.0，满足插件平台要求
+- [x] 补充导入/下载相关测试，覆盖转码成功、失败回退与 Podcast 下载结果路径
+- [x] 新增短静音常见格式 fixture（wav/mp3/m4a/aac/flac）和带封面图 MP3 fixture，macOS integration smoke test 验证真实 ffmpeg 插件可转码为可读取 m4a
+- [x] `flutter analyze lib/features/audio_import/audio_import_service.dart lib/features/audio_import/audio_transcode_service.dart lib/widgets/add_audio_dialog.dart test/features/audio_import/audio_import_service_test.dart test/features/audio_import/podcast_episode_download_test.dart`：No issues found
+- [x] `flutter test test/features/audio_import/audio_import_service_test.dart test/features/audio_import/podcast_episode_download_test.dart`：12 passed
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：13 passed
+- [x] `flutter analyze integration_test/audio_transcode_integration_test.dart lib/features/audio_import/audio_transcode_service.dart`：No issues found
+- [x] 后续修复：Podcast MP3 带封面图时，audio 版 ffmpeg 会尝试编码 h264 并失败；转码命令改为显式 `-map 0:a:0`，只输出第一条音频流
+- [x] 后续修复：下载/本地导入改为两阶段落盘，原始文件先进入 `tmp/audio_import`，转码或回退决策完成后才移动最终文件到正式音频目录，避免 `audios/imported` 出现中间态 mp3
+- [x] `flutter analyze lib/features/audio_import/audio_import_service.dart lib/features/audio_import/audio_transcode_service.dart lib/widgets/add_audio_dialog.dart test/features/audio_import/audio_import_service_test.dart test/features/audio_import/podcast_episode_download_test.dart integration_test/audio_transcode_integration_test.dart`：No issues found
+- [x] `flutter test test/features/audio_import/audio_import_service_test.dart test/features/audio_import/podcast_episode_download_test.dart test/widgets/import_audio_sheet_test.dart`：24 passed
+- [x] `flutter test integration_test/audio_transcode_integration_test.dart -d macos`：1 passed（覆盖带封面图 MP3；真实加载 ffmpeg-kit macOS 插件；仅有既有依赖 warning）
+- [x] 后续加固：`.m4a` 源文件替换改为先备份再替换，避免转码成功后因 rename 失败先删原文件
+- [x] 后续加固：下载/本地导入的正式落盘在 rename/copy 失败时清理半成品并抛 storage 错误，避免返回损坏路径
+- [x] 后续加固（2026-06-15 11:45 +0800）：用户本地导入、链接导入和 Podcast 单集下载改为使用最终音频 SHA256 作为沙盒文件名；相同 hash 只复用底层音频文件，不复用 `AudioItem`，不同合集可各自创建独立音频条目；同名不同 hash 可共存
+- [x] `flutter analyze lib/features/audio_import/audio_import_service.dart lib/features/audio_import/audio_registration_service.dart lib/widgets/add_audio_dialog.dart test/features/audio_import/audio_import_service_test.dart`：No issues found
+- [x] `flutter test test/features/audio_import/audio_import_service_test.dart`：12 passed
+- [x] `flutter test test/widgets/import_audio_sheet_test.dart`：12 passed
+- [x] `flutter test test/features/audio_import/podcast_episode_download_test.dart`：3 passed
+- [ ] `scripts/check.sh`：未跑；本次为音频导入/下载链路局部改动，按规范仅运行直接相关检查
+
 ## 已完成：字幕编辑器句子编号
 
 **完成时间**: 2026-06-15 09:01 +0800
