@@ -103,6 +103,16 @@ class CatalogPodcast {
       description: json['description'] as String?,
     );
   }
+
+  /// 订阅时提交给通用 Podcast 导入流程的原始输入 URL。
+  ///
+  /// catalog 同时给出 Apple Podcasts 和 RSS 时，优先保留 Apple 链接作为
+  /// `podcast_input_url`；RSS 由导入流程解析后写入 `podcast_feed_url`。
+  String get subscriptionInputUrl {
+    final appleUrl = applePodcastUrl.trim();
+    if (appleUrl.isNotEmpty) return appleUrl;
+    return rssUrl.trim();
+  }
 }
 
 /// catalog 的本地内存快照。

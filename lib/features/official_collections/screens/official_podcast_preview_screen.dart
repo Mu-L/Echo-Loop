@@ -220,7 +220,7 @@ class _OfficialPodcastPreviewScreenState
     try {
       final collection = await ref
           .read(podcastRepositoryProvider)
-          .createAndFetch(_subscriptionUrl(podcast));
+          .createAndFetch(podcast.subscriptionInputUrl);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -249,12 +249,6 @@ class _OfficialPodcastPreviewScreenState
     } finally {
       if (mounted) setState(() => _subscribing = false);
     }
-  }
-
-  String _subscriptionUrl(CatalogPodcast podcast) {
-    final rssUrl = podcast.rssUrl.trim();
-    if (rssUrl.isNotEmpty) return rssUrl;
-    return podcast.applePodcastUrl;
   }
 
   String _formatPreviewError(Object error) {

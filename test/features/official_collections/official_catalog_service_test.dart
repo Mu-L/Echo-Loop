@@ -167,6 +167,27 @@ void main() {
     expect(cached?.podcastCatalogs.single.rssUrl, contains('p02pc9tn.rss'));
   });
 
+  test('CatalogPodcast 订阅输入 URL 优先保留 Apple Podcasts 链接', () {
+    final withApple = makeCatalogPodcast(
+      applePodcastUrl:
+          ' https://podcasts.apple.com/us/podcast/6-minute-english/id262026947 ',
+      rssUrl: ' https://podcasts.files.bbci.co.uk/p02pc9tn.rss ',
+    );
+    final rssOnly = makeCatalogPodcast(
+      applePodcastUrl: ' ',
+      rssUrl: ' https://podcasts.files.bbci.co.uk/p02pc9tn.rss ',
+    );
+
+    expect(
+      withApple.subscriptionInputUrl,
+      'https://podcasts.apple.com/us/podcast/6-minute-english/id262026947',
+    );
+    expect(
+      rssOnly.subscriptionInputUrl,
+      'https://podcasts.files.bbci.co.uk/p02pc9tn.rss',
+    );
+  });
+
   test('旧 catalog body 缺少 podcastCatalogs 时按空列表兼容', () async {
     const body = '''
 {
