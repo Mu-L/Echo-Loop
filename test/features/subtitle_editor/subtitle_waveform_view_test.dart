@@ -662,6 +662,38 @@ void main() {
       audioEngine.disposeController();
     });
 
+    testWidgets('句子编号复用左侧播放区，不增加布局宽度', (tester) async {
+      final audioEngine = _ScreenTestAudioEngine(
+        duration: const Duration(seconds: 10),
+        sentences: _sentences(),
+      );
+
+      await tester.pumpWidget(
+        createTestScreen(
+          SubtitleSimpleEditorScreen(audioItem: createTestAudioItem()),
+          overrides: [audioEngineProvider.overrideWith(() => audioEngine)],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      for (var i = 0; i < 3; i++) {
+        final numberFinder = find.byKey(
+          ValueKey('subtitle-sentence-number-$i'),
+        );
+        expect(numberFinder, findsOneWidget);
+        expect(tester.widget<Text>(numberFinder).data, '${i + 1}');
+      }
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('subtitle-sentence-play-0')))
+            .width,
+        52,
+      );
+
+      audioEngine.disposeController();
+    });
+
     testWidgets('波形下方显示缩放和速度控制', (tester) async {
       final audioEngine = _ScreenTestAudioEngine(
         duration: const Duration(seconds: 10),

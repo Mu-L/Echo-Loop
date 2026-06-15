@@ -3,6 +3,18 @@
 > 最后更新：2026-06-15
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：字幕编辑器句子编号
+
+**完成时间**: 2026-06-15 09:01 +0800
+
+字幕编辑器句子列表左侧播放区新增弱化句子编号，编号复用原 52px 播放操作区，不新增列、不挤占字幕文本和右侧菜单空间，让用户能直接知道当前是第几句。
+
+- [x] `subtitle_simple_editor_screen.dart`：在句子播放按钮区域内叠加 `1/2/3...` 编号，保留原播放/停止图标和点击区域
+- [x] `subtitle_waveform_view_test.dart`：补充编号显示回归测试，并断言左侧播放区宽度仍为 52px
+- [x] `flutter analyze lib/features/subtitle_editor/subtitle_simple_editor_screen.dart test/features/subtitle_editor/subtitle_waveform_view_test.dart`：No issues found
+- [x] `flutter test test/features/subtitle_editor/subtitle_waveform_view_test.dart`：20 passed
+- [ ] `scripts/check.sh`：未跑；本次为字幕编辑器句子行局部 UI 调整，按规范仅运行直接相关检查
+
 ## 已完成：Podcast 合集详情 RSS 链接去重
 
 **完成时间**: 2026-06-15 08:43 +0800

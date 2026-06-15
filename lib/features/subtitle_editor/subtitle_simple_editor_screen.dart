@@ -572,12 +572,35 @@ class _SentenceListState extends State<_SentenceList> {
             child: InkWell(
               key: ValueKey('subtitle-sentence-play-$index'),
               onTap: isPlaying ? widget.onStop : () => widget.onPlay(index),
-              child: Center(
-                child: Icon(
-                  isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                  // 播放中用 primary 实色单点强调，区别于「仅选中定位」的行底高亮
-                  color: isPlaying ? theme.colorScheme.primary : null,
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: Icon(
+                      isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                      // 播放中用 primary 实色单点强调，区别于「仅选中定位」的行底高亮
+                      color: isPlaying ? theme.colorScheme.primary : null,
+                    ),
+                  ),
+                  Positioned(
+                    top: 5,
+                    left: 0,
+                    right: 0,
+                    child: Text(
+                      key: ValueKey('subtitle-sentence-number-$index'),
+                      '${index + 1}',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        height: 1,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: .62,
+                        ),
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
