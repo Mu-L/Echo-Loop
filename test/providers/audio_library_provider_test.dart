@@ -171,5 +171,21 @@ void main() {
       expect(await file.exists(), isFalse);
       expect(container.read(audioLibraryProvider).audioItems, isEmpty);
     });
+
+    test('删除音频时一并删除对应 waveform 文件', () async {
+      final audioFile = File('${tempDir.path}/audios/imported/a.m4a');
+      await audioFile.create(recursive: true);
+      await audioFile.writeAsString('audio');
+      final waveFile = File('${tempDir.path}/waveforms/wave-1.wave');
+      await waveFile.create(recursive: true);
+      await waveFile.writeAsString('wave');
+      final notifier = container.read(audioLibraryProvider.notifier);
+      await notifier.addAudioItems([item('wave-1', 'audios/imported/a.m4a')]);
+
+      await notifier.removeAudioItems({'wave-1'});
+
+      expect(await audioFile.exists(), isFalse);
+      expect(await waveFile.exists(), isFalse);
+    });
   });
 }

@@ -70,6 +70,49 @@ void main() {
       expect(missing, isNull);
     });
 
+    test('getAllReferencedRelPaths 含软删行、忽略空路径', () async {
+      final now = DateTime.now();
+      // 活跃行：音频 + 字幕路径
+      await db.audioItemDao.upsert(
+        AudioItemsCompanion(
+          id: Value('a'),
+          name: Value('A'),
+          audioPath: Value('audios/imported/a.mp3'),
+          transcriptPath: Value('transcripts/a.srt'),
+          addedDate: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+      // 软删行：文件仍应被视为「被引用」，不能当孤儿删
+      await db.audioItemDao.upsert(
+        AudioItemsCompanion(
+          id: Value('b'),
+          name: Value('B'),
+          audioPath: Value('audios/official/b.m4a'),
+          addedDate: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+      await db.audioItemDao.softDelete('b');
+      // 无路径行：应被忽略
+      await db.audioItemDao.upsert(
+        AudioItemsCompanion(
+          id: Value('c'),
+          name: Value('C'),
+          addedDate: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      final paths = await db.audioItemDao.getAllReferencedRelPaths();
+
+      expect(paths, {
+        'audios/imported/a.mp3',
+        'transcripts/a.srt',
+        'audios/official/b.m4a',
+      });
+    });
+
     test('upsert 更新已存在的音频项', () async {
       final now = DateTime.now();
       await db.audioItemDao.upsert(
