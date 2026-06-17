@@ -3,6 +3,18 @@
 > 最后更新：2026-06-17（v41→v42 迁移：清理仍停在 v1 盲听首步的存量进度，改用 v2 流程）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：自由练习全能播放器复用盲听句子列表组件
+
+自由练习「全能播放器」(`PlayerScreen`) 原用自有 `SentenceListView`（整条点击=播放、右侧书签切换按钮、显示时间范围）。改为复用全文盲听的共享组件 `ParagraphSentenceListCard`/`MaskedSentenceTile`，统一交互：点击左侧编号区从该句继续播放、点击句子主体进讲解页、内置「尊重用户手动滚动」的自动跟随。约束：仅共享句子列表组件，不共享 provider/controller，不给共享组件加新职责。
+
+- [x] `player_screen.dart`：`_buildFullTextTab`/`_buildBookmarkedTab` 用 `ParagraphSentenceListCard` 替换 `SentenceListView`。全文 tab `playingSentenceIndex=currentFullIndex`（列表位置==index）；收藏 tab 把 `currentBookmarkIndex` 换算成收藏子集本地位置。`displayMode` 由 `settings.showTranscript` 映射 showAll/hideAll。`autoFocusEnabled=autoScrollEnabled`。
+- [x] `player_screen.dart`：新增 `_handleSentenceDetail`（仿盲听、本页持有不共享）——`_isNavigatingToDetail` 防重入 → `pause()` → `context.push(AppRoutes.sentenceDetail, extra: SentenceDetailArgs(...))` → 返回后 `syncBookmarks()` 刷新收藏标记与「收藏(n)」计数。移除原 `onUserScroll→setAutoScroll(false)` 桥接（共享组件自管理）。删除 `_buildSingleSentenceView` 中遗留未用的 `l10n`。
+- [x] 删除死代码 `lib/widgets/sentence_list_view.dart` 及 `test/widgets/sentence_list_view_test.dart`（仅 PlayerScreen 引用）。
+- [x] 行为变化：列表内不再有内联书签切换（收藏改到讲解页完成）、不再显示时间范围、不再支持长按文本选择菜单（单句模式视图仍保留自带菜单）。
+- [x] 测试：`test/helpers/test_app.dart` 加 `/sentence-detail` stub 路由；重写 `player_screen_test.dart` 列表渲染断言（改查共享组件类型）、`play_arrow` 断言限定在 `PlaybackControls` 内（当前播放句编号区也渲染 ▶）；新增「点击编号区从该句播放」「点击主体进讲解页」两个交互用例。`flutter analyze` 改动文件 0 issue。
+
+  **完成时间**: 2026-06-17
+
 ## 已完成：修复未开始音频仍显示旧版首次学习流程（盲听优先）
 
 v33→v34 迁移把所有存量 audio 的 firstLearn 一律锁 v1。v2（盲听后置）上线后，一个**在旧版打开过学习计划页、被建了进度行但从未真正开始学习**的音频被永久锁在 v1 顺序（全文盲听排第一）。新增一次性迁移直接清空这类进度行——删除后无进度行 → plan 回退 `kLatestPlanVersions`（firstLearn=2）→ 显示新版流程；重新打开时 `ensureProgress` 建全新 v2 进度。

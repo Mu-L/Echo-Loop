@@ -8,6 +8,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/screens/player_screen.dart';
+import 'package:echo_loop/widgets/common/paragraph_sentence_list_card.dart';
+import 'package:echo_loop/widgets/common/masked_sentence_tile.dart';
+import 'package:echo_loop/widgets/playback_controls.dart';
 import 'package:echo_loop/models/audio_engine_state.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
@@ -118,7 +121,7 @@ void main() {
         await _disposeTree(tester);
       });
 
-      testWidgets('句子列表正确显示', (tester) async {
+      testWidgets('句子列表复用盲听共享组件渲染', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
 
@@ -136,10 +139,9 @@ void main() {
         );
         await tester.pump();
 
-        // 句子文本
-        expect(find.text('Test sentence number 1.'), findsOneWidget);
-        expect(find.text('Test sentence number 2.'), findsOneWidget);
-        expect(find.text('Test sentence number 3.'), findsOneWidget);
+        // 列表改用共享组件 ParagraphSentenceListCard + MaskedSentenceTile
+        expect(find.byType(ParagraphSentenceListCard), findsOneWidget);
+        expect(find.byType(MaskedSentenceTile), findsNWidgets(3));
         await _disposeTree(tester);
       });
 
@@ -161,8 +163,15 @@ void main() {
         );
         await tester.pump();
 
-        // 播放控制栏应存在
-        expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+        // 播放控制栏应存在（play_arrow 限定在 PlaybackControls 内，
+        // 因为当前播放句的编号区也会渲染 play_arrow）
+        expect(
+          find.descendant(
+            of: find.byType(PlaybackControls),
+            matching: find.byIcon(Icons.play_arrow),
+          ),
+          findsOneWidget,
+        );
         expect(find.byIcon(Icons.skip_previous), findsOneWidget);
         expect(find.byIcon(Icons.skip_next), findsOneWidget);
         await _disposeTree(tester);
@@ -172,16 +181,7 @@ void main() {
         await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pump();
 
-        expect(find.byIcon(Icons.settings), findsOneWidget);
-        await _disposeTree(tester);
-      });
-
-      testWidgets('AppBar 显示自动滚动切换按钮', (tester) async {
-        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
-        await tester.pump();
-
-        // 默认启用自动滚动
-        expect(find.byIcon(Icons.center_focus_strong), findsOneWidget);
+        expect(find.byIcon(Icons.tune), findsOneWidget);
         await _disposeTree(tester);
       });
 
@@ -213,7 +213,7 @@ void main() {
         await tester.pump();
 
         // 点击设置按钮
-        await tester.tap(find.byIcon(Icons.settings));
+        await tester.tap(find.byIcon(Icons.tune));
         await tester.pump();
 
         // 应弹出 SettingsDialog
@@ -249,6 +249,116 @@ void main() {
 
         // 应显示无书签提示
         expect(find.text('No bookmarked sentences'), findsOneWidget);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('点击句子编号区从该句开始播放', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _audioOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // 初始：第 1 句播放（编号区显示 ▶），第 2 句编号区显示 '2'
+        expect(find.text('2'), findsOneWidget);
+        expect(find.text('1'), findsNothing);
+
+        // 点击第 2 句编号区 → selectFullSentence(1) → currentFullIndex=1
+        await tester.tap(find.text('2'));
+        await tester.pump();
+
+        // 第 2 句变为播放（▶），第 1 句编号区恢复显示 '1'
+        expect(find.text('1'), findsOneWidget);
+        expect(find.text('2'), findsNothing);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('点击句子主体进入讲解页', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _audioOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // 点击第 1 句主体区（tile 中心落在文本区，非左侧编号区）
+        await tester.tap(find.byType(MaskedSentenceTile).first);
+        await tester.pumpAndSettle();
+
+        // 导航到讲解页 stub
+        expect(find.text('Sentence Detail'), findsOneWidget);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('进讲解页挂起 LP 监听、返回后恢复，currentFullIndex 不被重置', (
+        tester,
+      ) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        // 预构建 notifier 实例，便于读取 suspend/resume 调用计数
+        final practice = TestListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 1, // 非 0，验证返回后不会被抹成 0
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+              collectionListProvider.overrideWith(() => TestCollectionList()),
+              listeningPracticeProvider.overrideWith(() => practice),
+              audioEngineProvider.overrideWith(
+                () => TestAudioEngine(
+                  initialState: const AudioEngineState(
+                    totalDuration: Duration(seconds: 120),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+
+        // 点击句子 → 导航前应已挂起监听，尚未恢复
+        await tester.tap(find.byType(MaskedSentenceTile).first);
+        await tester.pumpAndSettle();
+        expect(find.text('Sentence Detail'), findsOneWidget);
+        expect(practice.suspendListenersCallCount, 1);
+        expect(practice.resumeListenersCallCount, 0);
+
+        // 返回 free player → 恢复监听
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(practice.resumeListenersCallCount, 1);
+
+        // currentFullIndex 未被重置为 0（修复点：避免主播放按钮跳回第一句）
+        expect(practice.state.currentFullIndex, 1);
         await _disposeTree(tester);
       });
     });

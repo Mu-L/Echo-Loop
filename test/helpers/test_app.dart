@@ -344,6 +344,11 @@ GoRouter createTestRouter(Widget screen) {
         builder: (context, state) => const Scaffold(body: Text('Settings')),
       ),
       GoRoute(
+        path: '/sentence-detail',
+        builder: (context, state) =>
+            const Scaffold(body: Text('Sentence Detail')),
+      ),
+      GoRoute(
         path: '/collections/:collectionId',
         builder: (context, state) =>
             const Scaffold(body: Text('Collection Detail')),

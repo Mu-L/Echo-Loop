@@ -123,7 +123,7 @@ class AppTheme {
         backgroundColor: isLight ? _scaffoldBg : _pureBlack,
         foregroundColor: colorScheme.onSurface,
         titleTextStyle: TextStyle(
-          fontSize: 20,
+          fontSize: 17,
           fontWeight: FontWeight.bold,
           color: colorScheme.onSurface,
         ),

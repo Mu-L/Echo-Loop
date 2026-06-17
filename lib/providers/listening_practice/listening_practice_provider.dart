@@ -164,8 +164,6 @@ class ListeningPractice extends _$ListeningPractice {
     AudioItem audioItem, {
     bool forceTranscriptReload = false,
   }) async {
-    state = state.copyWith(autoScrollEnabled: true);
-
     // 同一音频且字幕未变化时跳过。
     // 字幕内容入库后 transcriptPath 恒为 null，无法再作为「字幕是否变化」的信号；
     // 故同时比较 transcriptSource，以捕捉「新增字幕(null→source)/删除字幕(source→null)」。
@@ -499,8 +497,6 @@ class ListeningPractice extends _$ListeningPractice {
       await pause();
     }
 
-    state = state.copyWith(autoScrollEnabled: true);
-
     // 清除 clip 状态
     await _engine.clearClip();
     await _engine.seek(absolutePosition);
@@ -648,13 +644,11 @@ class ListeningPractice extends _$ListeningPractice {
       state = state.copyWith(
         currentBookmarkIndex: newIndex,
         lastPlayedBookmarkIndex: newIndex,
-        autoScrollEnabled: true,
       );
     } else {
       state = state.copyWith(
         currentFullIndex: newIndex,
         lastPlayedFullIndex: newIndex,
-        autoScrollEnabled: true,
       );
     }
 
@@ -697,13 +691,11 @@ class ListeningPractice extends _$ListeningPractice {
       state = state.copyWith(
         currentBookmarkIndex: newIndex,
         lastPlayedBookmarkIndex: newIndex,
-        autoScrollEnabled: true,
       );
     } else {
       state = state.copyWith(
         currentFullIndex: newIndex,
         lastPlayedFullIndex: newIndex,
-        autoScrollEnabled: true,
       );
     }
 
@@ -856,10 +848,6 @@ class ListeningPractice extends _$ListeningPractice {
       await pause();
       await play();
     }
-  }
-
-  void setAutoScroll(bool enabled) {
-    state = state.copyWith(autoScrollEnabled: enabled);
   }
 
   Future<void> setPlaylistMode(PlaylistMode mode) async {

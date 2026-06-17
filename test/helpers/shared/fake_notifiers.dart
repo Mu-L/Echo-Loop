@@ -464,11 +464,6 @@ class FakeListeningPractice extends ListeningPractice {
   }
 
   @override
-  void setAutoScroll(bool enabled) {
-    state = state.copyWith(autoScrollEnabled: enabled);
-  }
-
-  @override
   Future<void> setPlaylistMode(PlaylistMode mode) async {
     state = state.copyWith(playlistMode: mode);
   }
@@ -476,11 +471,21 @@ class FakeListeningPractice extends ListeningPractice {
   @override
   Future<void> saveCurrentPlaybackState() async {}
 
-  @override
-  void suspendListeners() {}
+  /// suspendListeners 调用次数（测试断言用）
+  int suspendListenersCallCount = 0;
+
+  /// resumeListeners 调用次数（测试断言用）
+  int resumeListenersCallCount = 0;
 
   @override
-  void resumeListeners() {}
+  void suspendListeners() {
+    suspendListenersCallCount++;
+  }
+
+  @override
+  void resumeListeners() {
+    resumeListenersCallCount++;
+  }
 
   @override
   Future<void> syncBookmarks() async {}

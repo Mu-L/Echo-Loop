@@ -14,7 +14,6 @@ class ListeningPracticeState {
   final PlaybackSettings settings;
   final PlaylistMode playlistMode;
   final Set<int> bookmarkedIndices;
-  final bool autoScrollEnabled;
   final bool isLoading;
 
   const ListeningPracticeState({
@@ -27,7 +26,6 @@ class ListeningPracticeState {
     this.settings = const PlaybackSettings(),
     this.playlistMode = PlaylistMode.full,
     this.bookmarkedIndices = const {},
-    this.autoScrollEnabled = true,
     this.isLoading = false,
   });
 
@@ -58,7 +56,6 @@ class ListeningPracticeState {
     PlaybackSettings? settings,
     PlaylistMode? playlistMode,
     Set<int>? bookmarkedIndices,
-    bool? autoScrollEnabled,
     bool? isLoading,
   }) {
     return ListeningPracticeState(
@@ -81,7 +78,6 @@ class ListeningPracticeState {
       settings: settings ?? this.settings,
       playlistMode: playlistMode ?? this.playlistMode,
       bookmarkedIndices: bookmarkedIndices ?? this.bookmarkedIndices,
-      autoScrollEnabled: autoScrollEnabled ?? this.autoScrollEnabled,
       isLoading: isLoading ?? this.isLoading,
     );
   }

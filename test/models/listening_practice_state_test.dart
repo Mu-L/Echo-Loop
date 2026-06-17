@@ -38,7 +38,6 @@ void main() {
         expect(state.settings, isA<PlaybackSettings>());
         expect(state.playlistMode, PlaylistMode.full);
         expect(state.bookmarkedIndices, isEmpty);
-        expect(state.autoScrollEnabled, isTrue);
         expect(state.isLoading, isFalse);
       });
     });
@@ -60,7 +59,6 @@ void main() {
         expect(copied.isLoading, isTrue);
         // 未修改保持原值
         expect(copied.playlistMode, PlaylistMode.full);
-        expect(copied.autoScrollEnabled, isTrue);
       });
     });
 

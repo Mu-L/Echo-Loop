@@ -4,17 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_io/io.dart' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../l10n/app_localizations.dart';
+import '../models/retell_settings.dart';
+import '../models/sentence.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/audio_engine/audio_engine_provider.dart';
+import '../providers/collection_provider.dart';
+import '../router/app_router.dart';
 import '../services/subtitle_parser.dart';
 import '../theme/app_theme.dart';
 import '../widgets/playback_controls.dart';
-import '../widgets/sentence_list_view.dart';
+import '../widgets/common/paragraph_sentence_list_card.dart';
+import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/settings_dialog.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/common/text_context_menu.dart';
+import 'sentence_detail_screen.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -27,6 +34,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _previousTabIndex = 0;
+
+  /// 防止进入讲解页重入（点击主体区 → pause + 导航）
+  bool _isNavigatingToDetail = false;
 
   @override
   void initState() {
@@ -87,19 +97,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(playerState.currentAudioItem?.name ?? l10n.player),
+          titleSpacing: 0,
+          title: _buildAppBarTitle(playerState, l10n),
           actions: [
             IconButton(
-              icon: Icon(
-                playerState.autoScrollEnabled
-                    ? Icons.center_focus_strong
-                    : Icons.center_focus_weak,
-              ),
-              onPressed: () =>
-                  controller.setAutoScroll(!playerState.autoScrollEnabled),
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.tune),
               onPressed: () => _showSettingsDialog(context),
             ),
           ],
@@ -108,6 +110,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             ? Center(child: Text(l10n.noAudioLoaded))
             : _buildLayout(context, playerState),
       ),
+    );
+  }
+
+  /// AppBar 标题：音频名为主标题，下方附带所属合集副标题。
+  /// 与学习计划页共用 [AudioAppBarTitle] 且合集名同源（按音频 id 查
+  /// [collectionListProvider] 的 audioToCollectionsMap），保证两页一致。
+  Widget _buildAppBarTitle(
+    ListeningPracticeState playerState,
+    AppLocalizations l10n,
+  ) {
+    final audioItem = playerState.currentAudioItem;
+    final audioName = audioItem?.name ?? l10n.player;
+    final collectionNames = audioItem == null
+        ? const <String>[]
+        : ref.watch(
+            collectionListProvider.select((s) {
+              final ids = s.audioToCollectionsMap[audioItem.id] ?? const [];
+              if (ids.isEmpty) return const <String>[];
+              final idSet = ids.toSet();
+              return s.collections
+                  .where((c) => idSet.contains(c.id))
+                  .map((c) => c.name)
+                  .toList(growable: false);
+            }),
+          );
+
+    return AudioAppBarTitle(
+      audioName: audioName,
+      collectionNames: collectionNames,
     );
   }
 
@@ -229,15 +260,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         controller.selectFullSentence(0, autoPlay: false);
       });
     }
-    return SentenceListView(
+    // 全文列表中 sentence.index == 列表位置，currentFullIndex 即本地位置索引
+    return ParagraphSentenceListCard(
       sentences: playerState.sentences,
-      currentIndex: playerState.currentFullIndex,
-      bookmarkedIndices: playerState.bookmarkedIndices,
-      showTranscript: playerState.settings.showTranscript,
-      autoScrollEnabled: playerState.autoScrollEnabled,
-      onSentenceTap: (index) => controller.selectFullSentence(index),
-      onBookmarkToggle: (index) => controller.toggleBookmark(index),
-      onUserScroll: () => controller.setAutoScroll(false),
+      displayMode: playerState.settings.showTranscript
+          ? RetellDisplayMode.showAll
+          : RetellDisplayMode.hideAll,
+      keywordMap: const {},
+      playingSentenceIndex: playerState.currentFullIndex ?? -1,
+      autoFocusEnabled: true,
+      bookmarkedSentenceIndices: playerState.bookmarkedIndices,
+      onSentencePlayFrom: (s) => controller.selectFullSentence(s.index),
+      onSentenceTap: _handleSentenceDetail,
     );
   }
 
@@ -319,15 +353,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         );
       });
     }
-    return SentenceListView(
+    // 收藏子集中列表位置 ≠ 全局 index，需将 currentBookmarkIndex 换算成本地位置
+    final playingLocalIndex = bookmarkedSentences.indexWhere(
+      (s) => s.index == playerState.currentBookmarkIndex,
+    );
+    return ParagraphSentenceListCard(
       sentences: bookmarkedSentences,
-      currentIndex: playerState.currentBookmarkIndex,
-      bookmarkedIndices: playerState.bookmarkedIndices,
-      showTranscript: playerState.settings.showTranscript,
-      autoScrollEnabled: playerState.autoScrollEnabled,
-      onSentenceTap: (index) => controller.selectBookmarkedSentence(index),
-      onBookmarkToggle: (index) => controller.toggleBookmark(index),
-      onUserScroll: () => controller.setAutoScroll(false),
+      displayMode: playerState.settings.showTranscript
+          ? RetellDisplayMode.showAll
+          : RetellDisplayMode.hideAll,
+      keywordMap: const {},
+      playingSentenceIndex: playingLocalIndex,
+      autoFocusEnabled: true,
+      bookmarkedSentenceIndices: playerState.bookmarkedIndices,
+      onSentencePlayFrom: (s) => controller.selectBookmarkedSentence(s.index),
+      onSentenceTap: _handleSentenceDetail,
     );
   }
 
@@ -336,7 +376,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     ListeningPractice controller,
     int index,
   ) {
-    final l10n = AppLocalizations.of(context)!;
     final currentSentence = playerState.sentences[index];
     final isBookmarked = playerState.bookmarkedIndices.contains(
       currentSentence.index,
@@ -430,6 +469,54 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         ),
       ),
     );
+  }
+
+  /// 点击句子主体 → 暂停播放 → 进入句子讲解页
+  ///
+  /// 与盲听任务行为一致：导航前停止音频，返回后同步收藏状态。
+  /// 仅本页持有，不与盲听共享（共享面只到句子列表组件）。
+  Future<void> _handleSentenceDetail(Sentence sentence) async {
+    if (_isNavigatingToDetail) return;
+    _isNavigatingToDetail = true;
+
+    final controller = ref.read(listeningPracticeProvider.notifier);
+    final playerState = ref.read(listeningPracticeProvider);
+    final audioItem = playerState.currentAudioItem;
+    if (audioItem == null) {
+      _isNavigatingToDetail = false;
+      return;
+    }
+
+    await controller.pause();
+    if (!mounted) {
+      _isNavigatingToDetail = false;
+      return;
+    }
+
+    // 讲解页会旁路驱动同一个 AudioEngine（playRangeOnce 试听单句），其播放完成
+    // 事件若被 LP 的监听器接住，会触发 _handlePlaybackCompleted() 把 currentFullIndex
+    // 重置为 0，导致返回后主播放按钮跳回第一句。与盲听/精听一致：导航期间挂起监听。
+    controller.suspendListeners();
+    await context.push(
+      AppRoutes.sentenceDetail,
+      extra: SentenceDetailArgs(
+        audioItemId: audioItem.id,
+        audioName: audioItem.name,
+        sentenceText: sentence.text,
+        sentenceIndex: sentence.index,
+        startTimeMs: sentence.startTime.inMilliseconds,
+        endTimeMs: sentence.endTime.inMilliseconds,
+      ),
+    );
+    // 必须在 mounted 检查之前恢复：LP 是 keepAlive provider，若页面已销毁仍要恢复
+    // 监听，否则监听器永久失效。
+    controller.resumeListeners();
+
+    _isNavigatingToDetail = false;
+
+    // 返回后刷新收藏状态（讲解页可能修改了收藏）
+    if (!mounted) return;
+    await controller.syncBookmarks();
   }
 
   void _showContextMenu(BuildContext context, Offset position, String text) {

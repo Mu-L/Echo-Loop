@@ -35,6 +35,7 @@ import '../utils/paragraph_grouping.dart';
 import '../utils/playback_speed_default.dart';
 import '../utils/retell_duration_estimator.dart';
 import '../widgets/blind_listen_paragraph_sheet.dart';
+import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
 import '../widgets/listen_and_repeat/listen_and_repeat_briefing_sheet.dart';
 import '../providers/learning_session/retell_player_provider.dart';
@@ -1002,7 +1003,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 0,
-          title: _AppBarTitle(
+          title: AudioAppBarTitle(
             audioName: audioItem.name,
             collectionNames: collectionNames,
           ),
@@ -1169,62 +1170,6 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       _reviewRoundExpandedMap[stage] =
           !(_reviewRoundExpandedMap[stage] ?? false);
     });
-  }
-}
-
-/// AppBar 标题：音频名 + 所属合集副标题
-///
-/// 没有所属合集时只显示音频名（与原行为一致）。
-/// 多合集用「、」拼接。
-class _AppBarTitle extends StatelessWidget {
-  final String audioName;
-  final List<String> collectionNames;
-
-  const _AppBarTitle({required this.audioName, required this.collectionNames});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (collectionNames.isEmpty) {
-      return Text(audioName);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          audioName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.folder_outlined,
-              size: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                collectionNames.join('、'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
   }
 }
 
