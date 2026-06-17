@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:path/path.dart' as p;
 import 'package:universal_io/io.dart';
 import '../analytics/analytics_providers.dart';
 import '../analytics/models/event_names.dart';
@@ -327,6 +328,21 @@ class AudioLibrary extends _$AudioLibrary {
       } catch (e) {
         AppLogger.log('AudioLib', 'Error deleting transcript file: $e');
       }
+    }
+
+    // 波形缓存按音频 id 独占落盘（waveforms/{id}.wave），无共享，删音频即可一并删，
+    // 无需引用检查。否则每删一个音频都会漏一个波形文件成为孤儿。
+    try {
+      final dataDir = await getAppDataDirectory();
+      final waveFile = File(
+        p.join(dataDir.path, 'waveforms', '${item.id}.wave'),
+      );
+      if (await waveFile.exists()) {
+        await waveFile.delete();
+        AppLogger.log('AudioLib', 'Deleted waveform file: ${waveFile.path}');
+      }
+    } catch (e) {
+      AppLogger.log('AudioLib', 'Error deleting waveform file: $e');
     }
   }
 

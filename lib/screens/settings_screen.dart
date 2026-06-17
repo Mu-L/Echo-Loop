@@ -38,6 +38,7 @@ import '../features/onboarding_survey/providers/onboarding_survey_provider.dart'
 import '../services/backup/backup_manifest.dart';
 import '../services/backup/backup_service.dart';
 import '../services/dictionary_download_manager.dart';
+import '../services/orphan_file_cleanup_service.dart';
 import '../services/temp_cleanup_service.dart';
 import '../utils/file_size.dart';
 import '../services/demo_data_seeder.dart';
@@ -346,7 +347,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       settings.nativeLanguage,
     );
     dictManager.dispose();
-    final totalFreed = result.freedBytes + dictFreed;
+
+    // 5. 清扫孤儿音频/字幕文件（磁盘有、DB 无引用）+ 全量清波形缓存
+    final referencedRelPaths = await ref
+        .read(audioItemDaoProvider)
+        .getAllReferencedRelPaths();
+    final orphanResult = await cleanupOrphanMediaFiles(
+      referencedRelPaths: referencedRelPaths,
+    );
+    final waveformResult = await cleanupAllWaveforms();
+
+    final totalFreed =
+        result.freedBytes +
+        dictFreed +
+        orphanResult.freedBytes +
+        waveformResult.freedBytes;
 
     if (!context.mounted) return;
     final String message;
