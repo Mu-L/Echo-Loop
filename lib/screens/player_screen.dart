@@ -18,7 +18,6 @@ import '../theme/app_theme.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/common/audio_app_bar_title.dart';
-import '../widgets/settings_dialog.dart';
 import '../widgets/player_hotkey_scope.dart';
 import '../widgets/common/text_context_menu.dart';
 import 'sentence_detail_screen.dart';
@@ -99,12 +98,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         appBar: AppBar(
           titleSpacing: 0,
           title: _buildAppBarTitle(playerState, l10n),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.tune),
-              onPressed: () => _showSettingsDialog(context),
-            ),
-          ],
         ),
         body: !playerState.hasAudio
             ? Center(child: Text(l10n.noAudioLoaded))
@@ -507,17 +500,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
     _isNavigatingToDetail = false;
 
-    // 返回后刷新收藏状态（讲解页可能修改了收藏）
     if (!mounted) return;
+    // 讲解页试听旁路驱动并 stop 了共享引擎，会改写 clip/position。返回后显式把
+    // 引擎对齐回当前句起点，使主播放按钮从「原来的句子」继续，而非跳第一句。
+    await controller.restorePosition();
+    // 返回后刷新收藏状态（讲解页可能修改了收藏）
     await controller.syncBookmarks();
   }
 
   void _showContextMenu(BuildContext context, Offset position, String text) {
     TextContextMenu.show(context, position, text);
-  }
-
-  void _showSettingsDialog(BuildContext context) {
-    showSettingsSheet(context);
   }
 
   Widget _buildControlPanel(
@@ -640,34 +632,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   ),
                 ],
               ),
-              if (playerState.settings.loopEnabled) ...[
+              // 整篇循环徽标
+              if (playerState.settings.loopWhole) ...[
                 const SizedBox(width: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.repeat_one, size: 14, color: iconColor),
-                    const SizedBox(width: 3),
-                    Text(
-                      'x${playerState.settings.loopCount}',
-                      style: captionStyle,
-                    ),
-                  ],
+                _buildLoopBadge(
+                  icon: Icons.repeat,
+                  count: playerState.settings.wholeLoopCount,
+                  iconColor: iconColor,
+                  captionStyle: captionStyle,
                 ),
               ],
-              if (playerState.settings.loopAudioEnabled) ...[
+              // 单句循环徽标
+              if (playerState.settings.loopSentence) ...[
                 const SizedBox(width: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.repeat, size: 14, color: iconColor),
-                    const SizedBox(width: 3),
-                    Text(
-                      playerState.settings.loopAudio == 0
-                          ? '∞'
-                          : 'x${playerState.settings.loopAudio}',
-                      style: captionStyle,
-                    ),
-                  ],
+                _buildLoopBadge(
+                  icon: Icons.repeat_one,
+                  count: playerState.settings.sentenceLoopCount,
+                  iconColor: iconColor,
+                  captionStyle: captionStyle,
                 ),
               ],
               const SizedBox(width: 12),
@@ -690,6 +672,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             ),
         ],
       ),
+    );
+  }
+
+  /// 单个循环状态徽标：图标 + 次数（∞ 或 xN）。
+  Widget _buildLoopBadge({
+    required IconData icon,
+    required int count,
+    required Color iconColor,
+    required TextStyle? captionStyle,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: 3),
+        Text(count == 0 ? '∞' : 'x$count', style: captionStyle),
+      ],
     );
   }
 }

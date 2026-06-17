@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/widgets/playback_controls.dart';
+import 'package:echo_loop/models/playback_settings.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
@@ -61,11 +62,36 @@ void main() {
         expect(find.text('1.0x'), findsOneWidget);
       });
 
-      testWidgets('显示循环开关按钮', (tester) async {
+      testWidgets('默认（不循环）显示 repeat 图标', (tester) async {
         await tester.pumpWidget(createTestApp(const PlaybackControls()));
         await tester.pumpAndSettle();
 
+        // 默认两个循环都关 → repeat 图标（非高亮）；仅单句循环开才是 repeat_one
+        expect(find.byIcon(Icons.repeat), findsOneWidget);
+        expect(find.byIcon(Icons.repeat_one), findsNothing);
+      });
+
+      testWidgets('仅单句循环开时显示 repeat_one 图标', (tester) async {
+        await tester.pumpWidget(
+          createTestApp(
+            const PlaybackControls(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(
+                  const ListeningPracticeState(
+                    settings: PlaybackSettings(loopSentence: true),
+                  ),
+                ),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
         expect(find.byIcon(Icons.repeat_one), findsOneWidget);
+        expect(find.byIcon(Icons.repeat), findsNothing);
       });
 
       testWidgets('显示字幕显示切换按钮', (tester) async {
@@ -124,6 +150,35 @@ void main() {
           find.widgetWithIcon(IconButton, Icons.skip_next),
         );
         expect(nextButton.onPressed, isNotNull);
+      });
+
+      testWidgets('点击循环按钮弹出悬浮循环设置浮层', (tester) async {
+        await tester.pumpWidget(createTestApp(const PlaybackControls()));
+        await tester.pumpAndSettle();
+
+        // 初始未弹出
+        expect(find.text('Loop Settings'), findsNothing);
+
+        await tester.tap(find.byIcon(Icons.repeat));
+        await tester.pumpAndSettle();
+
+        // 浮层出现：标题 + 两组循环开关
+        expect(find.text('Loop Settings'), findsOneWidget);
+        expect(find.byType(Switch), findsNWidgets(2));
+      });
+
+      testWidgets('点击浮层外部关闭浮层', (tester) async {
+        await tester.pumpWidget(createTestApp(const PlaybackControls()));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.repeat));
+        await tester.pumpAndSettle();
+        expect(find.text('Loop Settings'), findsOneWidget);
+
+        // 点击浮层外部（左上角遮罩区）关闭
+        await tester.tapAt(const Offset(5, 5));
+        await tester.pumpAndSettle();
+        expect(find.text('Loop Settings'), findsNothing);
       });
 
       testWidgets('点击速度按钮显示速度选择菜单', (tester) async {

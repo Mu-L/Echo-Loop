@@ -15,6 +15,7 @@ import '../../services/storage_service.dart';
 import '../audio_engine/audio_engine_provider.dart';
 import '../notification_permission_provider.dart';
 import 'bookmark_manager.dart';
+import 'playback_reducer.dart';
 import 'playback_state_storage.dart';
 import 'sentence_tracker.dart';
 
@@ -23,6 +24,16 @@ export '../../models/listening_practice_state.dart'
 
 part 'listening_practice_provider.g.dart';
 
+/// 自由练习播放器的状态与业务编排。
+///
+/// 播放推进采用单一的「事件驱动」模型：底层 [AudioEngine]（多个功能共享的
+/// 单实例 just_audio）只在「一句/整段播放完成」时回调 [_onPlayerStateChanged]，
+/// 由纯函数 [decideNext] 决定下一步（重播 / 进下一句 / 回卷 / 停止）。
+/// 不再有跨多次 await 持有状态的长协程，避免索引乱跳。
+///
+/// 真相源是 [ListeningPracticeState.currentFullIndex] /
+/// [ListeningPracticeState.currentBookmarkIndex]，只在以下入口被修改：
+/// 用户显式选句/上下句、连播时位置流推进（仅 gapless 模式）、完成事件归约器。
 @Riverpod(keepAlive: true)
 class ListeningPractice extends _$ListeningPractice {
   StreamSubscription? _positionSub;
@@ -31,8 +42,18 @@ class ListeningPractice extends _$ListeningPractice {
   /// 追踪正在进行的音频加载，避免重复调用时跳过未完成的加载
   Completer<void>? _loadingCompleter;
 
-  /// 连续播放模式的全曲循环计数（重新播放时重置）
-  int _audioLoopCount = 0;
+  /// 当前句已完成播放的次数（含刚结束这次）。进新句时归零。
+  int _sentenceRepeatsDone = 0;
+
+  /// 整篇已完成的遍数。换音频/重新起播时归零。
+  ///
+  /// gapless 模式下每次整篇 completed 即 +1；clip 模式下仅在真正整篇回卷
+  /// （走到末尾并回到第 0 句）时 +1。
+  int _wholeLoopsDone = 0;
+
+  /// 完成事件归约重入保护：切 clip/seek 期间可能吐出多余 completed 事件，
+  /// 该标志确保同一时刻只处理一次推进，避免递归推进。
+  bool _advancing = false;
 
   /// LP 自己发起播放时持有的 AudioEngine sessionId。
   ///
@@ -41,7 +62,6 @@ class ListeningPractice extends _$ListeningPractice {
   /// 监听回调只处理「属于 LP 当前播放 session」的事件，外来 session 的事件一律
   /// 忽略——否则讲解页试听单句时，位置流会把 `currentFullIndex` 改成被试听的句子，
   /// 返回后主播放按钮就从那一句（常表现为第一句）重新开始。
-  /// 与盲听播放器 `_startPositionTracking` 的 `isActiveSession` 守卫保持一致。
   int _playbackSessionId = -1;
 
   @override
@@ -68,11 +88,7 @@ class ListeningPractice extends _$ListeningPractice {
     _playerStateSub?.cancel();
   }
 
-  /// 暂停 stream 监听（盲听模式期间调用）
-  ///
-  /// 盲听期间 LP 的 `_onPlayerStateChanged` 会在音频完成时
-  /// 调用 `_handlePlaybackCompleted()` → `_playContinuous()`，
-  /// 导致 LP 尝试接管播放。暂停监听避免干扰。
+  /// 暂停 stream 监听（学习模式期间调用，避免 LP 接管共享引擎）。
   void suspendListeners() {
     _positionSub?.cancel();
     _playerStateSub?.cancel();
@@ -86,9 +102,6 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   /// 外部标注后同步书签状态（精听退出时调用）
-  ///
-  /// 重新从数据库加载书签并更新句子的 isBookmarked 状态，
-  /// 确保 LP 的内存状态与数据库一致。
   Future<void> syncBookmarks() async {
     if (state.currentAudioItem == null) return;
     final bookmarkDao = ref.read(bookmarkDaoProvider);
@@ -108,86 +121,151 @@ class ListeningPractice extends _$ListeningPractice {
     state = state.copyWith(settings: settings);
   }
 
+  // ===========================================================================
+  // 播放模型辅助：播放列表 / 当前序号 / clip 形态
+  // ===========================================================================
+
+  /// 当前播放列表：全文模式=全部句子；收藏模式=收藏句子。
+  List<Sentence> get _playable => state.playlistMode == PlaylistMode.bookmarks
+      ? state.bookmarkedSentences
+      : state.sentences;
+
+  /// 是否使用 clip（逐句）播放形态。
+  ///
+  /// 单句循环需要逐句精确循环；收藏句不连续也必须逐句 seek。其余（全文 +
+  /// 仅整篇循环/不循环）走整段无缝（gapless）播放。
+  bool get _isClipMode =>
+      state.playlistMode == PlaylistMode.bookmarks ||
+      state.settings.loopSentence;
+
+  /// 当前句在播放列表中的序号（0-based）。列表为空返回 null。
+  int? get _currentPos {
+    final playable = _playable;
+    if (playable.isEmpty) return null;
+    if (state.playlistMode == PlaylistMode.bookmarks) {
+      final ci = state.currentBookmarkIndex;
+      if (ci == null) return 0;
+      final p = playable.indexWhere((s) => s.index == ci);
+      return p == -1 ? 0 : p;
+    } else {
+      final ci = state.currentFullIndex;
+      if (ci == null || ci < 0 || ci >= playable.length) return 0;
+      return ci;
+    }
+  }
+
+  // ===========================================================================
+  // 引擎事件监听
+  // ===========================================================================
+
   void _onPositionChanged(Duration absolutePosition) {
     _updateCurrentSentence(absolutePosition);
   }
 
-  void _onPlayerStateChanged(ja.PlayerState playerState) {
-    if (playerState.processingState == ja.ProcessingState.completed) {
-      _handlePlaybackCompleted();
-    }
-    // Force rebuild for isPlaying changes
-    state = state.copyWith();
-  }
-
-  bool _shouldUseContinuousMode() {
-    if (state.playlistMode == PlaylistMode.bookmarks) return false;
-    if (state.settings.autoPlayNextSentenceEnabled &&
-        !state.settings.loopEnabled) {
-      return true;
-    }
-    return false;
-  }
-
+  /// 整段（gapless）播放时由位置流推进当前句高亮。clip 模式下当前句只由
+  /// 完成事件归约器修改，这里直接跳过。
   void _updateCurrentSentence(Duration position) {
-    // 仅处理 LP 自己发起的播放 session，忽略讲解页等外来 session 的位置事件
     if (!_engine.isActiveSession(_playbackSessionId)) return;
-    if (!_shouldUseContinuousMode() || !_engine.isPlaying) return;
+    if (_isClipMode) return;
+    if (!_engine.isPlaying) return;
     if (state.sentences.isEmpty) return;
 
-    int newIndex = SentenceTracker.findSentenceIndexByPosition(
+    final newIndex = SentenceTracker.findSentenceIndexByPosition(
       state.sentences,
       position,
     );
-
     if (newIndex != -1 && newIndex != state.currentFullIndex) {
       state = state.copyWith(currentFullIndex: newIndex);
     }
   }
 
-  void _handlePlaybackCompleted() {
-    // 仅处理 LP 自己发起的播放 session，忽略讲解页等外来 session 的完成事件
-    if (!_engine.isActiveSession(_playbackSessionId)) return;
-    if (!_shouldUseContinuousMode()) return;
-
-    if (state.settings.loopAudioEnabled) {
-      _audioLoopCount++;
-      final shouldLoop =
-          state.settings.loopAudio == 0 ||
-          _audioLoopCount < state.settings.loopAudio;
-      if (shouldLoop && state.sentences.isNotEmpty) {
-        Future.microtask(() async {
-          if (state.playlistMode == PlaylistMode.bookmarks) {
-            final bookmarked = state.bookmarkedSentences;
-            if (bookmarked.isNotEmpty) {
-              state = state.copyWith(
-                currentBookmarkIndex: bookmarked.first.index,
-              );
-            }
-          } else {
-            state = state.copyWith(currentFullIndex: 0);
-          }
-          await _playContinuous();
-        });
+  void _onPlayerStateChanged(ja.PlayerState playerState) {
+    if (playerState.processingState == ja.ProcessingState.completed) {
+      // 仅处理 LP 自己 session 的完成事件；重入保护避免切 clip 期间递归推进。
+      if (_engine.isActiveSession(_playbackSessionId) && !_advancing) {
+        _advancing = true;
+        unawaited(
+          _advanceAfterCompletion().whenComplete(() => _advancing = false),
+        );
       }
+    }
+    // 触发 isPlaying 变化的重建
+    state = state.copyWith();
+  }
+
+  /// 一句/整段播放完成后的推进：调用纯函数决策，再驱动引擎。
+  Future<void> _advanceAfterCompletion() async {
+    final sessionId = _playbackSessionId;
+    final playable = _playable;
+    if (playable.isEmpty) return;
+    final pos = _currentPos;
+    if (pos == null) return;
+
+    final s = state.settings;
+    final isClip = _isClipMode;
+    final isLast = pos >= playable.length - 1;
+
+    if (isClip) {
+      _sentenceRepeatsDone += 1;
+    } else {
+      // gapless：每次 completed 即完成一遍整篇。
+      _wholeLoopsDone += 1;
+    }
+
+    final action = decideNext(
+      isClipMode: isClip,
+      loopSentence: s.loopSentence,
+      sentenceLoopCount: s.sentenceLoopCount,
+      sentenceInterval: s.sentenceInterval,
+      loopWhole: s.loopWhole,
+      wholeLoopCount: s.wholeLoopCount,
+      wholeInterval: s.wholeInterval,
+      sentenceRepeatsDone: _sentenceRepeatsDone,
+      wholeLoopsDone: _wholeLoopsDone,
+      currentPos: pos,
+      playableCount: playable.length,
+    );
+
+    switch (action) {
+      case StopPlayback():
+        await _engine.stop();
+      case ReplayCurrent(:final pauseBefore):
+        await _delayInterval(pauseBefore);
+        if (!_engine.isActiveSession(sessionId)) return;
+        await _playPosition(pos);
+      case GoToPosition(:final position, :final pauseBefore):
+        await _delayInterval(pauseBefore);
+        if (!_engine.isActiveSession(sessionId)) return;
+        // clip 模式下，从末尾回卷到第 0 句意味着完成了一遍整篇。
+        if (isClip && isLast && position == 0) {
+          _wholeLoopsDone += 1;
+        }
+        _sentenceRepeatsDone = 0;
+        await _playPosition(position);
     }
   }
 
-  // --- 加载音频（业务编排）---
+  /// 按给定间隔停顿（来自 reducer 的决策，区分单句/整篇间隔）。
+  Future<void> _delayInterval(Duration interval) async {
+    if (interval > Duration.zero) {
+      await Future.delayed(interval);
+    }
+  }
+
+  // ===========================================================================
+  // 加载音频
+  // ===========================================================================
+
   Future<void> loadAudio(
     AudioItem audioItem, {
     bool forceTranscriptReload = false,
   }) async {
     // 同一音频且字幕未变化时跳过。
-    // 字幕内容入库后 transcriptPath 恒为 null，无法再作为「字幕是否变化」的信号；
-    // 故同时比较 transcriptSource，以捕捉「新增字幕(null→source)/删除字幕(source→null)」。
-    // 内容被原地编辑（source 不变）的场景由调用方显式传 forceTranscriptReload 处理。
     if (!forceTranscriptReload &&
         state.currentAudioItem?.id == audioItem.id &&
         state.currentAudioItem?.transcriptPath == audioItem.transcriptPath &&
         state.currentAudioItem?.transcriptSource ==
             audioItem.transcriptSource) {
-      // 如果当前正在加载，等待加载完成（而不是直接跳过）
       if (_loadingCompleter != null && !_loadingCompleter!.isCompleted) {
         return _loadingCompleter!.future;
       }
@@ -232,7 +310,6 @@ class ListeningPractice extends _$ListeningPractice {
         bookmarkedIndices = {...bookmarkedIndices, ...autoBookmarks};
 
         if (autoBookmarks.isNotEmpty) {
-          // 将自动书签写入数据库
           for (final idx in autoBookmarks) {
             await BookmarkManager.addBookmarkToDb(
               audioItem.id,
@@ -258,7 +335,6 @@ class ListeningPractice extends _$ListeningPractice {
         }
       }
 
-      // 更新书签状态
       for (var sentence in cleanedSentences) {
         sentence.isBookmarked = bookmarkedIndices.contains(sentence.index);
       }
@@ -269,10 +345,8 @@ class ListeningPractice extends _$ListeningPractice {
         currentFullIndex: 0,
       );
 
-      // 恢复播放状态
       await _restorePlaybackState(audioItem);
 
-      // 如果没有恢复到有效状态，设置初始句子
       if (state.sentences.isNotEmpty && state.currentFullIndex == null) {
         state = state.copyWith(currentFullIndex: 0);
         await _engine.seek(state.sentences[0].startTime);
@@ -302,7 +376,14 @@ class ListeningPractice extends _$ListeningPractice {
       }
       if (result.position != null) {
         await _engine.seek(result.position!);
-        // 从 position 计算 currentFullIndex（由 SentenceTracker 自动处理）
+        // 从恢复位置反推当前句高亮
+        final idx = SentenceTracker.findSentenceIndexByPosition(
+          state.sentences,
+          result.position!,
+        );
+        if (idx != -1) {
+          state = state.copyWith(currentFullIndex: idx);
+        }
       }
       AppLogger.log('Player', '✓ 恢复播放状态: ${audioItem.name}');
     } catch (e) {
@@ -310,7 +391,11 @@ class ListeningPractice extends _$ListeningPractice {
     }
   }
 
-  // --- Play ---
+  // ===========================================================================
+  // 播放控制
+  // ===========================================================================
+
+  /// 主播放按钮：暂停后从精确位置续播（仅 gapless），否则按真相源 index 起播。
   Future<void> play() async {
     if (state.currentAudioItem == null) return;
 
@@ -319,7 +404,75 @@ class ListeningPractice extends _$ListeningPractice {
       return;
     }
 
-    // 确保初始索引存在
+    _ensureValidIndex();
+    if (state.playlistMode == PlaylistMode.bookmarks &&
+        state.bookmarkedSentences.isEmpty) {
+      return;
+    }
+
+    // 暂停后恢复：引擎仍停在 LP 自己的 session、gapless 形态、未播完、且有非零位置
+    // → 从精确暂停位置续播。若期间被讲解页等外来 session 顶掉（clip/position 已被
+    // 改写或已 stop），认领失效，按真相源 index 重新起播，而非续播被污染的位置。
+    // 先校验 session 再读取引擎播放状态，避免无谓触达底层 player。
+    if (_engine.isActiveSession(_playbackSessionId) && !_isClipMode) {
+      final ps = _engine.audioPlayer.processingState;
+      final resumable =
+          ps != ja.ProcessingState.completed &&
+          ps != ja.ProcessingState.idle &&
+          _engine.currentPosition > Duration.zero;
+      if (resumable) {
+        await _engine.play();
+        return;
+      }
+    }
+
+    await _startCurrent();
+  }
+
+  /// 从当前真相源 index 起播（全新 session）。
+  Future<void> _startCurrent() async {
+    final playable = _playable;
+    if (playable.isEmpty) return;
+
+    _advancing = false;
+    _sentenceRepeatsDone = 0;
+    _wholeLoopsDone = 0;
+    _playbackSessionId = _engine.newSession();
+
+    final pos = _currentPos ?? 0;
+    await _playPosition(pos);
+  }
+
+  /// 播放列表中第 [pos] 条：更新真相源 index 后按 clip/gapless 形态起播。
+  Future<void> _playPosition(int pos) async {
+    final playable = _playable;
+    if (pos < 0 || pos >= playable.length) return;
+    final s = playable[pos];
+
+    if (state.playlistMode == PlaylistMode.bookmarks) {
+      state = state.copyWith(
+        currentBookmarkIndex: s.index,
+        lastPlayedBookmarkIndex: s.index,
+      );
+    } else {
+      state = state.copyWith(
+        currentFullIndex: s.index,
+        lastPlayedFullIndex: s.index,
+      );
+    }
+
+    if (_isClipMode) {
+      await _engine.setClip(s.startTime, s.endTime);
+      await _engine.seek(Duration.zero);
+      await _engine.play();
+    } else {
+      await _engine.clearClip();
+      await _engine.seek(s.startTime);
+      await _engine.play();
+    }
+  }
+
+  void _ensureValidIndex() {
     if (state.playlistMode == PlaylistMode.bookmarks) {
       final bookmarked = state.bookmarkedSentences;
       if (bookmarked.isEmpty) return;
@@ -333,177 +486,13 @@ class ListeningPractice extends _$ListeningPractice {
         state = state.copyWith(currentFullIndex: 0);
       }
     }
-
-    if (_shouldUseContinuousMode()) {
-      // 暂停后恢复：engine 有位置且未完成播放，跳过 seek 直接继续。
-      // 仅当引擎仍停在 LP 自己的 session 时才算「暂停后恢复」；若期间被讲解页等
-      // 外来 session 驱动过（clip/position 已被改写），必须按 currentFullIndex
-      // 重新定位，而不是从引擎当前（被污染的）位置继续。
-      final isResume =
-          _engine.isActiveSession(_playbackSessionId) &&
-          _engine.currentPosition > Duration.zero &&
-          _engine.audioPlayer.processingState != ja.ProcessingState.completed;
-      if (!isResume) {
-        _audioLoopCount = 0;
-      }
-      await _playContinuous(resume: isResume);
-    } else {
-      // 准备播放列表和起始位置
-      List<Sentence> playList;
-      int startIndex;
-
-      if (state.playlistMode == PlaylistMode.bookmarks) {
-        playList = state.bookmarkedSentences;
-        if (state.currentBookmarkIndex != null) {
-          startIndex = playList.indexWhere(
-            (s) => s.index == state.currentBookmarkIndex,
-          );
-          if (startIndex == -1) startIndex = 0;
-        } else {
-          startIndex = 0;
-        }
-      } else {
-        playList = state.sentences;
-        startIndex = state.currentFullIndex ?? 0;
-      }
-
-      await _playSubtitleDriven(playList, startIndex);
-    }
-  }
-
-  // --- 连续播放模式 ---
-  /// [resume] 为 true 时跳过 seek，从当前暂停位置继续播放
-  Future<void> _playContinuous({bool resume = false}) async {
-    final sessionId = _engine.newSession();
-    _playbackSessionId = sessionId;
-
-    if (!resume) {
-      final startIndex = state.currentFullIndex;
-      Duration? targetPosition;
-      if (startIndex != null && startIndex < state.sentences.length) {
-        targetPosition = state.sentences[startIndex].startTime;
-      }
-
-      await _engine.clearClip();
-      if (targetPosition != null) {
-        await _engine.seek(targetPosition);
-      }
-    } else {
-      await _engine.clearClip();
-    }
-
-    await _engine.play();
-
-    if (_engine.isPlaying) {
-      await _engine.playerStateStream.firstWhere(
-        (playerState) =>
-            !_engine.isActiveSession(sessionId) ||
-            !playerState.playing ||
-            playerState.processingState == ja.ProcessingState.completed,
-      );
-    }
-
-    AppLogger.log('Player', 'playContinuous end');
-    if (_engine.isActiveSession(sessionId)) {
-      await _engine.stop();
-    }
-  }
-
-  // --- 字幕驱动模式 ---
-  Future<void> _playSubtitleDriven(
-    List<Sentence> playList,
-    int startIndex,
-  ) async {
-    final sessionId = _engine.newSession();
-    _playbackSessionId = sessionId;
-
-    if (playList.isEmpty) return;
-
-    int audioLoopCount = 0;
-
-    while (true) {
-      if (audioLoopCount > 0) {
-        if (!state.settings.loopAudioEnabled) break;
-        final shouldLoop =
-            state.settings.loopAudio == 0 ||
-            audioLoopCount < state.settings.loopAudio;
-        if (!shouldLoop) break;
-      }
-
-      final int loopStartIdx = audioLoopCount == 0 ? startIndex : 0;
-
-      for (int i = loopStartIdx; i < playList.length; i++) {
-        if (!_engine.isActiveSession(sessionId)) return;
-
-        final sentence = playList[i];
-
-        // 更新当前索引
-        if (state.playlistMode == PlaylistMode.bookmarks) {
-          if (state.currentBookmarkIndex != sentence.index) {
-            state = state.copyWith(currentBookmarkIndex: sentence.index);
-          }
-        } else {
-          if (state.currentFullIndex != sentence.index) {
-            state = state.copyWith(currentFullIndex: sentence.index);
-          }
-        }
-
-        // 播放当前句子
-        await _engine.playClipWithLoops(
-          sentence,
-          sessionId,
-          loopCount: state.settings.loopEnabled ? state.settings.loopCount : 1,
-          interval: state.settings.pauseInterval,
-        );
-
-        // 句子之间间隔
-        if (i < playList.length - 1) {
-          if (state.playlistMode == PlaylistMode.bookmarks &&
-              !state.settings.loopEnabled) {
-            await Future.delayed(const Duration(seconds: 1));
-          } else if (state.settings.autoPlayNextSentenceEnabled &&
-              state.settings.loopEnabled &&
-              state.settings.pauseInterval > Duration.zero) {
-            await Future.delayed(state.settings.pauseInterval);
-          }
-        }
-
-        if (!_engine.isActiveSession(sessionId)) return;
-
-        if (!state.settings.autoPlayNextSentenceEnabled) {
-          if (_engine.isPlaying) {
-            await _engine.playerStateStream.firstWhere(
-              (playerState) =>
-                  !playerState.playing ||
-                  playerState.processingState == ja.ProcessingState.completed,
-            );
-          }
-          return;
-        }
-      }
-
-      audioLoopCount++;
-
-      if (!state.settings.loopAudioEnabled) break;
-    }
-
-    if (_engine.isActiveSession(sessionId)) {
-      await _engine.stop();
-    }
-  }
-
-  /// 重置播放位置到开头（供外部学习流程调用）
-  void resetToBeginning() {
-    if (state.sentences.isNotEmpty) {
-      state = state.copyWith(currentFullIndex: 0);
-    }
   }
 
   Future<void> pause() async {
     await _engine.pause();
-    // 记录暂停后的 session 为 LP 自己持有：普通的「暂停→继续」仍视为 LP 拥有引擎
-    // （可从当前位置续播）；但若期间被讲解页等外来 session 进一步驱动，引擎 session
-    // 会被顶掉，play() 便不再续播引擎位置，而是按 currentFullIndex 重新定位。
+    // 引擎 pause 会自增 session 以失效在途回调；LP 仍是这个「已暂停引擎」的拥有者，
+    // 故认领当前 session，使随后的 play() 能从精确暂停位置续播。若期间被讲解页等
+    // 外来 session 顶掉，认领失效，play() 会按真相源 index 重新起播。
     _playbackSessionId = _engine.currentSessionId;
   }
 
@@ -515,71 +504,91 @@ class ListeningPractice extends _$ListeningPractice {
     await _engine.seek(position);
   }
 
+  /// 离开讲解页返回后，把共享引擎显式对齐回当前句起点。
+  ///
+  /// 讲解页旁路驱动并 stop 了引擎，会改写 clip/position。返回后调用本方法清除
+  /// clip、seek 回当前句起点并认领 session，使主播放按钮从「原来的句子」继续，
+  /// 而不依赖对引擎残留位置的启发式判断。
+  Future<void> restorePosition() async {
+    if (state.currentAudioItem == null) return;
+    final pos = _currentPos;
+    if (pos == null) return;
+    final s = _playable[pos];
+    await _engine.clearClip();
+    await _engine.seek(s.startTime);
+    _playbackSessionId = _engine.currentSessionId;
+    _sentenceRepeatsDone = 0;
+    _wholeLoopsDone = 0;
+  }
+
   Future<void> seekAbsolute(Duration absolutePosition) async {
-    final wasPlaying = _engine.isPlaying;
-    if (wasPlaying) {
-      await pause();
+    if (state.sentences.isEmpty) {
+      await _engine.clearClip();
+      await _engine.seek(absolutePosition);
+      return;
     }
 
-    // 清除 clip 状态
+    final wasPlaying = _engine.isPlaying;
+    if (wasPlaying) await pause();
+
     await _engine.clearClip();
     await _engine.seek(absolutePosition);
 
-    int? snappedBookmarkIndex;
-    if (state.sentences.isNotEmpty) {
-      final newIndex = SentenceTracker.findSentenceIndexByPosition(
-        state.sentences,
-        absolutePosition,
-      );
-
-      if (newIndex != -1) {
-        if (state.playlistMode == PlaylistMode.bookmarks) {
-          if (state.bookmarkedIndices.contains(newIndex)) {
-            state = state.copyWith(currentBookmarkIndex: newIndex);
-            snappedBookmarkIndex = newIndex;
-          } else {
-            final closestIdx = SentenceTracker.findClosestBookmark(
-              state.bookmarkedSentences,
-              absolutePosition,
-            );
-            if (closestIdx != null) {
-              state = state.copyWith(currentBookmarkIndex: closestIdx);
-              snappedBookmarkIndex = closestIdx;
-            }
-          }
+    final newIndex = SentenceTracker.findSentenceIndexByPosition(
+      state.sentences,
+      absolutePosition,
+    );
+    if (newIndex != -1) {
+      if (state.playlistMode == PlaylistMode.bookmarks) {
+        if (state.bookmarkedIndices.contains(newIndex)) {
+          state = state.copyWith(currentBookmarkIndex: newIndex);
         } else {
-          state = state.copyWith(currentFullIndex: newIndex);
+          final closest = SentenceTracker.findClosestBookmark(
+            state.bookmarkedSentences,
+            absolutePosition,
+          );
+          if (closest != null) {
+            state = state.copyWith(currentBookmarkIndex: closest);
+          }
         }
+      } else {
+        state = state.copyWith(currentFullIndex: newIndex);
       }
     }
 
-    if (snappedBookmarkIndex != null) {
-      final s = state.sentences[snappedBookmarkIndex];
-      await _engine.seek(s.startTime);
-    }
-
     if (wasPlaying) {
-      await play();
+      if (_isClipMode) {
+        // clip 模式：从吸附到的目标句重新起播
+        await _startCurrent();
+      } else {
+        // gapless：从拖动位置继续连续播放
+        _advancing = false;
+        _sentenceRepeatsDone = 0;
+        _wholeLoopsDone = 0;
+        _playbackSessionId = _engine.newSession();
+        await _engine.play();
+      }
+    } else {
+      // 未播放时，把引擎对齐到目标句起点便于显示
+      final pos = _currentPos;
+      if (pos != null) {
+        await _engine.seek(_playable[pos].startTime);
+      }
+      _playbackSessionId = _engine.currentSessionId;
     }
   }
 
   Future<void> selectFullSentence(int index, {bool autoPlay = true}) async {
     if (index < 0 || index >= state.sentences.length) return;
 
-    final shouldResume = autoPlay && _engine.isPlaying;
-    if (shouldResume) {
-      await pause();
-    }
-
     state = state.copyWith(currentFullIndex: index, lastPlayedFullIndex: index);
 
-    if (state.currentAudioItem != null) {
+    if (autoPlay) {
+      await _startCurrent();
+    } else {
       await _engine.clearClip();
       await _engine.seek(state.sentences[index].startTime);
-    }
-
-    if (autoPlay) {
-      await play();
+      _playbackSessionId = _engine.currentSessionId;
     }
   }
 
@@ -589,47 +598,34 @@ class ListeningPractice extends _$ListeningPractice {
   }) async {
     if (index < 0 || index >= state.sentences.length) return;
 
-    final shouldResume = autoPlay && _engine.isPlaying;
-    if (shouldResume) {
-      await pause();
-    }
-
     state = state.copyWith(
       currentBookmarkIndex: index,
       lastPlayedBookmarkIndex: index,
     );
 
-    if (state.currentAudioItem != null) {
+    if (autoPlay) {
+      await _startCurrent();
+    } else {
       await _engine.clearClip();
       await _engine.seek(state.sentences[index].startTime);
-    }
-
-    if (autoPlay) {
-      await play();
+      _playbackSessionId = _engine.currentSessionId;
     }
   }
 
   Future<void> replayCurrentSentence() async {
     if (state.sentences.isEmpty) return;
 
-    int? lastPlayedIndex;
-    if (state.playlistMode == PlaylistMode.bookmarks) {
-      lastPlayedIndex = state.lastPlayedBookmarkIndex;
-    } else {
-      lastPlayedIndex = state.lastPlayedFullIndex;
-    }
-
+    final int? lastPlayedIndex = state.playlistMode == PlaylistMode.bookmarks
+        ? state.lastPlayedBookmarkIndex
+        : state.lastPlayedFullIndex;
     if (lastPlayedIndex == null) return;
 
-    if (_engine.isPlaying) {
-      await pause();
-    }
-
     if (state.playlistMode == PlaylistMode.bookmarks) {
-      await selectBookmarkedSentence(lastPlayedIndex, autoPlay: true);
+      state = state.copyWith(currentBookmarkIndex: lastPlayedIndex);
     } else {
-      await selectFullSentence(lastPlayedIndex, autoPlay: true);
+      state = state.copyWith(currentFullIndex: lastPlayedIndex);
     }
+    await _startCurrent();
   }
 
   Future<void> nextSentence() async {
@@ -661,27 +657,7 @@ class ListeningPractice extends _$ListeningPractice {
       }
     }
 
-    final shouldResume = _engine.isPlaying;
-    if (shouldResume) await pause();
-
-    if (state.playlistMode == PlaylistMode.bookmarks) {
-      state = state.copyWith(
-        currentBookmarkIndex: newIndex,
-        lastPlayedBookmarkIndex: newIndex,
-      );
-    } else {
-      state = state.copyWith(
-        currentFullIndex: newIndex,
-        lastPlayedFullIndex: newIndex,
-      );
-    }
-
-    await _engine.clearClip();
-    await _engine.seek(state.sentences[newIndex].startTime);
-
-    if (shouldResume) {
-      await play();
-    }
+    await _moveToIndex(newIndex);
   }
 
   Future<void> previousSentence() async {
@@ -708,8 +684,12 @@ class ListeningPractice extends _$ListeningPractice {
       }
     }
 
-    final shouldResume = _engine.isPlaying;
-    if (shouldResume) await pause();
+    await _moveToIndex(newIndex);
+  }
+
+  /// 上/下一句的公共落地：更新真相源 index，播放中则起播该句，否则对齐引擎。
+  Future<void> _moveToIndex(int newIndex) async {
+    final wasPlaying = _engine.isPlaying;
 
     if (state.playlistMode == PlaylistMode.bookmarks) {
       state = state.copyWith(
@@ -723,11 +703,12 @@ class ListeningPractice extends _$ListeningPractice {
       );
     }
 
-    await _engine.clearClip();
-    await _engine.seek(state.sentences[newIndex].startTime);
-
-    if (shouldResume) {
-      await play();
+    if (wasPlaying) {
+      await _startCurrent();
+    } else {
+      await _engine.clearClip();
+      await _engine.seek(state.sentences[newIndex].startTime);
+      _playbackSessionId = _engine.currentSessionId;
     }
   }
 
@@ -795,13 +776,11 @@ class ListeningPractice extends _$ListeningPractice {
 
       if (inBookmarksMode) {
         if (nextIndex != null && nextIndex < newSentences.length) {
-          final s = newSentences[nextIndex];
           state = state.copyWith(
             bookmarkedIndices: newBookmarks,
             sentences: newSentences,
             currentBookmarkIndex: nextIndex,
           );
-          await _engine.setClip(s.startTime, s.endTime);
         } else {
           state = state.copyWith(
             bookmarkedIndices: newBookmarks,
@@ -843,68 +822,72 @@ class ListeningPractice extends _$ListeningPractice {
       }
     }
 
+    // 收藏模式下移除当前句后，从下一收藏句继续播放
     if (inBookmarksMode &&
         shouldResume &&
         state.bookmarkedSentences.isNotEmpty) {
-      await play();
+      await _startCurrent();
     }
   }
 
   Future<void> updateSettings(PlaybackSettings newSettings) async {
-    final oldSettings = state.settings;
     final wasPlaying = _engine.isPlaying;
-
-    final oldContinuousMode =
-        state.playlistMode == PlaylistMode.full &&
-        oldSettings.autoPlayNextSentenceEnabled &&
-        !oldSettings.loopEnabled;
-    final newContinuousMode =
-        state.playlistMode == PlaylistMode.full &&
-        newSettings.autoPlayNextSentenceEnabled &&
-        !newSettings.loopEnabled;
-    final modeWillChange = oldContinuousMode != newContinuousMode;
+    final wasClip = _isClipMode;
 
     state = state.copyWith(settings: newSettings);
     await _engine.setSpeed(newSettings.playbackSpeed);
     await StorageService.saveSettings(newSettings);
 
-    if (wasPlaying && modeWillChange) {
-      await pause();
-      await play();
+    // clip/gapless 形态切换（如开/关单句循环、切收藏模式）需要从当前句重新起播；
+    // 仅速度/次数/间隔等不改变形态的设置无需打断播放。
+    if (wasPlaying && wasClip != _isClipMode) {
+      await _startCurrent();
     }
   }
 
   Future<void> setPlaylistMode(PlaylistMode mode) async {
     if (state.playlistMode == mode) return;
 
+    final wasPlaying = _engine.isPlaying;
     await pause();
 
     state = state.copyWith(playlistMode: mode);
 
-    await _engine.clearClip();
-
     if (mode == PlaylistMode.full) {
-      if (state.currentFullIndex != null &&
-          state.currentFullIndex! < state.sentences.length) {
-        await _engine.seek(state.sentences[state.currentFullIndex!].startTime);
-      } else if (state.sentences.isNotEmpty) {
-        state = state.copyWith(currentFullIndex: 0);
-        await _engine.seek(state.sentences[0].startTime);
+      if (state.currentFullIndex == null ||
+          state.currentFullIndex! >= state.sentences.length) {
+        if (state.sentences.isNotEmpty) {
+          state = state.copyWith(currentFullIndex: 0);
+        }
       }
     } else {
       final bookmarked = state.bookmarkedSentences;
-      if (bookmarked.isEmpty) return;
-
-      if (state.currentBookmarkIndex != null &&
-          state.currentBookmarkIndex! < state.sentences.length &&
-          state.bookmarkedIndices.contains(state.currentBookmarkIndex)) {
-        await _engine.seek(
-          state.sentences[state.currentBookmarkIndex!].startTime,
-        );
-      } else {
-        state = state.copyWith(currentBookmarkIndex: bookmarked.first.index);
-        await _engine.seek(bookmarked.first.startTime);
+      if (bookmarked.isEmpty) {
+        await _engine.clearClip();
+        return;
       }
+      if (state.currentBookmarkIndex == null ||
+          !state.bookmarkedIndices.contains(state.currentBookmarkIndex)) {
+        state = state.copyWith(currentBookmarkIndex: bookmarked.first.index);
+      }
+    }
+
+    if (wasPlaying) {
+      await _startCurrent();
+    } else {
+      final pos = _currentPos;
+      await _engine.clearClip();
+      if (pos != null) {
+        await _engine.seek(_playable[pos].startTime);
+      }
+      _playbackSessionId = _engine.currentSessionId;
+    }
+  }
+
+  /// 重置播放位置到开头（供外部学习流程调用）
+  void resetToBeginning() {
+    if (state.sentences.isNotEmpty) {
+      state = state.copyWith(currentFullIndex: 0);
     }
   }
 

@@ -452,6 +452,18 @@ abstract class AppLocalizations {
   /// **'Loop Settings'**
   String get loopSettings;
 
+  /// No description provided for @wholeTextLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole-text loop'**
+  String get wholeTextLoop;
+
+  /// No description provided for @singleSentenceLoop.
+  ///
+  /// In en, this message translates to:
+  /// **'Single-sentence loop'**
+  String get singleSentenceLoop;
+
   /// No description provided for @displaySettings.
   ///
   /// In en, this message translates to:
@@ -500,47 +512,23 @@ abstract class AppLocalizations {
   /// **'Auto Play Next Sentence'**
   String get autoPlayNextSentence;
 
-  /// No description provided for @sentenceRepeat.
-  ///
-  /// In en, this message translates to:
-  /// **'Sentence Repeat'**
-  String get sentenceRepeat;
-
   /// No description provided for @repeatCount.
   ///
   /// In en, this message translates to:
   /// **'Repeat Count'**
   String get repeatCount;
 
+  /// No description provided for @infiniteRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Infinite ∞'**
+  String get infiniteRepeat;
+
   /// No description provided for @intervalTime.
   ///
   /// In en, this message translates to:
   /// **'Interval (seconds)'**
   String get intervalTime;
-
-  /// No description provided for @audioLoop.
-  ///
-  /// In en, this message translates to:
-  /// **'Audio Loop'**
-  String get audioLoop;
-
-  /// No description provided for @loopTimes.
-  ///
-  /// In en, this message translates to:
-  /// **'Loop Count'**
-  String get loopTimes;
-
-  /// No description provided for @noLoop.
-  ///
-  /// In en, this message translates to:
-  /// **'No Loop'**
-  String get noLoop;
-
-  /// No description provided for @infiniteLoop.
-  ///
-  /// In en, this message translates to:
-  /// **'Infinite ∞'**
-  String get infiniteLoop;
 
   /// No description provided for @times.
   ///

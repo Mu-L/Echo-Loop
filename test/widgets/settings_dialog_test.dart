@@ -1,6 +1,7 @@
-/// SettingsDialog 组件测试
+/// LoopSettingsPopup 组件测试
 ///
-/// 测试播放设置对话框的渲染和交互。
+/// 测试循环设置浮层的渲染与交互：两组独立循环（整篇 / 单句）各有主开关，
+/// 开启后展开「标签 + 滑条 + 值」单行滑块。
 library;
 
 import 'package:flutter/material.dart';
@@ -15,142 +16,97 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
 
-/// 辅助函数：打开 SettingsDialog
-Widget _buildSettingsDialogTest({
-  ListeningPracticeState? practiceState,
-  List<Override>? overrides,
-}) {
-  final defaultOverrides = <Override>[
-    appSettingsProvider.overrideWith(() => TestAppSettings()),
-    listeningPracticeProvider.overrideWith(
-      () => TestListeningPractice(
-        practiceState ?? const ListeningPracticeState(),
-      ),
-    ),
-    audioEngineProvider.overrideWith(() => TestAudioEngine()),
-  ];
-
+/// 辅助函数：直接渲染循环设置浮层内容。
+Widget _buildLoopPopupTest({ListeningPracticeState? practiceState}) {
   return createTestApp(
-    Builder(
-      builder: (context) {
-        // 直接渲染设置面板内容
-        return const SettingsSheet();
-      },
-    ),
-    overrides: overrides ?? defaultOverrides,
+    const Align(child: LoopSettingsPopup()),
+    overrides: [
+      appSettingsProvider.overrideWith(() => TestAppSettings()),
+      listeningPracticeProvider.overrideWith(
+        () => TestListeningPractice(
+          practiceState ?? const ListeningPracticeState(),
+        ),
+      ),
+      audioEngineProvider.overrideWith(() => TestAudioEngine()),
+    ],
   );
 }
 
 void main() {
-  group('SettingsDialog', () {
+  group('LoopSettingsPopup', () {
     group('渲染', () {
-      testWidgets('显示句子循环设置区域', (tester) async {
-        await tester.pumpWidget(_buildSettingsDialogTest());
+      testWidgets('显示两组循环主开关', (tester) async {
+        await tester.pumpWidget(_buildLoopPopupTest());
         await tester.pumpAndSettle();
 
-        // 句子循环开关标题
-        expect(find.text('Sentence Repeat'), findsOneWidget);
-        // 自动播放下一句开关
-        expect(find.text('Auto Play Next Sentence'), findsOneWidget);
+        expect(find.text('Loop Settings'), findsOneWidget);
+        expect(find.text('Whole-text loop'), findsOneWidget);
+        expect(find.text('Single-sentence loop'), findsOneWidget);
+        expect(find.byType(Switch), findsNWidgets(2));
       });
 
-      testWidgets('显示音频循环设置区域', (tester) async {
-        await tester.pumpWidget(_buildSettingsDialogTest());
+      testWidgets('两个循环都关时不显示子滑块', (tester) async {
+        await tester.pumpWidget(_buildLoopPopupTest());
         await tester.pumpAndSettle();
 
-        expect(find.text('Audio Loop'), findsOneWidget);
-      });
-
-      testWidgets('循环关闭时不显示子设置', (tester) async {
-        // 默认 loopEnabled=false
-        await tester.pumpWidget(_buildSettingsDialogTest());
-        await tester.pumpAndSettle();
-
-        // 循环次数和间隔时间不应显示
+        expect(find.byType(Slider), findsNothing);
         expect(find.text('Repeat Count'), findsNothing);
-        expect(find.text('Interval (seconds)'), findsNothing);
       });
 
-      testWidgets('循环开启时显示子设置', (tester) async {
+      testWidgets('整篇循环开启时展开重复次数 + 间隔滑块', (tester) async {
         await tester.pumpWidget(
-          _buildSettingsDialogTest(
+          _buildLoopPopupTest(
             practiceState: const ListeningPracticeState(
-              settings: PlaybackSettings(loopEnabled: true),
+              settings: PlaybackSettings(loopWhole: true),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // 循环次数和间隔时间应显示
+        expect(find.byType(Slider), findsNWidgets(2));
         expect(find.text('Repeat Count'), findsOneWidget);
         expect(find.text('Interval (seconds)'), findsOneWidget);
       });
 
-      testWidgets('音频循环关闭时不显示子设置', (tester) async {
-        // 默认 loopAudioEnabled=false
-        await tester.pumpWidget(_buildSettingsDialogTest());
-        await tester.pumpAndSettle();
-
-        expect(find.text('Loop Count'), findsNothing);
-      });
-
-      testWidgets('音频循环开启时显示循环次数', (tester) async {
+      testWidgets('两组循环同时开启时展开 4 个滑块', (tester) async {
         await tester.pumpWidget(
-          _buildSettingsDialogTest(
+          _buildLoopPopupTest(
             practiceState: const ListeningPracticeState(
-              settings: PlaybackSettings(loopAudioEnabled: true),
+              settings: PlaybackSettings(loopWhole: true, loopSentence: true),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Loop Count'), findsOneWidget);
+        expect(find.byType(Slider), findsNWidgets(4));
+      });
+
+      testWidgets('无限次数显示 ∞ 文案', (tester) async {
+        await tester.pumpWidget(
+          _buildLoopPopupTest(
+            practiceState: const ListeningPracticeState(
+              settings: PlaybackSettings(loopWhole: true, wholeLoopCount: 0),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('∞'), findsOneWidget);
       });
     });
 
     group('交互', () {
-      testWidgets('切换句子循环开关', (tester) async {
-        await tester.pumpWidget(_buildSettingsDialogTest());
-        await tester.pumpAndSettle();
-
-        // 找到句子循环开关（第二个 Switch，第一个是自动播放下一句）
-        final switches = find.byType(Switch);
-        expect(switches, findsAtLeast(2));
-
-        // 点击句子循环开关（第二个 Switch）
-        await tester.tap(switches.at(1));
-        await tester.pumpAndSettle();
-
-        // 切换后应显示子设置
-        expect(find.text('Repeat Count'), findsOneWidget);
-        expect(find.text('Interval (seconds)'), findsOneWidget);
-      });
-
-      testWidgets('切换音频循环开关', (tester) async {
-        await tester.pumpWidget(_buildSettingsDialogTest());
-        await tester.pumpAndSettle();
-
-        // 音频循环开关是第三个 Switch
-        final switches = find.byType(Switch);
-        expect(switches, findsAtLeast(3));
-
-        await tester.tap(switches.at(2));
-        await tester.pumpAndSettle();
-
-        // 切换后应显示循环次数
-        expect(find.text('Loop Count'), findsOneWidget);
-      });
-
-      testWidgets('点击遮罩可以关闭底部弹窗', (tester) async {
+      testWidgets('切换主开关触发 updateSettings 并展开子滑块', (tester) async {
+        late ListeningPractice controller;
         await tester.pumpWidget(
           createTestApp(
-            Builder(
-              builder: (context) {
-                return ElevatedButton(
-                  onPressed: () => showSettingsSheet(context),
-                  child: const Text('Open'),
-                );
-              },
+            Align(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  controller = ref.read(listeningPracticeProvider.notifier);
+                  return const LoopSettingsPopup();
+                },
+              ),
             ),
             overrides: [
               appSettingsProvider.overrideWith(() => TestAppSettings()),
@@ -163,18 +119,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // 打开底部弹窗
-        await tester.tap(find.text('Open'));
+        // 点击「整篇循环」主开关
+        await tester.tap(find.byType(Switch).first);
         await tester.pumpAndSettle();
 
-        expect(find.text('Settings'), findsOneWidget);
-
-        // 点击遮罩区域（弹窗顶部以上）关闭
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
-
-        // 弹窗应已关闭
-        expect(find.text('Sentence Repeat'), findsNothing);
+        expect(controller.state.settings.loopWhole, isTrue);
+        expect(find.byType(Slider), findsNWidgets(2));
       });
     });
   });

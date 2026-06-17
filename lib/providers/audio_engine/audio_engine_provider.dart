@@ -235,26 +235,6 @@ class AudioEngine extends _$AudioEngine {
     }
   }
 
-  Future<void> playClipWithLoops(
-    Sentence sentence,
-    int sessionId, {
-    required int loopCount,
-    required Duration interval,
-  }) async {
-    for (int loop = 0; loop < loopCount; loop++) {
-      if (!isActiveSession(sessionId)) return;
-
-      await playClipOnce(sentence, sessionId);
-
-      if (!isActiveSession(sessionId)) return;
-
-      // 循环间隔
-      if (loop < loopCount - 1 && interval > Duration.zero) {
-        await Future.delayed(interval);
-      }
-    }
-  }
-
   // --- 区间播放（段落级） ---
 
   /// 播放指定时间区间一次（段落播放用）

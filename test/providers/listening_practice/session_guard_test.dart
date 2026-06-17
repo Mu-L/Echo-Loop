@@ -1,10 +1,9 @@
-/// ListeningPractice 监听器 session 守卫测试
+/// ListeningPractice 播放编排回归测试
 ///
-/// 回归用例：句子讲解页等组件会旁路驱动同一个 AudioEngine（playRangeOnce），
-/// 并通过 newSession() 顶掉当前 session。LP 的位置/状态监听只应处理「属于 LP
-/// 自己播放 session」的事件，外来 session 的事件必须忽略，否则讲解页试听单句时
-/// 位置流会把 currentFullIndex 改成被试听的句子，返回后主播放按钮就从那一句
-/// （常表现为第一句）重新开始。
+/// 覆盖三类历史 bug：
+/// 1. 讲解页旁路驱动共享引擎（newSession + 位置流）不应污染 LP 的 currentFullIndex；
+/// 2. 讲解页返回后 restorePosition() 把引擎对齐回当前句，主播放从原句继续（不跳第一句）；
+/// 3. 单句循环重复当前句、不跳到第一句。
 library;
 
 import 'dart:async';
@@ -19,17 +18,20 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
 import '../../helpers/mock_providers.dart';
 
-/// 测试用 AudioEngine：真实 session 计数 + 可控位置/状态流。
+/// 测试用 AudioEngine：真实 session 计数 + 可控位置/状态流 + clip 记录。
 class _SessionAudioEngine extends TestAudioEngine {
   int _sessionId = 0;
   final _positionController = StreamController<Duration>.broadcast();
   final _playerStateController = StreamController<ja.PlayerState>.broadcast();
 
-  /// 模拟引擎当前播放位置（用于 isResume 判定）
+  /// 模拟引擎当前播放位置
   Duration position = Duration.zero;
 
   /// 记录最后一次 seek 的目标位置
   Duration? lastSeek;
+
+  /// 记录最后一次 setClip 的起点
+  Duration? lastClipStart;
 
   @override
   Duration get currentPosition => position;
@@ -37,6 +39,11 @@ class _SessionAudioEngine extends TestAudioEngine {
   @override
   Future<void> seek(Duration pos) async {
     lastSeek = pos;
+  }
+
+  @override
+  Future<void> setClip(Duration start, Duration end) async {
+    lastClipStart = start;
   }
 
   @override
@@ -58,10 +65,8 @@ class _SessionAudioEngine extends TestAudioEngine {
   Stream<ja.PlayerState> get playerStateStream =>
       _playerStateController.stream;
 
-  /// 模拟引擎推送一个绝对位置
   void emitPosition(Duration position) => _positionController.add(position);
 
-  /// 模拟引擎推送一个播放状态
   void emitPlayerState(ja.PlayerState playerState) =>
       _playerStateController.add(playerState);
 
@@ -94,11 +99,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  // 连续播放模式（默认）：autoPlayNext=true 且 loopEnabled=false
-  const continuousSettings = PlaybackSettings(
-    autoPlayNextSentenceEnabled: true,
-    loopEnabled: false,
-  );
+  // 连播（gapless）：两个循环都关，走整段无缝
+  const continuousSettings = PlaybackSettings();
 
   final sentences = [
     Sentence(
@@ -170,8 +172,7 @@ void main() {
       settings: continuousSettings,
       currentFullIndex: 0,
     );
-    // 不 await：play 会停在等待 playerStateStream 的 await 点，
-    // 但此前已 newSession() 并把 _playbackSessionId 设为当前 session
+    // play() 进入 gapless 起播：newSession 后把 _playbackSessionId 设为当前 session
     unawaited(container.read(listeningPracticeProvider.notifier).play());
     await Future<void>.delayed(Duration.zero);
     engine.isPlaying = true;
@@ -181,37 +182,49 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(container.read(listeningPracticeProvider).currentFullIndex, 1);
-
-    // 推送完成态，让 _playContinuous 的 firstWhere 正常结束，避免悬挂
-    engine.emitPlayerState(
-      ja.PlayerState(false, ja.ProcessingState.completed),
-    );
-    await Future<void>.delayed(Duration.zero);
   });
 
-  test('外来 session 驱动后再播放，按 currentFullIndex 重新定位而非续播引擎位置', () async {
+  test('讲解页驱动后 restorePosition 把引擎对齐回当前句起点', () async {
     lp.seed(
       sentences: sentences,
       settings: continuousSettings,
       currentFullIndex: 2,
     );
-    // LP 暂停：把当前 session 记为自己持有（模拟正常「暂停→继续」前置）
+    // 正常暂停后进讲解页：讲解页 bump session + 改写引擎位置
     await container.read(listeningPracticeProvider.notifier).pause();
-    // 模拟讲解页旁路驱动：bump session + 引擎位置被改写到非零（若不校验 session，
-    // 这个非零位置会让 play() 误判为「续播」从而从被污染的位置播放）
     engine.newSession();
     engine.position = const Duration(seconds: 1);
     engine.lastSeek = null;
 
+    // 返回后显式恢复：应 seek 回第 2 句起点（6s），不续播被污染的 1s
+    await container.read(listeningPracticeProvider.notifier).restorePosition();
+
+    expect(engine.lastSeek, const Duration(seconds: 6));
+  });
+
+  test('单句循环重复当前句，完成后不跳到第一句', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: const PlaybackSettings(
+        loopSentence: true,
+        sentenceLoopCount: 0, // ∞ 无限重复当前句
+        sentenceInterval: Duration.zero,
+      ),
+      currentFullIndex: 2,
+    );
+
+    // 起播：clip 模式应 setClip 到第 2 句（6s 起）
     unawaited(container.read(listeningPracticeProvider.notifier).play());
     await Future<void>.delayed(Duration.zero);
+    expect(engine.lastClipStart, const Duration(seconds: 6));
 
-    // 应重新 seek 到第 2 句起点（6s），而不是续播引擎当前的 1s
-    expect(engine.lastSeek, const Duration(seconds: 6));
-
-    engine.emitPlayerState(
-      ja.PlayerState(false, ja.ProcessingState.completed),
-    );
+    // 模拟该句播放完成 → 单句循环应重播当前句，而非跳到第 0 句
+    engine.lastClipStart = null;
+    engine.emitPlayerState(ja.PlayerState(false, ja.ProcessingState.completed));
     await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(listeningPracticeProvider).currentFullIndex, 2);
+    expect(engine.lastClipStart, const Duration(seconds: 6));
   });
 }

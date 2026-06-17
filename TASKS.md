@@ -1,7 +1,32 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-17（v41→v42 迁移：清理仍停在 v1 盲听首步的存量进度，改用 v2 流程）
+> 最后更新：2026-06-17（free player 播放架构重构：单一事件驱动模型 + 标准 repeat 模式）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：循环设置弹窗（整篇 / 单句双循环独立可同时开启）
+
+自由播放器原循环交互繁琐：循环图标是三态切换（关闭→整段→单句，**互斥**），重复次数/间隔藏在右上角 `Icons.tune` 弹窗且仅作用于单句循环。改为：点击循环图标直接弹出循环设置面板，「整篇循环」「单句循环」两个**独立、可同时开启**的开关，各带「重复次数」「间隔时长」滑块。右上角 tune 按钮删除。已与用户确认语义：整篇循环「重复次数 N」= 整篇**总共播放 N 遍**（∞=无限）。
+
+- [x] `playback_settings.dart`：用六个新字段（`loopWhole`/`wholeLoopCount`/`wholeInterval` + `loopSentence`/`sentenceLoopCount`/`sentenceInterval`）**替换**单一 `repeatMode`/`loopCount`/`pauseInterval`；范围校验（次数 0=∞ 或 1-10，间隔 0-10s）；`fromJson` 兼容旧 schema 迁移（`one`→单句、`all`→整篇∞、`off`→双关，旧 `loopEnabled`/`loopAudioEnabled` 亦兼容）；删除已无消费方的 `PlaybackRepeatMode` 枚举与其 export。
+- [x] `playback_reducer.dart`：`decideNext` 重写为接收 `isClipMode` + 双循环参数，覆盖 gapless（整篇完成）/clip（单句完成）两种事件语义；`ReplayCurrent`/`GoToPosition` 增加 `pauseBefore` 字段，让 reducer 直接给出该用单句还是整篇间隔（单一真相源）。
+- [x] `listening_practice_provider.dart`：`_repeatsDone`→`_sentenceRepeatsDone` 并新增 `_wholeLoopsDone`（clip 模式仅在真正整篇回卷时 +1，避免 off-by-one）；`_isClipMode` 改为 `bookmarks || loopSentence`；`_advanceAfterCompletion` 走新 reducer；`_delayInterval(Duration)` 接收 reducer 决策的间隔；所有起播/seek 重置点同步归零两个计数。
+- [x] UI：`playback_controls.dart` 循环图标改为点击弹出**悬浮浮层**（`_LoopButton` 用 `OverlayPortal` + `CompositedTransformFollower` 锚定到按钮上方、右对齐，透明遮罩点击外部关闭；任一循环开则高亮，仅单句开用 repeat_one）；`settings_dialog.dart` 重写为浮层 `LoopSettingsPopup`（两组自定义紧凑开关行 + `AnimatedSize` 展开「标签 + 滑条 + 值」**单行**滑块：重复次数 1-10/∞、间隔 0-10s，即时生效）；`player_screen.dart` 删除 tune 按钮与 `_showSettingsDialog`，状态徽标改为按 `loopWhole`/`loopSentence` 各自展示；l10n 新增 `wholeTextLoop`/`singleSentenceLoop`（复用 `loopSettings`/`repeatCount`/`intervalTime`/`times`/`seconds`）。
+- [x] 测试：重写 `playback_reducer_test`（gapless/clip/两者同开全程 trace/边界，断言 `pauseBefore`）、`playback_settings_test`（六字段往返、范围截断、旧 schema 迁移）、`settings_dialog_test`（双开关展开滑块、∞ 文案、切换触发 updateSettings）、`playback_controls_test`（图标随循环态、点击开弹窗）、`player_screen_test`（移除 tune、循环按钮开弹窗）、`session_guard_test`（迁移到新字段）。
+
+  **完成时间**: 2026-06-17
+
+## 已完成：自由播放器（free player）播放架构重构
+
+free player 的循环/跳句 bug（单句循环莫名跳第一句、讲解页试听返回后跳句）根源是架构问题：`ListeningPractice` 用**两套执行模型**（响应式 `_playContinuous` + 命令式 `while/for` 长协程 `_playSubtitleDriven`）驱动同一个共享 `AudioEngine`，由 `loopEnabled×loopCount×autoPlayNext×loopAudio` 四开关矩阵 + 被多处递增的 `sessionId` 协调，事件竞态导致索引乱跳。本次彻底重写为**单一事件驱动模型**，不打补丁。
+
+- [x] 新增纯函数 `playback_reducer.dart`（`PlaybackRepeatMode{off,all,one}` + `decideNext`），把「一句播完后做什么」从协程剥离为可单测的无副作用决策；枚举名避开 Flutter material 的 `RepeatMode` 冲突。
+- [x] `playback_settings.dart`：用单一 `repeatMode` **替换** `loopEnabled`/`loopAudioEnabled`/`loopAudio`；`fromJson` 一次性迁移旧字段；删除废弃字段及其 toJson/copyWith/校验。
+- [x] 重写 `listening_practice_provider.dart`：删除 `_playContinuous`/`_playSubtitleDriven`/`_shouldUseContinuousMode`/`_audioLoopCount` 与 `play()` 的 `isResume` 启发式；改为「位置流推进高亮（gapless）+ 完成事件归约器 `_advanceAfterCompletion` 调 `decideNext`」；新增 `restorePosition()` 供讲解页返回显式对齐当前句；保留共享引擎必需的 `isActiveSession` 守卫并加注释。删除引擎中仅 LP 使用的死代码 `playClipWithLoops`。
+- [x] UI：`playback_controls.dart` 单句开关改为三态循环按钮（关闭→整段循环→单句循环）；`settings_dialog.dart` 删除「音频循环」整块与「句子重复」开关，合并为单句循环参数（重复次数/间隔）；`player_screen.dart` 讲解页返回调用 `restorePosition()`，InfoBar 按 `repeatMode` 展示；清理孤立 l10n 键。
+- [x] 交互简化（用户反馈）：删除费解的「自动播放下一句」开关，把「单句循环是无限重复还是重复 N 次后前进」折叠进**重复次数**——`loopCount=0` 即「∞」无限重复当前句，有限次数则重复够后自动进下一句。`autoPlayNextSentenceEnabled` 字段一并删除。
+- [x] 测试：新增 `playback_reducer_test.dart`（13 用例覆盖 decideNext 全分支）；重写 `session_guard_test.dart`（单句循环不跳第一句、讲解页返回 `restorePosition` 对齐当前句、gapless 位置推进、外来 session 隔离）；更新 `playback_settings_test`/`settings_dialog_test`/`playback_controls_test`/`player_screen_test`。`flutter analyze` lib 0 issue；全量 2841 单元/组件测试通过。（macOS integration_test 因环境「Unable to start the app on the device」启动失败，与本改动无关。）
+
+  **完成时间**: 2026-06-17
 
 ## 已完成：修复自由播放器看完句子讲解返回后主播放按钮跳回第一句
 

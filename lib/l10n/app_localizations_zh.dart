@@ -191,6 +191,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loopSettings => '循环设置';
 
   @override
+  String get wholeTextLoop => '整篇循环';
+
+  @override
+  String get singleSentenceLoop => '单句循环';
+
+  @override
   String get displaySettings => '显示设置';
 
   @override
@@ -215,25 +221,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoPlayNextSentence => '自动播放下一句';
 
   @override
-  String get sentenceRepeat => '句子重复';
-
-  @override
   String get repeatCount => '重复次数';
 
   @override
+  String get infiniteRepeat => '无限 ∞';
+
+  @override
   String get intervalTime => '间隔时间（秒）';
-
-  @override
-  String get audioLoop => '音频循环';
-
-  @override
-  String get loopTimes => '循环次数';
-
-  @override
-  String get noLoop => '不循环';
-
-  @override
-  String get infiniteLoop => '无穷 ∞';
 
   @override
   String get times => '次';

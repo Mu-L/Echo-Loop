@@ -177,11 +177,11 @@ void main() {
         await _disposeTree(tester);
       });
 
-      testWidgets('AppBar 显示设置按钮', (tester) async {
+      testWidgets('AppBar 不再显示设置按钮（已移除）', (tester) async {
         await tester.pumpWidget(createTestScreen(const PlayerScreen()));
         await tester.pump();
 
-        expect(find.byIcon(Icons.tune), findsOneWidget);
+        expect(find.byIcon(Icons.tune), findsNothing);
         await _disposeTree(tester);
       });
 
@@ -208,17 +208,32 @@ void main() {
     });
 
     group('交互', () {
-      testWidgets('点击设置按钮打开设置底部弹窗', (tester) async {
-        await tester.pumpWidget(createTestScreen(const PlayerScreen()));
+      testWidgets('点击循环按钮打开循环设置弹窗', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _audioOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+              ),
+            ),
+          ),
+        );
         await tester.pump();
 
-        // 点击设置按钮
-        await tester.tap(find.byIcon(Icons.tune));
+        // 默认两循环都关：控制栏循环图标为 repeat（无徽标干扰）
+        await tester.tap(find.byIcon(Icons.repeat));
         await tester.pumpAndSettle();
 
-        // 应弹出设置底部弹窗
-        expect(find.text('Settings'), findsAtLeast(1));
-        expect(find.text('Sentence Repeat'), findsOneWidget);
+        // 应弹出循环设置弹窗（含两组循环开关）
+        expect(find.text('Loop Settings'), findsOneWidget);
+        expect(find.text('Whole-text loop'), findsOneWidget);
+        expect(find.text('Single-sentence loop'), findsOneWidget);
         await _disposeTree(tester);
       });
 

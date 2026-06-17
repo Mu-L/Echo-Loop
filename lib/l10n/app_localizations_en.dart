@@ -192,6 +192,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loopSettings => 'Loop Settings';
 
   @override
+  String get wholeTextLoop => 'Whole-text loop';
+
+  @override
+  String get singleSentenceLoop => 'Single-sentence loop';
+
+  @override
   String get displaySettings => 'Display Settings';
 
   @override
@@ -216,25 +222,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get autoPlayNextSentence => 'Auto Play Next Sentence';
 
   @override
-  String get sentenceRepeat => 'Sentence Repeat';
-
-  @override
   String get repeatCount => 'Repeat Count';
 
   @override
+  String get infiniteRepeat => 'Infinite ∞';
+
+  @override
   String get intervalTime => 'Interval (seconds)';
-
-  @override
-  String get audioLoop => 'Audio Loop';
-
-  @override
-  String get loopTimes => 'Loop Count';
-
-  @override
-  String get noLoop => 'No Loop';
-
-  @override
-  String get infiniteLoop => 'Infinite ∞';
 
   @override
   String get times => 'times';

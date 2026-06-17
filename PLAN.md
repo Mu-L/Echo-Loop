@@ -377,6 +377,7 @@ integration_test/                    # 端到端集成测试（25 个测试）
 
 - **AudioEngine**（底层）：封装 just_audio，提供播放、暂停、seek、速度控制等原子操作，不包含业务逻辑
 - **ListeningPractice**（业务层）：基于 AudioEngine，实现句子追踪（二分查找定位当前句子）、书签管理、循环播放、播放模式切换等业务功能
+  - 播放编排为**单一事件驱动模型**：gapless 连播由位置流推进 `currentFullIndex`；单句循环/收藏逐句播放由「clip 完成事件」触发纯函数 `decideNext`（`playback_reducer.dart`）决策下一步（重播/进句/回卷/停止）。循环语义由**两组独立可同时开启**的开关描述——整篇循环（`loopWhole`+总遍数+间隔）与单句循环（`loopSentence`+次数+间隔），各自携带间隔由 reducer 经 `pauseBefore` 下发；取代旧 `PlaybackRepeatMode{off,all,one}` 互斥三态。讲解页等共享引擎的旁路驱动靠 `isActiveSession` session 守卫隔离，返回时 `restorePosition()` 显式对齐当前句。
 
 ### 状态管理
 
