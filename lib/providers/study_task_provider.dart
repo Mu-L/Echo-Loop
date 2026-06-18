@@ -33,6 +33,12 @@ class StudyTask {
   final Duration? overdueDuration;
   final DateTime updatedAt;
 
+  /// 当前阶段是否已有真实完成记录（≥1 个子步骤完成）。
+  ///
+  /// 来自 `stage_completions` 历史（非 `subStage` 位置推导），用于判定"学习中"。
+  /// 待解锁任务本轮尚未解锁、无任何完成记录 → 恒为 false。
+  final bool hasRoundProgress;
+
   const StudyTask({
     required this.audioId,
     required this.audioName,
@@ -43,6 +49,7 @@ class StudyTask {
     this.nextReviewAt,
     this.isOverdue = false,
     this.overdueDuration,
+    this.hasRoundProgress = false,
   });
 }
 
@@ -56,6 +63,9 @@ final studyTaskProvider = Provider<List<StudyTask>>((ref) {
   final audioState = ref.watch(audioLibraryProvider);
   final progressMap = ref.watch(
     learningProgressNotifierProvider.select((s) => s.progressMap),
+  );
+  final completionsByAudio = ref.watch(
+    learningProgressNotifierProvider.select((s) => s.completionsByAudio),
   );
   final now = ref.watch(nowProvider)();
 
@@ -74,6 +84,7 @@ final studyTaskProvider = Provider<List<StudyTask>>((ref) {
       audioId: item.id,
       audioName: item.name,
       progress: progress,
+      completions: completionsByAudio[item.id] ?? const {},
       now: now,
     );
     if (task != null) {
@@ -151,6 +162,7 @@ StudyTask? _buildTaskForAudio({
   required String audioId,
   required String audioName,
   required LearningProgress progress,
+  required Set<String> completions,
   required DateTime now,
 }) {
   if (progress.isCompleted) {
@@ -162,6 +174,11 @@ StudyTask? _buildTaskForAudio({
     return null;
   }
 
+  // 当前阶段是否已有真实完成记录（key 带冒号，'review1:' 不会误匹配 'review14:...'）。
+  final hasRoundProgress = completions.any(
+    (k) => k.startsWith('${progress.currentStage.key}:'),
+  );
+
   if (progress.currentStage == LearningStage.firstLearn) {
     return StudyTask(
       audioId: audioId,
@@ -170,6 +187,7 @@ StudyTask? _buildTaskForAudio({
       stage: progress.currentStage,
       subStage: progress.currentSubStage,
       updatedAt: progress.updatedAt,
+      hasRoundProgress: hasRoundProgress,
     );
   }
 
@@ -192,6 +210,7 @@ StudyTask? _buildTaskForAudio({
     isOverdue: progress.isReviewOverdueAt(now),
     overdueDuration: progress.overdueDurationAt(now),
     updatedAt: progress.updatedAt,
+    hasRoundProgress: hasRoundProgress,
   );
 }
 

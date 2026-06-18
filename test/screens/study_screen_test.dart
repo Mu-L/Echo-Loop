@@ -170,6 +170,49 @@ void main() {
     expect(disabledButtons, findsAtLeast(1));
   });
 
+  testWidgets('待解锁任务（v2 首步难句补练、无完成记录）显示倒计时而非"学习中"', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 2, 25, 12, 0);
+    final audioItems = [
+      AudioItem(
+        id: 'audio-1',
+        name: 'Upcoming v2 Audio',
+        audioPath: 'audios/review.mp3',
+        addedDate: now,
+      ),
+    ];
+    // review2 v2 首步为难句补练（≠ allSubStages.first 盲听），本轮无完成记录。
+    final progressState = LearningProgressState(
+      progressMap: {
+        'audio-1': LearningProgress(
+          audioItemId: 'audio-1',
+          currentStage: LearningStage.review2,
+          currentSubStage: SubStageType.reviewDifficultPractice,
+          lastStageCompletedAt: now, // 未到时间 → 待解锁，距解锁 48h
+          updatedAt: now,
+        ),
+      },
+    );
+
+    await tester.pumpWidget(
+      createTestWidget(
+        audioItems: audioItems,
+        progressState: progressState,
+        fixedNow: now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // upcoming reviews 默认折叠，先展开
+    await tester.tap(find.byType(ExpansionTile).first);
+    await tester.pumpAndSettle();
+
+    // 应显示解锁倒计时（48h → "in 2d"），不应误显"In Progress"
+    expect(find.text('in 2d'), findsOneWidget);
+    expect(find.text('In Progress'), findsNothing);
+  });
+
   testWidgets('复习任务点击开始后导航到学习计划页', (tester) async {
     final now = DateTime(2026, 2, 25, 12, 0);
     final audioItems = [

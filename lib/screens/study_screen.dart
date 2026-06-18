@@ -1065,7 +1065,7 @@ class _StatusBadge extends StatelessWidget {
 
 /// 状态文案（逾期、距离可复习时间等）
 ///
-/// 已有进度（非首个子阶段）→ "学习中"
+/// 本轮已有真实完成记录（[StudyTask.hasRoundProgress]）→ "学习中"
 /// 逾期分级：无时长/>7天→"待复习"，≤7天→"待复习 · X天前到期"，<1天→"待复习 · X小时前到期"
 String _statusText(
   BuildContext context,
@@ -1073,9 +1073,9 @@ String _statusText(
   StudyTask task,
   DateTime now,
 ) {
-  // 已有进度（当前子阶段不是该阶段的第一个）→ 显示"学习中"
-  final subStages = task.stage.allSubStages;
-  if (subStages.isNotEmpty && task.subStage != subStages.first) {
+  // 本轮已有真实完成记录 → 显示"学习中"（基于 stage_completions 历史，
+  // 而非 subStage 位置推导——待解锁任务本轮未解锁、无完成记录，永不命中）
+  if (task.hasRoundProgress) {
     return l10n.learningInProgress;
   }
   if (task.isOverdue) {

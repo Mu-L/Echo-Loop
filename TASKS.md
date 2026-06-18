@@ -1,7 +1,18 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-18（Free Player 单句模式改为精听模式）
+> 最后更新：2026-06-18（修复待解锁任务误显"学习中"）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：修复学习首页「待解锁」任务卡片误显"学习中"
+
+待解锁任务（`reviewUpcoming`）本轮尚未解锁，按设计只应显示解锁倒计时，但 v2 计划的音频会误显"学习中"。根因：`study_screen.dart` 的 `_statusText` 用 `task.subStage != task.stage.allSubStages.first` 判定"学习中"，而 `allSubStages`（v1∪v2 展示并集）复习阶段首元素是盲听，v2 计划首步却是难句补练，导致刚进入新复习轮的待解锁任务被误判。改为基于真实完成历史（`stage_completions`），与 `learning_plan_screen` 的判定口径统一，且不依赖计划版本。
+
+- [x] `study_task_provider.dart`：`StudyTask` 新增 `hasRoundProgress` 字段，`_buildTaskForAudio` 由 `completionsByAudio` 计算当前 stage 是否有 ≥1 完成记录（key 前缀带冒号，避免 `review1` 误匹配 `review14`）。
+- [x] `study_screen.dart`：`_statusText` 改用 `task.hasRoundProgress` 判定"学习中"，弃用 `allSubStages.first` 比较。
+- [x] 测试：`study_task_provider_test` 新增 `hasRoundProgress` group（待解锁无记录=false、有记录=true、跨阶段不误命中）；`study_screen_test` 新增待解锁卡片显示倒计时而非"学习中"用例。
+- [x] 验证：`flutter analyze` 改动文件 0 issue；目标测试全绿。
+
+  **完成时间**: 2026-06-18
 
 ## 已完成：Free Player 单句模式改为精听模式（复用 AnnotationContentView）
 

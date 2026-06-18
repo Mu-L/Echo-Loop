@@ -783,6 +783,145 @@ void main() {
     });
   });
 
+  group('StudyTask.hasRoundProgress', () {
+    // 进入 review 新轮、v2 计划首步为难句补练（≠ allSubStages.first 盲听），
+    // 且本轮无完成记录 → 不应判为"学习中"（覆盖待解锁误显 bug）。
+    test('待解锁任务本轮无完成记录时 hasRoundProgress 为 false', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'a',
+          name: 'Alpha',
+          audioPath: 'audios/a.mp3',
+          addedDate: now,
+        ),
+      ];
+      final progressMap = {
+        'a': LearningProgress(
+          audioItemId: 'a',
+          currentStage: LearningStage.review2,
+          currentSubStage: SubStageType.reviewDifficultPractice,
+          lastStageCompletedAt: now, // 未到下次复习时间 → 待解锁
+          updatedAt: now,
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(
+                progressMap: progressMap,
+                completionsByAudio: const {'a': <String>{}},
+              ),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final task = container.read(studyTaskProvider).single;
+      expect(task.type, StudyTaskType.reviewUpcoming);
+      expect(task.hasRoundProgress, isFalse);
+    });
+
+    // 本轮已有真实完成记录 → hasRoundProgress 为 true（"学习中"）。
+    test('本轮已有完成记录时 hasRoundProgress 为 true', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'a',
+          name: 'Alpha',
+          audioPath: 'audios/a.mp3',
+          addedDate: now,
+        ),
+      ];
+      final progressMap = {
+        'a': LearningProgress(
+          audioItemId: 'a',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.blindListen,
+          lastStageCompletedAt: now.subtract(const Duration(days: 2)),
+          updatedAt: now,
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(
+                progressMap: progressMap,
+                completionsByAudio: const {
+                  'a': {'review1:reviewDifficultPractice'},
+                },
+              ),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final task = container.read(studyTaskProvider).single;
+      expect(task.type, StudyTaskType.reviewReady);
+      expect(task.hasRoundProgress, isTrue);
+    });
+
+    // stage key 前缀匹配带冒号，'review1:' 不会误匹配 'review14:...'。
+    test('其他阶段的完成记录不计入当前阶段', () {
+      final now = DateTime(2026, 2, 25, 12, 0);
+      final audioItems = [
+        AudioItem(
+          id: 'a',
+          name: 'Alpha',
+          audioPath: 'audios/a.mp3',
+          addedDate: now,
+        ),
+      ];
+      final progressMap = {
+        'a': LearningProgress(
+          audioItemId: 'a',
+          currentStage: LearningStage.review1,
+          currentSubStage: SubStageType.reviewDifficultPractice,
+          lastStageCompletedAt: now,
+          updatedAt: now,
+        ),
+      };
+
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          ),
+          learningProgressNotifierProvider.overrideWith(
+            () => TestLearningProgressNotifier(
+              LearningProgressState(
+                progressMap: progressMap,
+                // review14 的完成记录不应被 review1 误命中
+                completionsByAudio: const {
+                  'a': {'review14:reviewDifficultPractice'},
+                },
+              ),
+            ),
+          ),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final task = container.read(studyTaskProvider).single;
+      expect(task.hasRoundProgress, isFalse);
+    });
+  });
+
   group('pendingStudyTaskCountProvider', () {
     test('不计入 reviewUpcoming 类型的任务', () {
       final now = DateTime(2026, 2, 25, 12, 0);
