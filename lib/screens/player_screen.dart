@@ -550,35 +550,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           final position = snapshot.data ?? Duration.zero;
           final total = engine.totalDuration ?? Duration.zero;
 
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ProgressBar(
-                progress: position,
-                total: total,
-                onSeek: (duration) => controller.seekAbsolute(duration),
-                barHeight: 3,
-                thumbRadius: 8,
-                thumbGlowRadius: 14,
-                timeLabelTextStyle: AppTextStyles.caption(context),
-                timeLabelLocation: TimeLabelLocation.none,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    SubtitleParser.formatDuration(position),
-                    style: AppTextStyles.caption(context),
-                  ),
-                  Text(() {
-                    final clampedPos = position > total ? total : position;
-                    final remaining = total - clampedPos;
-                    return '-${SubtitleParser.formatDuration(remaining)}';
-                  }(), style: AppTextStyles.caption(context)),
-                ],
-              ),
-            ],
+          // 时间标签直接用 ProgressBar 内置的 sides 布局放在进度条两侧同一行，
+          // 节省竖向空间；右侧显示剩余时间（-0:04 形式）。
+          return ProgressBar(
+            progress: position,
+            total: total,
+            onSeek: (duration) => controller.seekAbsolute(duration),
+            barHeight: 3,
+            thumbRadius: 8,
+            thumbGlowRadius: 14,
+            timeLabelTextStyle: AppTextStyles.caption(context),
+            timeLabelLocation: TimeLabelLocation.sides,
+            timeLabelType: TimeLabelType.remainingTime,
           );
         },
       ),
