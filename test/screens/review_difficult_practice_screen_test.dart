@@ -520,6 +520,7 @@ void main() {
       expect(find.byIcon(Icons.bookmark), findsOneWidget);
       expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
     });
+
   });
 
   group('ReviewDifficultPracticeScreen — 跟读模式', () {
@@ -707,6 +708,7 @@ void main() {
 
       expect(spyEngine.enteredWaitingForUser, isTrue);
     });
+
   });
 
   group('ReviewDifficultPracticeScreen — 播放按钮交互', () {

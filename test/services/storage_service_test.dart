@@ -70,21 +70,23 @@ void main() {
       expect(loaded.bookmark.sentenceInterval, const Duration(seconds: 1));
     });
 
-    test('旧持久化中的非支持倍速读取时回退到 1.0x', () async {
+    test('旧持久化中的非支持倍速：范围内吸附到最近档位、越界回退 1.0x', () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'playback_settings',
         json.encode({
+          // 1.25 在范围内但非档位 → 吸附到最近档位 1.3
           'fullSettings': const PlaybackSettings(playbackSpeed: 1.0).toJson()
             ..['playbackSpeed'] = 1.25,
-          'bookmarkSettings':
-              const PlaybackSettings(playbackSpeed: 0.8).toJson(),
+          // 3.0 超出支持范围 → 回退 1.0
+          'bookmarkSettings': const PlaybackSettings(playbackSpeed: 0.8).toJson()
+            ..['playbackSpeed'] = 3.0,
         }),
       );
 
       final loaded = await StorageService.loadSettings();
-      expect(loaded.full.playbackSpeed, 1.0);
-      expect(loaded.bookmark.playbackSpeed, 0.8);
+      expect(loaded.full.playbackSpeed, 1.3);
+      expect(loaded.bookmark.playbackSpeed, 1.0);
     });
   });
 }

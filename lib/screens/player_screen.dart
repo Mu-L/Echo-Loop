@@ -26,6 +26,10 @@ import '../widgets/player_hotkey_scope.dart';
 import '../widgets/practice/annotation_content_view.dart';
 import 'sentence_detail_screen.dart';
 
+const kPlayerSingleSentenceSwipeAreaKey = ValueKey(
+  'player-single-sentence-swipe-area',
+);
+
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
@@ -35,6 +39,12 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
+  static const double _singleSentenceSwipeVelocityThreshold = 250;
+  String? _lastSingleSentenceContentId;
+  PlaylistMode? _lastSingleSentencePlaylistMode;
+  int? _lastSingleSentenceIndex;
+  int _singleSentenceTransitionDirection = 0;
+
   late TabController _tabController;
   int _previousTabIndex = 0;
   Duration? _seekPreviewPosition;
@@ -213,6 +223,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            // Free Player 的横向手势保留给学习态切句，这里只允许点 tab 切换。
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildFullTextTab(playerState, controller),
               _buildBookmarkedTab(playerState, controller),
@@ -398,76 +410,185 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (audioItem == null) {
       return const SizedBox.shrink();
     }
+    final contentId = '${playerState.playlistMode.name}-$index';
+    if (_lastSingleSentenceContentId != contentId) {
+      if (_lastSingleSentencePlaylistMode == playerState.playlistMode &&
+          _lastSingleSentenceIndex != null) {
+        final previousIndex = _lastSingleSentenceIndex!;
+        _singleSentenceTransitionDirection = index > previousIndex
+            ? 1
+            : index < previousIndex
+            ? -1
+            : 0;
+      } else {
+        _singleSentenceTransitionDirection = 0;
+      }
+      _lastSingleSentenceContentId = contentId;
+      _lastSingleSentencePlaylistMode = playerState.playlistMode;
+      _lastSingleSentenceIndex = index;
+    }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 序号 + 时间区间（弱化辅助信息）
-          Padding(
-            padding: const EdgeInsets.only(
-              top: AppSpacing.m,
-              bottom: AppSpacing.s,
+    return GestureDetector(
+      key: kPlayerSingleSentenceSwipeAreaKey,
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (details) =>
+          _handleSingleSentenceSwipe(details, playerState, controller),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 序号 + 时间区间（弱化辅助信息）
+            Padding(
+              padding: const EdgeInsets.only(
+                top: AppSpacing.m,
+                bottom: AppSpacing.s,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '#${currentSentence.index + 1}',
+                    style: AppTextStyles.caption(context),
+                  ),
+                  const SizedBox(width: AppSpacing.l),
+                  Text(
+                    '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
+                    style: AppTextStyles.caption(context),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Text(
-                  '#${currentSentence.index + 1}',
-                  style: AppTextStyles.caption(context),
-                ),
-                const SizedBox(width: AppSpacing.l),
-                Text(
-                  '${SubtitleParser.formatDuration(currentSentence.startTime)} - ${SubtitleParser.formatDuration(currentSentence.endTime)}',
-                  style: AppTextStyles.caption(context),
-                ),
-              ],
+            // 难句标记行（复用精听）—— 不被遮蔽，盲听时仍可标记
+            BookmarkToggleRow(
+              isDifficult: isBookmarked,
+              onTap: () => controller.toggleBookmark(currentSentence.index),
             ),
-          ),
-          // 难句标记行（复用精听）—— 不被遮蔽，盲听时仍可标记
-          BookmarkToggleRow(
-            isDifficult: isBookmarked,
-            onTap: () => controller.toggleBookmark(currentSentence.index),
-          ),
-          const SizedBox(height: AppSpacing.m),
-          // 精听解析内容 + 隐藏字幕遮罩
-          Expanded(
-            child: Stack(
-              children: [
-                AnnotationContentView(
-                  // 切句时重建，确保 AnnotationContentView 内部意群等状态重置
-                  key: ValueKey(currentSentence.index),
-                  text: currentSentence.text,
-                  aiNotifier: ref.read(sentenceAiNotifierProvider),
-                  audioItemId: audioItem.id,
-                  sentenceIndex: currentSentence.index,
-                  sentenceStartMs: currentSentence.startTime.inMilliseconds,
-                  sentenceEndMs: currentSentence.endTime.inMilliseconds,
-                  // 意群试听与主播放共用引擎，播放前先暂停主播放
-                  onStopMainPlayer: () => controller.pause(),
+            const SizedBox(height: AppSpacing.m),
+            // 精听解析内容 + 隐藏字幕遮罩。切句时做轻量滑动过渡，降低跳变感。
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
                 ),
-                // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
-                if (!settings.showTranscript)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: ClipRRect(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                          child: Container(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.05),
+                transitionBuilder: (child, animation) {
+                  final page = child is _SingleSentenceAnimatedPage
+                      ? child
+                      : _SingleSentenceAnimatedPage(
+                          direction: 0,
+                          child: child,
+                        );
+                  final beginOffset = switch (page.direction) {
+                    1 => const Offset(0.1, 0),
+                    -1 => const Offset(-0.1, 0),
+                    _ => const Offset(0, 0),
+                  };
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position:
+                          Tween<Offset>(
+                            begin: beginOffset,
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                      child: page.child,
+                    ),
+                  );
+                },
+                child: _SingleSentenceAnimatedPage(
+                  key: ValueKey(contentId),
+                  direction: _singleSentenceTransitionDirection,
+                  child: Stack(
+                    children: [
+                      AnnotationContentView(
+                        // 切句时重建，确保 AnnotationContentView 内部意群等状态重置
+                        key: ValueKey(currentSentence.index),
+                        text: currentSentence.text,
+                        aiNotifier: ref.read(sentenceAiNotifierProvider),
+                        audioItemId: audioItem.id,
+                        sentenceIndex: currentSentence.index,
+                        sentenceStartMs: currentSentence.startTime.inMilliseconds,
+                        sentenceEndMs: currentSentence.endTime.inMilliseconds,
+                        // 意群试听与主播放共用引擎，播放前先暂停主播放
+                        onStopMainPlayer: () => controller.pause(),
+                      ),
+                      // 隐藏字幕遮罩：覆盖整个内容区（含工具栏），模糊且不可点击
+                      if (!settings.showTranscript)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ClipRRect(
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                                child: Container(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.05),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  void _handleSingleSentenceSwipe(
+    DragEndDetails details,
+    ListeningPracticeState playerState,
+    ListeningPractice controller,
+  ) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < _singleSentenceSwipeVelocityThreshold) {
+      return;
+    }
+    if (velocity < 0) {
+      if (playerState.playlistMode == PlaylistMode.bookmarks) {
+        final currentIndex = playerState.currentBookmarkIndex;
+        final bookmarked = playerState.bookmarkedSentences;
+        final currentPos = currentIndex == null
+            ? -1
+            : bookmarked.indexWhere((s) => s.index == currentIndex);
+        if (currentPos >= bookmarked.length - 1) {
+          return;
+        }
+      } else if ((playerState.currentFullIndex ?? 0) >=
+          playerState.sentences.length - 1) {
+        return;
+      }
+      unawaited(controller.nextSentence());
+      return;
+    }
+
+    if (playerState.playlistMode == PlaylistMode.bookmarks) {
+      final currentIndex = playerState.currentBookmarkIndex;
+      final bookmarked = playerState.bookmarkedSentences;
+      final currentPos = currentIndex == null
+          ? -1
+          : bookmarked.indexWhere((s) => s.index == currentIndex);
+      if (currentPos <= 0) {
+        return;
+      }
+    } else if ((playerState.currentFullIndex ?? 0) <= 0) {
+      return;
+    }
+    unawaited(controller.previousSentence());
   }
 
   /// 点击句子主体 → 暂停播放 → 进入句子讲解页
@@ -706,6 +827,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       ],
     );
   }
+}
+
+class _SingleSentenceAnimatedPage extends StatelessWidget {
+  final int direction;
+  final Widget child;
+
+  const _SingleSentenceAnimatedPage({
+    super.key,
+    required this.direction,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 class _HotkeyTipsCarousel extends StatefulWidget {

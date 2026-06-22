@@ -5045,7 +5045,7 @@ abstract class AppLocalizations {
   /// No description provided for @guideIntensiveListenCantUnderstandDescription.
   ///
   /// In en, this message translates to:
-  /// **'Tap here when a sentence is hard to follow. It will be auto-marked as difficult and you\'ll enter single-sentence analysis mode.'**
+  /// **'Tap here when a sentence is hard to follow. It will be auto-marked as difficult and you\'ll enter explanation mode.'**
   String get guideIntensiveListenCantUnderstandDescription;
 
   /// No description provided for @guideIntensiveListenAnnotationContinueDescription.

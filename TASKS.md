@@ -1,7 +1,17 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-22（学习版通知提示收敛到逐句精听完成）
+> 最后更新：2026-06-22（Free Player 禁止 tab swipe，逐句精听支持左右滑动切句）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：Free Player 禁止 tab swipe，逐句精听支持左右滑动切句
+
+此前 Free Player 的 `全文 / 收藏` 使用 `TabBarView` 默认横向切页，和产品想要的“横向手势优先用于学习态切句”语义冲突；逐句精听则只有底部上下句按钮，没有对应的左右滑动切句入口。现统一调整为：Free Player 只允许点击 tab 切换，逐句精听支持左右 swipe 切换句子。
+
+- [x] `player_screen.dart`：`TabBarView` 显式禁用横向 swipe，仅保留点击 `TabBar` 切换。
+- [x] `intensive_listen_player_screen.dart`：在主体内容区新增横向手势，左滑下一句、右滑上一句，并补边界防越界处理。
+- [x] 测试：`player_screen_test.dart` 增加“横向滑动不会切 tab”回归；`intensive_listen_player_screen_test.dart` 增加左右滑动切句与首句防越界回归。
+
+  **完成时间**: 2026-06-22 22:09:26 +0800
 
 ## 已完成：学习版通知提示收敛到逐句精听完成
 

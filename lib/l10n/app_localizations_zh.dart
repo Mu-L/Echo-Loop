@@ -2743,7 +2743,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get guideIntensiveListenCantUnderstandDescription =>
-      '遇到听不懂的句子时点这里，会自动标记为难句并进入单句解析模式。';
+      '遇到听不懂的句子时点这里，会自动标记为难句并进入讲解模式。';
 
   @override
   String get guideIntensiveListenAnnotationContinueDescription =>

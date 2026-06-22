@@ -887,6 +887,10 @@ bool _isIntensiveMainPlaybackActive(IntensiveListenState state) {
 
 extension on _IntensiveListenPlayerScreenState {
   void _handlePrevious() {
+    final playerState = ref.read(intensiveListenPlayerProvider);
+    if (playerState.currentSentenceIndex <= 0) {
+      return;
+    }
     final player = ref.read(intensiveListenPlayerProvider.notifier);
     unawaited(player.goToPrevious());
   }

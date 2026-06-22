@@ -59,6 +59,53 @@ class _TestAudioItemDao implements AudioItemDao {
   dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }
 
+class _RecordingListeningPractice extends TestListeningPractice {
+  _RecordingListeningPractice(super.initialState);
+
+  int nextSentenceCalls = 0;
+  int previousSentenceCalls = 0;
+
+  @override
+  Future<void> nextSentence() async {
+    nextSentenceCalls += 1;
+    if (state.playlistMode == PlaylistMode.bookmarks) {
+      final bookmarked = state.bookmarkedSentences;
+      final currentIndex = state.currentBookmarkIndex;
+      final pos = currentIndex == null
+          ? -1
+          : bookmarked.indexWhere((s) => s.index == currentIndex);
+      if (pos >= 0 && pos < bookmarked.length - 1) {
+        state = state.copyWith(currentBookmarkIndex: bookmarked[pos + 1].index);
+      }
+      return;
+    }
+    final currentIndex = state.currentFullIndex ?? 0;
+    if (currentIndex < state.sentences.length - 1) {
+      state = state.copyWith(currentFullIndex: currentIndex + 1);
+    }
+  }
+
+  @override
+  Future<void> previousSentence() async {
+    previousSentenceCalls += 1;
+    if (state.playlistMode == PlaylistMode.bookmarks) {
+      final bookmarked = state.bookmarkedSentences;
+      final currentIndex = state.currentBookmarkIndex;
+      final pos = currentIndex == null
+          ? -1
+          : bookmarked.indexWhere((s) => s.index == currentIndex);
+      if (pos > 0) {
+        state = state.copyWith(currentBookmarkIndex: bookmarked[pos - 1].index);
+      }
+      return;
+    }
+    final currentIndex = state.currentFullIndex ?? 0;
+    if (currentIndex > 0) {
+      state = state.copyWith(currentFullIndex: currentIndex - 1);
+    }
+  }
+}
+
 /// 单句模式（精听）所需 overrides：在音频 overrides 基础上补齐
 /// [AnnotationContentView] 的 AI / DAO / 学习设置依赖。
 List<Override> _singleSentenceOverrides({
@@ -324,6 +371,43 @@ void main() {
         await _disposeTree(tester);
       });
 
+      testWidgets('横向滑动不会切换全文/书签 Tab', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _audioOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('No bookmarked sentences'), findsNothing);
+
+        await tester.drag(find.byType(TabBarView), const Offset(-400, 0));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+
+        expect(find.text('No bookmarked sentences'), findsNothing);
+        expect(find.byType(ParagraphSentenceListCard), findsOneWidget);
+
+        await tester.tap(find.textContaining('Bookmarked'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+
+        expect(find.text('No bookmarked sentences'), findsOneWidget);
+        await _disposeTree(tester);
+      });
+
       testWidgets('点击句子编号区从该句开始播放', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
@@ -493,6 +577,131 @@ void main() {
         // 切换后显示已标记文案
         expect(find.text('Tap to mark as difficult'), findsNothing);
         expect(find.text('Marked difficult, tap to undo'), findsOneWidget);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('全文 tab 单句模式左滑切到下一句', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 0,
+            settings: const PlaybackSettings(singleSentenceMode: true),
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+              collectionListProvider.overrideWith(() => TestCollectionList()),
+              listeningPracticeProvider.overrideWith(() => player),
+              audioEngineProvider.overrideWith(
+                () => TestAudioEngine(
+                  initialState: const AudioEngineState(
+                    totalDuration: Duration(seconds: 120),
+                  ),
+                ),
+              ),
+              ...learningSettingsOverrides(),
+              bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+              audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
+              sentenceAiNotifierProvider.overrideWithValue(
+                SentenceAiNotifier(
+                  cacheDao: createStubbedMockCacheDao(),
+                  apiClient: _MockApiClient(),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.fling(
+          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          const Offset(-500, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(player.nextSentenceCalls, 1);
+        expect(player.state.currentFullIndex, 1);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('收藏 tab 单句模式左右滑动切换收藏句', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            bookmarkedIndices: const {0, 2},
+            currentFullIndex: 0,
+            currentBookmarkIndex: 0,
+            playlistMode: PlaylistMode.full,
+            fullSettings: const PlaybackSettings(singleSentenceMode: true),
+            bookmarkSettings: const PlaybackSettings(singleSentenceMode: true),
+          ),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+              collectionListProvider.overrideWith(() => TestCollectionList()),
+              listeningPracticeProvider.overrideWith(() => player),
+              audioEngineProvider.overrideWith(
+                () => TestAudioEngine(
+                  initialState: const AudioEngineState(
+                    totalDuration: Duration(seconds: 120),
+                  ),
+                ),
+              ),
+              ...learningSettingsOverrides(),
+              bookmarkDaoProvider.overrideWithValue(_TestBookmarkDao()),
+              audioItemDaoProvider.overrideWithValue(_TestAudioItemDao()),
+              sentenceAiNotifierProvider.overrideWithValue(
+                SentenceAiNotifier(
+                  cacheDao: createStubbedMockCacheDao(),
+                  apiClient: _MockApiClient(),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.textContaining('Bookmarked'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+
+        await tester.fling(
+          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          const Offset(-500, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(player.nextSentenceCalls, 1);
+        expect(player.state.currentBookmarkIndex, 2);
+
+        await tester.fling(
+          find.byKey(kPlayerSingleSentenceSwipeAreaKey),
+          const Offset(500, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(player.previousSentenceCalls, 1);
+        expect(player.state.currentBookmarkIndex, 0);
         await _disposeTree(tester);
       });
     });

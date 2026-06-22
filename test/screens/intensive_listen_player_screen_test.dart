@@ -81,6 +81,8 @@ class _RecordingIntensiveListenPlayer extends TestIntensiveListenPlayer {
   int resumeCalls = 0;
   int replayInDetailsCalls = 0;
   int replayDuringCountdownCalls = 0;
+  int goToNextCalls = 0;
+  int goToPreviousCalls = 0;
 
   @override
   Future<void> startPlaying() async {}
@@ -107,6 +109,18 @@ class _RecordingIntensiveListenPlayer extends TestIntensiveListenPlayer {
   Future<void> replayDuringCountdown() async {
     replayDuringCountdownCalls += 1;
     await super.replayDuringCountdown();
+  }
+
+  @override
+  Future<void> goToNext() async {
+    goToNextCalls += 1;
+    await super.goToNext();
+  }
+
+  @override
+  Future<void> goToPrevious() async {
+    goToPreviousCalls += 1;
+    await super.goToPrevious();
   }
 }
 
