@@ -23,12 +23,14 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/learning_session/retell_player_provider.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/database/daos/bookmark_dao.dart';
 import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
 import 'package:echo_loop/database/app_database.dart' show Bookmark;
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/providers/retell_recording_controller_provider.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:echo_loop/services/audio_playback_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
@@ -42,6 +44,9 @@ import '../helpers/mock_providers.dart';
 class _MockCacheDao extends Mock implements SentenceAiCacheDao {}
 
 class _MockApiClient extends Mock implements SentenceAiApiClient {}
+
+class _MockNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
 
 /// 测试用 BookmarkDao
 class _TestBookmarkDao implements BookmarkDao {
@@ -99,6 +104,10 @@ class _TrackingRetellPlayer extends _StaticRetellPlayer {
     bookmarkCalls += 1;
     lastBookmarkedSentenceIndex = sentence.index;
     await super.toggleBookmark(audioItemId, sentence);
+  }
+
+  void emit(RetellPlayerState nextState) {
+    state = nextState;
   }
 }
 
@@ -305,6 +314,50 @@ void main() {
         find.byType(SegmentedButton<RetellDisplayMode>),
       );
       expect(segmented.selected, contains(RetellDisplayMode.showAll));
+    });
+
+    testWidgets('完成后不再检查学习版通知提示', (tester) async {
+      final notificationService = _MockNotificationPermissionService();
+      when(
+        () => notificationService.canShowPrompt(),
+      ).thenAnswer((_) async => true);
+
+      final testParagraphs = createTestParagraphs();
+      final initialState = RetellPlayerState(
+        currentParagraphIndex: 0,
+        totalParagraphs: testParagraphs.length,
+        phase: RetellPhase.listening,
+        isPlaying: true,
+        playingSentenceIndex: 0,
+        displayMode: RetellDisplayMode.showAll,
+        settings: const RetellSettings(keywordMethod: KeywordMethod.random),
+      );
+      final trackingPlayer = _TrackingRetellPlayer(
+        initialState,
+        testParagraphs,
+        const {},
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: initialState,
+          paragraphs: testParagraphs,
+          playerFactory: (_, __, ___) => trackingPlayer,
+          extraOverrides: [
+            notificationPermissionServiceProvider.overrideWithValue(
+              notificationService,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      trackingPlayer.emit(
+        trackingPlayer.state.copyWith(stepFinished: true, isPlaying: false),
+      );
+      await tester.pumpAndSettle();
+
+      verifyNever(() => notificationService.canShowPrompt());
     });
 
     testWidgets('不同选中态下 SegmentedButton 总宽度保持不变', (tester) async {

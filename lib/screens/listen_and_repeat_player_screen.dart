@@ -13,8 +13,6 @@ library;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../widgets/notification_permission_dialog.dart'
-    show maybeShowLearningNotificationPrompt;
 import '../widgets/speech_permission_dialog.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
@@ -310,7 +308,6 @@ class _ListenAndRepeatPlayerScreenState
     // 清除断点 + 标记完成
     await ctrl.clearBreakpoint(isFreePlay: false);
     await ctrl.completeSubStage();
-    await maybeShowLearningNotificationPrompt(context, ref);
     await ctrl.exitLearningMode();
     if (!mounted) return;
 

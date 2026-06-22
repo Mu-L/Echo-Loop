@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/models/blind_listen_settings.dart';
 import 'package:echo_loop/models/intensive_listen_settings.dart'
@@ -17,7 +18,9 @@ import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/blind_listen_player_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/listening_practice/listening_practice_provider.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/screens/blind_listen_player_screen.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 import 'package:echo_loop/widgets/common/masked_sentence_tile.dart';
 import 'package:echo_loop/widgets/common/playback_controls.dart';
@@ -30,6 +33,17 @@ class _StaticBlindListenPlayer extends TestBlindListenPlayer {
   @override
   Future<void> startPlaying() async {}
 }
+
+class _MutableBlindListenPlayer extends _StaticBlindListenPlayer {
+  _MutableBlindListenPlayer(super.initialState);
+
+  void emit(BlindListenPlayerState nextState) {
+    state = nextState;
+  }
+}
+
+class _MockNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
 
 class _TrackingBlindListenPlayer extends _StaticBlindListenPlayer {
   _TrackingBlindListenPlayer(super.initialState, this.paragraphs);
@@ -63,6 +77,7 @@ void main() {
   Widget createTestWidget({
     Locale locale = const Locale('en'),
     BlindListenPlayerState? playerState,
+    List<Override> extraOverrides = const [],
     TestBlindListenPlayer Function(BlindListenPlayerState initialState)?
     playerFactory,
   }) {
@@ -109,6 +124,7 @@ void main() {
           () => (playerFactory ?? TestBlindListenPlayer.new)(initialState),
         ),
         ...studyTimeOverrides(),
+        ...extraOverrides,
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -291,6 +307,39 @@ void main() {
       expect(find.text('Listen first, then recall'), findsOneWidget);
       expect(find.text('Listen carefully...'), findsNothing);
       expect(find.text('Try to recall what you just heard'), findsNothing);
+    });
+
+    testWidgets('完成后不再检查学习版通知提示', (tester) async {
+      final notificationService = _MockNotificationPermissionService();
+      when(
+        () => notificationService.canShowPrompt(),
+      ).thenAnswer((_) async => true);
+
+      final player = _MutableBlindListenPlayer(
+        const BlindListenPlayerState(
+          currentParagraphIndex: 0,
+          totalParagraphs: 2,
+          currentRepeatCount: 1,
+          isPlaying: true,
+        ),
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerFactory: (_) => player,
+          extraOverrides: [
+            notificationPermissionServiceProvider.overrideWithValue(
+              notificationService,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      player.emit(player.state.copyWith(stepFinished: true, isPlaying: false));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => notificationService.canShowPrompt());
     });
 
     // 盲听页面不再支持点词查词（已移除 onWordTap）

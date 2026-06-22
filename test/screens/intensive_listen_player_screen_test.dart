@@ -14,12 +14,14 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/learning_session/intensive_listen_player_provider.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/database/app_database.dart' show AudioItem, Bookmark;
 import 'package:echo_loop/database/daos/audio_item_dao.dart';
 import 'package:echo_loop/database/daos/bookmark_dao.dart';
 
 import 'package:echo_loop/database/providers.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 import 'package:echo_loop/widgets/practice/sentence_annotation_card.dart';
@@ -116,6 +118,9 @@ class _MutableIntensiveListenPlayer extends TestIntensiveListenPlayer {
   }
 }
 
+class _MockNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
+
 void main() {
   /// 创建测试用的精听状态
   IntensiveListenState createPlayerState({
@@ -180,6 +185,7 @@ void main() {
     IntensiveListenState? playerState,
     LearningSessionState? sessionState,
     _TestBookmarkDao? bookmarkDao,
+    List<Override> extraOverrides = const [],
     TestIntensiveListenPlayer Function(
       IntensiveListenState initialState,
       List<Sentence> sentences,
@@ -239,6 +245,7 @@ void main() {
             apiClient: _MockApiClient(),
           ),
         ),
+        ...extraOverrides,
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -570,6 +577,45 @@ void main() {
       // 难句统计 chip 显示数据库难句总数 2（而非本次会话的 1），标签为 Difficult
       expect(find.text('2'), findsOneWidget);
       expect(find.text('Difficult'), findsOneWidget);
+    });
+
+    testWidgets('完成后仍会检查并弹出学习版通知提示', (tester) async {
+      final notificationService = _MockNotificationPermissionService();
+      when(
+        () => notificationService.canShowPrompt(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => notificationService.onUserAcceptedPrompt(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => notificationService.onUserDismissedPrompt(),
+      ).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        createTestWidget(
+          playerState: createPlayerState(
+            totalSentences: 5,
+            difficultSentences: {0},
+          ),
+          playerFactory: (state, sentences) =>
+              _AutoCompleteIntensiveListenPlayer(state, sentences),
+          extraOverrides: [
+            notificationPermissionServiceProvider.overrideWithValue(
+              notificationService,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.check_circle_rounded));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      verify(() => notificationService.canShowPrompt()).called(1);
+      expect(find.text('Review while it\'s fresh'), findsOneWidget);
     });
 
     testWidgets('点击设置按钮打开设置面板', (tester) async {

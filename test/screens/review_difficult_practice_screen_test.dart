@@ -14,6 +14,7 @@ import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
 import 'package:echo_loop/providers/learning_progress_provider.dart';
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/providers/learning_session/review_difficult_practice_provider.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/providers/repeat_flow/repeat_flow_engine.dart';
 import 'package:echo_loop/providers/repeat_flow/repeat_flow_phase.dart' as flow;
 import 'package:echo_loop/providers/repeat_flow/repeat_flow_state.dart';
@@ -25,6 +26,7 @@ import 'package:echo_loop/database/app_database.dart' show Bookmark;
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/providers/speech/speech_recording_controller.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
 import 'package:echo_loop/theme/app_theme.dart';
@@ -35,6 +37,9 @@ import 'package:echo_loop/widgets/common/recording_button.dart';
 import '../helpers/mock_providers.dart';
 
 class _MockApiClient extends Mock implements SentenceAiApiClient {}
+
+class _MockNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
 
 class _MockAudioItemDao extends Mock implements AudioItemDao {}
 
@@ -186,6 +191,7 @@ void main() {
     ReviewDifficultPracticeState? playerState,
     LearningSessionState? sessionState,
     SpeechRecordingPhase turnPhase = SpeechRecordingPhase.idle,
+    List<Override> extraOverrides = const [],
     TestReviewDifficultPractice Function(
       ReviewDifficultPracticeState initialState,
       List<Sentence> sentences,
@@ -256,6 +262,7 @@ void main() {
             apiClient: _MockApiClient(),
           ),
         ),
+        ...extraOverrides,
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -826,6 +833,36 @@ void main() {
 
       // 完成弹窗应显示步骤完成对话框
       expect(find.text('Difficult Practice Complete'), findsOneWidget);
+    });
+
+    testWidgets('完成后不再检查学习版通知提示', (tester) async {
+      final notificationService = _MockNotificationPermissionService();
+      when(
+        () => notificationService.canShowPrompt(),
+      ).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        createTestWidget(
+          sessionState: const LearningSessionState(isFreePlay: false),
+          playerState: createPlayerState(
+            currentSentenceIndex: 4,
+            totalSentences: 5,
+            isPlaying: false,
+          ),
+          extraOverrides: [
+            notificationPermissionServiceProvider.overrideWithValue(
+              notificationService,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.check_circle_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Difficult Practice Complete'), findsOneWidget);
+      verifyNever(() => notificationService.canShowPrompt());
     });
   });
 }

@@ -19,9 +19,11 @@ import 'package:echo_loop/providers/listen_and_repeat/listen_and_repeat_controll
 import 'package:echo_loop/providers/listen_and_repeat/listen_and_repeat_phase.dart';
 import 'package:echo_loop/providers/listen_and_repeat/listen_and_repeat_settings_provider.dart';
 import 'package:echo_loop/providers/listen_and_repeat/listen_and_repeat_session_state.dart';
+import 'package:echo_loop/providers/notification_permission_provider.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/providers/speech/speech_recording_controller.dart';
 import 'package:echo_loop/screens/listen_and_repeat_player_screen.dart';
+import 'package:echo_loop/services/notification_permission_service.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
 import 'package:echo_loop/theme/app_theme.dart';
@@ -33,6 +35,9 @@ import '../helpers/mock_providers.dart';
 class _MockApiClient extends Mock implements SentenceAiApiClient {}
 
 class _MockAudioItemDao extends Mock implements AudioItemDao {}
+
+class _MockNotificationPermissionService extends Mock
+    implements NotificationPermissionService {}
 
 class _FakeSpeechPermissionService implements SpeechPermissionService {
   @override
@@ -166,6 +171,7 @@ class _TestListenAndRepeatController extends ListenAndRepeatController {
 Widget _createTestWidget({
   required _TestListenAndRepeatController controller,
   SpeechRecordingState recordingState = const SpeechRecordingState(),
+  List<Override> extraOverrides = const [],
 }) {
   final audioItemDao = _MockAudioItemDao();
   when(
@@ -222,6 +228,7 @@ Widget _createTestWidget({
         createTestTranscriptionApiClient(),
       ),
       audioItemDaoProvider.overrideWithValue(audioItemDao),
+      ...extraOverrides,
     ],
     child: MaterialApp.router(
       supportedLocales: const [Locale('en'), Locale('zh')],
@@ -413,6 +420,39 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('Listen & Repeat Complete'), findsOneWidget);
+    });
+
+    testWidgets('完成后不再检查学习版通知提示', (tester) async {
+      final notificationService = _MockNotificationPermissionService();
+      when(
+        () => notificationService.canShowPrompt(),
+      ).thenAnswer((_) async => true);
+
+      final controller = _TestListenAndRepeatController(
+        createState(),
+        createTestSentences(count: 3),
+        startPlayingNoop: true,
+      );
+
+      await tester.pumpWidget(
+        _createTestWidget(
+          controller: controller,
+          extraOverrides: [
+            notificationPermissionServiceProvider.overrideWithValue(
+              notificationService,
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      controller.completeSession();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Listen & Repeat Complete'), findsOneWidget);
+      verifyNever(() => notificationService.canShowPrompt());
     });
 
     testWidgets('修改重复次数后当前句遍数标签立即刷新', (tester) async {

@@ -466,6 +466,10 @@ class _IntensiveListenPlayerScreenState
       debugPrint('精听完成处理出错: $e');
     }
 
+    if (!mounted) return;
+
+    // 学习版通知提示只挂在首次学习当前第一任务的完成点。
+    // 现行任务顺序下，该任务就是逐句精听。
     await maybeShowLearningNotificationPrompt(context, ref);
 
     await ref.read(learningSessionProvider.notifier).exitLearningMode();
