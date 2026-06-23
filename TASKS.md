@@ -1,7 +1,17 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-23（资源库排序方式持久化）
+> 最后更新：2026-06-23（Free Player 恢复进度条首帧同步）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：修复 Free Player 恢复后进度条停在 0:00
+
+Free Player 恢复播放断点时，provider 已经按持久化绝对时间 `seek` 到正确位置，句子高亮也会恢复到对应句；但底部进度条首帧只依赖 `absolutePositionStream`，如果 `seek` 后还没有新的位置流事件，UI 会暂时显示 `0:00`。现改为：进度条无拖动预览时直接读取 `AudioEngine.absoluteCurrentPosition` 作为首帧真相源，避免“当前句已恢复到末句，但进度条仍在起点”的错位。
+
+- [x] `player_screen.dart`：`_buildProgressBar()` 的首帧位置来源从“stream 快照兜底 `Duration.zero`”调整为“优先 `_seekPreviewPosition`，否则读取 `absoluteCurrentPosition`”；保留 `StreamBuilder` 负责响应后续位置变化。
+- [x] `player_screen_test.dart`：新增恢复断点回归，覆盖“getter 已在恢复位置、positionStream 尚未发事件”场景，直接断言 `ProgressBar.progress` 使用恢复后的绝对时间。
+- [x] 验证：`flutter analyze lib/screens/player_screen.dart test/screens/player_screen_test.dart` 通过；`flutter test test/screens/player_screen_test.dart` 23 passed。
+
+  **完成时间**: 2026-06-23 19:07:53 +0800
 
 ## 已完成：资源库排序方式持久化
 

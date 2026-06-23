@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:echo_loop/screens/player_screen.dart';
 import 'package:echo_loop/widgets/common/paragraph_sentence_list_card.dart';
 import 'package:echo_loop/widgets/common/masked_sentence_tile.dart';
@@ -87,6 +88,22 @@ class _RecordingListeningPractice extends TestListeningPractice {
   }
 }
 
+/// 测试恢复断点首帧：getter 已在恢复位置，但 positionStream 还未发事件。
+class _RestorePositionAudioEngine extends TestAudioEngine {
+  _RestorePositionAudioEngine({
+    required this.restoredPosition,
+    super.initialState,
+  });
+
+  final Duration restoredPosition;
+
+  @override
+  Duration get absoluteCurrentPosition => restoredPosition;
+
+  @override
+  Stream<Duration> get absolutePositionStream => const Stream.empty();
+}
+
 /// 单句模式（精听）所需 overrides：在音频 overrides 基础上补齐
 /// [AnnotationContentView] 的 AI / DAO / 学习设置依赖。
 List<Override> _singleSentenceOverrides({
@@ -152,6 +169,24 @@ List<Override> _recordingOverrides(_RecordingListeningPractice player) => [
     SentenceAiNotifier(
       cacheDao: createStubbedMockCacheDao(),
       apiClient: _MockApiClient(),
+    ),
+  ),
+];
+
+List<Override> _restoreProgressOverrides({
+  required ListeningPracticeState practiceState,
+  required Duration restoredPosition,
+}) => [
+  appSettingsProvider.overrideWith(() => TestAppSettings()),
+  audioLibraryProvider.overrideWith(() => TestAudioLibrary()),
+  collectionListProvider.overrideWith(() => TestCollectionList()),
+  listeningPracticeProvider.overrideWith(() => TestListeningPractice(practiceState)),
+  audioEngineProvider.overrideWith(
+    () => _RestorePositionAudioEngine(
+      restoredPosition: restoredPosition,
+      initialState: const AudioEngineState(
+        totalDuration: Duration(seconds: 120),
+      ),
     ),
   ),
 ];
@@ -284,6 +319,31 @@ void main() {
         );
         expect(find.byIcon(Icons.skip_previous), findsOneWidget);
         expect(find.byIcon(Icons.skip_next), findsOneWidget);
+        await _disposeTree(tester);
+      });
+
+      testWidgets('恢复断点后进度条首帧显示当前绝对位置，不回到 0:00', (tester) async {
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 6);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            overrides: _restoreProgressOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 5,
+              ),
+              restoredPosition: const Duration(seconds: 45),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final progressBar = tester.widget<ProgressBar>(find.byType(ProgressBar));
+        expect(progressBar.progress, const Duration(seconds: 45));
+        expect(progressBar.total, const Duration(seconds: 120));
         await _disposeTree(tester);
       });
 

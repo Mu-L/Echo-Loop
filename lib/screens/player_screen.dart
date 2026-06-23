@@ -733,8 +733,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       child: StreamBuilder<Duration>(
         stream: engineNotifier.absolutePositionStream,
         builder: (context, snapshot) {
+          // 恢复断点/详情页返回时，provider 可能已先 seek 成功，但 positionStream
+          // 还未来得及发下一帧。这里直接读引擎当前绝对位置作为首帧真相源，避免
+          // 进度条短暂回到 0:00。
           final position =
-              _seekPreviewPosition ?? snapshot.data ?? Duration.zero;
+              _seekPreviewPosition ?? engineNotifier.absoluteCurrentPosition;
           final total = engine.totalDuration ?? Duration.zero;
 
           // 时间标签直接用 ProgressBar 内置的 sides 布局放在进度条两侧同一行，
