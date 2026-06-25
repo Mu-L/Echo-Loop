@@ -522,7 +522,7 @@ void main() {
       expect(progress.nextReviewAt, expectedReviewAt);
     });
 
-    test('review1 — 有 lastStageCompletedAt 时正确计算', () {
+    test('review1 — 有 lastStageCompletedAt 时按增量 18h 计算', () {
       final completedAt = DateTime(2026, 2, 20, 10, 0);
       final progress = LearningProgress(
         audioItemId: 'audio-1',
@@ -532,8 +532,8 @@ void main() {
         updatedAt: now,
       );
 
-      // review1 的 intervalHours = 24
-      final expectedReviewAt = completedAt.add(const Duration(hours: 24));
+      // review1 的 intervalHours = 18（1天 - 6小时）
+      final expectedReviewAt = completedAt.add(const Duration(hours: 18));
       expect(progress.nextReviewAt, expectedReviewAt);
     });
 
@@ -549,7 +549,7 @@ void main() {
       expect(progress.isReviewReadyAt(DateTime(2026, 2, 21, 10, 0)), true);
     });
 
-    test('review7 — 正确计算 168 小时间隔', () {
+    test('review7 — 正确计算 72 小时间隔', () {
       final completedAt = DateTime(2026, 2, 14);
       final progress = LearningProgress(
         audioItemId: 'audio-1',
@@ -559,8 +559,24 @@ void main() {
         updatedAt: now,
       );
 
-      final expectedReviewAt = completedAt.add(const Duration(hours: 168));
+      final expectedReviewAt = completedAt.add(const Duration(hours: 72));
       expect(progress.nextReviewAt, expectedReviewAt);
+    });
+
+    test('晚完成某轮后，后续轮次按上一轮完成时间顺延', () {
+      final review1CompletedAt = DateTime(2026, 2, 20, 22, 0);
+      final progress = LearningProgress(
+        audioItemId: 'audio-1',
+        currentStage: LearningStage.review2,
+        currentSubStage: SubStageType.blindListen,
+        lastStageCompletedAt: review1CompletedAt,
+        updatedAt: now,
+      );
+
+      expect(
+        progress.nextReviewAt,
+        review1CompletedAt.add(const Duration(hours: 24)),
+      );
     });
 
     test('review0 解锁边界：未到时间时锁定、边界时刻解锁、超过边界解锁', () {
@@ -597,7 +613,7 @@ void main() {
         updatedAt: completedAt,
       );
 
-      final reviewAt = completedAt.add(const Duration(hours: 24));
+      final reviewAt = completedAt.add(const Duration(hours: 18));
       final before = reviewAt.subtract(const Duration(seconds: 1));
       final at = reviewAt;
       final after = reviewAt.add(const Duration(seconds: 1));
@@ -659,7 +675,7 @@ void main() {
         updatedAt: completedAt,
       );
 
-      final reviewAt = completedAt.add(const Duration(hours: 24));
+      final reviewAt = completedAt.add(const Duration(hours: 18));
       final windowEnd = reviewAt.add(const Duration(hours: 24));
       expect(progress.reviewWindowDuration, const Duration(hours: 24));
       expect(progress.reviewWindowEndAt, windowEnd);

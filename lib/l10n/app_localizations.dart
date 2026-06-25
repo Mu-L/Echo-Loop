@@ -1196,6 +1196,24 @@ abstract class AppLocalizations {
   /// **'Retell the gist of each paragraph in English'**
   String get stepRetellingDesc;
 
+  /// Title of the warm-up card above the First Study section, guiding users to free-listen before intensive listening
+  ///
+  /// In en, this message translates to:
+  /// **'Warm-up Listening'**
+  String get warmUpCardTitle;
+
+  /// Warm-up card description, telling users to just grab the gist on a free listen
+  ///
+  /// In en, this message translates to:
+  /// **'Listen once to get the main idea. No need to catch every sentence.'**
+  String get warmUpCardSubtitle;
+
+  /// Badge on the warm-up card marking it as recommended to do first
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended First'**
+  String get warmUpCardBadge;
+
   /// No description provided for @reviewRound0.
   ///
   /// In en, this message translates to:
@@ -1237,48 +1255,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review 7'**
   String get reviewRound28;
-
-  /// No description provided for @reviewIntervalNow.
-  ///
-  /// In en, this message translates to:
-  /// **'After 6 hours'**
-  String get reviewIntervalNow;
-
-  /// No description provided for @reviewInterval1d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 1 day'**
-  String get reviewInterval1d;
-
-  /// No description provided for @reviewInterval2d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 2 days'**
-  String get reviewInterval2d;
-
-  /// No description provided for @reviewInterval4d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 4 days'**
-  String get reviewInterval4d;
-
-  /// No description provided for @reviewInterval7d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 7 days'**
-  String get reviewInterval7d;
-
-  /// No description provided for @reviewInterval14d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 14 days'**
-  String get reviewInterval14d;
-
-  /// No description provided for @reviewInterval28d.
-  ///
-  /// In en, this message translates to:
-  /// **'After 28 days'**
-  String get reviewInterval28d;
 
   /// No description provided for @reviewUnlockIn.
   ///
@@ -3205,12 +3181,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue'**
   String get continueButton;
-
-  /// No description provided for @reviewButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Review'**
-  String get reviewButton;
 
   /// No description provided for @streakDays.
   ///

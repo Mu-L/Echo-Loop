@@ -202,6 +202,18 @@
   "stepShadowingDesc": "针对弱项句子反复跟读",
   "stepRetelling": "段落复述",
   "stepRetellingDesc": "挑战一下：用自己的话复述每段大意",
+  "warmUpCardTitle": "听前预热",
+  "@warmUpCardTitle": {
+    "description": "学习计划页「首次学习」上方的听前预热卡标题，引导用户精听前先随心听熟悉内容"
+  },
+  "warmUpCardSubtitle": "先听一遍，抓住大意，不必听懂每句",
+  "@warmUpCardSubtitle": {
+    "description": "听前预热卡描述，说明先泛听抓大意即可"
+  },
+  "warmUpCardBadge": "推荐先做",
+  "@warmUpCardBadge": {
+    "description": "听前预热卡右上角徽章，标示推荐先做"
+  },
   "reviewRound0": "首轮复习",
   "reviewRound1": "第二轮复习",
   "reviewRound2": "第三轮复习",
@@ -209,13 +221,6 @@
   "reviewRound7": "第五轮复习",
   "reviewRound14": "第六轮复习",
   "reviewRound28": "第七轮复习",
-  "reviewIntervalNow": "6小时后",
-  "reviewInterval1d": "1天后",
-  "reviewInterval2d": "2天后",
-  "reviewInterval4d": "4天后",
-  "reviewInterval7d": "7天后",
-  "reviewInterval14d": "14天后",
-  "reviewInterval28d": "28天后",
   "reviewUnlockIn": "{days}天后解锁",
   "reviewUnlockInHours": "{hours}小时后解锁",
   "reviewUnlocked": "已解锁",
@@ -730,7 +735,6 @@
   "continueLearningHero": "继续学习",
   "startButton": "开始",
   "continueButton": "继续",
-  "reviewButton": "复习",
   "streakDays": "连续 {count} 天",
   "todayStudyTimeShort": "今日",
   "weekStudyTimeShort": "本周",

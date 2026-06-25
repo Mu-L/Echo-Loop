@@ -61,6 +61,14 @@ class _MainShellState extends ConsumerState<MainShell> {
   /// 资源库 tab 图标的引导 target key；在整个 shell 生命周期内保持稳定。
   final GlobalKey _keyLibraryNav = GlobalKey();
 
+  /// 预热学习页首屏所需数据：音频列表 + 学习进度。
+  Future<void> _bootstrapStudyLandingData() {
+    return Future.wait<void>([
+      ref.read(audioLibraryProvider.notifier).loadLibrary(),
+      ref.read(learningProgressNotifierProvider.notifier).loadAll(),
+    ]);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,13 +103,19 @@ class _MainShellState extends ConsumerState<MainShell> {
           .read(notificationPermissionServiceProvider)
           .syncSystemAuthorizationStatus();
 
-      AppLogger.log('StartupLoad', 'library bootstrap start');
+      AppLogger.log('StartupLoad', 'study bootstrap start');
       try {
-        await ref.read(audioLibraryProvider.notifier).loadLibrary();
+        // 学习页是默认落地 tab，先并发预热其首屏必需数据：
+        // 资源库音频列表 + 学习进度。其它非首屏关键数据继续后置，避免启动路径膨胀。
+        await _bootstrapStudyLandingData();
+
         final audioState = ref.read(audioLibraryProvider);
         AppLogger.log(
           'StartupLoad',
-          'library bootstrap audio done: stateItems=${audioState.audioItems.length}',
+          'study bootstrap ready: '
+              'audioItems=${audioState.audioItems.length}, '
+              'progressItems='
+              '${ref.read(learningProgressNotifierProvider).progressMap.length}',
         );
 
         await ref.read(collectionListProvider.notifier).loadCollections();
@@ -118,14 +132,9 @@ class _MainShellState extends ConsumerState<MainShell> {
         await ref.read(audioLibraryProvider.notifier).backfillTranscriptSrt();
         ref.read(audioLibraryProvider.notifier).backfillTranscriptStats();
       } catch (e, st) {
-        AppLogger.log('StartupLoad', 'library bootstrap failed: $e');
+        // 启动预热失败：先落盘日志（崩溃/异常排查重度依赖落盘日志），再给用户反馈。
+        AppLogger.log('StartupLoad', 'study bootstrap failed: $e');
         AppLogger.log('StartupLoad', st.toString());
-      }
-      // 学习进度加载失败时给用户 snackbar 反馈，而不是默默吞掉；
-      // isLoading 已在 notifier 内部重置，状态不会卡死。
-      try {
-        await ref.read(learningProgressNotifierProvider.notifier).loadAll();
-      } catch (_) {
         if (!mounted) return;
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -133,12 +142,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             content: Text(l10n.learningProgressLoadFailed),
             action: SnackBarAction(
               label: l10n.retry,
-              onPressed: () => ref
-                  .read(learningProgressNotifierProvider.notifier)
-                  .loadAll()
-                  .catchError((_) {
-                    /* 重试失败不再嵌套提示 */
-                  }),
+              onPressed: () => unawaited(_retryStudyBootstrap()),
             ),
           ),
         );
@@ -227,6 +231,12 @@ class _MainShellState extends ConsumerState<MainShell> {
               'NotifPerm',
               'MainShell listener: rootNavigatorKey.currentContext is null, skip',
             );
+            ref
+                .read(notificationPromptTriggerProvider.notifier)
+                .onDialogClosed();
+            return;
+          }
+          if (!ctx.mounted) {
             ref
                 .read(notificationPromptTriggerProvider.notifier)
                 .onDialogClosed();
@@ -368,6 +378,14 @@ class _MainShellState extends ConsumerState<MainShell> {
     ref
         .read(notificationPermissionServiceProvider)
         .syncSystemAuthorizationStatus();
+  }
+
+  Future<void> _retryStudyBootstrap() async {
+    try {
+      await _bootstrapStudyLandingData();
+    } catch (_) {
+      /* 重试失败不再嵌套提示 */
+    }
   }
 
   /// 提醒设置变更回调：重新同步收藏复习提醒和音频复习提醒

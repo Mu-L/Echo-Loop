@@ -172,15 +172,17 @@ enum LearningStage {
   int get subStageCount => allSubStages.length;
 
   /// 复习间隔（小时）
+  ///
+  /// 这里的语义是“距上一轮完成后的等待时长”，不是“距首次学习完成的累计里程碑”。
   int get intervalHours => switch (this) {
     firstLearn => 0,
     review0 => 6,
-    review1 => 24,
-    review2 => 48,
-    review4 => 96,
-    review7 => 168,
-    review14 => 336,
-    review28 => 672,
+    review1 => 18,
+    review2 => 24,
+    review4 => 48,
+    review7 => 72,
+    review14 => 168,
+    review28 => 336,
     completed => 0,
   };
 

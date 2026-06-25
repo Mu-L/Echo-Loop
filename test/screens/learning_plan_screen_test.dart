@@ -149,6 +149,7 @@ void main() {
     DateTime? fixedNow,
     ListeningPracticeState? lpState,
     TestListeningPractice Function()? listeningPracticeOverride,
+    Map<String, DateTime>? completedStageTimes,
   }) {
     final item = audioItem ?? testAudioItem;
     final router = GoRouter(
@@ -216,6 +217,9 @@ void main() {
         ),
         learningSessionProvider.overrideWith(() => TestLearningSession()),
         if (fixedNow != null) nowProvider.overrideWithValue(() => fixedNow),
+        reviewStageCompletionTimesProvider(item.id).overrideWith(
+          (ref) async => completedStageTimes ?? const <String, DateTime>{},
+        ),
       ],
       child: MaterialApp.router(
         locale: locale,
@@ -709,6 +713,57 @@ void main() {
       expect(find.text('Intensive Listen'), findsOneWidget);
     });
 
+    testWidgets('点击当前进行中步骤卡片效果同「开始学习」（弹出简报）', (tester) async {
+      // 当前子步骤为精听 → 精听步骤卡为当前态、可点击。
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: SubStageType.intensiveListen,
+            updatedAt: DateTime(2026, 5, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      // 直接点击当前步骤卡片（不经底部按钮）。
+      await tester.tap(find.text('Intensive Listening'));
+      await tester.pumpAndSettle();
+
+      // 与点击底部「开始学习」一致：弹出精听简报。
+      expect(find.text('Start Practice'), findsOneWidget);
+    });
+
+    testWidgets('无字幕时点击当前步骤卡片无反应', (tester) async {
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: SubStageType.intensiveListen,
+            updatedAt: DateTime(2026, 5, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          audioItem: testAudioItemNoTranscript,
+          progressState: progressState,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Intensive Listening'));
+      await tester.pumpAndSettle();
+
+      // 无字幕 → 回调为 null，点击不弹出任何练习面板。
+      expect(find.text('Start Practice'), findsNothing);
+    });
+
     testWidgets('精听子步骤无字幕时显示提示对话框', (tester) async {
       final progressState = LearningProgressState(
         progressMap: {
@@ -1037,7 +1092,7 @@ void main() {
       expect(find.textContaining('Difficulty:'), findsNothing);
     });
 
-    testWidgets('未来复习轮次显示固定间隔文案而非动态解锁倒计时', (tester) async {
+    testWidgets('未来复习轮次不显示固定间隔文案和动态解锁倒计时', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -1068,45 +1123,84 @@ void main() {
       await tester.scrollUntilVisible(find.text('Review 2'), 200);
       await tester.pumpAndSettle();
 
-      // 未来阶段显示固定间隔文案（如"After 1 day"），不显示动态倒计时
+      // 未来阶段既不显示固定间隔文案，也不显示动态倒计时
       expect(find.textContaining('Unlocks in'), findsNothing);
-      expect(find.text('After 1 day'), findsAtLeast(1));
+      expect(find.text('After 1 day'), findsNothing);
     });
 
-    testWidgets('已完成复习轮次不显示"已解锁"文案', (tester) async {
+    testWidgets('已完成复习轮次显示相对完成时间', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      // 首次学习完成 2 天前，review1（24h）应已解锁
+      // 当前已进入 review1，说明 review0 已完成；标题行应显示 review0 的相对完成时间
       final firstLearnCompletedAt = DateTime(2026, 1, 1);
-      final now = DateTime(2026, 1, 3, 12, 0); // 2.5 天后
+      final now = DateTime(2026, 1, 3, 12, 0);
       final progressState = LearningProgressState(
         progressMap: {
           'test-1': LearningProgress(
             audioItemId: 'test-1',
-            currentStage: LearningStage.review0,
+            currentStage: LearningStage.review1,
             currentSubStage: SubStageType.blindListen,
             firstLearnCompletedAt: firstLearnCompletedAt,
-            lastStageCompletedAt: firstLearnCompletedAt,
+            lastStageCompletedAt: now.subtract(const Duration(hours: 6)),
             updatedAt: now,
           ),
         },
       );
 
       await tester.pumpWidget(
-        createTestWidget(progressState: progressState, fixedNow: now),
+        createTestWidget(
+          progressState: progressState,
+          fixedNow: now,
+          completedStageTimes: {
+            LearningStage.review0.key: now.subtract(const Duration(days: 2)),
+          },
+        ),
       );
       await tester.pumpAndSettle();
 
-      // 滚动到 Review 2（review1 阶段，未来阶段）
-      await tester.scrollUntilVisible(find.text('Review 2'), 200);
+      await tester.scrollUntilVisible(find.text('Review 1').first, 200);
       await tester.pumpAndSettle();
 
-      // 未来阶段不再显示"Unlocked"，显示固定间隔文案
+      expect(find.textContaining('Completed '), findsAtLeast(1));
       expect(find.text('Unlocked'), findsNothing);
-      expect(find.text('After 1 day'), findsAtLeast(1));
+      expect(find.text('After 1 day'), findsNothing);
+    });
+
+    testWidgets('已完成首次学习显示相对完成时间', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final now = DateTime(2026, 1, 3, 12, 0);
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            firstLearnCompletedAt: now.subtract(const Duration(days: 3)),
+            lastStageCompletedAt: now.subtract(const Duration(days: 1)),
+            updatedAt: now,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          progressState: progressState,
+          fixedNow: now,
+          completedStageTimes: {
+            LearningStage.firstLearn.key: now.subtract(const Duration(days: 3)),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Completed '), findsAtLeast(1));
     });
 
     testWidgets('已完成步骤圆形背景使用较深绿色（非 shade50）', (tester) async {
@@ -1290,6 +1384,55 @@ void main() {
       expect(find.textContaining('2x'), findsWidgets);
       // 验证跟读遍数显示（"Shadowing 1x"）
       expect(find.textContaining('1x'), findsWidgets);
+    });
+
+    // ====== 听前预热卡（「首次学习」上方） ======
+
+    testWidgets('未开始且有字幕时显示听前预热卡', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Warm-up Listening'), findsOneWidget);
+      expect(find.text('Recommended First'), findsOneWidget);
+    });
+
+    testWidgets('点击预热卡进入随心听播放器（与右上角入口同一目的地）', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      // 整卡可点（取消独立按钮），点标题即触发
+      await tester.tap(find.text('Warm-up Listening'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Player'), findsOneWidget);
+    });
+
+    testWidgets('已开始学习后预热卡消失', (tester) async {
+      // 已进行到跟读（精听入口子步骤已过）→ isStarted=true
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.firstLearn,
+            currentSubStage: SubStageType.listenAndRepeat,
+            updatedAt: DateTime(2026, 5, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Warm-up Listening'), findsNothing);
+    });
+
+    testWidgets('无字幕时不显示预热卡', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(audioItem: testAudioItemNoTranscript),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Warm-up Listening'), findsNothing);
     });
   });
 }

@@ -34,6 +34,7 @@ import '../utils/blind_listen_duration_estimator.dart';
 import '../utils/paragraph_grouping.dart';
 import '../utils/playback_speed_default.dart';
 import '../utils/retell_duration_estimator.dart';
+import '../utils/time_format.dart';
 import '../widgets/blind_listen_paragraph_sheet.dart';
 import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/intensive_listen/intensive_listen_briefing_sheet.dart';
@@ -60,6 +61,27 @@ final _bookmarkCountProvider = StreamProvider.family.autoDispose<int, String>((
       .watchByAudioId(audioItemId)
       .map((bookmarks) => bookmarks.length);
 });
+
+/// 查询指定音频各复习大阶段的最终完成时间。
+///
+/// 学习计划页据此为已完成的大阶段显示“X 天前”一类相对完成时间。
+final reviewStageCompletionTimesProvider =
+    FutureProvider.family<Map<String, DateTime>, String>((ref, audioItemId) {
+      final dao = ref.watch(stageCompletionDaoProvider);
+      return dao.getStageCompletedAtByAudioId(audioItemId);
+    });
+
+/// 已完成大阶段标题文案。
+///
+/// 使用相对时间，但显式带上“完成于 / Completed”前缀，避免误读成逾期时间。
+String formatCompletedStageTimeLabel(
+  BuildContext context,
+  DateTime completedAt,
+) {
+  final ago = formatTimeAgo(context, completedAt);
+  final isZh = Localizations.localeOf(context).languageCode == 'zh';
+  return isZh ? '完成于$ago' : 'Completed $ago';
+}
 
 /// 学习计划表页面
 class LearningPlanScreen extends ConsumerStatefulWidget {
@@ -176,6 +198,17 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
     };
   }
 
+  /// 打开「随心听」播放器（泛听/预热用途，不计学习进度）。
+  ///
+  /// 右上角随心听胶囊与「首次学习」预热卡共用此入口，保证目的地单一来源。
+  void _openFreePlay(BuildContext context) {
+    if (widget.collectionId != null) {
+      context.push(AppRoutes.player(widget.collectionId!, widget.audioItemId));
+    } else {
+      context.push(AppRoutes.audioPlayer(widget.audioItemId));
+    }
+  }
+
   /// 处理"开始学习/继续学习"按钮点击
   void _handleStartLearning(BuildContext context, LearningProgress? progress) {
     final now = ref.read(nowProvider)();
@@ -201,13 +234,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
       _startRetelling(context);
     } else {
       // 其他子步骤 → 直接导航到播放器
-      if (widget.collectionId != null) {
-        context.push(
-          AppRoutes.player(widget.collectionId!, widget.audioItemId),
-        );
-      } else {
-        context.push(AppRoutes.audioPlayer(widget.audioItemId));
-      }
+      _openFreePlay(context);
     }
   }
 
@@ -1002,18 +1029,7 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                 padding: const EdgeInsets.only(right: AppSpacing.s),
                 child: _FreePlayAppBarButton(
                   label: l10n.freePlay,
-                  onPressed: () {
-                    if (widget.collectionId != null) {
-                      context.push(
-                        AppRoutes.player(
-                          widget.collectionId!,
-                          widget.audioItemId,
-                        ),
-                      );
-                    } else {
-                      context.push(AppRoutes.audioPlayer(widget.audioItemId));
-                    }
-                  },
+                  onPressed: () => _openFreePlay(context),
                 ),
               ),
             ),
@@ -1039,7 +1055,20 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                       addSubtitleStep: stepAddSubtitle,
                     ),
                   ],
-                  const SizedBox(height: AppSpacing.l),
+                  // 听前预热卡：未开始本音频且有字幕时显示，引导用户先随心听
+                  // 熟悉内容。放在「首次学习」之上，作为整个学习流程的前置预热；
+                  // 用户开始学习后 isStarted 变 true，卡片自动消失（按音频维度
+                  // 一次性，无需新增持久化）。
+                  if ((progress == null || !progress.isStarted) &&
+                      hasTranscript) ...[
+                    const SizedBox(height: AppSpacing.s),
+                    _WarmUpCard(
+                      l10n: l10n,
+                      onTap: () => _openFreePlay(context),
+                    ),
+                    const SizedBox(height: AppSpacing.s),
+                  ] else
+                    const SizedBox(height: AppSpacing.l),
                   _FirstStudySection(
                     l10n: l10n,
                     progress: progress,
@@ -1052,6 +1081,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                       () => _isFirstLearnExpanded =
                           !(_isFirstLearnExpanded ?? true),
                     ),
+                    onStartCurrentStage: hasTranscript && !isLockedReview
+                        ? () => _handleStartLearning(context, progress)
+                        : null,
                   ),
                   const SizedBox(height: AppSpacing.m),
                   ...List.generate(reviewStages.length, (index) {
@@ -1075,6 +1107,9 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
                         ),
                         onToggle: () =>
                             _toggleReviewRoundExpanded(review.stage),
+                        onStartCurrentStage: hasTranscript && !isLockedReview
+                            ? () => _handleStartLearning(context, progress)
+                            : null,
                       ),
                     );
                   }),
@@ -1103,41 +1138,13 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
   /// 构建复习阶段列表（review0 ~ review28，共 7 个）
   List<_ReviewStageData> _buildReviewStages(AppLocalizations l10n) {
     return [
-      _ReviewStageData(
-        name: l10n.reviewRound0,
-        interval: l10n.reviewIntervalNow,
-        stage: LearningStage.review0,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound1,
-        interval: l10n.reviewInterval1d,
-        stage: LearningStage.review1,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound2,
-        interval: l10n.reviewInterval2d,
-        stage: LearningStage.review2,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound4,
-        interval: l10n.reviewInterval4d,
-        stage: LearningStage.review4,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound7,
-        interval: l10n.reviewInterval7d,
-        stage: LearningStage.review7,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound14,
-        interval: l10n.reviewInterval14d,
-        stage: LearningStage.review14,
-      ),
-      _ReviewStageData(
-        name: l10n.reviewRound28,
-        interval: l10n.reviewInterval28d,
-        stage: LearningStage.review28,
-      ),
+      _ReviewStageData(name: l10n.reviewRound0, stage: LearningStage.review0),
+      _ReviewStageData(name: l10n.reviewRound1, stage: LearningStage.review1),
+      _ReviewStageData(name: l10n.reviewRound2, stage: LearningStage.review2),
+      _ReviewStageData(name: l10n.reviewRound4, stage: LearningStage.review4),
+      _ReviewStageData(name: l10n.reviewRound7, stage: LearningStage.review7),
+      _ReviewStageData(name: l10n.reviewRound14, stage: LearningStage.review14),
+      _ReviewStageData(name: l10n.reviewRound28, stage: LearningStage.review28),
     ];
   }
 
@@ -1551,6 +1558,9 @@ class _FirstStudySection extends ConsumerWidget {
   /// 折叠/展开切换回调
   final VoidCallback onToggle;
 
+  /// 点击当前进行中步骤的回调（效果同底部「开始学习」），不可启动时为 null
+  final VoidCallback? onStartCurrentStage;
+
   const _FirstStudySection({
     required this.l10n,
     this.progress,
@@ -1558,12 +1568,18 @@ class _FirstStudySection extends ConsumerWidget {
     required this.audioItemId,
     required this.isExpanded,
     required this.onToggle,
+    this.onStartCurrentStage,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final plan = ref.watch(learningPlanForAudioProvider(audioItemId));
+    final stageCompletedAtMap =
+        ref
+            .watch(reviewStageCompletionTimesProvider(audioItemId))
+            .valueOrNull ??
+        const <String, DateTime>{};
     final completedKeys = ref
         .watch(learningProgressNotifierProvider)
         .completionsFor(audioItemId);
@@ -1572,6 +1588,13 @@ class _FirstStudySection extends ConsumerWidget {
     final firstLearnStage = LearningStage.firstLearn;
     final isFirstLearnCompleted =
         progress?.isStageCompleted(LearningStage.firstLearn) ?? false;
+    final firstLearnCompletedAt =
+        stageCompletedAtMap[LearningStage.firstLearn.key] ??
+        progress?.firstLearnCompletedAt;
+    final firstLearnStatusText =
+        isFirstLearnCompleted && firstLearnCompletedAt != null
+        ? formatCompletedStageTimeLabel(context, firstLearnCompletedAt)
+        : null;
 
     /// 子步骤的 UI 数据映射
     final stepDataMap = {
@@ -1650,6 +1673,19 @@ class _FirstStudySection extends ConsumerWidget {
                             : '🔒',
                         style: const TextStyle(fontSize: 16),
                       ),
+                      if (firstLearnStatusText != null) ...[
+                        const SizedBox(width: AppSpacing.s),
+                        Flexible(
+                          child: Text(
+                            firstLearnStatusText,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.green,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1764,6 +1800,11 @@ class _FirstStudySection extends ConsumerWidget {
                 }
               } else if (canFreePlay && subStage == SubStageType.retell) {
                 onTap = () => _startFreePlayRetell(context, ref);
+              }
+
+              // 当前进行中的步骤：点击等同底部「开始学习」
+              if (isCurrent) {
+                onTap = onStartCurrentStage;
               }
 
               return _StepCard(
@@ -2110,6 +2151,151 @@ class _StepData {
   });
 }
 
+/// 听前预热卡（横向单行紧凑卡，置于「首次学习」之上）。
+///
+/// 引导用户在正式精听前先用「随心听」整篇泛听、建立内容认知。视觉上用暖奶油
+/// 色填充块（区别于页面其余白底蓝调卡片）+ 内联「推荐先做」小徽章 + 右侧
+/// chevron，整卡可点进入「随心听」播放器（与右上角胶囊同一目的地）。
+///
+/// 作为次要推荐引导，视觉权重刻意低于底部「开始学习」主按钮：取消独立大按钮、
+/// 高度压缩到约一半。显隐由父级按 `!isStarted && hasTranscript` 控制，开始学习
+/// 后自动消失，不计学习进度。
+class _WarmUpCard extends StatelessWidget {
+  final AppLocalizations l10n;
+  final VoidCallback onTap;
+
+  const _WarmUpCard({required this.l10n, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // 暖橙调配色（亮/暗双套），不读 colorScheme 以避免主题 tertiary 偏色。
+    const amber = Color(0xFFFFB300);
+    final bg = isDark
+        ? Color.alphaBlend(
+            amber.withValues(alpha: 0.12),
+            theme.colorScheme.surface,
+          )
+        : const Color(0xFFFFF4E2);
+    final border = isDark
+        ? amber.withValues(alpha: 0.20)
+        : const Color(0xFFF4D7A8).withValues(alpha: 0.6);
+    final iconBg = amber.withValues(alpha: isDark ? 0.22 : 0.16);
+    final iconFg = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE8870C);
+    final titleColor = isDark
+        ? const Color(0xFFFFE2B8)
+        : const Color(0xFF5A3A12);
+    final descColor = titleColor.withValues(alpha: isDark ? 0.70 : 0.72);
+    final badgeBg = isDark ? amber : const Color(0xFFF38B00);
+    final badgeFg = isDark ? const Color(0xFF3A2400) : Colors.white;
+
+    return Semantics(
+      button: true,
+      label:
+          '${l10n.warmUpCardTitle}. ${l10n.warmUpCardSubtitle}. '
+          '${l10n.warmUpCardBadge}',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: border, width: 1),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.m,
+                vertical: AppSpacing.s + 2,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.headphones_rounded,
+                      size: 20,
+                      color: iconFg,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s + 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                l10n.warmUpCardTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: titleColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.s),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.s,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: badgeBg,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                l10n.warmUpCardBadge,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: badgeFg,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.warmUpCardSubtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: descColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s),
+                  ExcludeSemantics(
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 22,
+                      color: iconFg.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 单个步骤卡片 — 支持三态：已完成、当前、未开始
 class _StepCard extends StatelessWidget {
   final int stepNumber;
@@ -2309,14 +2495,9 @@ class _StepCard extends StatelessWidget {
 /// 单个复习轮次的数据模型
 class _ReviewStageData {
   final String name;
-  final String interval;
   final LearningStage stage;
 
-  const _ReviewStageData({
-    required this.name,
-    required this.interval,
-    required this.stage,
-  });
+  const _ReviewStageData({required this.name, required this.stage});
 }
 
 /// 单个复习轮次区块（与首次学习同级）
@@ -2336,6 +2517,9 @@ class _ReviewRoundSection extends ConsumerWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
 
+  /// 点击当前进行中步骤的回调（效果同底部「开始学习」），不可启动时为 null
+  final VoidCallback? onStartCurrentStage;
+
   const _ReviewRoundSection({
     required this.l10n,
     this.progress,
@@ -2345,6 +2529,7 @@ class _ReviewRoundSection extends ConsumerWidget {
     required this.audioItemId,
     required this.isExpanded,
     required this.onToggle,
+    this.onStartCurrentStage,
   });
 
   /// 计算本轮次「已完成」子步骤数（基于真实完成历史 [completedKeys]）。
@@ -2387,21 +2572,6 @@ class _ReviewRoundSection extends ConsumerWidget {
     }
 
     return l10n.reviewDue;
-  }
-
-  /// 解锁状态文案（非当前轮次、非已完成轮次显示）。
-  ///
-  /// 已完成：不显示文案（由 ✅ emoji 传达）。
-  /// 当前轮次：由 _reviewTimingText 处理。
-  /// 未来阶段：返回 null，回退到固定间隔文案。
-  String? _unlockStatusText() {
-    if (progress == null) return null;
-    // 已完成的轮次：不显示文案（✅ emoji 已传达完成语义）
-    if (progress!.isStageCompleted(review.stage)) return null;
-    // 当前轮次由 _reviewTimingText 处理
-    if (progress!.isCurrentStage(review.stage)) return null;
-    // 未来阶段：返回 null，由固定间隔文案兜底
-    return null;
   }
 
   /// 逾期措辞：短期保留时间信息，长期只显示"待复习"。
@@ -2684,6 +2854,11 @@ class _ReviewRoundSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final plan = ref.watch(learningPlanForAudioProvider(audioItemId));
+    final stageCompletedAtMap =
+        ref
+            .watch(reviewStageCompletionTimesProvider(audioItemId))
+            .valueOrNull ??
+        const <String, DateTime>{};
     final completedKeys = ref
         .watch(learningProgressNotifierProvider)
         .completionsFor(audioItemId);
@@ -2698,26 +2873,36 @@ class _ReviewRoundSection extends ConsumerWidget {
     );
     final completedCount = _completedSubStageCount(completedKeys);
     final timingText = _reviewTimingText(context, completedKeys: completedKeys);
-    final unlockText = _unlockStatusText();
-    // 当前轮次显示实时状态，其余轮次显示解锁状态，都没有则显示固定间隔
-    final statusText = timingText ?? unlockText ?? review.interval;
     final isCompleted = progress?.isStageCompleted(review.stage) ?? false;
     final isCurrent = progress?.isCurrentStage(review.stage) ?? false;
     final isFuture = !isCompleted && !isCurrent;
+    final completedAt = stageCompletedAtMap[review.stage.key];
+    // 标题行文案优先级：
+    // 1. 已完成轮次显示相对完成时间
+    // 2. 当前轮次显示真实倒计时 / 待复习 / 逾期
+    // 3. 未来轮次不显示固定时间标签，避免误导为累计里程碑
+    final statusText = isCompleted
+        ? (completedAt == null
+              ? null
+              : formatCompletedStageTimeLabel(context, completedAt))
+        : timingText;
     // 标题颜色：已完成→绿色，当前→默认，未来→弱化
     final titleColor = isCompleted
         ? Colors.green
         : isFuture
         ? theme.colorScheme.onSurfaceVariant
         : null;
-    // 状态文案颜色：已完成→绿色，当前轮次→onSurfaceVariant，固定间隔→onSurfaceVariant
-    final statusColor = theme.colorScheme.onSurfaceVariant;
+    // 状态文案颜色：已完成→绿色，其余状态→弱化前景色。
+    final statusColor = isCompleted
+        ? Colors.green
+        : theme.colorScheme.onSurfaceVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Opacity(
-          opacity: isFuture ? 0.7 : 1.0,
+          // 未开始（锁定）轮次进一步弱化，避免抢夺当前/已完成轮次的注意力
+          opacity: isFuture ? 0.45 : 1.0,
           child: InkWell(
             onTap: onToggle,
             borderRadius: BorderRadius.circular(8),
@@ -2751,8 +2936,9 @@ class _ReviewRoundSection extends ConsumerWidget {
                               : '🔒',
                           style: const TextStyle(fontSize: 16),
                         ),
-                        // 状态文案内联到标题行（已完成阶段不显示）
-                        if (!isCompleted) ...[
+                        // 状态文案内联到标题行：已完成显示完成时间，当前显示真实状态，
+                        // 未来轮次不显示固定“After X days”，避免误导。
+                        if (statusText != null) ...[
                           const SizedBox(width: AppSpacing.s),
                           Text(
                             statusText,
@@ -2861,6 +3047,11 @@ class _ReviewRoundSection extends ConsumerWidget {
                     _ => null,
                   };
                 }
+              }
+
+              // 当前进行中的步骤：点击等同底部「开始学习」
+              if (isCurrent) {
+                onTap = onStartCurrentStage;
               }
 
               return _StepCard(

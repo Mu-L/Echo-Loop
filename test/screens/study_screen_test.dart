@@ -28,7 +28,8 @@ void main() {
   });
 
   Widget createTestWidget({
-    required List<AudioItem> audioItems,
+    List<AudioItem> audioItems = const [],
+    AudioLibraryState? audioLibraryState,
     required LearningProgressState progressState,
     DateTime? fixedNow,
     List<RecentCompletion>? recentCompletions,
@@ -89,7 +90,9 @@ void main() {
       overrides: [
         ...learningSettingsOverrides(prefs: prefs),
         audioLibraryProvider.overrideWith(
-          () => TestAudioLibrary(AudioLibraryState(audioItems: audioItems)),
+          () => TestAudioLibrary(
+            audioLibraryState ?? AudioLibraryState(audioItems: audioItems),
+          ),
         ),
         learningProgressNotifierProvider.overrideWith(
           () => TestLearningProgressNotifier(progressState),
@@ -116,14 +119,67 @@ void main() {
   testWidgets('无任务时显示空状态', (tester) async {
     await tester.pumpWidget(
       createTestWidget(
-        audioItems: const [],
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('No study tasks yet'), findsOneWidget);
     expect(find.text('Go to Library'), findsOneWidget);
+  });
+
+  testWidgets('音频列表加载中时显示骨架，不显示空状态', (tester) async {
+    await tester.pumpWidget(
+      createTestWidget(
+        audioLibraryState: const AudioLibraryState(isLoading: true),
+        progressState: const LearningProgressState(isLoading: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No study tasks yet'), findsNothing);
+    expect(find.text('Go to Library'), findsNothing);
+  });
+
+  testWidgets('学习进度加载中时显示骨架，不显示空状态', (tester) async {
+    await tester.pumpWidget(
+      createTestWidget(
+        progressState: const LearningProgressState(isLoading: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No study tasks yet'), findsNothing);
+    expect(find.text('Go to Library'), findsNothing);
+  });
+
+  testWidgets('已有任务时即使库正在 reload 也保留任务，不显示骨架', (tester) async {
+    final now = DateTime(2026, 2, 25, 12, 0);
+    final audioItems = [
+      AudioItem(
+        id: 'audio-1',
+        name: 'Existing Task Audio',
+        audioPath: 'audios/existing.mp3',
+        addedDate: now,
+        totalDuration: 180,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      createTestWidget(
+        // 运行期 reload：audioItems 已有数据，但 isLoading 被置回 true。
+        audioLibraryState: AudioLibraryState(
+          audioItems: audioItems,
+          isLoading: true,
+        ),
+        progressState: const LearningProgressState(isLoading: false),
+        fixedNow: now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 骨架不含任何任务文案；任务卡正常渲染即证明未被骨架替换。
+    expect(find.text('Existing Task Audio'), findsAtLeast(1));
   });
 
   testWidgets('未到时间复习任务的开始按钮禁用', (tester) async {
@@ -146,6 +202,7 @@ void main() {
           updatedAt: now,
         ),
       },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -193,6 +250,7 @@ void main() {
           updatedAt: now,
         ),
       },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -233,6 +291,10 @@ void main() {
           updatedAt: now,
         ),
       },
+      completionsByAudio: {
+        'audio-1': {'firstLearn:intensiveListen'},
+      },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -247,8 +309,8 @@ void main() {
     // 音频名称出现在任务卡片中
     expect(find.text('Review Audio'), findsAtLeast(1));
 
-    // 点击任务卡片中的 Review 按钮
-    await tester.tap(find.text('Review').first);
+    // 本轮无完成记录，按钮文案应为 Start
+    await tester.tap(find.text('Start').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Learning Plan'), findsOneWidget);
@@ -275,6 +337,7 @@ void main() {
           updatedAt: now,
         ),
       },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -288,9 +351,9 @@ void main() {
 
     // 新格式："Review due · Due 3h ago"
     expect(find.textContaining('Due 3h ago'), findsOneWidget);
-    // 任务卡片有 Review 按钮
-    final reviewButtons = find.widgetWithText(FilledButton, 'Review');
-    expect(reviewButtons, findsAtLeast(1));
+    // 任务卡片本轮无完成记录 → 按钮显示 Start
+    final startButtons = find.widgetWithText(FilledButton, 'Start');
+    expect(startButtons, findsAtLeast(1));
   });
 
   testWidgets('首次学习任务显示子阶段标签', (tester) async {
@@ -312,6 +375,12 @@ void main() {
           updatedAt: now,
         ),
       },
+      completionsByAudio: {
+        'audio-1': {
+          '${LearningStage.firstLearn.key}:${SubStageType.intensiveListen.key}',
+        },
+      },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -427,7 +496,7 @@ void main() {
     await tester.pumpWidget(
       createTestWidget(
         audioItems: audioItems,
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
         fixedNow: now,
       ),
     );
@@ -474,7 +543,7 @@ void main() {
     await tester.pumpWidget(
       createTestWidget(
         audioItems: audioItems,
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
         fixedNow: now,
       ),
     );
@@ -518,6 +587,7 @@ void main() {
           updatedAt: now,
         ),
       },
+      isLoading: false,
     );
 
     await tester.pumpWidget(
@@ -538,7 +608,7 @@ void main() {
     await tester.pumpWidget(
       createTestWidget(
         audioItems: const [],
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
       ),
     );
     await tester.pumpAndSettle();
@@ -582,7 +652,7 @@ void main() {
     await tester.pumpWidget(
       createTestWidget(
         audioItems: audioItems,
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
         fixedNow: now,
         recentCompletions: completions,
       ),
@@ -621,7 +691,7 @@ void main() {
     await tester.pumpWidget(
       createTestWidget(
         audioItems: audioItems,
-        progressState: const LearningProgressState(),
+        progressState: const LearningProgressState(isLoading: false),
         fixedNow: now,
         recentCompletions: const [],
       ),

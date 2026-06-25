@@ -3,7 +3,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:echo_loop/database/app_database.dart';
-import 'package:echo_loop/database/daos/stage_completion_dao.dart';
 
 /// 创建内存数据库用于测试（启用外键约束）
 AppDatabase _createTestDatabase() {
@@ -225,6 +224,60 @@ void main() {
       final result = await db.stageCompletionDao.getCompletionKeysByAudio();
       expect(result['a1'], {'firstLearn:blindListen'});
       expect(result['a1']!.length, 1);
+    });
+  });
+
+  group('getStageCompletedAtByAudioId', () {
+    test('空表返回空 Map', () async {
+      final result = await db.stageCompletionDao.getStageCompletedAtByAudioId(
+        'a1',
+      );
+      expect(result, isEmpty);
+    });
+
+    test('同一 stage 取最后一个子步骤完成时间', () async {
+      await insertAudio('a1', 'Audio One');
+      final base = DateTime(2026, 3, 25, 12, 0);
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'review1',
+        subStage: 'blindListen',
+        completedAt: base,
+      );
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'review1',
+        subStage: 'reviewDifficultPractice',
+        completedAt: base.add(const Duration(hours: 1)),
+      );
+
+      final result = await db.stageCompletionDao.getStageCompletedAtByAudioId(
+        'a1',
+      );
+      expect(result['review1'], base.add(const Duration(hours: 1)));
+    });
+
+    test('不同 stage 独立返回各自最终完成时间', () async {
+      await insertAudio('a1', 'Audio One');
+      final base = DateTime(2026, 3, 25, 12, 0);
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'review0',
+        subStage: 'blindListen',
+        completedAt: base,
+      );
+      await insertCompletion(
+        audioId: 'a1',
+        stage: 'review1',
+        subStage: 'blindListen',
+        completedAt: base.add(const Duration(days: 2)),
+      );
+
+      final result = await db.stageCompletionDao.getStageCompletedAtByAudioId(
+        'a1',
+      );
+      expect(result['review0'], base);
+      expect(result['review1'], base.add(const Duration(days: 2)));
     });
   });
 }

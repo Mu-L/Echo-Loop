@@ -298,6 +298,18 @@
   "stepShadowingDesc": "Repeat weak sentences over and over",
   "stepRetelling": "Paragraph Retelling",
   "stepRetellingDesc": "Retell the gist of each paragraph in English",
+  "warmUpCardTitle": "Warm-up Listening",
+  "@warmUpCardTitle": {
+    "description": "Title of the warm-up card above the First Study section, guiding users to free-listen before intensive listening"
+  },
+  "warmUpCardSubtitle": "Listen once to get the main idea. No need to catch every sentence.",
+  "@warmUpCardSubtitle": {
+    "description": "Warm-up card description, telling users to just grab the gist on a free listen"
+  },
+  "warmUpCardBadge": "Recommended First",
+  "@warmUpCardBadge": {
+    "description": "Badge on the warm-up card marking it as recommended to do first"
+  },
   "reviewRound0": "Review 1",
   "reviewRound1": "Review 2",
   "reviewRound2": "Review 3",
@@ -305,13 +317,6 @@
   "reviewRound7": "Review 5",
   "reviewRound14": "Review 6",
   "reviewRound28": "Review 7",
-  "reviewIntervalNow": "After 6 hours",
-  "reviewInterval1d": "After 1 day",
-  "reviewInterval2d": "After 2 days",
-  "reviewInterval4d": "After 4 days",
-  "reviewInterval7d": "After 7 days",
-  "reviewInterval14d": "After 14 days",
-  "reviewInterval28d": "After 28 days",
   "reviewUnlockIn": "Unlocks in {days} days",
   "@reviewUnlockIn": {
     "placeholders": {
@@ -970,7 +975,6 @@
   "continueLearningHero": "Continue Learning",
   "startButton": "Start",
   "continueButton": "Continue",
-  "reviewButton": "Review",
   "streakDays": "{count}d streak",
   "@streakDays": {
     "placeholders": { "count": { "type": "int" } }

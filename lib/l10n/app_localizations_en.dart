@@ -607,6 +607,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Retell the gist of each paragraph in English';
 
   @override
+  String get warmUpCardTitle => 'Warm-up Listening';
+
+  @override
+  String get warmUpCardSubtitle =>
+      'Listen once to get the main idea. No need to catch every sentence.';
+
+  @override
+  String get warmUpCardBadge => 'Recommended First';
+
+  @override
   String get reviewRound0 => 'Review 1';
 
   @override
@@ -626,27 +636,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reviewRound28 => 'Review 7';
-
-  @override
-  String get reviewIntervalNow => 'After 6 hours';
-
-  @override
-  String get reviewInterval1d => 'After 1 day';
-
-  @override
-  String get reviewInterval2d => 'After 2 days';
-
-  @override
-  String get reviewInterval4d => 'After 4 days';
-
-  @override
-  String get reviewInterval7d => 'After 7 days';
-
-  @override
-  String get reviewInterval14d => 'After 14 days';
-
-  @override
-  String get reviewInterval28d => 'After 28 days';
 
   @override
   String reviewUnlockIn(int days) {
@@ -1791,9 +1780,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continueButton => 'Continue';
-
-  @override
-  String get reviewButton => 'Review';
 
   @override
   String streakDays(int count) {

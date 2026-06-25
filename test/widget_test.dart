@@ -69,8 +69,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // 验证 App 正常加载 — 默认显示学习任务页空状态
-    expect(find.text('No study tasks yet'), findsOneWidget);
+    // 验证 App 正常加载 — 默认进入学习页
+    expect(find.text('Study Tasks'), findsOneWidget);
 
     // 消耗冷启动保护定时器（5 秒），避免 pending timer 断言失败
     await tester.pump(const Duration(seconds: 6));

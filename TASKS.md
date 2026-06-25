@@ -1,7 +1,52 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-24（AI 转录「自动合并短句」开关）
+> 最后更新：2026-06-25（学习计划页当前阶段 item 可点击）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：学习计划页当前阶段 item 可点击
+
+学习计划页时间线上，已完成/已跳过/过去阶段的子步骤卡可点击进入自由练习，但**当前进行中的子步骤卡**（`isCurrent`）此前不可点击，用户只能靠底部「开始学习」按钮启动。现改为：当前步骤卡可直接点击，效果与点击底部「开始学习」完全一致（复用同一 `_handleStartLearning` 回调，同样受「有字幕 && 复习未锁定」门控）。
+
+- [x] `lib/screens/learning_plan_screen.dart`：`_FirstStudySection` / `_ReviewRoundSection` 各新增 `onStartCurrentStage` 回调字段；父级以与底部按钮一致的 `hasTranscript && !isLockedReview ? () => _handleStartLearning(...) : null` 注入；两区块 item 构造在 `isCurrent` 时把 `onTap` 指向该回调。
+- [x] 测试：`learning_plan_screen_test.dart` 新增 2 例（点击当前精听卡弹出简报、无字幕时点击当前卡无反应）。
+- [x] 验证：`flutter analyze lib/screens/learning_plan_screen.dart test/screens/learning_plan_screen_test.dart` 0 问题；`flutter test test/screens/learning_plan_screen_test.dart` 全通过（49）。
+
+  **完成时间**: 2026-06-25
+
+## 已完成：复习轮次增量间隔修正 + 学习计划页完成时间展示
+
+学习计划的复习解锁原先沿用“上一轮完成后再等”的滚动基准，但误把累计里程碑（1d/2d/4d/28d）直接当作相邻两轮的等待时长，导致后续轮次整体偏长；同时学习计划页未来轮次展示固定 `After X days` 文案，在滚动基准下容易误导。现改为：继续保留“上一轮完成后解锁下一轮”的简单策略，但把各轮等待时长修正为增量值；未来未解锁轮次不再显示固定时间，已完成轮次则显示相对完成时间（如 `2天前` / `2h ago`）。
+
+- [x] `lib/database/enums.dart`：将 `LearningStage.intervalHours` 改为“距上一轮完成后的等待时长”，各轮增量修正为 `6h / 18h / 24h / 48h / 72h / 168h / 336h`。
+- [x] `lib/database/daos/stage_completion_dao.dart`：新增按音频聚合 `stage -> 最终 completedAt` 的查询，供学习计划页标题行读取大阶段完成时间。
+- [x] `lib/screens/learning_plan_screen.dart`：新增 `reviewStageCompletionTimesProvider`；已完成复习轮次标题行显示相对完成时间，当前轮次继续显示真实倒计时/待复习/逾期，未来轮次隐藏固定 `After X days` 标签。
+- [x] 测试：更新 `learning_progress_test.dart` 的增量间隔断言；为 `stage_completion_dao_test.dart` 补聚合查询用例；更新 `learning_plan_screen_test.dart` 覆盖“未来轮次隐藏固定时间”“已完成轮次显示相对完成时间”。
+- [x] 验证：`flutter analyze lib/database/enums.dart lib/database/daos/stage_completion_dao.dart lib/screens/learning_plan_screen.dart test/models/learning_progress_test.dart test/database/daos/stage_completion_dao_test.dart test/screens/learning_plan_screen_test.dart` 通过；`flutter test test/models/learning_progress_test.dart`、`flutter test test/database/daos/stage_completion_dao_test.dart`、`flutter test test/screens/learning_plan_screen_test.dart` 全通过。
+
+  **完成时间**: 2026-06-25 13:16:43 +0800
+
+## 已完成：学习页冷启动预加载 + 骨架兜底
+
+默认落地 `Study` tab 时，启动链路原本在首帧后才异步加载音频列表和学习进度，`StudyScreen` 又把“尚未加载”的空列表直接渲染成空态，导致冷启动先闪 `No study tasks yet`，随后才切到真实任务页。现改为：启动阶段优先并发预热学习页首屏必需数据，同时 `Study` 页自身补 loading skeleton 兜底，保证慢机/竞态下也不会再误闪空态。
+
+- [x] `lib/router/main_shell.dart`：将 `audioLibrary.loadLibrary()` 与 `learningProgress.loadAll()` 前移为默认学习页首屏关键预加载，并发等待完成后再继续合集/标签/backfill 等非首屏关键任务；补统一 retry helper，保持失败 snackbar 行为。
+- [x] `lib/screens/study_screen.dart`：新增 `audioLibrary.isLoading || learningProgress.isLoading` gate；加载中显示学习页骨架，不再直接渲染 `No study tasks yet`；骨架仅使用私有 `_StudyLoadingSkeleton` / `_SkeletonBlock` 组件，不改任务排序与空态语义。
+- [x] 测试：`study_screen_test.dart` 新增音频列表加载中 / 学习进度加载中骨架用例，并把原有用例显式区分 `isLoading=false`；`app_shell_test.dart` / `widget_test.dart` 更新为断言默认进入学习页而非写死首帧空态。
+- [x] 验证：`flutter analyze lib/router/main_shell.dart lib/screens/study_screen.dart test/screens/study_screen_test.dart test/screens/app_shell_test.dart test/widget_test.dart` 通过；`flutter test test/screens/study_screen_test.dart test/screens/app_shell_test.dart test/widget_test.dart` 全通过（22）。
+
+  **完成时间**: 2026-06-25 11:50:00 +0800
+
+## 已完成：精听前「听前预热」卡
+
+v2 计划把逐句精听提到首步后，用户对长音频内容零认知就直接精听会蒙。在「首次学习」**上方**插入一张独立醒目的「听前预热」卡片（「推荐先做」徽章 + 耳机图标 + 描述「先听一遍全文，抓住大意，不用听懂每一句」+「先听全文」主按钮），引导用户先用现有随心听播放器整篇泛听熟悉内容。仅 `!isStarted && hasTranscript` 时显示，开始学习后自动消失（按音频维度一次性，无新增持久化）；按钮与右上角胶囊同一目的地。不新增学习步骤、不改进度模型、不强制。
+
+- [x] `lib/screens/learning_plan_screen.dart`：抽 `_openFreePlay`（AppBar 胶囊 + 预热卡 + start 兜底分支共用，消除三处重复）；新增 `_WarmUpCard`（横向单行紧凑卡：暖橙奶油底 + 耳机图标圆底 + 内联「推荐先做」徽章 + 右侧 chevron，整卡可点），在 `_ProgressCard`/无字幕横幅与 `_FirstStudySection` 之间条件插入。
+- [x] l10n：`app_zh.arb` / `app_en.arb` 新增 `warmUpCardTitle`(听前预热) / `warmUpCardSubtitle` / `warmUpCardBadge`(推荐先做)。
+- [x] 测试：`learning_plan_screen_test.dart` 新增 4 例（未开始+有字幕显示标题与徽章 / 点击进播放器 / 已开始消失 / 无字幕不显示），全部通过。
+- [x] 验证：改动文件 `flutter analyze` 0 问题；`flutter test test/screens/learning_plan_screen_test.dart` 全通过（46）。
+
+  **完成时间**: 2026-06-25
+  **备注**: 经两轮反馈定稿——初版「首次学习」内嵌虚线小卡 → 上方独立大卡 → 暖橙调横向紧凑卡（更矮、按钮收敛为整卡可点）。
 
 ## 已完成：AI 转录「自动合并短句」开关（App 侧）
 

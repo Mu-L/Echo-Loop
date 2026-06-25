@@ -595,6 +595,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stepRetellingDesc => '挑战一下：用自己的话复述每段大意';
 
   @override
+  String get warmUpCardTitle => '听前预热';
+
+  @override
+  String get warmUpCardSubtitle => '先听一遍，抓住大意，不必听懂每句';
+
+  @override
+  String get warmUpCardBadge => '推荐先做';
+
+  @override
   String get reviewRound0 => '首轮复习';
 
   @override
@@ -614,27 +623,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reviewRound28 => '第七轮复习';
-
-  @override
-  String get reviewIntervalNow => '6小时后';
-
-  @override
-  String get reviewInterval1d => '1天后';
-
-  @override
-  String get reviewInterval2d => '2天后';
-
-  @override
-  String get reviewInterval4d => '4天后';
-
-  @override
-  String get reviewInterval7d => '7天后';
-
-  @override
-  String get reviewInterval14d => '14天后';
-
-  @override
-  String get reviewInterval28d => '28天后';
 
   @override
   String reviewUnlockIn(int days) {
@@ -1726,9 +1714,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get continueButton => '继续';
-
-  @override
-  String get reviewButton => '复习';
 
   @override
   String streakDays(int count) {

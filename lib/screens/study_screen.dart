@@ -11,6 +11,7 @@ import '../config/api_config.dart';
 import '../database/daos/stage_completion_dao.dart';
 import '../database/enums.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/audio_library_provider.dart';
 import '../providers/learning_plan_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/new_user_guide_provider.dart';
@@ -49,10 +50,14 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final audioLibraryState = ref.watch(audioLibraryProvider);
+    final progressState = ref.watch(learningProgressNotifierProvider);
     final tasks = ref.watch(studyTaskProvider);
     final completedAudios = ref.watch(completedAudioProvider);
     final now = ref.watch(nowProvider)();
     final statsAsync = ref.watch(studyStatsNotifierProvider);
+    final isBootstrappingStudy =
+        audioLibraryState.isLoading || progressState.isLoading;
 
     final recentCompletionsAsync = ref.watch(recentCompletionsProvider);
 
@@ -153,7 +158,11 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
           title: Text(l10n.studyTasks),
           actions: [GuideTarget(step: stepStreakChip, child: streakChip)],
         ),
-        body: !hasAnyTask
+        // 仅在「正在预热且尚无任何任务可展示」时显示骨架，避免冷启动闪空态；
+        // 已有任务时即使触发运行期 reload（如官方合集后台同步）也保留任务，不闪骨架。
+        body: (isBootstrappingStudy && !hasAnyTask)
+            ? const _StudyLoadingSkeleton()
+            : !hasAnyTask
             ? const _EmptyState(type: _EmptyStateType.noTasks)
             : tasks.isEmpty && completedAudios.isNotEmpty
             ? _buildAllDoneContent(
@@ -963,6 +972,95 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+/// 学习页冷启动骨架屏。
+///
+/// 与正式页面结构保持近似，只表达"学习数据正在加载"，避免误闪"暂无任务"空态。
+class _StudyLoadingSkeleton extends StatelessWidget {
+  const _StudyLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
+      children: const [
+        _SkeletonBlock(height: 72, radius: 24),
+        SizedBox(height: AppSpacing.s),
+        _SkeletonBlock(height: 164, radius: 28),
+        SizedBox(height: AppSpacing.l),
+        _SkeletonRow(widthFactors: [0.18, 0.28]),
+        SizedBox(height: AppSpacing.m),
+        _SkeletonTaskCard(),
+        SizedBox(height: AppSpacing.m),
+        _SkeletonTaskCard(),
+      ],
+    );
+  }
+}
+
+class _SkeletonTaskCard extends StatelessWidget {
+  const _SkeletonTaskCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonBlock(height: 156, radius: 28);
+  }
+}
+
+class _SkeletonRow extends StatelessWidget {
+  final List<double> widthFactors;
+
+  const _SkeletonRow({required this.widthFactors});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Row(
+          children: [
+            for (var i = 0; i < widthFactors.length; i++) ...[
+              _SkeletonBlock(
+                width: constraints.maxWidth * widthFactors[i],
+                height: 18,
+                radius: 999,
+              ),
+              if (i != widthFactors.length - 1)
+                const SizedBox(width: AppSpacing.s),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonBlock extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _SkeletonBlock({
+    this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
 // ============================================================
 // Helper functions
 // ============================================================
@@ -1009,17 +1107,10 @@ String _stageName(AppLocalizations l10n, LearningStage stage) {
   };
 }
 
-/// 按钮文案：未开始=开始，进行中=继续，复习=复习
+/// 按钮文案：本轮尚无完成记录=开始，已有完成记录=继续。
+/// 复习任务与首次学习统一按"是否已开始本轮"判定，不再区分类型。
 String _actionLabel(AppLocalizations l10n, StudyTask task) {
-  if (task.type == StudyTaskType.reviewReady ||
-      task.type == StudyTaskType.reviewUpcoming) {
-    return l10n.reviewButton;
-  }
-  if (task.subStage == SubStageType.blindListen &&
-      task.stage == LearningStage.firstLearn) {
-    return l10n.startButton;
-  }
-  return l10n.continueButton;
+  return task.hasRoundProgress ? l10n.continueButton : l10n.startButton;
 }
 
 /// 状态标签（学习中 / 逾期 / 倒计时等）

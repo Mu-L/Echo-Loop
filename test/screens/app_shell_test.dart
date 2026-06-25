@@ -24,7 +24,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('No study tasks yet'), findsOneWidget);
+      expect(find.text('Study Tasks'), findsOneWidget);
 
       // 消耗冷启动保护定时器（5 秒）
       await tester.pump(const Duration(seconds: 6));

@@ -117,4 +117,24 @@ class StageCompletionDao extends DatabaseAccessor<AppDatabase>
     }
     return result;
   }
+
+  /// 查询指定音频各大阶段的最终完成时间。
+  ///
+  /// 同一大阶段可能有多个子步骤完成记录，这里取该 stage 下最后一个子步骤的
+  /// `completedAt` 作为“大阶段完成时间”，供学习计划页显示“X 天前完成”。
+  Future<Map<String, DateTime>> getStageCompletedAtByAudioId(
+    String audioItemId,
+  ) async {
+    final rows =
+        await (select(stageCompletions)
+              ..where((t) => t.audioItemId.equals(audioItemId))
+              ..orderBy([(t) => OrderingTerm.asc(t.completedAt)]))
+            .get();
+
+    final result = <String, DateTime>{};
+    for (final row in rows) {
+      result[row.stage] = row.completedAt;
+    }
+    return result;
+  }
 }
