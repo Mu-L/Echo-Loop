@@ -147,6 +147,37 @@ void main() {
     });
   });
 
+  group('processingState 映射（锁屏状态）', () {
+    test('completed 上报为 ready，避免锁屏进度条卡在结尾', () {
+      // just_audio 自然播完后处于 completed、playing 仍为 true（§7.6）。
+      when(
+        () => player.processingState,
+      ).thenReturn(ja.ProcessingState.completed);
+      when(() => player.playing).thenReturn(true);
+
+      // 触发一次广播（setSkipHandlers 内部调用 _broadcastState）。
+      handler.setSkipHandlers(onPrevious: null, onNext: null);
+
+      final state = handler.playbackState.value;
+      // 关键断言：系统永远收不到 completed，否则整篇循环回卷后进度条会被钉在结尾。
+      expect(state.processingState, AudioProcessingState.ready);
+    });
+
+    test('其余状态按原样映射', () {
+      const cases = {
+        ja.ProcessingState.idle: AudioProcessingState.idle,
+        ja.ProcessingState.loading: AudioProcessingState.loading,
+        ja.ProcessingState.buffering: AudioProcessingState.buffering,
+        ja.ProcessingState.ready: AudioProcessingState.ready,
+      };
+      for (final entry in cases.entries) {
+        when(() => player.processingState).thenReturn(entry.key);
+        handler.setSkipHandlers(onPrevious: null, onNext: null);
+        expect(handler.playbackState.value.processingState, entry.value);
+      }
+    });
+  });
+
   group('play/pause 命令路由', () {
     test('未注册时 play/pause 直接驱动底层播放器', () async {
       await handler.play();

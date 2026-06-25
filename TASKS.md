@@ -1,7 +1,28 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-25（Free Player 无字幕场景修复）
+> 最后更新：2026-06-25（锁屏整篇循环进度条偶发卡结尾修复）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：锁屏整篇循环进度条偶发卡在结尾
+
+整篇循环时锁屏 Now Playing 进度条偶发卡在上一遍结束位置（满格、暂停图标），但音频已在播下一遍。根因：`_broadcastState()` 把 just_audio 自然播完的 `completed` 状态原样上报给系统，iOS 据此把曲目当作已播完、进度条钉在结尾，后续回卷 `seek(0)` 在「已结束」态下被忽略（偶发，取决于 completed→ready 转换时序）。详见 CLAUDE.md §7.7。
+
+- [x] `lib/services/background_audio_handler.dart`：`_mapProcessingState` 把 `ja.ProcessingState.completed` 映射为 `AudioProcessingState.ready`——循环播放器对系统从不真正「结束」，系统永不收到 completed 标志，回卷/续播的 position 更新在 ready 态下被正常接受。app 内部 completed 判定均读原始 player 状态，零副作用。
+- [x] 测试：`background_audio_handler_test.dart` 新增 2 例（completed→ready 映射、其余状态原样映射）。
+- [x] 验证：`flutter analyze` 改动文件 0 问题；`background_audio_handler_test` 全通过（14）。
+
+  **完成时间**: 2026-06-25
+
+## 已完成：Free Player 结束态进入后首次点击误从结尾起播
+
+进入 player 时 `_restorePlaybackState` 会把引擎 seek 到上次存档位置；若上次正好播到结尾，存档位置就在音频末尾，此时 just_audio 的 `processingState` 仍是 `ready`（非 `completed`，且 `_awaitingReplayFromStart` 为 false）。「续播 vs 从头」的启发式（`processingState != completed && position > 0`）据此误判为「续播」：无字幕从结尾起播立即结束（需点两次才从头播），有字幕则从最后一句起播而非音频开头。
+
+- [x] `lib/providers/audio_engine/audio_engine_provider.dart`：新增 `totalDuration` getter（暴露已解析总时长）。
+- [x] `lib/providers/listening_practice/listening_practice_provider.dart`：新增 `_isAtAudioEnd()`（位置接近总时长即视作已播完）。无字幕 `_startNoTranscriptPlayback` 的续播判定加 `!_isAtAudioEnd()`；有字幕 `play()` 把「已播完重播」分支条件改为 `_awaitingReplayFromStart || _isAtAudioEnd()`，结尾态统一走 `_restartFromPlayableBeginning` 从列表开头重播。
+- [x] 测试：`free_player_playback_flow_test.dart` 新增 3 例（无字幕结尾态首点 seek(0)、无字幕中段续播不 seek(0)、有字幕结尾态首点从第 1 句重播）。
+- [x] 验证：`flutter analyze` 0 问题；`flutter test` 全通过（3032）。
+
+  **完成时间**: 2026-06-25
 
 ## 已完成：Free Player 无字幕场景修复
 

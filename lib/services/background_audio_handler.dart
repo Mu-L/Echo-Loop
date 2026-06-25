@@ -320,7 +320,10 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
       ja.ProcessingState.loading => AudioProcessingState.loading,
       ja.ProcessingState.buffering => AudioProcessingState.buffering,
       ja.ProcessingState.ready => AudioProcessingState.ready,
-      ja.ProcessingState.completed => AudioProcessingState.completed,
+      // 循环播放器对系统从不真正「结束」：completed 上报为 ready，避免 iOS 把曲目
+      // 当作已播完而把锁屏进度条钉在结尾、忽略整篇回卷后的 seek/position 更新
+      // （见 CLAUDE.md §7.7）。app 内部的 completed 判定均读原始 player 状态，不受影响。
+      ja.ProcessingState.completed => AudioProcessingState.ready,
     };
   }
 }

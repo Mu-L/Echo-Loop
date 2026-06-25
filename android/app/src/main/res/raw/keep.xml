@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  资源压缩白名单（release 构建 shrinkResources 生效时使用）。
+
+  ic_stat_logo 是锁屏/通知栏媒体通知的 small icon，仅在 Dart 运行时以字符串
+  'drawable/ic_stat_logo' 通过 audio_service 的 getIdentifier 动态查找，没有任何
+  代码/XML 静态引用。R8 资源压缩器据此判定其「未使用」并从 release APK 中删除，
+  导致运行时 setSmallIcon(0) → startForeground 抛 "Couldn't create icon"，媒体
+  通知建不起来、系统退化成「正在运行」占位通知（debug 不压缩资源故无此问题）。
+
+  这里显式 keep 该资源，使其在 release 包中保留，getIdentifier 才能解析到。
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_logo" />
