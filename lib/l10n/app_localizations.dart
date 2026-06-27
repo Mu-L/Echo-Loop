@@ -6787,6 +6787,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Audio URL'**
   String get podcastEnclosureUrl;
+
+  /// No description provided for @dictionarySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary Settings'**
+  String get dictionarySettings;
+
+  /// No description provided for @dictionaryDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Dictionary'**
+  String get dictionaryDefault;
+
+  /// No description provided for @dictionaryDefaultDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Source shown by default when you tap a word'**
+  String get dictionaryDefaultDescription;
+
+  /// No description provided for @dictionarySources.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary Sources'**
+  String get dictionarySources;
+
+  /// No description provided for @dictionarySourcesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled dictionaries won\'t appear in the lookup switcher'**
+  String get dictionarySourcesDescription;
+
+  /// No description provided for @dictSourceLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Dictionary'**
+  String get dictSourceLocal;
+
+  /// No description provided for @dictSourceAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Dictionary'**
+  String get dictSourceAi;
+
+  /// No description provided for @dictSourceCambridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Cambridge'**
+  String get dictSourceCambridge;
+
+  /// No description provided for @dictSourceAlwaysOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Always on'**
+  String get dictSourceAlwaysOn;
+
+  /// No description provided for @dictSourceCannotDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is a base source and can\'t be disabled'**
+  String dictSourceCannotDisable(String name);
+
+  /// No description provided for @dictDefaultBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get dictDefaultBadge;
+
+  /// No description provided for @dictSwitcherSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch dictionary, currently {name}'**
+  String dictSwitcherSemantics(String name);
+
+  /// No description provided for @cambridgeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found in Cambridge'**
+  String get cambridgeNotFound;
+
+  /// No description provided for @dictTryOtherSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another dictionary'**
+  String get dictTryOtherSource;
+
+  /// No description provided for @dictCambridgeOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get dictCambridgeOpenInBrowser;
+
+  /// No description provided for @aiNoAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'No AI analysis available'**
+  String get aiNoAnalysis;
+
+  /// No description provided for @aiSignInRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to use the AI dictionary'**
+  String get aiSignInRequired;
+
+  /// No description provided for @ttsPlayUk.
+  ///
+  /// In en, this message translates to:
+  /// **'Play UK pronunciation'**
+  String get ttsPlayUk;
+
+  /// No description provided for @ttsPlayUs.
+  ///
+  /// In en, this message translates to:
+  /// **'Play US pronunciation'**
+  String get ttsPlayUs;
+
+  /// No description provided for @dictAiSynonyms.
+  ///
+  /// In en, this message translates to:
+  /// **'Synonyms'**
+  String get dictAiSynonyms;
+
+  /// No description provided for @dictAiAntonyms.
+  ///
+  /// In en, this message translates to:
+  /// **'Antonyms'**
+  String get dictAiAntonyms;
+
+  /// No description provided for @dictAiExpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'Common Expressions'**
+  String get dictAiExpressions;
+
+  /// No description provided for @dictAiWordFamily.
+  ///
+  /// In en, this message translates to:
+  /// **'Word Family'**
+  String get dictAiWordFamily;
+
+  /// No description provided for @dictAiForms.
+  ///
+  /// In en, this message translates to:
+  /// **'Word Forms'**
+  String get dictAiForms;
+
+  /// No description provided for @dictAiEtymology.
+  ///
+  /// In en, this message translates to:
+  /// **'Etymology'**
+  String get dictAiEtymology;
+
+  /// No description provided for @dictAiTips.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get dictAiTips;
 }
 
 class _AppLocalizationsDelegate

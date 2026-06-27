@@ -14,7 +14,7 @@ import '../config/api_config.dart';
 import 'api_log_interceptor.dart';
 import '../models/sentence_ai_result.dart';
 import '../models/sense_group_result.dart';
-import '../models/word_analysis.dart';
+import '../models/dictionary/dictionary_entry.dart';
 
 part 'sentence_ai_api_client.g.dart';
 
@@ -84,21 +84,29 @@ class SentenceAiApiClient {
     return SentenceAnalysis.fromJson(response.data!);
   }
 
-  /// 解析单词
+  /// AI 词典释义
   ///
-  /// 调用后端 AI 单词解析接口，返回语境释义、搭配、用法和词族分析。
-  /// [sentence] 为可选上下文句子，帮助 AI 确定语境含义。
-  Future<WordAnalysis> analyzeWord(
+  /// 调用后端 `POST /api/v2/ai/dictionary`（需登录态），返回结构化词典条目。
+  /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
+  /// 响应缺少 `analysis` 字段时返回 null。
+  Future<DictionaryEntry?> lookupDictionary(
     String word, {
-    String? sentence,
+    required String accessToken,
+    String? targetLanguage,
     CancelToken? cancelToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/ai/word-analyze',
-      data: {'word': word, if (sentence != null) 'sentence': sentence},
+      '/api/v2/ai/dictionary',
+      data: {
+        'word': word,
+        if (targetLanguage != null) 'targetLanguage': targetLanguage,
+      },
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       cancelToken: cancelToken,
     );
-    return WordAnalysis.fromJson(response.data!);
+    final analysis = response.data?['analysis'];
+    if (analysis is! Map<String, dynamic>) return null;
+    return DictionaryEntry.fromJson(analysis);
   }
 
   /// 拆分意群

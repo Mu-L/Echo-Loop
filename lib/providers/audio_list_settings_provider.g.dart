@@ -6,7 +6,7 @@ part of 'audio_list_settings_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$audioListSettingsHash() => r'0fbc7c7ee547b389ddcb81e9f6782834dd4e59e0';
+String _$audioListSettingsHash() => r'428a8706f0950ff3144e0d1e98ddf2d6f9d71561';
 
 /// See also [AudioListSettings].
 @ProviderFor(AudioListSettings)

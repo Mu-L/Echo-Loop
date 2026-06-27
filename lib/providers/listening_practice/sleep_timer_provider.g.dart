@@ -6,7 +6,7 @@ part of 'sleep_timer_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sleepTimerHash() => r'c558b04951fde4cea970c3211006f8131df047bc';
+String _$sleepTimerHash() => r'ff171027377fa2885f71d3fa55f25ed76fbf5782';
 
 /// 自由播放器的睡眠定时器（定时停止）。
 ///

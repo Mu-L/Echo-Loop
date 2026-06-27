@@ -6,14 +6,16 @@ part of 'listening_practice_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$listeningPracticeHash() => r'e337984ab82c23f8764208c09001ed3a7ce5a9ea';
+String _$listeningPracticeHash() => r'b6634323fabac0651ec18a24f33fa9fc09178ae5';
 
 /// 自由练习播放器的状态与业务编排。
 ///
-/// 播放推进采用单一的「事件驱动」模型：底层 [AudioEngine]（多个功能共享的
-/// 单实例 just_audio）只在「一句/整段播放完成」时回调 [_onPlayerStateChanged]，
-/// 由纯函数 [decideNext] 决定下一步（重播 / 进下一句 / 回卷 / 停止）。
-/// 不再有跨多次 await 持有状态的长协程，避免索引乱跳。
+/// 播放推进采用统一的「确定性 await-完成循环」模型：无论整篇连续播放
+/// （[_playWholeDriven]）还是单句循环/收藏跳播（[_playSentenceDriven]），都在
+/// 协程里 `await` 引擎播放一遍（[AudioEngine.playToEnd] / [AudioEngine.playClipOnce]）
+/// 后，用纯函数 [decideNext] / [shouldLoopWhole] 决定下一步（重播 / 进下一句 /
+/// 回卷 / 停止）。计数与循环不依赖反应式的 `completed` 事件流，从根上避免 just_audio
+/// 重复/滞后 `completed` 事件导致的多计数与提前停止。
 ///
 /// 真相源是 [ListeningPracticeState.currentFullIndex] /
 /// [ListeningPracticeState.currentBookmarkIndex]，只在以下入口被修改：

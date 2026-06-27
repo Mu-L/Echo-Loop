@@ -7,7 +7,7 @@ part of 'listen_and_repeat_settings_provider.dart';
 // **************************************************************************
 
 String _$listenAndRepeatSettingsHash() =>
-    r'f80277787084f6f96ae9f7c2e564d6c347f19c32';
+    r'b05544d8de3bc2458b9c386de3f19aaeae1aede4';
 
 /// 跟读设置 Provider
 ///

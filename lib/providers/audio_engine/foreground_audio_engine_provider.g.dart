@@ -7,7 +7,7 @@ part of 'foreground_audio_engine_provider.dart';
 // **************************************************************************
 
 String _$foregroundAudioEngineHash() =>
-    r'c1a656d395c484562d440631ea38ea63a254d8fb';
+    r'b2a2a37d4df0da67f796c4eefb9e2999e7226be0';
 
 /// 前台音频引擎——录音/复习类任务专用，**不接入 `audio_service`**。
 ///

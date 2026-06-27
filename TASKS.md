@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-27（媒体引擎 / 前台引擎分离落地，根除 §7.7–7.11 suppress 类竞态；待真机 iOS 回归）
+> 最后更新：2026-06-27（媒体引擎 / 前台引擎分离落地 + 多词典源查词）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
 ## 已完成：修复段落复述/全文盲听打开段落时句子高亮乱跳、断点被覆盖成首句
@@ -68,6 +68,106 @@
 - [x] 验证：`flutter analyze` 改动文件 0 问题；`flutter test` 全通过（3117）。真机 iOS 端到端验收（E1/E2/E3、跨音频标题、录音阶段不进后台、中断同步）待用户回归。
 
   **完成时间**: 2026-06-26
+
+> 最后更新：2026-06-27（网页词典源扩展：抽象通用网页源 + 新增 7 个词典）
+> 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：新增 7 个网页词典源（Oxford/Longman/Merriam-Webster/Collins/Vocabulary.com/有道/欧陆）
+
+参照 Cambridge 网页源，再加 7 个同类网页词典。因这些源与 Cambridge 本质相同（仅 URL 模板与品牌展示不同），把 Cambridge 这一已验证模式**抽象为配置驱动的通用网页源**，Cambridge 降级为配置之一——新增源只需往 `kWebDictConfigs` 加一行。Macmillan 未纳入（官网 2023-06-30 已永久关停）。7 个新源默认全部启用，中文品牌用中文名（有道/欧陆）。
+
+- [x] 抽象通用件：`WebDictResult`（替代 `CambridgeWebResult`，带 `sourceId`）、`WebDictionarySource`+`WebDictConfig`+`kWebDictConfigs`（`lib/services/dictionary/web_dictionary_source.dart`）、`WebDictionaryView`（`lib/widgets/dictionary/web_dictionary_view.dart`，由 cambridge_web_view 泛化）。
+- [x] 接线：`dictionary_result_view`（web 源统一走 `WebDictionaryView`）、`dict_source_presentation`（颜色/名称取自配置）、`dictionary_registry`（`webDictionarySources` 展开拼入）。删除 cambridge 三个旧专用件。
+- [x] 切源不闪旧页（**标准做法**）：`WebDictionaryView` 用 `initialUrlRequest` 加载、`ValueKey('web_$sourceId')` 让 Flutter 在切源时重建为全新 native view（杜绝旧页像素残留），加载遮罩盖到 `onLoadStop` 揭示。**放弃**单实例保活 + `loadUrl` 切换 + 进度阈值/延时启发式那套 workaround（删 `web_dictionary_keepalive_provider`）。移动端 UA + `preferredContentMode.MOBILE` 走移动布局。
+- [x] 测试：`web_dictionary_source_test`（遍历配置校验 id/URL 编码/sourceId）；`lookup_controller_test` 改用 `WebDictResult`。`flutter analyze` 我方文件 0、dictionary 全部 84 测试通过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：修复 AI 词典弹窗出现时闪烁一下
+
+复查过的单词（L2 SQLite 缓存命中）再次查词时，弹窗弹出途中会「闪烁一下」。根因：内容区套了 `AnimatedSize`/`AnimatedSwitcher`，缓存结果在弹窗滑入动画途中（约几十 ms）到达，触发高度增长动画 + 内容切换，与滑入运动叠加。L1 内存命中（首帧前解析完）和 L3 网络（滑入早已结束）都不受影响，故只在复查单词时显现。改为：滑入动画期间内容区直接渲染（不套过渡，被滑入运动掩盖即时定型），监听弹窗路由动画，滑入结束后才启用 `AnimatedSize`/`AnimatedSwitcher` 供切换数据源平滑过渡。
+
+- [x] `lib/widgets/intensive_listen/word_dictionary_sheet.dart`：新增 `_entered` 标志 + `didChangeDependencies` 监听 `ModalRoute.animation`，滑入完成置位刷新；`_buildContent` 据此决定是否套过渡。
+- [x] 测试：`word_dictionary_sheet_test` 新增「滑入期间内容区不套 AnimatedSwitcher，滑入结束后启用」用例。`flutter analyze` 0、相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：修复默认 AI 词典冷启动后首个单词误显 local 词典
+
+默认源设为 AI 时，冷启动/热更新后点第一个单词显示的是 local，点其它单词才正常。根因：`DictionarySettingsNotifier` 采用「假异步」——`build()` 同步返回缺省 `local`，真实值由 `_load()` 后台 `await SharedPreferences.getInstance()` 异步读入；首查在加载完成前同步锁定了缺省 local。改为同步从 main() 已预热注入的 `sharedPreferencesProvider` 读取，首次 build 即拿到真实设置，竞态从根上消除（`resolvedDefaultSourceId`/`lookup_controller`/UI 零改动）。
+
+- [x] `lib/providers/dictionary/dictionary_settings_provider.dart`：`build()` 改为同步 `ref.watch(sharedPreferencesProvider)` 读取并解析；删除 `_load()`；`_persist` 改用同步 provider 取实例。
+- [x] 测试：`dictionary_settings_provider_test` 新增「冷启动同步读取持久化默认源」用例 + 各 dictionary/settings 测试补 `sharedPreferencesProvider` override（settings_screen 的 study section 同步读词典设置，需注入 SP）。`flutter analyze` 0、相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：清理死掉的 WordAi 解析 + AI 缓存表正名 + 修复 AI 词典 L1 缓存清不掉
+
+围绕 AI 缓存的三件清理：删除已被 AI 词典取代、无任何 UI 调用的 WordAi 单词解析；澄清缓存表实为通用 AI 结果缓存；补齐清缓存对 AI 词典内存缓存的清理。
+
+- [x] **删死代码**：`word_analysis` type 已无任何调用点（`getWordAnalysis`/`analyzeWord` 仅剩 `clearMemoryCache`/`invalidate` 接线）。删除 `lib/providers/word_ai_provider.dart`、`lib/models/word_analysis.dart`、`SentenceAiApiClient.analyzeWord`、`/api/v1/ai/word-analyze` 调用及对应测试（`word_ai_provider_test`/`word_analysis_test`/api client 的 analyzeWord group）；移除 `database/providers.dart`、`settings_screen.dart` 里的 import 与 `wordAiNotifierProvider` 接线。
+- [x] **缓存表正名**：`sentence_ai_cache` 实为按 `(textHash, type)` 索引的**通用 AI 结果缓存**（住着 translation/analysis/ai_dictionary）。更新表/DAO/`type` 列/`_cacheType` 注释如实表达（表名为历史遗留，不改名以免迁移）。
+- [x] **修复 AI 词典 L1 缓存清不掉**（原 bug）：清缓存只清了 SQLite + 句子 AI 的 L1，`AiDictionarySource._memCache` 从没被清→清缓存后重查仍命中旧结果。新增 `AiDictionarySource.clearMemoryCache()`，接入 `settings_screen` 清缓存第 2 步与 `switchAppDatabase`（切库 invalidate keepAlive 源以丢弃旧库结果）。
+- [x] 测试：`ai_dictionary_source_test` 新增「clearMemoryCache 后重查回到 L2/L3（API 调 2 次）」；改动文件 `flutter analyze` 0、相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：AI 词典改为后台单请求（关弹窗不中断、重查复用、不重复发请求）
+
+原行为：加载中关闭词典弹窗 → controller autoDispose → 取消在途 CancelToken → AI 请求被中断且未落缓存 → 重查同词从零再发请求（烧 token、慢）。改为标准的「后台单请求」语义：请求生命周期与弹窗解耦，跑完落缓存，全程只有一个请求。
+
+- [x] AI 源 `lib/services/dictionary/ai_dictionary_source.dart`：`lookup` 刻意忽略调用方 `cancelToken`，`_fetch` 去掉该参数、不转发给 API——请求一经发起即跑到底并落 L1+L2 缓存。`_pending` 在途去重 + 缓存共同保证同词只有一个请求（与 widget 生命周期解耦）。
+- [x] controller `lib/providers/dictionary/lookup_controller.dart`：新增 `_disposed` 守卫（`_dropResult = _disposed || _isStale`），AI 后台请求在 dispose 后回调到达时丢弃，避免对已销毁 Notifier 写 state 抛错。onDispose 仍取消 token（网页源据此中断抓取，AI 忽略后台续跑）。
+- [x] 接口注释 `dictionary_source.dart`：注明源可忽略 `cancelToken`（AI 后台单请求语义）。
+- [x] 测试：`ai_dictionary_source_test`（忽略 cancelToken 不转发 API、并发同词只调一次 API）、`lookup_controller_test`（controller 销毁后在途请求完成不写已销毁状态不抛错）；改动文件 `flutter analyze` 0、相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：修复 Cambridge 网页词典加载（缓存失败/卡转圈/误判失败/强刷）+ 切换器 UX
+
+网页词典（Cambridge WebView）一系列加载问题修复 + 切换器交互优化。
+
+- [x] **缓存失败结果致空白页**：`markLoaded` 原在 `onWebViewCreated` 发起加载时**乐观调用**，失败的加载被记入复用缓存→重开命中复用窗口跳过加载→显示空白。改为仅成功才 `markLoaded`；新增 `markFailed(word)` 清该词复用记录（只清匹配词），失败/超时即清。
+- [x] **加载超时**：新增 20s 超时计时器，超时未完成转失败态可重试；进度达标即取消。
+- [x] **重试不强刷**：重试走 `_startLoad(forceReload: true)` 绕过 HTTP 缓存（iOS/macOS 用 `RELOAD_IGNORING_LOCAL_CACHE_DATA`，Android 先 `clearAllCache`），避免重试又命中失败缓存。
+- [x] **卡在"加载中"**：`onLoadStop` 原先 `await` 美化注入在清 `_loading` 之前，注入抛错则卡转圈。改为先结束 loading 再 try-catch 包裹注入。
+- [x] **内容已显示却变失败**：Cambridge 页（AI Assistant 长连接）迟迟不触发 `onLoadStop`，`_loading` 一直 true→20s 后超时误判失败。改以 `onProgressChanged` 进度 ≥70% 为主信号（`_markShown`）；`onReceivedError` 仅在加载中、主框架、非 CANCELLED 才算失败。
+- [x] **加载条太抢眼**：`LinearProgressIndicator` 改 2px 高 + 透明底 + 主色 35% 透明度。
+- [x] **切换器 UX**（`source_switcher.dart`）：下拉 chip 选中态加主色边框/字（与 AI 按钮对称，标明当前选中）；选中 AI 时点 chip 直接切到默认源（不先展开菜单），切到下拉源后才展开菜单换源。
+- [x] 测试：`cambridge_webview_provider_test`（复用窗口/换词/超窗/失败清缓存/markFailed 不误清）、`source_switcher_test` 新增「选中 AI 时点 chip 直接切源」；`flutter analyze` 0、相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：AI 词典对齐后端新 entry 格式 + 美化展示
+
+后端 `/api/v2/ai/dictionary` 的 entry 格式调整（`learnerTips` 由单字符串改为字符串数组、`wordFamily` 项新增 `meaning`），App 侧对齐模型并整体美化 AI 词典结果视图，使其专业、简洁、美观。仅动 AI 源相关代码，本地/Cambridge 源、弹窗组装器、切换器、TTS/收藏不变。
+
+- [x] 模型对齐 `lib/models/dictionary/dictionary_entry.dart`：`DictionaryEntry.learnerTips` 改 `List<String>`（`fromJson` 复用 `_strList`）、`WordFamilyItem` 新增 `meaning`（`_str`）；`toJson`/`isEmpty` 随之兼容。
+- [x] 美化渲染层 `lib/widgets/dictionary/ai_dict_result_view.dart`（整体重写）：多义项序号徽章 + 义项间细分隔；释义字重提升；近/反义词由逗号文本改为圆角 chips（近义主色淡底、反义中性淡底）；例句改圆角主色淡底块 + 左主色 accent，中英文层级分明；常见搭配补显此前被丢弃的 `type` 小标签；词族补显新增 `meaning`；学习提示由单段改为项目符号列表；补充分节（搭配/词族/词源/提示）包入柔和卡片 + 图标徽章标题。状态分支与「空字段隐藏」原则不变。
+- [x] 空条目兜底 `lib/services/dictionary/ai_dictionary_source.dart`：`learnerTips: const []`。
+- [x] 测试：`dictionary_entry_test`（learnerTips 数组 / wordFamily meaning / 类型不符回退空列表 / 往返）、`ai_dict_result_view_test`（近义 chip / 多义序号 / 搭配 type / 词族 meaning / 提示逐条）；`ai_dictionary_source_test`、`word_dictionary_sheet_switch_test` 同步签名。
+- [x] 验证：改动文件 `flutter analyze` 0 问题；相关测试全过。
+
+  **完成时间**: 2026-06-27
+
+## 已完成：多词典源查词（可插拔框架：本地 / AI / Cambridge）
+
+查词底部弹窗从「单一本地词典」升级为「可切换的多词典源」。右上角下拉切换数据源，「我的」Tab 新增「词典设置」（设默认词典 + 启用/禁用可选源）。核心是可插拔框架：日后加 Oxford 等只需新增一个 source 实现 + 注册一行，不改现有 source / 弹窗 controller / 设置。
+
+- [x] 领域模型：`DictionaryLookupResult`(sealed: Local/Ai/CambridgeWeb) + `DictionaryEntry`(镜像后端 v2 `/api/v2/ai/dictionary`) + `DictionarySettings` + `DictionarySource`/`Request` 接口。
+- [x] 三个 source：本地（包装 `DictionaryService`）、AI（v2 接口 + 三级缓存 + Bearer 鉴权 + targetLanguage，依赖延迟解析避免枚举即初始化 DB）、Cambridge（构造中英对照网页 URL）。
+- [x] 注册表 + 派生可见列表：`dictionary_registry`、`visibleDictionarySources`、`resolvedDefaultSourceId`（默认源被禁用时回退 local）。
+- [x] 设置 provider：`DictionarySettingsNotifier`（SharedPreferences；只允许可禁用源进禁用集、禁用当前默认源自动回退）。
+- [x] 查词 controller：`DictionaryLookupController`（family by word，选中源 + 各源态缓存 + 每源序列号/CancelToken 防竞态）。
+- [x] 渲染层：本地/AI(结构化)/Cambridge(InAppWebView 保活+5min复用) 三视图 + 右上角下拉切换器 + sealed-result 穷尽分发；AI 复用词性蓝标签。
+- [x] 弹窗整合：`word_dictionary_sheet` 瘦身为组装器（切换器 + controller + AnimatedSwitcher），`showWordDictionarySheet` 签名不变，保留 TTS/收藏。
+- [x] 词典设置页 + 「我的」Tab 入口（默认词典单选 + 源开关/锁定）。
+- [x] i18n：en/zh 新增词典源名/设置页/Cambridge/AI 空态·登录等文案。
+- [x] 新增依赖 `flutter_inappwebview`（含 macOS）。
+- [x] 测试：模型/设置/可见列表/三源/controller 单测 + 各视图/切换器/设置页/弹窗切换 widget 测；`flutter analyze` 0（新代码）、`flutter test` 全过。
+- [x] UI 微调：AI 源提到下拉菜单外，成独立「✨ AI」快捷按钮（紫色，紧贴切换器左侧、与其等高、整体靠右）；选中 AI 时清空菜单内勾选；两 chip 视觉权重统一（同中性底，AI 仅以紫色字/选中淡紫底区分）；弹窗最高限 2/3 屏。
+
+  **完成时间**: 2026-06-27
 
 ## 已完成：全部学习子阶段设置持久化改用「按槽位 typed 偏好」
 

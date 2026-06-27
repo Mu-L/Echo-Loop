@@ -3656,4 +3656,86 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get podcastEnclosureUrl => '音频链接';
+
+  @override
+  String get dictionarySettings => '词典设置';
+
+  @override
+  String get dictionaryDefault => '默认词典';
+
+  @override
+  String get dictionaryDefaultDescription => '选择点单词时默认展示的词典源';
+
+  @override
+  String get dictionarySources => '词典源';
+
+  @override
+  String get dictionarySourcesDescription => '关闭的词典不会出现在查词切换器中';
+
+  @override
+  String get dictSourceLocal => '本地词典';
+
+  @override
+  String get dictSourceAi => 'AI 词典';
+
+  @override
+  String get dictSourceCambridge => 'Cambridge';
+
+  @override
+  String get dictSourceAlwaysOn => '始终启用';
+
+  @override
+  String dictSourceCannotDisable(String name) {
+    return '$name为基础词源，无法关闭';
+  }
+
+  @override
+  String get dictDefaultBadge => '默认';
+
+  @override
+  String dictSwitcherSemantics(String name) {
+    return '切换词典源，当前 $name';
+  }
+
+  @override
+  String get cambridgeNotFound => 'Cambridge 未收录该词';
+
+  @override
+  String get dictTryOtherSource => '试试其它词典';
+
+  @override
+  String get dictCambridgeOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get aiNoAnalysis => '暂无 AI 解析';
+
+  @override
+  String get aiSignInRequired => '登录后可使用 AI 词典';
+
+  @override
+  String get ttsPlayUk => '播放英式发音';
+
+  @override
+  String get ttsPlayUs => '播放美式发音';
+
+  @override
+  String get dictAiSynonyms => '近义词';
+
+  @override
+  String get dictAiAntonyms => '反义词';
+
+  @override
+  String get dictAiExpressions => '常见搭配';
+
+  @override
+  String get dictAiWordFamily => '词族';
+
+  @override
+  String get dictAiForms => '词形变化';
+
+  @override
+  String get dictAiEtymology => '词源';
+
+  @override
+  String get dictAiTips => '提示';
 }

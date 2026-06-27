@@ -7,7 +7,7 @@ part of 'review_difficult_practice_provider.dart';
 // **************************************************************************
 
 String _$reviewDifficultPracticeHash() =>
-    r'50cbefca2abb0527b80c00bde1278618a69862a4';
+    r'5423467b2a0b4d6d0af9462f2987b4c7fc59b887';
 
 /// 难句补练 Provider
 ///

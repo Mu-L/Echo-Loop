@@ -1861,5 +1861,37 @@
     "placeholders": { "time": { "type": "String" } }
   },
   "podcastEpisodeGuid": "GUID",
-  "podcastEnclosureUrl": "Audio URL"
+  "podcastEnclosureUrl": "Audio URL",
+  "dictionarySettings": "Dictionary Settings",
+  "dictionaryDefault": "Default Dictionary",
+  "dictionaryDefaultDescription": "Source shown by default when you tap a word",
+  "dictionarySources": "Dictionary Sources",
+  "dictionarySourcesDescription": "Disabled dictionaries won't appear in the lookup switcher",
+  "dictSourceLocal": "Local Dictionary",
+  "dictSourceAi": "AI Dictionary",
+  "dictSourceCambridge": "Cambridge",
+  "dictSourceAlwaysOn": "Always on",
+  "dictSourceCannotDisable": "{name} is a base source and can't be disabled",
+  "@dictSourceCannotDisable": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "dictDefaultBadge": "Default",
+  "dictSwitcherSemantics": "Switch dictionary, currently {name}",
+  "@dictSwitcherSemantics": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "cambridgeNotFound": "Not found in Cambridge",
+  "dictTryOtherSource": "Try another dictionary",
+  "dictCambridgeOpenInBrowser": "Open in browser",
+  "aiNoAnalysis": "No AI analysis available",
+  "aiSignInRequired": "Sign in to use the AI dictionary",
+  "ttsPlayUk": "Play UK pronunciation",
+  "ttsPlayUs": "Play US pronunciation",
+  "dictAiSynonyms": "Synonyms",
+  "dictAiAntonyms": "Antonyms",
+  "dictAiExpressions": "Common Expressions",
+  "dictAiWordFamily": "Word Family",
+  "dictAiForms": "Word Forms",
+  "dictAiEtymology": "Etymology",
+  "dictAiTips": "Tips"
 }

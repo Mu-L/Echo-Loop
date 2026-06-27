@@ -3815,4 +3815,88 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get podcastEnclosureUrl => 'Audio URL';
+
+  @override
+  String get dictionarySettings => 'Dictionary Settings';
+
+  @override
+  String get dictionaryDefault => 'Default Dictionary';
+
+  @override
+  String get dictionaryDefaultDescription =>
+      'Source shown by default when you tap a word';
+
+  @override
+  String get dictionarySources => 'Dictionary Sources';
+
+  @override
+  String get dictionarySourcesDescription =>
+      'Disabled dictionaries won\'t appear in the lookup switcher';
+
+  @override
+  String get dictSourceLocal => 'Local Dictionary';
+
+  @override
+  String get dictSourceAi => 'AI Dictionary';
+
+  @override
+  String get dictSourceCambridge => 'Cambridge';
+
+  @override
+  String get dictSourceAlwaysOn => 'Always on';
+
+  @override
+  String dictSourceCannotDisable(String name) {
+    return '$name is a base source and can\'t be disabled';
+  }
+
+  @override
+  String get dictDefaultBadge => 'Default';
+
+  @override
+  String dictSwitcherSemantics(String name) {
+    return 'Switch dictionary, currently $name';
+  }
+
+  @override
+  String get cambridgeNotFound => 'Not found in Cambridge';
+
+  @override
+  String get dictTryOtherSource => 'Try another dictionary';
+
+  @override
+  String get dictCambridgeOpenInBrowser => 'Open in browser';
+
+  @override
+  String get aiNoAnalysis => 'No AI analysis available';
+
+  @override
+  String get aiSignInRequired => 'Sign in to use the AI dictionary';
+
+  @override
+  String get ttsPlayUk => 'Play UK pronunciation';
+
+  @override
+  String get ttsPlayUs => 'Play US pronunciation';
+
+  @override
+  String get dictAiSynonyms => 'Synonyms';
+
+  @override
+  String get dictAiAntonyms => 'Antonyms';
+
+  @override
+  String get dictAiExpressions => 'Common Expressions';
+
+  @override
+  String get dictAiWordFamily => 'Word Family';
+
+  @override
+  String get dictAiForms => 'Word Forms';
+
+  @override
+  String get dictAiEtymology => 'Etymology';
+
+  @override
+  String get dictAiTips => 'Tips';
 }

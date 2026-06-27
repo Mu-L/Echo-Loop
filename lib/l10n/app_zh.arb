@@ -1465,5 +1465,37 @@
     "placeholders": { "time": { "type": "String" } }
   },
   "podcastEpisodeGuid": "GUID",
-  "podcastEnclosureUrl": "音频链接"
+  "podcastEnclosureUrl": "音频链接",
+  "dictionarySettings": "词典设置",
+  "dictionaryDefault": "默认词典",
+  "dictionaryDefaultDescription": "选择点单词时默认展示的词典源",
+  "dictionarySources": "词典源",
+  "dictionarySourcesDescription": "关闭的词典不会出现在查词切换器中",
+  "dictSourceLocal": "本地词典",
+  "dictSourceAi": "AI 词典",
+  "dictSourceCambridge": "Cambridge",
+  "dictSourceAlwaysOn": "始终启用",
+  "dictSourceCannotDisable": "{name}为基础词源，无法关闭",
+  "@dictSourceCannotDisable": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "dictDefaultBadge": "默认",
+  "dictSwitcherSemantics": "切换词典源，当前 {name}",
+  "@dictSwitcherSemantics": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "cambridgeNotFound": "Cambridge 未收录该词",
+  "dictTryOtherSource": "试试其它词典",
+  "dictCambridgeOpenInBrowser": "在浏览器中打开",
+  "aiNoAnalysis": "暂无 AI 解析",
+  "aiSignInRequired": "登录后可使用 AI 词典",
+  "ttsPlayUk": "播放英式发音",
+  "ttsPlayUs": "播放美式发音",
+  "dictAiSynonyms": "近义词",
+  "dictAiAntonyms": "反义词",
+  "dictAiExpressions": "常见搭配",
+  "dictAiWordFamily": "词族",
+  "dictAiForms": "词形变化",
+  "dictAiEtymology": "词源",
+  "dictAiTips": "提示"
 }

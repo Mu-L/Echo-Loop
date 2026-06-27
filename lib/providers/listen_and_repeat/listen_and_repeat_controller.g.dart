@@ -7,7 +7,7 @@ part of 'listen_and_repeat_controller.dart';
 // **************************************************************************
 
 String _$listenAndRepeatControllerHash() =>
-    r'7a97cacbdb57297b152cc74a356bf73438f46759';
+    r'e9075bd1195cb22b15b05d7216f5ddae3c02fb80';
 
 /// 跟读会话控制器
 ///

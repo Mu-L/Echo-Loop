@@ -8,13 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
 import 'package:echo_loop/widgets/intensive_listen/word_dictionary_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../helpers/mock_providers.dart';
+
+/// 词典设置读取的 SharedPreferences（在 setUp 注入），供 [_buildTestPage] override
+late SharedPreferences _prefs;
 
 /// 创建测试用内存词典数据库
 Database _createTestDb() {
@@ -41,7 +46,11 @@ Database _createTestDb() {
 /// 构建打开弹窗的测试页面
 Widget _buildTestPage(String word, {String? sentenceText}) {
   return ProviderScope(
-    overrides: [analyticsOverride(), dictionaryOverride()],
+    overrides: [
+      analyticsOverride(),
+      dictionaryOverride(),
+      sharedPreferencesProvider.overrideWithValue(_prefs),
+    ],
     child: MaterialApp(
       locale: const Locale('en'),
       supportedLocales: const [Locale('en'), Locale('zh')],
@@ -84,7 +93,9 @@ void main() {
   late Database db;
   late DictionaryService oldInstance;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    _prefs = await SharedPreferences.getInstance();
     db = _createTestDb();
     oldInstance = DictionaryService.replaceInstance(
       DictionaryService.withDatabase(db),
@@ -188,6 +199,19 @@ void main() {
       await _openSheet(tester, 'abandon');
 
       expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+
+    testWidgets('滑入动画期间内容区不套 AnimatedSwitcher（防闪烁），滑入结束后启用', (tester) async {
+      await tester.pumpWidget(_buildTestPage('abandon'));
+      await tester.tap(find.text('Open'));
+      // 滑入途中（弹窗进场动画约 250ms）：内容区应直接渲染，无切换过渡
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(AnimatedSwitcher), findsNothing);
+
+      // 滑入结束后：启用 AnimatedSwitcher 供切换数据源平滑过渡
+      await tester.pumpAndSettle();
+      expect(find.byType(AnimatedSwitcher), findsOneWidget);
     });
   });
 }

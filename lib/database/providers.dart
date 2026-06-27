@@ -35,7 +35,7 @@ import '../providers/study_stats_provider.dart';
 import '../providers/study_task_provider.dart';
 import '../providers/learned_vocabulary_tracker_provider.dart';
 import '../providers/sentence_ai_provider.dart';
-import '../providers/word_ai_provider.dart';
+import '../providers/dictionary/dictionary_registry.dart';
 
 /// 当前活跃的数据库实例（运行时可切换）。
 ///
@@ -100,7 +100,8 @@ void switchAppDatabase(AppDatabase newDb, WidgetRef ref) {
 
   // 4. Invalidate AI 缓存提供者（依赖 sentenceAiCacheDao）
   ref.invalidate(sentenceAiNotifierProvider);
-  ref.invalidate(wordAiNotifierProvider);
+  // AI 词典源（keepAlive）持有 L1 内存缓存，切库后须重建以丢弃旧库结果
+  ref.invalidate(aiDictionarySourceProvider);
 }
 
 /// 数据库 Provider

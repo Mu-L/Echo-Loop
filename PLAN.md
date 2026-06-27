@@ -1,7 +1,36 @@
 # Echo Loop 项目规划
 
-> 最后更新：2026-04-03
+> 最后更新：2026-06-27
 > 当前焦点：录音+识别功能
+
+---
+
+## 已完成：多词典源查词（可插拔框架）
+
+**完成时间**: 2026-06-27
+
+查词弹窗从「单一本地词典」升级为「可切换的多词典源」可插拔框架。本期落地本地 / AI / Cambridge 三个真实源；加新源（如 Oxford）只需实现 `DictionarySource` + 在注册表加一行，不改现有源 / 弹窗 controller / 设置。
+
+### 架构
+- sealed `DictionaryLookupResult`（Local/Ai/WebDict）+ 各源独立渲染器（编译期穷尽 switch 兜底新增源）
+- `DictionarySource` 接口（id/icon/canBeDisabled/requiresNetwork/lookup）+ 静态注册表 + 派生「可见源 / 生效默认源」
+- `DictionaryLookupController`（family by word；选中源 + 各源态缓存 + 每源序列号/CancelToken 防竞态）
+- `DictionarySettingsNotifier`（SharedPreferences；默认源 + 禁用集；禁用当前默认源自动回退）
+
+### 数据源
+- 本地：复用 `DictionaryService`（离线，不可禁用）
+- AI：后端 `POST /api/v2/ai/dictionary`（Bearer 登录态）→ 结构化 `DictionaryEntry`（音标/词义/搭配/词族/词源/提示）；三级缓存；依赖延迟解析
+- 网页源（共 8 个）：`flutter_inappwebview` 显示词条网页（单实例保活 + 5min「源+词」复用 + CSS 收敛；不支持平台降级外部打开）；均可禁用。由配置表 `kWebDictConfigs` 驱动的通用 `WebDictionarySource`/`WebDictResult`/`WebDictionaryView`——加一个网页词典只需加一行配置：
+  - Cambridge（中英对照）/ Oxford / Longman / Merriam-Webster / Collins / Vocabulary.com / 有道 / 欧陆
+  - 默认全部启用；Macmillan 未纳入（官网已永久关停）
+
+### UI
+- 弹窗右上角下拉切换器（图标+名称，仅列已启用源，标记默认）+ AnimatedSwitcher 平滑过渡；TTS/收藏跨源恒定
+- 「我的」Tab → 词典设置（默认词典单选 + 源开关，本地/AI 锁定）
+- AI 结果视图美化（2026-06-27）：对齐后端新 entry 格式（`learnerTips` 改字符串数组、`wordFamily` 加 `meaning`）；多义项序号 + 细分隔、近/反义词 chips、例句圆角淡底块、搭配 `type` 标签、词族 `meaning`、学习提示项目符号、补充分节柔和卡片，整体专业简洁
+
+### 测试覆盖
+- 模型/设置/可见列表/三源/controller 单测 + 各视图/切换器/设置页/弹窗多源切换 widget 测；`flutter analyze` 0（新代码）、`flutter test` 全过
 
 ---
 

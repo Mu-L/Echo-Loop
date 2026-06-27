@@ -5,9 +5,9 @@ import '../tables/sentence_ai_cache.dart';
 
 part 'sentence_ai_cache_dao.g.dart';
 
-/// AI 缓存 DAO
+/// 通用 AI 结果缓存 DAO
 ///
-/// 提供句子翻译/解析结果的 SQLite 缓存操作。
+/// 按 (textHash, type) 读写各类 AI 结果 JSON（句子翻译/解析、AI 词典等）。
 /// 读取时自动更新 lastAccessedAt，支持按时间清理过期缓存。
 @DriftAccessor(tables: [SentenceAiCache])
 class SentenceAiCacheDao extends DatabaseAccessor<AppDatabase>

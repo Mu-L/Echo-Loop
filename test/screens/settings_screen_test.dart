@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:echo_loop/providers/app_update_provider.dart';
 import 'package:echo_loop/providers/developer_options_provider.dart';
 import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
@@ -33,6 +34,13 @@ void main() {
     buildNumber: '1',
   );
 
+  // 词典设置等同步读取 SharedPreferences 的 provider 需注入实例
+  late SharedPreferences prefs;
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+  });
+
   List<Override> buildOverrides({
     AppSettingsState settings = const AppSettingsState(),
     bool showDeveloperOptions = true,
@@ -46,7 +54,7 @@ void main() {
       type: AsrModelType.whisper,
     );
     return [
-      ...learningSettingsOverrides(),
+      ...learningSettingsOverrides(prefs: prefs),
       appSettingsProvider.overrideWith(() => TestAppSettings(settings)),
       showDeveloperOptionsProvider.overrideWith(
         () => _TestDeveloperOptions(showDeveloperOptions),

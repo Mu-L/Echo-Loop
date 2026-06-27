@@ -23,7 +23,6 @@ import '../providers/package_info_provider.dart';
 import '../providers/reminder_settings_provider.dart';
 import '../providers/sentence_ai_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/word_ai_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../providers/collection_provider.dart';
 import '../providers/learning_progress_provider.dart';
@@ -47,8 +46,12 @@ import '../services/demo_data_seeder.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
 import '../theme/app_theme.dart';
+import '../providers/dictionary/dictionary_registry.dart';
+import '../providers/dictionary/visible_sources_provider.dart';
+import '../widgets/dictionary/dict_source_presentation.dart';
 import 'asr_settings_screen.dart';
 import 'asr_test_screen.dart';
+import 'dictionary_settings_screen.dart';
 import 'learning_settings_screen.dart';
 import 'log_viewer_screen.dart';
 import 'playback_settings_screen.dart';
@@ -283,6 +286,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ),
+        ListTile(
+          leading: _emojiIcon('📖'),
+          title: Text(l10n.dictionarySettings),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                dictSourceLabel(
+                  l10n,
+                  ref.watch(resolvedDefaultSourceIdProvider),
+                ),
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const DictionarySettingsScreen(),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -335,9 +361,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final dao = ref.read(sentenceAiCacheDaoProvider);
     final deleted = await dao.deleteAll();
 
-    // 2. 清空内存缓存
+    // 2. 清空内存缓存（句子 AI + AI 词典的 L1，否则清缓存后重查仍命中旧结果）
     ref.read(sentenceAiNotifierProvider).clearMemoryCache();
-    ref.read(wordAiNotifierProvider).clearMemoryCache();
+    ref.read(aiDictionarySourceProvider).clearMemoryCache();
 
     // 3. 清理临时目录（录音 .caf 残留、Library/Caches 下 app 自建导出/导入临时目录）
     final result = await cleanupAllTempFiles();

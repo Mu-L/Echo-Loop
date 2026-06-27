@@ -1,29 +1,28 @@
 /// 词典查询底部弹窗
 ///
-/// 点击单词时弹出，显示音标、释义、柯林斯星级和考试标签。
-/// 未查到结果时显示"未收录"提示。
-/// 支持收藏/取消收藏单词。
+/// 点击单词时弹出。右上角下拉切换数据源（本地 / AI / Cambridge），
+/// 内容区按选中源渲染对应结果。标题行的单词、发音、收藏跨源恒定。
+/// 本组件是「组装器」：查词逻辑在 [DictionaryLookupController]，
+/// 各源渲染在 dictionary/ 视图组件，本文件只负责布局与回调分发。
 library;
-
-// TODO: AI 解析功能暂时隐藏，后续版本再启用时恢复以下 import。
-// import 'dart:convert';
-// import '../../models/word_analysis.dart';
-// import '../../providers/word_ai_provider.dart';
-// import '../common/ai_content_section.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../analytics/analytics_providers.dart';
-import '../../analytics/models/event_names.dart';
+
+import '../../features/auth/sign_in_required_dialog.dart';
 import '../../l10n/app_localizations.dart';
-import '../../models/dict_entry.dart';
+import '../../models/dictionary/dictionary_lookup_result.dart';
+import '../../providers/dictionary/dictionary_registry.dart';
+import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/dictionary_provider.dart';
 import '../../providers/saved_word_provider.dart';
-import '../../services/dictionary_service.dart';
+import '../../services/dictionary/web_dictionary_source.dart';
 import '../../services/tts_service.dart';
 import '../../theme/app_theme.dart';
 import '../animated_bookmark_icon.dart';
 import '../common/text_context_menu.dart';
+import '../dictionary/dictionary_result_view.dart';
+import '../dictionary/source_switcher.dart';
 
 /// 显示词典底部弹窗
 ///
@@ -41,6 +40,11 @@ Future<void> showWordDictionarySheet({
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    // 默认占屏幕 2/3；网页源可经拖拽指示条上拉放大，故 modal 上限放到 92%
+    // 以容纳上拉后的高度。文本源仍内部限回 2/3、按内容自适应。
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+    ),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -91,56 +95,103 @@ class WordDictionarySheet extends ConsumerStatefulWidget {
 }
 
 class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
-  DictEntry? _entry;
-  bool _loading = true;
-  bool _notFound = false;
+  /// 弹窗滑入动画是否已结束。
+  ///
+  /// 滑入期间内容区不套 AnimatedSize/AnimatedSwitcher——否则缓存命中（L2）的
+  /// 结果在滑入途中到达时，内容区高度增长动画会与滑入叠加，视觉上「闪烁一下」。
+  /// 滑入期间内容直接定型（被滑入运动掩盖），滑入结束后才启用切换源的平滑过渡。
+  bool _entered = false;
 
-  /// 词典弹窗统一使用清洗后的词形作为查询和兜底展示文本，
-  /// 避免句末标点在“未收录”状态下直接暴露给用户。
+  /// 监听的弹窗路由滑入动画（用于在滑入结束时刷新启用过渡）
+  Animation<double>? _routeAnimation;
+
+  /// 网页源弹窗的当前高度（像素）。仅网页源使用：默认 2/3 屏高，
+  /// 用户上拉拖拽指示条可放大、下拉可缩小（夹在 [_minSheetHeight] 与
+  /// [_maxSheetHeight] 之间）。文本源不用此值（按内容自适应）。
+  double? _sheetHeight;
+
+  /// 网页源弹窗高度下限：屏高 40%
+  double get _minSheetHeight => MediaQuery.sizeOf(context).height * 0.4;
+
+  /// 网页源弹窗高度上限：屏高 92%（与 modal constraints 一致）
+  double get _maxSheetHeight => MediaQuery.sizeOf(context).height * 0.92;
+
+  /// 网页源弹窗默认高度：屏高 2/3
+  double get _defaultSheetHeight => MediaQuery.sizeOf(context).height * 2 / 3;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final anim = ModalRoute.of(context)?.animation;
+    if (identical(anim, _routeAnimation)) return;
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _routeAnimation = anim;
+    if (anim == null || anim.status == AnimationStatus.completed) {
+      _entered = true;
+    } else {
+      anim.addStatusListener(_onRouteAnimationStatus);
+    }
+  }
+
+  /// 滑入完成后启用内容区过渡并刷新
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_entered) {
+      setState(() => _entered = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    super.dispose();
+  }
+
+  /// 当前选中源是否为网页词典源
+  ///
+  /// 网页源内容为固定像素的 WebView，需要弹窗给出明确高度并支持上拉放大；
+  /// 文本源（本地/AI）按内容自适应，不走拖拽逻辑。
+  bool _isWebSource(String sourceId) =>
+      ref.read(dictionarySourcesByIdProvider)[sourceId] is WebDictionarySource;
+
+  /// 拖拽指示条调整网页源弹窗高度：上拉（delta.dy<0）放大，下拉缩小。
+  void _onHandleDrag(DragUpdateDetails details) {
+    setState(() {
+      final base = _sheetHeight ?? _defaultSheetHeight;
+      _sheetHeight = (base - details.delta.dy)
+          .clamp(_minSheetHeight, _maxSheetHeight)
+          .toDouble();
+    });
+  }
+
+  /// 清洗后的词形（去首尾标点），用于查询与展示
   String get _normalizedWord => widget.word.trim().replaceAll(
     RegExp(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$'),
     '',
   );
 
-  /// 用于收藏的 lemmatized 单词（优先使用词典返回的原形）
-  String get _lemmaWord =>
-      _entry?.word.toLowerCase() ?? _normalizedWord.toLowerCase();
-
-  @override
-  void initState() {
-    super.initState();
-    _lookup();
+  /// 标题展示词：优先用当前结果的 headword（本地原形/AI 词头），否则用清洗词形
+  String _displayWord(DictionaryLookupState state) {
+    final cur = state.current;
+    if (cur is LookupLoaded) return cur.result.headword;
+    return _normalizedWord;
   }
 
-  void _lookup() {
-    if (!DictionaryService.instance.isAvailable) {
-      // 词典未就绪，不查询，由 build 根据 dictionaryProvider 状态展示
-      setState(() => _loading = false);
-      return;
+  /// 收藏用 lemma：优先用本地词典返回的原形，否则用清洗词形
+  String _lemmaWord(DictionaryLookupState state) {
+    final local = state.bySource['local'];
+    if (local case LookupLoaded(result: final LocalDictResult r)) {
+      return r.entry.word.toLowerCase();
     }
-    final entry = DictionaryService.instance.lookup(_normalizedWord);
-    setState(() {
-      _entry = entry;
-      _notFound = entry == null;
-      _loading = false;
-    });
-    if (entry != null) {
-      ref.read(analyticsServiceProvider).track(Events.wordLookup, {
-        EventParams.word: _normalizedWord,
-      });
-    }
+    return _normalizedWord.toLowerCase();
   }
 
-  /// 切换收藏状态
-  ///
-  /// 弹窗不会关闭，图标动画已提供足够反馈，无需 SnackBar。
-  Future<void> _toggleSave(bool currentlySaved) async {
+  Future<void> _toggleSave(String lemma, bool currentlySaved) async {
     final notifier = ref.read(savedWordListProvider.notifier);
     if (currentlySaved) {
-      await notifier.removeWord(_lemmaWord);
+      await notifier.removeWord(lemma);
     } else {
       await notifier.saveWord(
-        word: _lemmaWord,
+        word: lemma,
         audioItemId: widget.audioItemId,
         sentenceIndex: widget.sentenceIndex,
         sentenceText: widget.sentenceText,
@@ -150,207 +201,192 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     }
   }
 
+  /// AI 源未登录时引导登录，登录成功后重试
+  Future<void> _handleSignIn(String word) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await ensureSignedInForAction(
+      context: context,
+      ref: ref,
+      title: l10n.senseGroupSignInRequiredTitle,
+      message: l10n.senseGroupSignInRequiredMessage,
+    );
+    if (ok) {
+      ref.read(dictionaryLookupControllerProvider(word).notifier).retry();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dictState = ref.watch(dictionaryProvider);
+    final word = _normalizedWord;
+    final controllerProvider = dictionaryLookupControllerProvider(word);
+    final state = ref.watch(controllerProvider);
+    final notifier = ref.read(controllerProvider.notifier);
 
-    // 词典下载完成后自动重新查询
-    if (dictState.status == DictionaryStatus.downloaded &&
-        _entry == null &&
-        !_notFound) {
-      _lookup();
-    }
+    // 本地词典下载完成后，若当前选中本地源，自动重新查询
+    ref.listen(dictionaryProvider, (prev, next) {
+      if (next.status == DictionaryStatus.downloaded &&
+          state.selectedSourceId == 'local') {
+        notifier.retry();
+      }
+    });
+
+    final lemma = _lemmaWord(state);
+    final displayWord = _displayWord(state);
+    final isWeb = _isWebSource(state.selectedSourceId);
+    // AI 与网页源内容丰富，默认 2/3 屏高且可上拉放大；本地源内容短，按内容自适应。
+    final isResizable = isWeb || state.selectedSourceId == 'ai';
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.l,
-          12,
-          AppSpacing.l,
-          AppSpacing.l,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 拖拽指示条
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+      child: SizedBox(
+        key: const Key('dict_sheet_sizer'),
+        // 可拉伸源用显式高度（默认 2/3，可拖拽指示条调整）；本地源按内容自适应。
+        height: isResizable ? (_sheetHeight ?? _defaultSheetHeight) : null,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.l,
+            12,
+            AppSpacing.l,
+            AppSpacing.l,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 拖拽指示条：可拉伸源（AI/网页）时可上下拖拽调整弹窗高度
+              _buildDragHandle(theme, isResizable),
+              const SizedBox(height: 12),
 
-            if (_loading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(AppSpacing.xl),
-                  child: CircularProgressIndicator.adaptive(),
-                ),
-              )
-            else if (!DictionaryService.instance.isAvailable)
-              _buildDictUnavailable(theme, dictState)
-            else ...[
-              // 词典内容（支持滚动）
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_notFound)
-                        _buildNotFound(theme)
-                      else
-                        _buildContent(theme, _entry!),
-
-                      // TODO: AI 解析功能暂时隐藏，后续版本再启用。
-                      // if (!_loading) ...[
-                      //   const SizedBox(height: AppSpacing.m),
-                      //   _buildWordAiSection(),
-                      // ],
-                    ],
+            // 数据源选择：整体靠右，AI 快捷按钮紧贴切换器左侧、与其等高
+            IntrinsicHeight(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AiSourceButton(
+                    selectedId: state.selectedSourceId,
+                    onSelected: notifier.selectSource,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  SourceSwitcher(
+                    selectedId: state.selectedSourceId,
+                    onSelected: notifier.selectSource,
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 8),
+
+            // 标题行：单词 + 发音 + 收藏（跨源恒定）
+            _buildTitleRow(theme, displayWord, lemma),
+            const SizedBox(height: AppSpacing.s),
+
+              // 内容区：按选中源渲染。
+              _buildResultArea(state, word, notifier, isWeb, isResizable),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  /// 词典不可用时的提示（下载中 / 失败 / 未下载）
-  Widget _buildDictUnavailable(ThemeData theme, DictionaryState dictState) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.l),
-      child: Column(
-        children: [
-          if (dictState.status == DictionaryStatus.downloading) ...[
-            Text(
-              l10n.dictionaryDownloading,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.m),
-            LinearProgressIndicator(value: dictState.progress),
-          ] else ...[
-            Text(
-              dictState.status == DictionaryStatus.failed
-                  ? l10n.dictionaryDownloadFailed
-                  : l10n.dictionaryNotDownloaded,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.m),
-            FilledButton.tonal(
-              onPressed: () {
-                ref.read(dictionaryProvider.notifier).retryDownload();
-              },
-              child: Text(
-                dictState.status == DictionaryStatus.failed
-                    ? l10n.retry
-                    : l10n.download,
-              ),
-            ),
-          ],
-        ],
+  /// 内容区：按源类型决定填充策略。
+  /// - 网页源（[isWeb]）：填满弹窗剩余高度且占满宽度，WebView 跟随上拉一起放大；
+  /// - AI 源（[isResizable] 且非网页）：填满剩余高度并内部滚动，跟随上拉显示更多；
+  /// - 本地源：按内容自适应、限高 2/3 并内部滚动。
+  Widget _buildResultArea(
+    DictionaryLookupState state,
+    String word,
+    DictionaryLookupController notifier,
+    bool isWeb,
+    bool isResizable,
+  ) {
+    final resultView = DictionaryResultView(
+      sourceId: state.selectedSourceId,
+      state: state.current,
+      word: word,
+      onRetry: notifier.retry,
+      onSignIn: () => _handleSignIn(word),
+    );
+    if (isWeb) {
+      // 填满剩余高度且占满宽度，交由 WebView 自身渲染滚动
+      return Expanded(
+        child: SizedBox(width: double.infinity, child: resultView),
+      );
+    }
+    if (isResizable) {
+      // AI 源：填满显式高度并在内部滚动
+      return Expanded(
+        child: SingleChildScrollView(
+          child: _buildContent(state.selectedSourceId, resultView),
+        ),
+      );
+    }
+    return Flexible(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
+        ),
+        child: SingleChildScrollView(
+          child: _buildContent(state.selectedSourceId, resultView),
+        ),
       ),
     );
   }
 
-  /// 未找到结果
-  Widget _buildNotFound(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 单词（支持长按/右键复制）
-          GestureDetector(
-            onLongPressStart: (details) => TextContextMenu.show(
-              context,
-              details.globalPosition,
-              _normalizedWord,
-            ),
-            onSecondaryTapDown: (details) => TextContextMenu.show(
-              context,
-              details.globalPosition,
-              _normalizedWord,
-            ),
-            child: Text(
-              _normalizedWord,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.m),
-          // 未收录提示
-          Text(
-            AppLocalizations.of(context)!.intensiveListenWordDictNotFound,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+  /// 拖拽指示条。[draggable] 为 true（网页源）时包一层竖向拖拽手势，
+  /// 上拉放大、下拉缩小弹窗；并扩大可点区域便于抓取。
+  Widget _buildDragHandle(ThemeData theme, bool draggable) {
+    final bar = Container(
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.outlineVariant,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+    if (!draggable) return Center(child: bar);
+    return GestureDetector(
+      key: const Key('dict_drag_handle'),
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragUpdate: _onHandleDrag,
+      child: Center(
+        // 扩大竖向命中区域，便于抓住指示条拖拽
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: bar,
+        ),
       ),
     );
   }
 
-  /// 词典内容
-  Widget _buildContent(ThemeData theme, DictEntry entry) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 单词 + 收藏按钮
-        _buildTitleRow(theme, entry),
-        const SizedBox(height: 6),
-
-        // 音标 + 星级 + 考试标签（紧凑一行）
-        _buildMetaLine(theme, entry),
-        const SizedBox(height: AppSpacing.m),
-
-        // 释义
-        if (entry.translation != null && entry.translation!.isNotEmpty)
-          _buildTranslation(theme, entry.translation!),
-
-        const SizedBox(height: AppSpacing.s),
-      ],
+  /// 内容区包装：滑入结束前直接返回内容（无过渡，被滑入运动掩盖）；
+  /// 滑入结束后套 AnimatedSize + AnimatedSwitcher，使切换数据源时平滑过渡。
+  Widget _buildContent(String sourceId, Widget content) {
+    if (!_entered) return content;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: KeyedSubtree(key: ValueKey(sourceId), child: content),
+      ),
     );
   }
 
-  /// 标题行：单词 + 收藏按钮
-  Widget _buildTitleRow(ThemeData theme, DictEntry entry) {
-    final isSavedAsync = ref.watch(isWordSavedProvider(_lemmaWord));
-    final isSaved = isSavedAsync.valueOrNull ?? false;
-
+  /// 标题行：单词（可长按复制）+ TTS + 收藏
+  Widget _buildTitleRow(ThemeData theme, String word, String lemma) {
+    final isSaved = ref.watch(isWordSavedProvider(lemma)).valueOrNull ?? false;
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onLongPressStart: (details) => TextContextMenu.show(
-              context,
-              details.globalPosition,
-              entry.word,
-            ),
-            onSecondaryTapDown: (details) => TextContextMenu.show(
-              context,
-              details.globalPosition,
-              entry.word,
-            ),
+            onLongPressStart: (d) =>
+                TextContextMenu.show(context, d.globalPosition, word),
+            onSecondaryTapDown: (d) =>
+                TextContextMenu.show(context, d.globalPosition, word),
             child: Text(
-              entry.word,
+              word,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: theme.colorScheme.onSurface,
@@ -359,9 +395,8 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             ),
           ),
         ),
-        // TTS 发音按钮
         IconButton(
-          onPressed: () => TtsService.instance.speak(entry.word),
+          onPressed: () => TtsService.instance.speak(word),
           icon: Icon(
             Icons.volume_up,
             color: theme.colorScheme.onSurfaceVariant,
@@ -369,190 +404,9 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         ),
         AnimatedBookmarkIcon(
           isSaved: isSaved,
-          onPressed: () => _toggleSave(isSaved),
-        ),
-      ],
-    );
-  }
-
-  /// 音标、星级、考试标签合并为一行
-  Widget _buildMetaLine(ThemeData theme, DictEntry entry) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // 音标
-        if (entry.phonetic.isNotEmpty)
-          Text(
-            '/${entry.phonetic}/',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              letterSpacing: 0.2,
-            ),
-          ),
-
-        // 柯林斯星级
-        if (entry.collins > 0) _buildStars(theme, entry.collins),
-
-        // 考试标签
-        if (entry.examTags.isNotEmpty) _buildExamTags(theme, entry.examTags),
-      ],
-    );
-  }
-
-  /// 柯林斯五星评级
-  Widget _buildStars(ThemeData theme, int rating) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (i) {
-        final isFilled = i < rating;
-        return Padding(
-          padding: const EdgeInsets.only(right: 1),
-          child: Icon(
-            isFilled ? Icons.star_rounded : Icons.star_rounded,
-            size: 14,
-            color: isFilled
-                ? Colors.amber.shade600
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
-        );
-      }),
-    );
-  }
-
-  /// 考试标签组
-  Widget _buildExamTags(ThemeData theme, List<String> tags) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < tags.length; i++) ...[
-          if (i > 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                '·',
-                style: TextStyle(
-                  color: theme.colorScheme.outlineVariant,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          Text(
-            tags[i],
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary.withValues(alpha: 0.8),
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// 释义内容 — 解析词性前缀，区分显示
-  Widget _buildTranslation(ThemeData theme, String translation) {
-    final lines = translation.split('\n').where((l) => l.trim().isNotEmpty);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final line in lines)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: _buildDefinitionLine(theme, line.trim()),
-          ),
-      ],
-    );
-  }
-
-  // TODO: AI 单词解析区块，后续版本再启用。
-  // Widget _buildWordAiSection() {
-  //   final l10n = AppLocalizations.of(context)!;
-  //   final wordAi = ref.read(wordAiNotifierProvider);
-  //   final cachedAnalysis = wordAi.getCachedWordAnalysis(_lemmaWord);
-  //   final cachedJson = cachedAnalysis != null
-  //       ? jsonEncode(cachedAnalysis.toJson())
-  //       : null;
-  //
-  //   return AiContentSection(
-  //     icon: Icons.auto_awesome,
-  //     title: l10n.wordAiAnalysis,
-  //     cachedContent: cachedJson,
-  //     onRequest: () async {
-  //       final result = await wordAi.getWordAnalysis(
-  //         _lemmaWord,
-  //         sentence: widget.sentenceText,
-  //       );
-  //       return jsonEncode(result.toJson());
-  //     },
-  //     contentBuilder: (content) => _WordAnalysisContent(content: content),
-  //   );
-  // }
-
-  /// 单条释义行 — 词性标签 + 释义文本
-  ///
-  /// 识别 "vt." "n." "a." "adv." 等词性前缀，
-  /// 以蓝色小标签显示词性，后接释义正文。
-  Widget _buildDefinitionLine(ThemeData theme, String line) {
-    final posMatch = RegExp(
-      r'^([a-z]+\.(?:\s*&\s*[a-z]+\.)*)\s*',
-    ).firstMatch(line);
-
-    if (posMatch == null) {
-      // 无词性前缀，直接显示
-      return Text(
-        line,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          height: 1.6,
-          color: theme.colorScheme.onSurface,
-        ),
-      );
-    }
-
-    final pos = posMatch.group(1)!;
-    final definition = line.substring(posMatch.end);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 词性标签
-        Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              pos,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: theme.colorScheme.primary,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 释义文本
-        Expanded(
-          child: Text(
-            definition,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.6,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
+          onPressed: () => _toggleSave(lemma, isSaved),
         ),
       ],
     );
   }
 }
-
-// TODO: AI 单词解析结构化内容，后续版本再启用。
-// class _WordAnalysisContent extends StatelessWidget { ... }

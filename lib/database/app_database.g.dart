@@ -7539,10 +7539,12 @@ class SentenceAiCacheData extends DataClass
   /// 自增主键
   final int id;
 
-  /// 句子文本的 SHA-256 哈希值（归一化后）
+  /// 被缓存文本的 SHA-256 哈希值（归一化后）。
+  /// 句子级 type 用句子文本；词级 type（如 `ai_dictionary`）用 `词|目标语言`。
   final String textHash;
 
-  /// 结果类型：'translation' 或 'analysis'
+  /// 结果类型，区分同表不同来源：
+  /// `translation`（句子翻译）/ `analysis`（句子解析）/ `ai_dictionary`（AI 词典）。
   final String type;
 
   /// API 返回的 JSON 字符串

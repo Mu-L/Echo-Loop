@@ -49,7 +49,7 @@ final transcriptionFinalizationServiceProvider =
 typedef TranscriptionFinalizationServiceRef =
     ProviderRef<AudioFinalizationService>;
 String _$transcriptionTaskManagerHash() =>
-    r'087b1b744353771200c1a28f908c484f85bddc7f';
+    r'd977a9ab37a5721cb2f49029ce8c6cc7a97558ef';
 
 /// 转录任务管理器
 ///
