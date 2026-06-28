@@ -50,13 +50,13 @@ void main() {
         expect(web.url.toString(), config.buildUrl('nice'));
       });
 
-      test('查询词被规整为小写并 URL 编码', () async {
+      test('对已归一化的查询词做 URL 编码（词内空格编码为 %20）', () async {
+        // 归一化由 controller 统一完成，源只对 request.word 做 URL 编码
         final result =
             await source.lookup(
-                  const DictionaryLookupRequest(word: '  A Posteriori '),
+                  const DictionaryLookupRequest(word: 'a posteriori'),
                 )
                 as WebDictResult;
-        // trim + toLowerCase + 空格编码为 %20
         expect(result.url.toString(), contains('a%20posteriori'));
         expect(result.url.toString(), isNot(contains(' ')));
       });

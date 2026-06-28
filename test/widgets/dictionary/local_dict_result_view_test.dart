@@ -39,21 +39,23 @@ void main() {
   tearDown(() => DictionaryService.replaceInstance(old));
 
   testWidgets('已收录：渲染音标与释义', (tester) async {
-    await tester.pumpWidget(_wrap(
-      const LocalDictResultView(
-        state: LookupLoaded(
-          LocalDictResult(
-            DictEntry(
-              word: 'run',
-              phonetic: 'rʌn',
-              translation: 'v. 跑',
-              collins: 3,
-              examTags: ['CET4'],
+    await tester.pumpWidget(
+      _wrap(
+        const LocalDictResultView(
+          state: LookupLoaded(
+            LocalDictResult(
+              DictEntry(
+                word: 'run',
+                phonetic: 'rʌn',
+                translation: 'v. 跑',
+                collins: 3,
+                examTags: ['CET4'],
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     expect(find.text('/rʌn/'), findsOneWidget);
     expect(find.text('跑'), findsOneWidget);
     expect(find.text('v.'), findsOneWidget);

@@ -42,6 +42,46 @@ void main() {
     });
   });
 
+  group('normalizeWord', () {
+    test('去除首尾空白', () {
+      expect(normalizeWord('  hello  '), 'hello');
+    });
+
+    test('一律转小写', () {
+      expect(normalizeWord('Hello'), 'hello');
+    });
+
+    test('全大写缩写不做特殊保留，统一小写化', () {
+      expect(normalizeWord('NASA'), 'nasa');
+      expect(normalizeWord('FBI'), 'fbi');
+      expect(normalizeWord('COVID-19'), 'covid-19');
+    });
+
+    test('剥离首尾标点，保留词内连字符', () {
+      expect(normalizeWord('"word"'), 'word');
+      expect(normalizeWord('(test)'), 'test');
+      expect(normalizeWord('co-op.'), 'co-op');
+    });
+
+    test('保留右侧撇号（所有格/缩写）', () {
+      expect(normalizeWord("dogs'"), "dogs'");
+      expect(normalizeWord("it's"), "it's");
+      expect(normalizeWord("library's"), "library's");
+      expect(normalizeWord("dogs'."), "dogs'");
+    });
+
+    test('弯撇号统一为直撇号（排版文本 I’d → i\'d）', () {
+      expect(normalizeWord('I’d'), "i'd");
+      expect(normalizeWord('it’s'), "it's");
+      expect(normalizeWord('dogs’'), "dogs'");
+      expect(normalizeWord('don‘t'), "don't");
+    });
+
+    test('空字符串', () {
+      expect(normalizeWord(''), '');
+    });
+  });
+
   group('hashText', () {
     test('相同文本生成相同哈希', () {
       final hash1 = hashText('Hello World');

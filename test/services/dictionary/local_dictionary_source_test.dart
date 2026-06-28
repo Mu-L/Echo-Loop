@@ -27,8 +27,9 @@ void main() {
 
   test('词典就绪且命中 → LocalDictResult', () async {
     when(() => service.isAvailable).thenReturn(true);
-    when(() => service.lookup('run'))
-        .thenReturn(const DictEntry(word: 'run', phonetic: 'rʌn'));
+    when(
+      () => service.lookup('run'),
+    ).thenReturn(const DictEntry(word: 'run', phonetic: 'rʌn'));
 
     final result = await source.lookup(req);
 

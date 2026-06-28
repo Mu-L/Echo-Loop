@@ -169,6 +169,14 @@ void main() {
       expect(find.text('Word not found in dictionary'), findsOneWidget);
     });
 
+    testWidgets('标题保留右侧撇号（dogs\' 不被截断）', (tester) async {
+      await _openSheet(tester, '"Dogs\'"');
+
+      // normalizeWord：剥首尾引号、小写，但保留右撇号
+      expect(find.text("dogs'"), findsOneWidget);
+      expect(find.text('Word not found in dictionary'), findsOneWidget);
+    });
+
     testWidgets('翻译为 null 时不崩溃', (tester) async {
       await _openSheet(tester, 'test');
 

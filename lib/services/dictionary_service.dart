@@ -9,6 +9,7 @@ import 'package:lemmatizerx/lemmatizerx.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../models/dict_entry.dart';
+import '../utils/text_normalize.dart';
 
 /// 词典服务单例
 class DictionaryService {
@@ -33,10 +34,6 @@ class DictionaryService {
 
   Database? _db;
   final Lemmatizer _lemmatizer = Lemmatizer();
-
-  static final RegExp _edgePunctuationPattern = RegExp(
-    r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$',
-  );
 
   /// 词典数据库是否已就绪
   bool get isAvailable => _db != null;
@@ -84,9 +81,7 @@ class DictionaryService {
     return null;
   }
 
-  String _normalizeLookupWord(String word) {
-    return word.trim().replaceAll(_edgePunctuationPattern, '').toLowerCase();
-  }
+  String _normalizeLookupWord(String word) => normalizeWord(word);
 
   /// 直接查询数据库
   DictEntry? _queryWord(String word) {

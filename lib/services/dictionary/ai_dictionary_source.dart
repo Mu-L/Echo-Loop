@@ -75,7 +75,10 @@ class AiDictionarySource implements DictionarySource {
       throw const DictionaryAuthRequiredException();
     }
     final language = request.targetLanguage ?? _defaultLanguage;
-    final key = hashText('${request.word}|$language');
+    // request.word 已由 controller 归一化（见 DictionaryLookupRequest.word 契约），
+    // 缓存键、发往后端的词、LLM 输入三者共用同一清洗结果
+    final word = request.word;
+    final key = hashText('$word|$language');
 
     // L1 内存
     final mem = _memCache[key];
@@ -87,7 +90,7 @@ class AiDictionarySource implements DictionarySource {
 
     final future = _fetch(
       key: key,
-      word: request.word,
+      word: word,
       accessToken: token,
       language: language,
     );

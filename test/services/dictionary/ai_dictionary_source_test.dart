@@ -80,6 +80,35 @@ void main() {
     verify(() => dao.upsert(any(), 'ai_dictionary', any())).called(1);
   });
 
+  test('request.word（已归一化）原样发往后端', () async {
+    // 归一化由 controller 统一完成；源拿到的已是清洗结果，原样透传
+    when(
+      () => dao.getByHash(any(), 'ai_dictionary'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => api.lookupDictionary(
+        any(),
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => _entry('run'));
+    when(
+      () => dao.upsert(any(), 'ai_dictionary', any()),
+    ).thenAnswer((_) async {});
+
+    await source.lookup(tokenReq);
+
+    verify(
+      () => api.lookupDictionary(
+        'run',
+        accessToken: any(named: 'accessToken'),
+        targetLanguage: any(named: 'targetLanguage'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
+  });
+
   test('L1 内存命中 → 第二次不再调 API', () async {
     when(
       () => dao.getByHash(any(), 'ai_dictionary'),

@@ -73,7 +73,8 @@ class WebDictionarySource implements DictionarySource {
     DictionaryLookupRequest request, {
     CancelToken? cancelToken,
   }) async {
-    final slug = Uri.encodeComponent(request.word.trim().toLowerCase());
+    // request.word 已由 controller 归一化（见 DictionaryLookupRequest.word 契约）
+    final slug = Uri.encodeComponent(request.word);
     return WebDictResult(
       sourceId: config.id,
       url: Uri.parse(config.buildUrl(slug)),

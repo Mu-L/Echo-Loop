@@ -20,6 +20,9 @@ class ControllableSource implements DictionarySource {
 
   final List<Completer<DictionaryLookupResult?>> calls = [];
 
+  /// 记录每次 lookup 收到的请求，供断言归一化结果
+  final List<DictionaryLookupRequest> requests = [];
+
   @override
   IconData get icon => Icons.abc;
   @override
@@ -30,6 +33,7 @@ class ControllableSource implements DictionarySource {
     DictionaryLookupRequest request, {
     CancelToken? cancelToken,
   }) {
+    requests.add(request);
     final c = Completer<DictionaryLookupResult?>();
     calls.add(c);
     return c.future;
@@ -223,6 +227,15 @@ void main() {
     a.calls.single.complete(_result('run'));
     await pump();
     // 跑到这里无未捕获异常即通过
+  });
+
+  test('word（已由调用方归一化）原样透传给各源，controller 不再归一', () async {
+    final a = ControllableSource('a');
+    final c = makeContainer({'a': a});
+    // family key 已是归一化结果（由 widget 层 normalizeWord 产出）
+    start(c, "dogs'");
+    await pump();
+    expect(a.requests.single.word, "dogs'");
   });
 
   test('不需联网的源不读取上下文也能查', () async {

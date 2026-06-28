@@ -187,7 +187,9 @@ class DictionaryLookupController extends _$DictionaryLookupController {
   bool _isStale(String id, int seq) => _seq[id] != seq;
 
   DictionaryLookupRequest _buildRequest(DictionarySource source) {
-    // 不需联网的源无需鉴权/语言上下文，避免无谓读取
+    // word（= family key）已由调用方归一化一次（见 DictionaryLookupRequest.word
+    // 「已清洗」契约 + word_dictionary_sheet._normalizedWord）。此处及各源均不再归一，
+    // 保证「查一次词只归一化一次」，各端共用同一清洗结果。
     if (!source.requiresNetwork) {
       return DictionaryLookupRequest(word: word);
     }

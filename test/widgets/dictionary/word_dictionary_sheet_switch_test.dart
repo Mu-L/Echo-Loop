@@ -48,8 +48,8 @@ class _FixedSource implements DictionarySource {
   }
 }
 
-DictionaryEntry _aiEntry() => DictionaryEntry(
-  headword: 'run',
+DictionaryEntry _aiEntry({String headword = 'run'}) => DictionaryEntry(
+  headword: headword,
   pronunciation: const Pronunciation(uk: '', us: ''),
   meanings: const [
     WordMeaning(
@@ -94,37 +94,40 @@ void main() {
 
   tearDown(() => DictionaryService.replaceInstance(oldInstance));
 
-  Widget wrap() => ProviderScope(
-    overrides: [
-      analyticsOverride(),
-      dictionaryOverride(),
-      sharedPreferencesProvider.overrideWithValue(prefs),
-      dictionarySourcesProvider.overrideWithValue([local, ai]),
-      dictionarySourcesByIdProvider.overrideWithValue({
-        'local': local,
-        'ai': ai,
-      }),
-      resolvedDefaultSourceIdProvider.overrideWithValue('local'),
-      dictionaryLookupContextProvider.overrideWithValue(
-        const DictionaryLookupContext(
-          accessToken: 'tok',
-          targetLanguage: 'zh-CN',
+  Widget wrap({_FixedSource? aiSource, String word = 'run'}) {
+    final aiSrc = aiSource ?? ai;
+    return ProviderScope(
+      overrides: [
+        analyticsOverride(),
+        dictionaryOverride(),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        dictionarySourcesProvider.overrideWithValue([local, aiSrc]),
+        dictionarySourcesByIdProvider.overrideWithValue({
+          'local': local,
+          'ai': aiSrc,
+        }),
+        resolvedDefaultSourceIdProvider.overrideWithValue('local'),
+        dictionaryLookupContextProvider.overrideWithValue(
+          const DictionaryLookupContext(
+            accessToken: 'tok',
+            targetLanguage: 'zh-CN',
+          ),
         ),
-      ),
-    ],
-    child: MaterialApp(
-      locale: const Locale('en'),
-      supportedLocales: const [Locale('en'), Locale('zh')],
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
-      theme: AppTheme.light(),
-      home: const Scaffold(body: WordDictionarySheet(word: 'run')),
-    ),
-  );
+      child: MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('zh')],
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: AppTheme.light(),
+        home: Scaffold(body: WordDictionarySheet(word: word)),
+      ),
+    );
+  }
 
   testWidgets('默认本地 → 切 AI → 切回本地复用缓存', (tester) async {
     await tester.pumpWidget(wrap());
@@ -147,5 +150,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('跑'), findsOneWidget);
     expect(local.calls, 1); // 仍只查过一次
+  });
+
+  testWidgets('切到 AI 成功后，标题替换为 AI headword（区别于查询词）', (tester) async {
+    // 查询词 "geese" 在各源都不出现：标题始终用结果 headword。
+    // 切到 AI 后，标题为 AI 返回的 headword "goose"。
+    final aiGoose = _FixedSource(
+      'ai',
+      AiDictResult(_aiEntry(headword: 'goose')),
+    );
+    await tester.pumpWidget(wrap(aiSource: aiGoose, word: 'geese'));
+    await tester.pumpAndSettle();
+
+    // 查询词从不直接作标题（本地命中后显示本地 headword）
+    expect(find.text('geese'), findsNothing);
+
+    // 切到 AI：标题为 AI headword goose
+    await tester.tap(find.text('AI'));
+    await tester.pumpAndSettle();
+    expect(find.text('goose'), findsOneWidget);
   });
 }

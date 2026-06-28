@@ -18,6 +18,7 @@ import '../../providers/dictionary_provider.dart';
 import '../../providers/saved_word_provider.dart';
 import '../../services/dictionary/web_dictionary_source.dart';
 import '../../services/tts_service.dart';
+import '../../utils/text_normalize.dart';
 import '../../theme/app_theme.dart';
 import '../animated_bookmark_icon.dart';
 import '../common/text_context_menu.dart';
@@ -190,26 +191,24 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     }
   }
 
-  /// 清洗后的词形（去首尾标点），用于查询与展示
-  String get _normalizedWord => widget.word.trim().replaceAll(
-    RegExp(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$'),
-    '',
-  );
+  /// 归一化后的词形，用于查询（family key）与展示，
+  /// 与各词典源、后端共用同一 [normalizeWord]（trim + 剥首尾标点[右撇号除外] + 小写）
+  String get _normalizedWord => normalizeWord(widget.word);
 
-  /// 标题展示词：优先用当前结果的 headword（本地原形/AI 词头），否则用清洗词形
+  /// 标题展示词：优先用当前结果的 headword（本地原形/AI 词头），否则用归一化词形
   String _displayWord(DictionaryLookupState state) {
     final cur = state.current;
     if (cur is LookupLoaded) return cur.result.headword;
     return _normalizedWord;
   }
 
-  /// 收藏用 lemma：优先用本地词典返回的原形，否则用清洗词形
+  /// 收藏用 lemma：优先用本地词典返回的原形，否则用归一化词形
   String _lemmaWord(DictionaryLookupState state) {
     final local = state.bySource['local'];
     if (local case LookupLoaded(result: final LocalDictResult r)) {
       return r.entry.word.toLowerCase();
     }
-    return _normalizedWord.toLowerCase();
+    return _normalizedWord;
   }
 
   Future<void> _toggleSave(String lemma, bool currentlySaved) async {
