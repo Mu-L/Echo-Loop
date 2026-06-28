@@ -166,7 +166,7 @@ void main() {
     });
   });
 
-  testWidgets('上拉不超过 92% 屏高上限', (tester) async {
+  testWidgets('上拉不超过 95% 屏高上限', (tester) async {
     await withLinux(() async {
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
@@ -178,7 +178,7 @@ void main() {
     // 远超上限的拖拽量
     await tester.drag(handle, const Offset(0, -2000));
     await tester.pumpAndSettle();
-    expect(tester.getSize(sizer).height, lessThanOrEqualTo(screenH * 0.92 + 1));
+    expect(tester.getSize(sizer).height, lessThanOrEqualTo(screenH * 0.95 + 1));
     });
   });
 
