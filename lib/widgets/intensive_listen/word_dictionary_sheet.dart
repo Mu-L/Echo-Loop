@@ -40,10 +40,10 @@ Future<void> showWordDictionarySheet({
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    // 默认占屏幕 2/3；网页源可经拖拽指示条上拉放大，故 modal 上限放到 92%
+    // 默认占屏幕 2/3；网页源可经拖拽指示条上拉放大，故 modal 上限放到 95%
     // 以容纳上拉后的高度。文本源仍内部限回 2/3、按内容自适应。
     constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.95,
     ),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -113,8 +113,8 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   /// 网页源弹窗高度下限：屏高 40%
   double get _minSheetHeight => MediaQuery.sizeOf(context).height * 0.4;
 
-  /// 网页源弹窗高度上限：屏高 92%（与 modal constraints 一致）
-  double get _maxSheetHeight => MediaQuery.sizeOf(context).height * 0.92;
+  /// 网页源弹窗高度上限：屏高 95%（与 modal constraints 一致）
+  double get _maxSheetHeight => MediaQuery.sizeOf(context).height * 0.95;
 
   /// 网页源弹窗默认高度：屏高 2/3
   double get _defaultSheetHeight => MediaQuery.sizeOf(context).height * 2 / 3;
@@ -245,9 +245,9 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.l,
-            12,
+            6,
             AppSpacing.l,
-            AppSpacing.l,
+            AppSpacing.s,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -255,31 +255,31 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             children: [
               // 拖拽指示条：可拉伸源（AI/网页）时可上下拖拽调整弹窗高度
               _buildDragHandle(theme, isResizable),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
 
-            // 数据源选择：整体靠右，AI 快捷按钮紧贴切换器左侧、与其等高
-            IntrinsicHeight(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AiSourceButton(
-                    selectedId: state.selectedSourceId,
-                    onSelected: notifier.selectSource,
-                  ),
-                  const SizedBox(width: 8),
-                  SourceSwitcher(
-                    selectedId: state.selectedSourceId,
-                    onSelected: notifier.selectSource,
-                  ),
-                ],
+              // 数据源选择：整体靠右，AI 快捷按钮紧贴切换器左侧、与其等高
+              IntrinsicHeight(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AiSourceButton(
+                      selectedId: state.selectedSourceId,
+                      onSelected: notifier.selectSource,
+                    ),
+                    const SizedBox(width: 8),
+                    SourceSwitcher(
+                      selectedId: state.selectedSourceId,
+                      onSelected: notifier.selectSource,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // 标题行：单词 + 发音 + 收藏（跨源恒定）
-            _buildTitleRow(theme, displayWord, lemma),
-            const SizedBox(height: AppSpacing.s),
+              // 标题行：单词 + 发音 + 收藏（跨源恒定）
+              _buildTitleRow(theme, displayWord, lemma),
+              const SizedBox(height: AppSpacing.s),
 
               // 内容区：按选中源渲染。
               _buildResultArea(state, word, notifier, isWeb, isResizable),
@@ -396,6 +396,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
           ),
         ),
         IconButton(
+          visualDensity: VisualDensity.compact,
           onPressed: () => TtsService.instance.speak(word),
           icon: Icon(
             Icons.volume_up,

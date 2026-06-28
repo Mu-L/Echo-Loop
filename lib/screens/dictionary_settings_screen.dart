@@ -78,6 +78,41 @@ class DictionarySettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: AppSpacing.s),
+          _WebAdsNotice(text: l10n.dictionaryWebAdsNotice),
+        ],
+      ),
+    );
+  }
+}
+
+/// 在线词典广告提醒：在线源为第三方网站，可能自带广告，与 Echo Loop 无关。
+class _WebAdsNotice extends StatelessWidget {
+  final String text;
+  const _WebAdsNotice({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -119,6 +154,7 @@ class _SectionHeader extends StatelessWidget {
             title,
             style: theme.textTheme.titleSmall?.copyWith(
               color: theme.colorScheme.primary,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 2),

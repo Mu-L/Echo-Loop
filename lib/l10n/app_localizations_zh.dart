@@ -3664,13 +3664,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dictionaryDefault => '默认词典';
 
   @override
-  String get dictionaryDefaultDescription => '选择点单词时默认展示的词典源';
+  String get dictionaryDefaultDescription => '选择查词时默认展示的词典';
 
   @override
   String get dictionarySources => '词典源';
 
   @override
   String get dictionarySourcesDescription => '关闭的词典不会出现在查词切换器中';
+
+  @override
+  String get dictionaryWebAdsNotice => '在线词典可能含其自带广告，与 Echo Loop 无关。';
 
   @override
   String get dictSourceLocal => '本地词典';

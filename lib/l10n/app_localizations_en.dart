@@ -3824,7 +3824,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dictionaryDefaultDescription =>
-      'Source shown by default when you tap a word';
+      'Dictionary shown by default when looking up a word';
 
   @override
   String get dictionarySources => 'Dictionary Sources';
@@ -3832,6 +3832,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dictionarySourcesDescription =>
       'Disabled dictionaries won\'t appear in the lookup switcher';
+
+  @override
+  String get dictionaryWebAdsNotice =>
+      'Online dictionaries may show their own ads, unrelated to Echo Loop.';
 
   @override
   String get dictSourceLocal => 'Local Dictionary';

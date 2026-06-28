@@ -134,6 +134,17 @@ class FakeAudioLibrary extends AudioLibrary {
   @override
   Future<void> loadLibrary() async {}
 
+  // 启动预热阶段的 backfill 迁移在测试里全部 no-op，避免触达真实
+  // DAO/文件 IO 抛错（会触发 main_shell 的「加载失败」SnackBar 遮挡底部按钮）。
+  @override
+  Future<void> backfillDurations() async {}
+
+  @override
+  Future<void> backfillTranscriptSrt() async {}
+
+  @override
+  Future<void> backfillTranscriptStats() async {}
+
   @override
   Future<void> addAudioItem(AudioItem item) async {
     state = state.copyWith(audioItems: [...state.audioItems, item]);

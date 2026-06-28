@@ -16,6 +16,7 @@ import 'package:echo_loop/providers/learning_session/learning_session_provider.d
 import 'package:echo_loop/router/app_router.dart';
 import 'package:echo_loop/screens/intensive_listen_player_screen.dart';
 import 'package:echo_loop/widgets/practice/sentence_annotation_card.dart';
+import 'package:echo_loop/widgets/practice/practice_progress_section.dart';
 
 import '../helpers/test_notifiers.dart';
 
@@ -93,8 +94,8 @@ void intensiveListenTests() {
       // 验证 AppBar 标题
       expect(find.text('Intensive Listening'), findsOneWidget);
 
-      // 验证进度条
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      // 验证进度条（可拖动进度条：多句时为吸附滑块，单句为 LinearProgressIndicator）
+      expect(find.byType(PracticeProgressSection), findsOneWidget);
 
       // 验证播放控制按钮
       expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);

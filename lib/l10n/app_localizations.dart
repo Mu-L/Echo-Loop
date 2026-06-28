@@ -6803,7 +6803,7 @@ abstract class AppLocalizations {
   /// No description provided for @dictionaryDefaultDescription.
   ///
   /// In en, this message translates to:
-  /// **'Source shown by default when you tap a word'**
+  /// **'Dictionary shown by default when looking up a word'**
   String get dictionaryDefaultDescription;
 
   /// No description provided for @dictionarySources.
@@ -6817,6 +6817,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disabled dictionaries won\'t appear in the lookup switcher'**
   String get dictionarySourcesDescription;
+
+  /// No description provided for @dictionaryWebAdsNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Online dictionaries may show their own ads, unrelated to Echo Loop.'**
+  String get dictionaryWebAdsNotice;
 
   /// No description provided for @dictSourceLocal.
   ///

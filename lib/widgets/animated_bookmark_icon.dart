@@ -83,6 +83,7 @@ class _AnimatedBookmarkIconState extends State<AnimatedBookmarkIcon>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: IconButton(
+        visualDensity: VisualDensity.compact,
         onPressed: widget.onPressed,
         icon: Icon(
           widget.isSaved ? Icons.bookmark : Icons.bookmark_border,

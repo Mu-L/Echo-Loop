@@ -17,6 +17,7 @@ import 'package:echo_loop/providers/learning_session/learning_session_provider.d
 import 'package:echo_loop/providers/learning_session/review_difficult_practice_provider.dart';
 import 'package:echo_loop/router/app_router.dart';
 import 'package:echo_loop/screens/review_difficult_practice_screen.dart';
+import 'package:echo_loop/widgets/practice/practice_progress_section.dart';
 
 import '../helpers/test_notifiers.dart';
 
@@ -261,7 +262,8 @@ void reviewSubStageTests() {
       await safeSettle(tester);
 
       expect(find.text('Difficult Sentence Practice'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      // 可拖动进度条（多句为吸附滑块，单句为 LinearProgressIndicator）
+      expect(find.byType(PracticeProgressSection), findsOneWidget);
       expect(find.text('Sentence 1/3'), findsOneWidget);
       expect(find.text('Peek'), findsOneWidget);
       expect(find.text('Unclear'), findsOneWidget);
@@ -315,7 +317,8 @@ void reviewSubStageTests() {
       await safeSettle(tester);
 
       expect(find.text('Difficult Practice Complete'), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      // 统一成就卡完成弹窗的徽章图标为 check_rounded
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       expect(find.text('Done'), findsOneWidget);
       expect(find.textContaining('Continue:'), findsOneWidget);
     });

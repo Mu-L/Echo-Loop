@@ -15,6 +15,7 @@ import 'package:echo_loop/providers/learning_session/retell_player_provider.dart
 import 'package:echo_loop/providers/learning_session/learning_session_provider.dart';
 import 'package:echo_loop/router/app_router.dart';
 import 'package:echo_loop/screens/retell_player_screen.dart';
+import 'package:echo_loop/widgets/practice/practice_progress_section.dart';
 import 'package:echo_loop/models/retell_settings.dart';
 import 'package:echo_loop/models/sentence.dart';
 
@@ -193,8 +194,8 @@ void retellTests() {
       // 验证 AppBar 标题
       expect(find.text('Paragraph Retelling'), findsOneWidget);
 
-      // 验证进度条
-      expect(find.byType(LinearProgressIndicator), findsWidgets);
+      // 验证进度条（多段为可拖动吸附滑块，统一用 PracticeProgressSection 判定）
+      expect(find.byType(PracticeProgressSection), findsOneWidget);
 
       // 验证段落进度信息
       expect(find.textContaining('1/3'), findsWidgets);
@@ -309,12 +310,13 @@ void retellTests() {
       await tester.tap(find.byIcon(Icons.check_circle_rounded));
       await safeSettle(tester);
 
-      // 验证完成对话框弹出
-      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      // 验证完成对话框弹出（统一成就卡徽章图标为 check_rounded）
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       expect(find.text('Retelling Complete'), findsOneWidget);
 
-      // 验证统计信息
-      expect(find.text('3 paragraphs retold'), findsOneWidget);
+      // 验证统计信息（成就卡统计 chip：数值 3 + 标签 Paragraphs）
+      expect(find.text('3'), findsWidgets);
+      expect(find.text('Paragraphs'), findsWidgets);
 
       // 复述是首次学习的最后一步，按钮显示"完成首次学习"
       expect(find.text('Complete Initial Learning'), findsOneWidget);

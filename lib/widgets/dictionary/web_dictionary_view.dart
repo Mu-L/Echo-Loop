@@ -11,6 +11,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -153,9 +154,16 @@ class _WebDictionaryViewState extends State<WebDictionaryView> {
         child: Stack(
           children: [
             InAppWebView(
-              initialUrlRequest: URLRequest(
-                url: WebUri(widget.url.toString()),
-              ),
+              initialUrlRequest: URLRequest(url: WebUri(widget.url.toString())),
+              // WebView 处在可拖拽的 modal 弹窗内：默认情况下竖向拖拽会被弹窗的
+              // 拖拽手势（drag-to-dismiss）赢走，导致网页无法滚动、一拉就把弹窗拉走。
+              // 显式给 WebView 注册竖向拖拽识别器，让其在手势竞技场中赢得竖向拖拽，
+              // 网页内部滚动恢复正常。
+              gestureRecognizers: {
+                Factory<VerticalDragGestureRecognizer>(
+                  VerticalDragGestureRecognizer.new,
+                ),
+              },
               initialSettings: InAppWebViewSettings(
                 cacheEnabled: true,
                 transparentBackground: true,
