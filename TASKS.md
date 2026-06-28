@@ -1,7 +1,18 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-27（媒体引擎 / 前台引擎分离落地 + 多词典源查词）
+> 最后更新：2026-06-28（词典弹窗整个 header 可拖拽调整高度 + 下滑关闭）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：词典弹窗整个 header 区域可拖拽调整高度 + 下滑关闭
+
+AI/网页源查词弹窗支持上拉/下拉调整高度，但此前只有顶部 36×4 的指示条能触发拖拽（`_buildDragHandle` 的 `GestureDetector` 只包住指示条，命中区仅约 16px 高），header 里数据源选择行、标题行、行间留白都拖不动，体验上"只能点上方中间很小一块"；且把 header 全包成 resize 后，原本在 header 空白处的「下滑关闭」被吞掉、缩到下限就卡住。
+
+- [x] `word_dictionary_sheet.dart`：竖向拖拽手势从"只包指示条"上提到新增的 `_buildHeader`——指示条 + 数据源行 + 标题行整块用 `GestureDetector(opaque, onVerticalDragStart/Update/End)` 包裹（仅 `isResizable` 时）；`_buildDragHandle` 简化为纯视觉指示条；`Key('dict_drag_handle')` 迁到外层 header。内容区仍在 header 之外，WebView/滚动不受影响。
+- [x] 手势共存：外层只注册 `VerticalDragGestureRecognizer`，与 header 内按钮/长按经手势竞技场天然区分（纯点击→按钮赢，有竖向位移→拖拽赢）。
+- [x] 下滑关闭（标准底部弹窗手感）：拖拽期间用「逻辑高度」`_dragLogicalHeight`（可低于下限，记录手指真实位置；渲染高度仍夹在下限上避免溢出）；松手时逻辑高度低于下限超过 `_kDismissOverdrag`(80px) 即 `Navigator.maybePop` 关闭。从手指真实位置计算，单步/多步拖拽结果一致，不会因一次大 move 误判。
+- [x] 测试：`word_dictionary_sheet_resize_test.dart` 抽 `buildOverrides`/`app`/`pumpModal` 公共 helper，新增「标题行非指示条区域上拉放大」「下拉到底再继续下拉关闭弹窗」「下拉到下限但未超阈值仅缩小不关闭」，共 6 例全通过；`flutter analyze` 改动文件 0 问题。
+
+  **完成时间**: 2026-06-28
 
 ## 已完成：修复段落复述/全文盲听打开段落时句子高亮乱跳、断点被覆盖成首句
 

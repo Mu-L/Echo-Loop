@@ -110,6 +110,17 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   /// [_maxSheetHeight] 之间）。文本源不用此值（按内容自适应）。
   double? _sheetHeight;
 
+  /// 拖拽过程中的「逻辑高度」（仅手势期间有值，可低于 [_minSheetHeight]）。
+  ///
+  /// 渲染用的 [_sheetHeight] 夹在 [_minSheetHeight] 上，不会真的缩到更小（避免
+  /// 内容溢出）；而本字段如实记录手指位置，低于下限的部分即「关闭意图」。
+  /// 松手时若低于下限超过 [_kDismissOverdrag] 则关闭弹窗，实现标准底部弹窗的
+  /// 下滑关闭手感。如此从手指真实位置计算，单步/多步拖拽结果一致。
+  double? _dragLogicalHeight;
+
+  /// 触发下滑关闭的 overdrag 阈值（像素）：低于下限再多拉这么多即关闭。
+  static const double _kDismissOverdrag = 80;
+
   /// 网页源弹窗高度下限：屏高 40%
   double get _minSheetHeight => MediaQuery.sizeOf(context).height * 0.4;
 
@@ -153,14 +164,30 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   bool _isWebSource(String sourceId) =>
       ref.read(dictionarySourcesByIdProvider)[sourceId] is WebDictionarySource;
 
-  /// 拖拽指示条调整网页源弹窗高度：上拉（delta.dy<0）放大，下拉缩小。
+  /// 拖拽开始：以当前高度初始化逻辑高度。
+  void _onHandleDragStart(DragStartDetails details) {
+    _dragLogicalHeight = _sheetHeight ?? _defaultSheetHeight;
+  }
+
+  /// 拖拽 header 调整弹窗高度：上拉（delta.dy<0）放大，下拉缩小。
+  /// 逻辑高度可低于下限（记录手指真实位置），渲染高度夹在下限上。
   void _onHandleDrag(DragUpdateDetails details) {
+    final base = _dragLogicalHeight ?? _sheetHeight ?? _defaultSheetHeight;
+    // 逻辑高度允许低于下限（下拉关闭意图），但不超过上限
+    final logical = (base - details.delta.dy).clamp(0.0, _maxSheetHeight);
+    _dragLogicalHeight = logical;
     setState(() {
-      final base = _sheetHeight ?? _defaultSheetHeight;
-      _sheetHeight = (base - details.delta.dy)
-          .clamp(_minSheetHeight, _maxSheetHeight)
-          .toDouble();
+      _sheetHeight = logical.clamp(_minSheetHeight, _maxSheetHeight).toDouble();
     });
+  }
+
+  /// 拖拽结束：逻辑高度低于下限超过阈值（下拉到底再继续拉）则关闭弹窗。
+  void _onHandleDragEnd(DragEndDetails details) {
+    final logical = _dragLogicalHeight ?? _minSheetHeight;
+    _dragLogicalHeight = null;
+    if (_minSheetHeight - logical > _kDismissOverdrag && mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   /// 清洗后的词形（去首尾标点），用于查询与展示
@@ -253,32 +280,15 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 拖拽指示条：可拉伸源（AI/网页）时可上下拖拽调整弹窗高度
-              _buildDragHandle(theme, isResizable),
-              const SizedBox(height: 6),
-
-              // 数据源选择：整体靠右，AI 快捷按钮紧贴切换器左侧、与其等高
-              IntrinsicHeight(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AiSourceButton(
-                      selectedId: state.selectedSourceId,
-                      onSelected: notifier.selectSource,
-                    ),
-                    const SizedBox(width: 8),
-                    SourceSwitcher(
-                      selectedId: state.selectedSourceId,
-                      onSelected: notifier.selectSource,
-                    ),
-                  ],
-                ),
+              // header（指示条 + 数据源行 + 标题行）：可拉伸源时整块可上下拖拽调整高度
+              _buildHeader(
+                theme,
+                state,
+                notifier,
+                displayWord,
+                lemma,
+                isResizable,
               ),
-              const SizedBox(height: 8),
-
-              // 标题行：单词 + 发音 + 收藏（跨源恒定）
-              _buildTitleRow(theme, displayWord, lemma),
               const SizedBox(height: AppSpacing.s),
 
               // 内容区：按选中源渲染。
@@ -334,8 +344,64 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     );
   }
 
-  /// 拖拽指示条。[draggable] 为 true（网页源）时包一层竖向拖拽手势，
-  /// 上拉放大、下拉缩小弹窗；并扩大可点区域便于抓取。
+  /// header 整块：指示条 + 数据源选择行 + 标题行。
+  ///
+  /// [resizable] 为 true（AI/网页源）时，整块 header（含指示条、数据源行、
+  /// 标题行及行间留白）都可上下拖拽调整弹窗高度——竖向拖拽由外层
+  /// [GestureDetector] 接管，内部按钮/长按只用 tap/longPress，经手势竞技场天然
+  /// 区分（纯点击→按钮赢，有竖向位移→拖拽赢），不破坏现有交互。
+  Widget _buildHeader(
+    ThemeData theme,
+    DictionaryLookupState state,
+    DictionaryLookupController notifier,
+    String displayWord,
+    String lemma,
+    bool resizable,
+  ) {
+    final header = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 拖拽指示条（视觉提示；拖拽手势由外层 header 统一接管）
+        _buildDragHandle(theme, resizable),
+        const SizedBox(height: 6),
+
+        // 数据源选择：整体靠右，AI 快捷按钮紧贴切换器左侧、与其等高
+        IntrinsicHeight(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AiSourceButton(
+                selectedId: state.selectedSourceId,
+                onSelected: notifier.selectSource,
+              ),
+              const SizedBox(width: 8),
+              SourceSwitcher(
+                selectedId: state.selectedSourceId,
+                onSelected: notifier.selectSource,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 标题行：单词 + 发音 + 收藏（跨源恒定）
+        _buildTitleRow(theme, displayWord, lemma),
+      ],
+    );
+    if (!resizable) return header;
+    return GestureDetector(
+      key: const Key('dict_drag_handle'),
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: _onHandleDragStart,
+      onVerticalDragUpdate: _onHandleDrag,
+      onVerticalDragEnd: _onHandleDragEnd,
+      child: header,
+    );
+  }
+
+  /// 拖拽指示条（仅视觉）。[draggable] 时加竖向留白让指示条更易识别为可拖拽。
   Widget _buildDragHandle(ThemeData theme, bool draggable) {
     final bar = Container(
       width: 36,
@@ -346,16 +412,10 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
       ),
     );
     if (!draggable) return Center(child: bar);
-    return GestureDetector(
-      key: const Key('dict_drag_handle'),
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragUpdate: _onHandleDrag,
-      child: Center(
-        // 扩大竖向命中区域，便于抓住指示条拖拽
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: bar,
-        ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: bar,
       ),
     );
   }

@@ -106,24 +106,26 @@ void main() {
     }
   }
 
-  Widget wrap({String defaultId = 'cambridge'}) => ProviderScope(
-    overrides: [
-      analyticsOverride(),
-      dictionaryOverride(),
-      sharedPreferencesProvider.overrideWithValue(prefs),
-      dictionarySourcesProvider.overrideWithValue([web, ai]),
-      dictionarySourcesByIdProvider.overrideWithValue({
-        'cambridge': web,
-        'ai': ai,
-      }),
-      resolvedDefaultSourceIdProvider.overrideWithValue(defaultId),
-      dictionaryLookupContextProvider.overrideWithValue(
-        const DictionaryLookupContext(
-          accessToken: 'tok',
-          targetLanguage: 'zh-CN',
-        ),
+  List<Override> buildOverrides(String defaultId) => [
+    analyticsOverride(),
+    dictionaryOverride(),
+    sharedPreferencesProvider.overrideWithValue(prefs),
+    dictionarySourcesProvider.overrideWithValue([web, ai]),
+    dictionarySourcesByIdProvider.overrideWithValue({
+      'cambridge': web,
+      'ai': ai,
+    }),
+    resolvedDefaultSourceIdProvider.overrideWithValue(defaultId),
+    dictionaryLookupContextProvider.overrideWithValue(
+      const DictionaryLookupContext(
+        accessToken: 'tok',
+        targetLanguage: 'zh-CN',
       ),
-    ],
+    ),
+  ];
+
+  Widget app(String defaultId, Widget home) => ProviderScope(
+    overrides: buildOverrides(defaultId),
     child: MaterialApp(
       locale: const Locale('en'),
       supportedLocales: const [Locale('en'), Locale('zh')],
@@ -134,51 +136,84 @@ void main() {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: AppTheme.light(),
-      home: const Scaffold(body: WordDictionarySheet(word: 'run')),
+      home: home,
     ),
   );
 
+  Widget wrap({String defaultId = 'cambridge'}) =>
+      app(defaultId, const Scaffold(body: WordDictionarySheet(word: 'run')));
+
+  /// 以 modal 路由打开弹窗（使下滑关闭有可 pop 的路由）。返回打开弹窗的动作。
+  Future<void> pumpModal(WidgetTester tester, {String defaultId = 'ai'}) async {
+    await tester.pumpWidget(
+      app(
+        defaultId,
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const WordDictionarySheet(word: 'run'),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('网页源默认 2/3 屏高，上拉指示条放大、下拉缩小', (tester) async {
     await withLinux(() async {
-    await tester.pumpWidget(wrap());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
 
-    final sizer = find.byKey(const Key('dict_sheet_sizer'));
-    final handle = find.byKey(const Key('dict_drag_handle'));
-    expect(sizer, findsOneWidget);
-    expect(handle, findsOneWidget);
+      final sizer = find.byKey(const Key('dict_sheet_sizer'));
+      final handle = find.byKey(const Key('dict_drag_handle'));
+      expect(sizer, findsOneWidget);
+      expect(handle, findsOneWidget);
 
-    final screenH = tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    final initial = tester.getSize(sizer).height;
-    // 默认约 2/3 屏高（受 SafeArea 影响略小，给足容差）
-    expect(initial, closeTo(screenH * 2 / 3, 40));
+      final screenH =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      final initial = tester.getSize(sizer).height;
+      // 默认约 2/3 屏高（受 SafeArea 影响略小，给足容差）
+      expect(initial, closeTo(screenH * 2 / 3, 40));
 
-    // 上拉放大
-    await tester.drag(handle, const Offset(0, -200));
-    await tester.pumpAndSettle();
-    final enlarged = tester.getSize(sizer).height;
-    expect(enlarged, greaterThan(initial + 150));
+      // 上拉放大
+      await tester.drag(handle, const Offset(0, -200));
+      await tester.pumpAndSettle();
+      final enlarged = tester.getSize(sizer).height;
+      expect(enlarged, greaterThan(initial + 150));
 
-    // 下拉缩小
-    await tester.drag(handle, const Offset(0, 300));
-    await tester.pumpAndSettle();
-    expect(tester.getSize(sizer).height, lessThan(enlarged));
+      // 下拉缩小
+      await tester.drag(handle, const Offset(0, 300));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(sizer).height, lessThan(enlarged));
     });
   });
 
   testWidgets('上拉不超过 95% 屏高上限', (tester) async {
     await withLinux(() async {
-    await tester.pumpWidget(wrap());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
 
-    final handle = find.byKey(const Key('dict_drag_handle'));
-    final sizer = find.byKey(const Key('dict_sheet_sizer'));
-    final screenH = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      final handle = find.byKey(const Key('dict_drag_handle'));
+      final sizer = find.byKey(const Key('dict_sheet_sizer'));
+      final screenH =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
 
-    // 远超上限的拖拽量
-    await tester.drag(handle, const Offset(0, -2000));
-    await tester.pumpAndSettle();
-    expect(tester.getSize(sizer).height, lessThanOrEqualTo(screenH * 0.95 + 1));
+      // 远超上限的拖拽量
+      await tester.drag(handle, const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(sizer).height,
+        lessThanOrEqualTo(screenH * 0.95 + 1),
+      );
     });
   });
 
@@ -202,5 +237,48 @@ void main() {
     await tester.drag(handle, const Offset(0, -200));
     await tester.pumpAndSettle();
     expect(tester.getSize(sizer).height, greaterThan(initial + 150));
+  });
+
+  testWidgets('在标题行（非指示条）区域上拉也能放大弹窗', (tester) async {
+    await tester.pumpWidget(wrap(defaultId: 'ai'));
+    await tester.pumpAndSettle();
+
+    final sizer = find.byKey(const Key('dict_sheet_sizer'));
+    final initial = tester.getSize(sizer).height;
+
+    // 在标题行（header 内的非指示条区域）发起竖向拖拽
+    await tester.drag(find.text('run'), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(sizer).height, greaterThan(initial + 150));
+  });
+
+  testWidgets('下拉到底再继续下拉关闭弹窗', (tester) async {
+    await pumpModal(tester);
+    expect(find.byKey(const Key('dict_sheet_sizer')), findsOneWidget);
+
+    // 远超下限的下拉：缩到下限后继续下拉（overdrag）超阈值，松手关闭
+    await tester.drag(
+      find.byKey(const Key('dict_drag_handle')),
+      const Offset(0, 2000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dict_sheet_sizer')), findsNothing);
+  });
+
+  testWidgets('下拉到下限但未超 overdrag 阈值：仅缩小，不关闭', (tester) async {
+    await pumpModal(tester);
+    final sizer = find.byKey(const Key('dict_sheet_sizer'));
+    final screenH =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final initial = tester.getSize(sizer).height;
+
+    // 缩到下限附近（overdrag < 80）：弹窗仍在，高度夹在 40% 下限
+    await tester.drag(
+      find.byKey(const Key('dict_drag_handle')),
+      Offset(0, initial - screenH * 0.4 + 40),
+    );
+    await tester.pumpAndSettle();
+    expect(sizer, findsOneWidget);
+    expect(tester.getSize(sizer).height, closeTo(screenH * 0.4, 20));
   });
 }
