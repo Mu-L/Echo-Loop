@@ -1,7 +1,20 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-28（词典弹窗整个 header 可拖拽调整高度 + 下滑关闭）
+> 最后更新：2026-06-29（修复盲听后台播放锁屏控制两处缺陷）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：修复盲听后台播放锁屏控制两处缺陷（控件不显示 + 上/下一句无反应）
+
+2b20c840 给盲听/精听接入锁屏控制后出现两个 bug（iOS+Android 都有）：① 锁屏控件有时不显示（冷启动正常、用一段时间后消失）；② 盲听锁屏「上一句/下一句」按钮可见但点了无反应。单一根因：锁屏会话销毁由 `processingState` 跳 `idle` 驱动（audio_service `非idle→idle` → `stopService` 拆 `MPRemoteCommandCenter`/前台通知）。**精听**每次中断走 `engine.pause()`（非 idle，不拆会话）；**盲听**每次暂停/切段/seek/改设置都走 `engine.stopPlayback()`（idle→stopService），于是每中断一次就拆/重建系统媒体会话——命令 target 被移除致 prev/next 死按钮，反复拆建致卡片时序性消失。
+
+- [x] `blind_listen_player_provider.dart`：4 处会话内中断 `engine.stopPlayback()` → `engine.pauseKeepSession()`（`pause()` / `enterWaitingForUser()` / `updateSettings()` 模式切换 / `_cancelAll()`，后者被 seek/切段/重听共用）。session 已由各调用点 `newSession()` 失效，故用不再 bump 的 `pauseKeepSession`，行为等价、只去掉 idle 广播。真正退出仍由 `exitLearningMode → practice.stop()`（idle）清卡片。
+- [x] 测试：盲听 fake 引擎经 `FakeAudioEngine.pauseKeepSession`（已存在、no-op）兜底，无需改测试；`blind_listen_player_test`(50) + `background_audio_handler_test` 全通过。
+- [x] CLAUDE.md 新增 §7.14（盲听会话内中断必须 pause 不能 stop，与精听对齐）。
+- [x] **统一上一句/下一句导航**：盲听左右按钮（锁屏 + 屏内控制栏 + 键盘热键）从「上一段/下一段」改为「上一句/下一句」，与逐句精听语义统一。`blind_listen_player_provider.dart` 新增 `goToNextSentence`/`goToPreviousSentence`（基于 `_currentSentenceLocation` 跨段步进，复用 `seekToSentence`）+ `canGoToPreviousSentence`/`isAtLastSentence` 判定按钮可用态/完成态；屏幕 3 处调用点改用之；段间自动推进（`_onPauseCountdownFinished`）仍走段级 `goToNextParagraph`，进度条段级拖动 `seekToParagraph` 不变。`FakeBlindListenPlayer` 加对应 override（无真实段落时按段索引近似）；新增 4 例导航单测。
+- [x] **修复锁屏进度切句归零**（§7.15）：盲听每段用 `setClip` 播放，just_audio 在 clip 下 `position` 相对 clip 起点、`duration` 为 clip 长度，handler 直接广播致锁屏进度每切句归零。`background_audio_handler.dart` 记 `_clipStart`/`_clipActive`/`_fullDuration`，`_broadcastState` 上报 `_clipStart + position`（绝对位置），duration 监听 clip 期间保留全曲时长；无 clip 时 `_clipStart=0`，Free Player 整曲不变。新增 3 例 handler 测试（clip 绝对位置 / 切段不归零 / clearClip 回退）。
+- [x] 验证：`flutter analyze` 0 error（改动文件无问题）；`services/` + `audio_engine/` + `listening_practice/` + `learning_session/` + `screens/` 全通过（1068 passed / 11 skipped）。**待真机验证**（锁屏/后台本机测不到）：iOS/Android 锁屏点上一句/下一句逐句切换且进度不归零、多次中断 + 长时使用后卡片仍在、录音任务卡片仍消失、退出回 Free Player 正常。
+
+  **完成时间**: 2026-06-29
 
 ## 已完成：词典弹窗整个 header 区域可拖拽调整高度 + 下滑关闭
 

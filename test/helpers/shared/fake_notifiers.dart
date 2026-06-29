@@ -1840,6 +1840,7 @@ class FakeAudioEngine extends AudioEngine {
 
   /// 逻辑播放态覆盖的最近值（null = 已恢复读裸 player）。
   bool? logicalPlaying;
+  bool? progressFrozen;
   int startKeepAliveCount = 0;
   int stopKeepAliveCount = 0;
 
@@ -1870,6 +1871,11 @@ class FakeAudioEngine extends AudioEngine {
   @override
   void setLogicalPlaying(bool? playing) {
     logicalPlaying = playing;
+  }
+
+  @override
+  void setProgressFrozen(bool frozen) {
+    progressFrozen = frozen;
   }
 
   @override

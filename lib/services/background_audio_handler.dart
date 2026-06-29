@@ -24,7 +24,16 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
     _durationSub = _player.durationStream.listen((duration) {
       final item = mediaItem.value;
       if (item == null || duration == null) return;
-      mediaItem.add(item.copyWith(duration: duration));
+      // 有 clip 时 just_audio 的 duration 是 clip 长度。锁屏进度要展示「全曲」
+      // 时长 + 绝对位置（见 _broadcastState），否则段落分段播放（盲听 playRangeOnce）
+      // 每切一段就把进度按 clip 长度归零。无 clip 时记录全曲时长；有 clip 时不让
+      // clip 长度覆盖 mediaItem.duration，保持显示全曲时长。
+      if (!_clipActive) {
+        _fullDuration = duration;
+        mediaItem.add(item.copyWith(duration: duration));
+      } else if (_fullDuration != null && item.duration != _fullDuration) {
+        mediaItem.add(item.copyWith(duration: _fullDuration));
+      }
       _broadcastState();
     });
   }
@@ -44,6 +53,14 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// 锁屏/系统媒体会话采用的有效播放态：有覆盖用覆盖，否则读裸 player。
   bool get _effectivePlaying => _logicalPlaying ?? _player.playing;
+
+  /// 进度冻结：停顿倒计时期间为 true。广播时上报 `speed=0`，使 iOS 停止按
+  /// playbackRate 外推 elapsed（锁屏进度条不再前进），同时保留 `playing=true`
+  /// 让锁屏图标仍显示「播放中」（图标读 playing、外推读 rate，二者解耦）。
+  ///
+  /// 历史坑：停顿期 `_logicalPlaying=true` + `speed>0` → iOS 持续外推进度条，
+  /// 段间倒计时时进度条越过段尾前进，下一段起播 setClip 复位又回退（见 §7.16）。
+  bool _progressFrozen = false;
 
   /// 后台静音保活播放器。停顿（静音）期间循环播放打包的静音轨，使 iOS 音频会话
   /// 保持活跃、isolate 不被挂起，让 Dart 倒计时定时器在后台照常推进。
@@ -76,6 +93,18 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
 
   List<MediaControl> _controls = const [MediaControl.play, MediaControl.stop];
   List<int> _compactActionIndices = const [0];
+
+  /// 当前 clip 起点（[setClip] 写入，无 clip 时为 zero）。锁屏进度上报「绝对位置」
+  /// = `_clipStart + _player.position`，使段落分段播放（盲听）切句不把进度归零。
+  Duration _clipStart = Duration.zero;
+
+  /// 是否处于 clip 播放（[setClip] 非空区间）。用于让 duration 监听跳过 clip 长度、
+  /// 保留全曲时长。
+  bool _clipActive = false;
+
+  /// 全曲时长（[loadFile] 解析、duration 监听在无 clip 时刷新）。clip 期间用它兜住
+  /// mediaItem.duration，避免被 clip 长度覆盖。
+  Duration? _fullDuration;
 
   ja.AudioPlayer get player => _player;
 
@@ -129,6 +158,13 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
   /// 传 null 恢复读裸 [_player.playing]。赋值后立即广播，使锁屏图标即时同步。
   void setLogicalPlaying(bool? playing) {
     _logicalPlaying = playing;
+    _broadcastState();
+  }
+
+  /// 设置进度冻结（见 [_progressFrozen]）。幂等：值未变不重复广播。
+  void setProgressFrozen(bool frozen) {
+    if (_progressFrozen == frozen) return;
+    _progressFrozen = frozen;
     _broadcastState();
   }
 
@@ -251,8 +287,14 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
         artUri: _artworkUri,
       ),
     );
+    // 新音频：清掉上一条音频残留的 clip 偏移与全曲时长（避免锁屏进度按旧值偏移）。
+    _clipStart = Duration.zero;
+    _clipActive = false;
+    _fullDuration = null;
+    _progressFrozen = false;
     final duration = await _player.setFilePath(filePath);
     await _player.setSpeed(speed);
+    _fullDuration = duration ?? _player.duration;
     _broadcastState();
     return duration;
   }
@@ -261,6 +303,9 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
     required Duration? start,
     required Duration? end,
   }) async {
+    // 记录 clip 起点/激活态，供锁屏上报绝对位置与保留全曲时长（见 _broadcastState）。
+    _clipStart = start ?? Duration.zero;
+    _clipActive = start != null || end != null;
     await _player.setClip(start: start, end: end);
     _broadcastState();
   }
@@ -371,9 +416,13 @@ class EchoLoopAudioHandler extends BaseAudioHandler with SeekHandler {
         androidCompactActionIndices: _compactActionIndices,
         processingState: _mapProcessingState(_player.processingState),
         playing: _effectivePlaying,
-        updatePosition: _player.position,
-        bufferedPosition: _player.bufferedPosition,
-        speed: _player.speed,
+        // 绝对位置（clip 起点 + clip 内相对位置），配合全曲时长，使段落分段播放
+        // 切句不把锁屏进度归零；无 clip 时 _clipStart=zero 即原始行为。
+        updatePosition: _clipStart + _player.position,
+        bufferedPosition: _clipStart + _player.bufferedPosition,
+        // 冻结时上报 speed=0：iOS 据 playbackRate 外推 elapsed，rate=0 即进度条不再
+        // 前进，停在当前 updatePosition（段尾），停顿倒计时期间锁屏进度不漂移。
+        speed: _progressFrozen ? 0.0 : _player.speed,
       ),
     );
   }

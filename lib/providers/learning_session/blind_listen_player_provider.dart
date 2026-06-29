@@ -348,7 +348,10 @@ class BlindListenPlayer extends _$BlindListenPlayer
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateCountdown();
-    await engine.stopPlayback();
+    // 会话内中断只暂停（非 idle），不 stop——stop 会广播 processingState=idle 触发
+    // audio_service stopService 反复拆/重建系统媒体会话，导致锁屏控件失灵（见 §7.14）。
+    // session 已由上方 newSession() 失效，故用不再 bump 的 pauseKeepSession。
+    await engine.pauseKeepSession();
     if (snapshotIdx >= 0) {
       _resumeStartLocalSentenceIndex = snapshotIdx;
     }
@@ -577,7 +580,8 @@ class BlindListenPlayer extends _$BlindListenPlayer
     _sessionId = engine.newSession();
     _positionSub?.cancel();
     _invalidateCountdown();
-    unawaited(engine.stopPlayback());
+    // 暂停（非 idle）不拆媒体会话，session 已失效（见 §7.14 / pause 同理）。
+    unawaited(engine.pauseKeepSession());
     setSessionActive(false);
     state = state.copyWith(
       isPlaying: false,
@@ -632,7 +636,8 @@ class BlindListenPlayer extends _$BlindListenPlayer
       _sessionId = engine.newSession();
       _positionSub?.cancel();
       _invalidateCountdown();
-      unawaited(engine.stopPlayback());
+      // 暂停（非 idle）不拆媒体会话，session 已失效（见 §7.14）。
+      unawaited(engine.pauseKeepSession());
       setSessionActive(false);
       state = state.copyWith(
         isPlaying: false,
@@ -764,6 +769,8 @@ class BlindListenPlayer extends _$BlindListenPlayer
     // 进入活跃会话（含随后的段间倒计时，保活全程在跑）。回调槽已在 initializeParagraphs
     // 绑定一次，此处不再重绑。
     setSessionActive(true);
+    // 实际播放开始：解除停顿期的进度冻结，锁屏进度条恢复随播放前进。
+    setProgressFrozen(false);
 
     _persistCurrentSentenceIndexAsync();
 
@@ -919,6 +926,10 @@ class BlindListenPlayer extends _$BlindListenPlayer
       isWaitingForUser: false,
     );
 
+    // 停顿倒计时期间冻结锁屏进度条：保活会话仍活跃（图标显示播放中），但音频不前进，
+    // 进度条应停在段尾而非按 playbackRate 继续外推（见 §7.16）。
+    setProgressFrozen(true);
+
     _countdown.start(duration).then((_) {
       if (state.isPauseCountdown && runId == _countdownRunId) {
         _onPauseCountdownFinished();
@@ -960,7 +971,9 @@ class BlindListenPlayer extends _$BlindListenPlayer
     _positionSub?.cancel();
     _invalidateCountdown();
     _waitAfterCurrentParagraph = false;
-    await engine.stopPlayback();
+    // 切段/seek/重听等会话内中断只暂停（非 idle），不拆媒体会话——session 已由上方
+    // newSession() 失效，旧 playRangeOnce 的 await 会因此解开（见 §7.14）。
+    await engine.pauseKeepSession();
   }
 
   /// 使当前倒计时失效

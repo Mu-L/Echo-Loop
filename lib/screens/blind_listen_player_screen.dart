@@ -693,23 +693,10 @@ class _BlindListenPlayerScreenState
                 ),
               ),
             ),
-            // 常态（非倒计时）只占必要高度，倒计时时才撑开为「回忆提示 + 倒计时行」
-            // 两段固定预留会在常态浪费大量垂直空间，故按状态条件渲染。
+            // 常态（非倒计时）只占必要高度，倒计时时才撑开为倒计时行。
             practiceControls: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (playerState.isPauseCountdown)
-                  SizedBox(
-                    height: 22,
-                    child: Center(
-                      child: Text(
-                        l10n.blindListenRecallHint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
                 SizedBox(
                   height: playerState.isPauseCountdown ? 48 : 32,
                   child: playerState.isPauseCountdown

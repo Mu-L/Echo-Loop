@@ -276,4 +276,112 @@ void main() {
       expect(state.playing, isFalse);
     });
   });
+
+  group('锁屏进度：clip 偏移上报绝对位置（盲听切句不归零）', () {
+    setUp(() {
+      when(
+        () => player.setClip(
+          start: any(named: 'start'),
+          end: any(named: 'end'),
+        ),
+      ).thenAnswer((_) async => const Duration(seconds: 20));
+    });
+
+    test('setClip 后广播绝对位置 = clip 起点 + clip 内相对位置', () async {
+      // 段落 clip = [30s, 50s]，clip 内已播 5s。
+      await handler.setClip(
+        start: const Duration(seconds: 30),
+        end: const Duration(seconds: 50),
+      );
+      when(() => player.position).thenReturn(const Duration(seconds: 5));
+      when(
+        () => player.bufferedPosition,
+      ).thenReturn(const Duration(seconds: 6));
+
+      handler.setLogicalPlaying(true); // 触发广播
+
+      final state = handler.playbackState.value;
+      // 绝对位置 = 30s + 5s = 35s（而非 clip 相对的 5s，更非归零）。
+      expect(state.updatePosition, const Duration(seconds: 35));
+      expect(state.bufferedPosition, const Duration(seconds: 36));
+    });
+
+    test('切到另一段（重设 clip）后绝对位置随新 clip 起点更新，不归零', () async {
+      await handler.setClip(
+        start: const Duration(seconds: 30),
+        end: const Duration(seconds: 50),
+      );
+      // 切到下一段 clip = [50s, 70s]，新 clip 内相对位置回到 0。
+      await handler.setClip(
+        start: const Duration(seconds: 50),
+        end: const Duration(seconds: 70),
+      );
+      when(() => player.position).thenReturn(Duration.zero);
+
+      handler.setLogicalPlaying(true);
+
+      // 绝对位置 = 50s（新段起点），而非 0。
+      expect(handler.playbackState.value.updatePosition, const Duration(seconds: 50));
+    });
+
+    test('无 clip（clearClip）后绝对位置回退为裸 player.position', () async {
+      await handler.setClip(
+        start: const Duration(seconds: 30),
+        end: const Duration(seconds: 50),
+      );
+      // clearClip：start/end 均为 null。
+      await handler.setClip(start: null, end: null);
+      when(() => player.position).thenReturn(const Duration(seconds: 8));
+
+      handler.setLogicalPlaying(true);
+
+      // _clipStart 归零 → 绝对位置 = 裸 position（Free Player 整曲行为不变）。
+      expect(handler.playbackState.value.updatePosition, const Duration(seconds: 8));
+    });
+  });
+
+  group('进度冻结（停顿倒计时锁屏进度条不外推前进）', () {
+    test('冻结时广播 speed=0，但 playing 仍由逻辑播放态决定（图标不变）', () {
+      when(() => player.speed).thenReturn(1.5);
+      handler.setLogicalPlaying(true);
+
+      handler.setProgressFrozen(true);
+
+      final state = handler.playbackState.value;
+      // speed=0 → iOS 不按 playbackRate 外推 elapsed，进度条停住。
+      expect(state.speed, 0.0);
+      // playing 仍为 true → 锁屏图标保持「播放中」（暂停图标）。
+      expect(state.playing, isTrue);
+    });
+
+    test('解除冻结后广播恢复真实 speed', () {
+      when(() => player.speed).thenReturn(1.5);
+      handler.setLogicalPlaying(true);
+      handler.setProgressFrozen(true);
+
+      handler.setProgressFrozen(false);
+
+      expect(handler.playbackState.value.speed, 1.5);
+    });
+
+    test('冻结期间仍上报当前绝对位置（停在段尾），不归零', () async {
+      when(
+        () => player.setClip(start: any(named: 'start'), end: any(named: 'end')),
+      ).thenAnswer((_) async => const Duration(seconds: 20));
+      // 段落 clip = [30s, 50s]，已播到段尾（clip 内相对 20s）。
+      await handler.setClip(
+        start: const Duration(seconds: 30),
+        end: const Duration(seconds: 50),
+      );
+      when(() => player.position).thenReturn(const Duration(seconds: 20));
+      handler.setLogicalPlaying(true);
+
+      handler.setProgressFrozen(true);
+
+      final state = handler.playbackState.value;
+      expect(state.speed, 0.0);
+      // 进度停在段尾绝对位置 50s（= 30s + 20s），而非归零或继续前进。
+      expect(state.updatePosition, const Duration(seconds: 50));
+    });
+  });
 }

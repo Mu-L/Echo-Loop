@@ -88,6 +88,12 @@ class AudioEngine extends _$AudioEngine {
     _handler.setLogicalPlaying(playing);
   }
 
+  /// 设置进度冻结（停顿倒计时期间上报 speed=0，锁屏进度条不再外推前进），
+  /// 转发给底层 handler。
+  void setProgressFrozen(bool frozen) {
+    _handler.setProgressFrozen(frozen);
+  }
+
   /// 启动后台静音保活（仅 iOS 生效，见 handler），转发给底层 handler。
   Future<void> startKeepAlive() => _handler.startKeepAlive();
 

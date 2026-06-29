@@ -208,7 +208,8 @@ void main() {
 
       // 多段模式进度条按段落驱动，且可拖动跳段（共享骨架的进度区域）
       expect(find.byType(PracticeProgressSection), findsOneWidget);
-      expect(find.text('Try to recall what you just heard'), findsOneWidget);
+      // 倒计时阶段不再显示多余的「回忆提示」label（仅倒计时行）。
+      expect(find.text('Try to recall what you just heard'), findsNothing);
       expect(find.byType(PlaybackControls), findsOneWidget);
     });
 

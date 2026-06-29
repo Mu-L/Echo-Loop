@@ -347,3 +347,42 @@ flutter test integration_test -d macos
 - **规则**：**段落/区间播放的 position 追踪必须等 `seek(0)` 落定后才订阅**（用 `onClipReady` 回调时机，不在 `playRangeOnce` 之前订阅）；监听器对越界 position 一律丢弃，不可让其改高亮或写断点
 - **相关代码**：`lib/providers/audio_engine/foreground_audio_engine_provider.dart` / `audio_engine_provider.dart`（`playRangeOnce` 的 `onClipReady`）、`lib/providers/learning_session/retell_player_provider.dart` / `blind_listen_player_provider.dart`（`_playCurrentParagraph` 订阅后移 + `_startPositionTracking` 越界丢弃）
 - **修复时间**：2026-06-27
+
+### 7.14 盲听会话内中断用 stop（idle）反复拆/重建系统媒体会话 → 锁屏控件失效
+
+- **现象**（iOS + Android 都有）：① 盲听锁屏「上一句/下一句」按钮可见但点击**无反应**；② 锁屏媒体控件有时不显示——冷启动后正常，用一段时间后就不再出现。精听无此问题
+- **根因（单一根因，两处表现）**：锁屏卡片/控件的销毁由 **`processingState` 跳到 `idle`** 驱动——audio_service 监听到 `非idle→idle` 跳变即调 `stopService`（`audio_service.dart:1132`）→ iOS 把 `MPRemoteCommandCenter` 置 nil、移除全部命令 target、清 `nowPlayingInfo`（`AudioServicePlugin.m:230`）；Android 撤前台服务通知。`EchoLoopAudioHandler.stop()` 内 `_player.stop()`→idle→`_broadcastState()` 广播 idle，`AudioEngine.stopPlayback()/stop()` 都走它。**关键不对称**：精听每次中断走 `engine.pause()`→`pausePlayer()`（**非 idle**，不拆会话）；盲听每次暂停/切段/seek/改设置都走 `engine.stopPlayback()`（**idle→stopService**），于是每中断一次就把整个系统媒体会话拆掉再重建——拆掉后命令 target 被移除 → prev/next 死按钮（Bug②）；反复拆建、恢复依赖随后非 idle 广播精确落地、时序不稳 → 卡片偶发不再出现（Bug①，冷启动尚未拆除故正常）
+- **解法**：盲听「会话内中断」与精听对齐——`engine.stopPlayback()` 改 `engine.pauseKeepSession()`（=`pausePlayer`，非 idle、不拆会话；session 已由调用点 `newSession()` 自行失效，故用不再 bump 的 `pauseKeepSession`）。共 4 处：`pause()` / `enterWaitingForUser()` / `updateSettings()` 模式切换 / `_cancelAll()`（被 seek/切段/重听共用）。**真正退出**（exitLearningMode → `practice.stop()` → idle）仍负责清卡片，不受影响
+- **规则**：**接 audio_service 的媒体引擎，会话内的暂停/切句/seek 一律用 pause（非 idle），不能用 stop（idle）**——stop 只留给「真正退出该播放会话」。否则每次中断都触发 stopService 拆/重建系统媒体会话，锁屏控件失灵。录音类前台引擎不接 audio_service，不受此约束
+- **相关代码**：`lib/providers/learning_session/blind_listen_player_provider.dart`（4 处 `stopPlayback`→`pauseKeepSession`）；对照 `intensive_listen_player_provider.dart`+`blind_practice_flow_engine.dart`（`callbacks.pauseAudio`→`engine.pause`）；`audio_engine_provider.dart`（`pauseKeepSession`/`stopPlayback`/`stop`）
+- **修复时间**：2026-06-29
+- **真机验证**：iOS/Android 锁屏点上一句下一句应正确切段；多次暂停/切段 + 长时使用后卡片仍显示；录音任务卡片仍消失、退出回 Free Player 正常
+
+### 7.15 段落分段播放（clip）锁屏进度每切句归零：必须上报「绝对位置 + 全曲时长」
+
+- **现象**：全文盲听点上一句/下一句，锁屏 now-playing 进度条总被清零
+- **根因**：盲听每段用 `playRangeOnce` → `setClip(start,end)` 播放。just_audio 在 clip 下 `player.position` 是**相对 clip 起点**（切句重设 clip + `seek(0)` → 归零）、`player.duration` 是**clip 长度**。handler 此前直接广播 `updatePosition: _player.position` + duration 监听用 `player.duration` 覆盖 `mediaItem.duration` → 锁屏拿到「clip 相对位置 / clip 长度」，每切一段就归零
+- **解法**：handler 记 `_clipStart`/`_clipActive`/`_fullDuration`——`setClip` 写入 clip 起点与激活态，`loadFile` 解析并复位全曲时长；`_broadcastState` 上报 `updatePosition = _clipStart + _player.position`（+ bufferedPosition 同理）；duration 监听在 clip 期间不让 clip 长度覆盖 `mediaItem.duration`，保持全曲时长。无 clip 时 `_clipStart=zero`，Free Player 整曲行为不变
+- **规则**：**接 audio_service 的 clip 分段播放，锁屏进度必须上报「全曲绝对位置 + 全曲时长」，不能直接用 just_audio 的 clip 相对 position / clip 长度 duration**（否则切片即归零）。app 内进度走 `engine.absolutePositionStream`（已是 clipStart+rel），与本次锁屏修复同源不同通道
+- **注意**：锁屏「拖动进度条」(`changePlaybackPositionCommand` → `handler.seek`) 仍是 clip 相对语义，与现上报的绝对位置不一致——盲听/精听未用此交互，属既有遗留，未在本次处理
+- **相关代码**：`lib/services/background_audio_handler.dart`（`_clipStart`/`_clipActive`/`_fullDuration`、`setClip`/`loadFile`/`_durationSub`/`_broadcastState`）；测试 `test/services/background_audio_handler_test.dart`（clip 绝对位置 / 切段不归零 / clearClip 回退）
+- **修复时间**：2026-06-29
+
+### 7.16 停顿倒计时锁屏进度条仍前进、下一段又回退：必须上报 `speed=0` 冻结
+
+- **现象**：全文盲听段落播完进入段间停顿倒计时期间，锁屏 now-playing 进度条仍持续往前走（越过段尾），下一段起播又回退
+- **根因**：停顿期靠 `setSessionActive(true)` 保持 `_logicalPlaying=true`（锁屏图标显示「播放中」+ 静音保活让 Dart 倒计时后台推进）。`_broadcastState` 据此广播 `playing:true` + `speed:_player.speed`(>0)。iOS `MPNowPlayingInfoPropertyPlaybackRate = playing ? speed : 0`，rate>0 时系统按**墙钟时间外推** `elapsedPlaybackTime`（`AudioServicePlugin.m:288`），进度条自行前进；下一段 `setClip` 复位 `updatePosition` → 回退。问题本质是 iOS 端外推，主 player 实际已停在段尾
+- **解法**：停顿期广播 `speed:0.0`（新增 `_progressFrozen` 开关），iOS rate=0 即不再外推，进度停在当前 `updatePosition`（段尾）；`playing` 仍读 `_effectivePlaying`(=true) 保持图标「播放中」——因 iOS 播放/暂停图标由 `center.playbackState`(读 `playing`，`AudioServicePlugin.m:294`) 驱动，与 rate 解耦。段落连续，下一段从段头(≈上段段尾)起播，无回退。`setProgressFrozen` 经 engine→mixin 暴露，provider 在 `_startPauseCountdown` 置 true、`_playCurrentParagraph`(实际起播) 置 false；`unbindLockScreen`/`loadFile` 复位 false 防泄漏到 Free Player
+- **规则**：**「图标显示播放中但音频实际不前进」的场景（停顿倒计时）必须广播 `speed=0` 冻结锁屏进度**——iOS 进度外推只认 playbackRate，不能靠 `playing:false`（会误把图标切成暂停、且停保活）。图标真相源是 `playing`，进度外推真相源是 `speed`，二者要分别控制
+- **相关代码**：`lib/services/background_audio_handler.dart`（`_progressFrozen`/`setProgressFrozen`/`_broadcastState` speed 分支）、`lib/providers/audio_engine/audio_engine_provider.dart` + `study_background_playback_mixin.dart`（passthrough + unbind 复位）、`lib/providers/learning_session/blind_listen_player_provider.dart`（`_startPauseCountdown` 冻结 / `_playCurrentParagraph` 解冻）；测试 `test/services/background_audio_handler_test.dart`（冻结 speed=0 / 图标不变 / 段尾位置不归零）
+- **注意**：逐句精听（`intensive_listen_player_provider`）句间倒计时同属此类，本次未改；句子短、漂移小，如有反馈再按同法接 `setProgressFrozen`
+- **修复时间**：2026-06-29
+
+### 7.17 合集内详情路由拍平在顶层 → 返回后自动多退一层（学习计划页 → 资源库）
+
+- **现象**（Android 16 / Honor MagicOS）：随心听播放器点返回，先短暂停在学习计划页，随即**自动**又退到资源库列表页（合集 tab 根）。期望停在学习计划页
+- **根因**：`app_router.dart` 把合集内音频详情页（学习计划 / 各播放器）声明成 **`StatefulShellRoute` 的顶层兄弟路由**（带 `parentNavigatorKey: rootNavigatorKey`），但路径 `/collections/:c/:a/plan` 与 branch-0 的 `/collections` 前缀重叠。正常入栈 `[Shell(branch-0=合集详情), plan, player]` 里，「合集详情」这一层是 imperative push、**只存在于页面栈、不编码进 URI**。go_router 17 在 `restoreRouteInformation` 后把当前 URI 回报框架；框架以 **null state** 回灌时（Android 生命周期/前台播放服务窗口焦点抖动触发），parser 走「合成 go → `findMatch(uri)` 从零重建栈」，而 `/collections/:c/:a/plan` 只匹配到顶层 plan 路由，shell 分支被重置回初始 location（资源库根），合集详情丢失。随后那一次返回 pop 掉 plan 就落到资源库根
+- **解法**：把 7 条 `/collections/:c/:a/*`（plan/player/blind-listen/intensive-listen/listen-and-repeat/retell/review-difficult-practice）下沉为 branch-0 里 `:collectionId` 的**相对路径子路由**（`:audioId/plan` 等），**保留各自 `parentNavigatorKey: rootNavigatorKey`** 继续全屏无 tab bar。这样 URI 经由 shell 匹配、合集详情是匹配链里的真实祖先，重解析/恢复能重建出 `/collections/c1`，分支不再塌回根。`AppRoutes.*` 生成的字符串一字不变 → 调用点零改动。`/audio/:audioId/*` 系列不与任何分支前缀重叠，保持顶层不动
+- **规则**：**`StatefulShellRoute` 全屏子页（带 rootNavigatorKey）若路径与某分支前缀重叠，必须嵌套在该分支子树内、用相对路径**，不能拍平成顶层兄弟路由——否则 null-state 重解析会按 URI 重建而丢失 imperative push 的中间层，把分支重置回初始 location。「是否上 tab bar」由 `parentNavigatorKey` 表达，「属于哪个分支」由路由树嵌套表达，二者解耦
+- **相关代码**：`lib/router/app_router.dart`（branch-0 `:collectionId` 的 `routes:` 子路由）；测试 `test/router/app_router_test.dart`（嵌套结构重解析后 pop 回合集详情 / 顶层平级结构复现分支塌回根）
+- **修复时间**：2026-06-29

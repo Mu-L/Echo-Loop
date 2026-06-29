@@ -68,6 +68,13 @@ mixin StudyBackgroundPlaybackMixin {
     }
   }
 
+  /// 设置进度冻结：停顿倒计时期间传 true，使锁屏进度条停在段尾不再外推前进；
+  /// 实际播放（起播/续播/切句）入口传 false 恢复。图标仍由 [setSessionActive]
+  /// 维护的逻辑播放态驱动，与本开关解耦。
+  void setProgressFrozen(bool frozen) {
+    _bgEngine.setProgressFrozen(frozen);
+  }
+
   /// 清空锁屏控制 + 恢复读裸 player + 停保活。
   ///
   /// 离开任务页或进入录音子模式调用。逻辑播放态恢复 null 后，handler 回退读裸
@@ -78,6 +85,7 @@ mixin StudyBackgroundPlaybackMixin {
     engine.setSkipHandlers(onPrevious: null, onNext: null);
     engine.setSeekHandlers(onRewind: null, onFastForward: null);
     engine.setLogicalPlaying(null);
+    engine.setProgressFrozen(false);
     unawaited(engine.stopKeepAlive());
   }
 }
