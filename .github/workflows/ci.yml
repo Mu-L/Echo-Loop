@@ -39,7 +39,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: analyze
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,10 @@ jobs:
         run: flutter pub get
 
       - name: Run tests
-        run: flutter test
+        # --concurrency=1：串行跑测试。并行多个 flutter_tester 子进程在
+        # teardown 段偶发 native 段错误（所有用例通过、进程却以 segfault 退出 1），
+        # 降并发规避子进程间的资源争用。见提交说明。
+        run: flutter test --concurrency=1
 
   build:
     needs: [analyze, test]
