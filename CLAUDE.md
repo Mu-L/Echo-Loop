@@ -377,6 +377,10 @@ flutter test integration_test -d macos
 - **相关代码**：`lib/services/background_audio_handler.dart`（`_progressFrozen`/`setProgressFrozen`/`_broadcastState` speed 分支）、`lib/providers/audio_engine/audio_engine_provider.dart` + `study_background_playback_mixin.dart`（passthrough + unbind 复位）、`lib/providers/learning_session/blind_listen_player_provider.dart`（`_startPauseCountdown` 冻结 / `_playCurrentParagraph` 解冻）；测试 `test/services/background_audio_handler_test.dart`（冻结 speed=0 / 图标不变 / 段尾位置不归零）
 - **注意**：逐句精听（`intensive_listen_player_provider`）句间倒计时同属此类，本次未改；句子短、漂移小，如有反馈再按同法接 `setProgressFrozen`
 - **修复时间**：2026-06-29
+- **补充（2026-06-29）：Free Player 同源接入**
+  - **现象**：Free Player（`ListeningPractice`）句间循环/整篇循环之间的停顿期间，锁屏进度条同样仍前进、下一遍起播又回退——与精听/盲听修复前同源。Free Player 走同一媒体引擎但从未调过 `setProgressFrozen`
+  - **解法**：Free Player 所有停顿延迟唯一收敛到 `_delayInterval(interval)`（整篇/无字幕整篇/单句重播/跳句/gapless 交接 5 处调用点全经此）。在此单点包裹：延迟前 `_engine.setProgressFrozen(true)`、`finally` 中 `setProgressFrozen(false)`。`interval==0` 不触碰，`finally` 保证延迟异常/会话作废也不残留冻结态
+  - **相关代码**：`lib/providers/listening_practice/listening_practice_provider.dart`（`_delayInterval`）；测试 `test/providers/listening_practice/free_player_playback_flow_test.dart`（「整篇循环间隔」用例断言停顿期 `progressFrozen==true`、起播后 `==false`）
 
 ### 7.17 合集内详情路由拍平在顶层 → 返回后自动多退一层（学习计划页 → 资源库）
 

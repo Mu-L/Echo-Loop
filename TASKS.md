@@ -1,7 +1,39 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-06-29（修复盲听后台播放锁屏控制两处缺陷）
+> 最后更新：2026-06-30（Free Player / 全文盲听停顿期上一键重播当前单元）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：统一 Free Player / 全文盲听停顿期上一键语义
+
+精听句间停顿已改为「上一句先重播当前句」后，继续收敛同源体验：Free Player 在句间 / 整篇循环间隔、全文盲听在段间停顿期间，左按钮也应把刚结束的当前播放单元从头重播，而不是直接跳到前一个单元。
+
+- [x] `listening_practice_provider.dart`：新增私有 `_isInPlaybackInterval` 标记，仅包住 `_delayInterval`；`previousSentence()` 在停顿期改为 `replayCurrentSentence()`。同时 dispose 时递增播放代际，并让 `_delayInterval` 持有 engine 引用，避免延迟 finally 在 provider 销毁后再 `ref.read`。
+- [x] `blind_listen_player_provider.dart`：`goToPreviousParagraph()` 在 `isPauseCountdown` 期间重播当前段段首；非停顿期保留原上一段语义。
+- [x] 测试：Free Player 覆盖整篇循环间隔中上一句重播末句；全文盲听覆盖段间停顿期上一段重播当前段。相关 provider 测试共 76 passed。
+- [x] 验证：`flutter analyze` 改动文件 0 问题；未跑 `scripts/check.sh`：本次为两个 provider 的局部交互语义修复，按仓库规范仅跑相关检查。
+
+  **完成时间**: 2026-06-30
+
+## 已完成：修复精听句间停顿期锁屏上一句跳转异常
+
+逐句精听在 `BlindWaitingInterval`（句间停顿）期间，锁屏/屏内「上一句」原本无条件走 `currentSentenceIndex - 1`：第一句停顿期被 clamp 成当前句后 no-op，第二句停顿期会跳回第一句开头（用户感觉像往前跳两句/跳到 0 点）。句间停顿应视为刚播完的当前句等待态，左按钮先回到当前句开头重播。
+
+- [x] `intensive_listen_player_provider.dart`：`goToPrevious()` 在 `BlindWaitingInterval` 期间改为 `_blindEngine.replayCurrentSentence()`；其他阶段保留原本上一句跳转语义。锁屏控制已绑定同一方法，无需改 `BackgroundAudioHandler`。
+- [x] 测试：`intensive_listen_player_test.dart` 新增两例回归，覆盖第一句停顿期不再 no-op、第二句停顿期不再跳回第一句；同步修正测试 fake engine，使同一句重播使用独立完成点。
+- [x] 验证：`flutter analyze` 改动文件 0 问题；`flutter test test/providers/intensive_listen_player_test.dart` 44 passed。未跑 `scripts/check.sh`：本次为单 provider 小范围 bug 修复，按仓库规范仅跑相关检查。
+
+  **完成时间**: 2026-06-30
+
+## 已完成：Free Player 倒计时期间冻结锁屏进度条（§7.16 同源）
+
+Free Player（`ListeningPractice`）句间循环/整篇循环之间的停顿期间，锁屏进度条仍前进（越过句尾/篇尾）、下一遍起播又回退——与精听/盲听 §7.16 修复前同源。Free Player 走同一媒体引擎但从未调过 `setProgressFrozen`。
+
+- [x] `listening_practice_provider.dart`：所有停顿延迟唯一收敛到 `_delayInterval(interval)`（整篇/无字幕整篇/单句重播/跳句/gapless 交接 5 处调用点全经此）。单点包裹——延迟前 `_engine.setProgressFrozen(true)`、`finally` 中 `setProgressFrozen(false)`；`interval==0` 不触碰，`finally` 保证延迟异常/会话作废也不残留冻结态。
+- [x] 测试：`free_player_playback_flow_test.dart`「整篇循环间隔」用例补断言——停顿期 `engine.progressFrozen==true`、起播下一遍后 `==false`。
+- [x] CLAUDE.md §7.16 补充「Free Player 同源接入」。
+- [x] 验证：`flutter analyze` 改动文件 0 问题；`flutter test` 全套 3229 passed / 11 skipped。**待真机验证**（iOS 后台外推本机/CI 测不到）：Free Player 设间隔>0+循环，锁屏停顿期进度条停住、起播恢复、图标仍显「播放中」。
+
+  **完成时间**: 2026-06-29
 
 ## 已完成：修复盲听后台播放锁屏控制两处缺陷（控件不显示 + 上/下一句无反应）
 

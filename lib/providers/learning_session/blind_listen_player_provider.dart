@@ -460,6 +460,21 @@ class BlindListenPlayer extends _$BlindListenPlayer
 
   /// 跳转到上一段
   Future<void> goToPreviousParagraph() async {
+    if (state.isPauseCountdown) {
+      await _cancelAll();
+      _resumeStartLocalSentenceIndex = 0;
+      state = state.copyWith(
+        currentRepeatCount: 1,
+        hasCompletedCurrentParagraphPlayback: false,
+        playingSentenceIndex: -1,
+        isPauseCountdown: false,
+        isCountdownPaused: false,
+        displayMode: BlindListenDisplayMode.hideAll,
+      );
+      await _playCurrentParagraph();
+      return;
+    }
+
     if (state.currentParagraphIndex <= 0) return;
 
     await _cancelAll();

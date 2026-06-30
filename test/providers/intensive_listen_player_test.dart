@@ -37,6 +37,7 @@ class _ReplayTestAudioEngine extends TestAudioEngine {
 class _DeferredBlindAudioEngine extends TestAudioEngine {
   int _sessionId = 0;
   final Map<int, Completer<void>> _sentenceCompletions = {};
+  final List<int> playedSentenceIndices = [];
 
   @override
   int newSession() {
@@ -49,8 +50,9 @@ class _DeferredBlindAudioEngine extends TestAudioEngine {
 
   @override
   Future<void> playClipOnce(Sentence sentence, int sessionId) {
-    final completer = _sentenceCompletions[sentence.index] ??=
-        Completer<void>();
+    playedSentenceIndices.add(sentence.index);
+    final completer = Completer<void>();
+    _sentenceCompletions[sentence.index] = completer;
     return completer.future;
   }
 
@@ -468,6 +470,117 @@ void main() {
       );
       expect(stateAfterCurrentCallback.currentSentenceIndex, 1);
       expect(stateAfterCurrentCallback.isPauseBetweenSentences, true);
+    });
+  });
+
+  group('句间停顿期上一句重播当前句', () {
+    test('第一句停顿期 goToPrevious 从第一句开头重播，不因 clamp 成为 no-op', () async {
+      final audioEngine = _DeferredBlindAudioEngine();
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3));
+
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(Duration.zero);
+      expect(audioEngine.playedSentenceIndices, [0]);
+
+      audioEngine.completeSentence(0);
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+      expect(
+        container.read(intensiveListenPlayerProvider).isPauseBetweenPlays,
+        true,
+      );
+
+      unawaited(notifier.goToPrevious());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(intensiveListenPlayerProvider).currentSentenceIndex,
+        0,
+      );
+      expect(audioEngine.playedSentenceIndices, [0, 0]);
+      expect(container.read(intensiveListenPlayerProvider).isPlaying, true);
+    });
+
+    test('第二句停顿期 goToPrevious 重播第二句，不跳回第一句开头', () async {
+      final audioEngine = _DeferredBlindAudioEngine();
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3), startIndex: 1);
+
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(Duration.zero);
+      expect(audioEngine.playedSentenceIndices, [1]);
+
+      audioEngine.completeSentence(1);
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+      expect(
+        container.read(intensiveListenPlayerProvider).isPauseBetweenPlays,
+        true,
+      );
+
+      unawaited(notifier.goToPrevious());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(intensiveListenPlayerProvider).currentSentenceIndex,
+        1,
+      );
+      expect(audioEngine.playedSentenceIndices, [1, 1]);
+      expect(container.read(intensiveListenPlayerProvider).isPlaying, true);
+    });
+  });
+
+  group('句间倒计时冻结锁屏进度（见 §7.16）', () {
+    test('播放中不冻结，进入句间停顿倒计时冻结，下一句起播解冻', () async {
+      final audioEngine = _DeferredBlindAudioEngine();
+      final container = ProviderContainer(
+        overrides: [
+          audioEngineProvider.overrideWith(() => audioEngine),
+          learningSessionProvider.overrideWith(() => TestLearningSession()),
+          analyticsOverride(),
+          ...studyTimeOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(intensiveListenPlayerProvider.notifier);
+      await notifier.initialize(createTestSentences(count: 3));
+
+      unawaited(notifier.startPlaying());
+      await Future<void>.delayed(Duration.zero);
+
+      // 播放中（BlindPlayingPrompt）：进度不冻结
+      expect(container.read(intensiveListenPlayerProvider).isPlaying, true);
+      expect(audioEngine.progressFrozen, false);
+
+      // 本句播完 → 进入停顿倒计时（BlindWaitingInterval）：进度冻结
+      audioEngine.completeSentence(0);
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(
+        container.read(intensiveListenPlayerProvider).isPauseBetweenPlays,
+        true,
+      );
+      expect(audioEngine.progressFrozen, true);
     });
   });
 

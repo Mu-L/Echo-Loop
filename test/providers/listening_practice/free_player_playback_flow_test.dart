@@ -1102,9 +1102,47 @@ void main() {
     engine.emitCompleted();
     await flushBoundary();
     expect(engine.playCount, 1, reason: '停顿期间不起播');
+    expect(
+      engine.progressFrozen,
+      isTrue,
+      reason: '停顿倒计时期间冻结锁屏进度（speed=0），进度条不前进',
+    );
 
     await Future<void>.delayed(const Duration(milliseconds: 80));
     expect(engine.playCount, 2, reason: '停顿结束后回卷起播第 2 遍');
+    expect(engine.progressFrozen, isFalse, reason: '停顿结束、起播下一遍时解冻，进度条恢复前进');
+  });
+
+  test('整篇循环间隔中切上一句：重播刚结束的当前句，不跳到前一句', () async {
+    lp.seed(
+      sentences: sentences,
+      currentFullIndex: sentences.length - 1,
+      settings: const PlaybackSettings(
+        loopWhole: true,
+        wholeLoopCount: 2,
+        wholeInterval: Duration(milliseconds: 80),
+      ),
+    );
+
+    await start();
+    await flushBoundary();
+
+    engine.emitCompleted();
+    await flushBoundary();
+    expect(engine.progressFrozen, isTrue, reason: '已进入整篇循环间隔');
+
+    await lp.previousSentence();
+    await flushBoundary();
+
+    expect(
+      container.read(listeningPracticeProvider).currentFullIndex,
+      sentences.length - 1,
+    );
+    expect(engine.lastSeek, sentences.last.startTime);
+    while (engine.playCount < 2) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    await lp.pause();
   });
 
   test('整篇循环播完后图标恢复「播放」，单击从第 1 句重新开始', () async {

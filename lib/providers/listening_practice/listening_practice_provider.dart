@@ -84,6 +84,12 @@ class ListeningPractice extends _$ListeningPractice {
   /// 句级模式下由协程消费，provider 的全局 playerState 监听必须忽略，避免双推进。
   bool _activeSentenceDrivenPlayback = false;
 
+  /// 当前是否处于句间 / 整篇循环间隔。
+  ///
+  /// 停顿仍属于刚播完的当前播放单元；此时「上一句」应先重播当前句，而不是按索引
+  /// 后退到前一句。该标记只包住 [_delayInterval]，不暴露到 UI 状态。
+  bool _isInPlaybackInterval = false;
+
   /// 播放中切换循环开关后，期望的播放驱动模式与当前实际模式不一致时置为 true。
   ///
   /// 设计要求是“切开关不打断当前播放态”：不立即回句首、不自动播放。因此这里只记
@@ -123,7 +129,10 @@ class ListeningPractice extends _$ListeningPractice {
   @override
   ListeningPracticeState build() {
     _setupListeners();
-    ref.onDispose(_disposeListeners);
+    ref.onDispose(() {
+      _playbackGen++;
+      _disposeListeners();
+    });
     _loadSettings();
     return const ListeningPracticeState();
   }
@@ -790,9 +799,21 @@ class ListeningPractice extends _$ListeningPractice {
   }
 
   /// 按给定间隔停顿（来自 reducer 的决策，区分单句/整篇间隔）。
+  ///
+  /// 停顿期间冻结锁屏进度（向系统上报 speed=0），iOS 不再按墙钟外推进度条，
+  /// 避免无声倒计时期间进度条越过句尾/篇尾、下一遍起播又回退（同 §7.16）。
+  /// `finally` 保证延迟异常或会话作废时也不残留冻结态。
   Future<void> _delayInterval(Duration interval) async {
     if (interval > Duration.zero) {
-      await Future.delayed(interval);
+      _isInPlaybackInterval = true;
+      final engine = _engine;
+      engine.setProgressFrozen(true);
+      try {
+        await Future.delayed(interval);
+      } finally {
+        _isInPlaybackInterval = false;
+        engine.setProgressFrozen(false);
+      }
     }
   }
 
@@ -1354,6 +1375,11 @@ class ListeningPractice extends _$ListeningPractice {
 
   Future<void> previousSentence() async {
     if (state.sentences.isEmpty) return;
+
+    if (_isInPlaybackInterval) {
+      await replayCurrentSentence();
+      return;
+    }
 
     late int newIndex;
     if (state.playlistMode == PlaylistMode.bookmarks) {

@@ -316,8 +316,17 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer
 
   Future<void> goToNext() async => goToSentence(state.currentSentenceIndex + 1);
 
-  Future<void> goToPrevious() async =>
-      goToSentence(state.currentSentenceIndex - 1);
+  /// 上一句控制。
+  ///
+  /// 句间停顿仍属于刚播完的当前句；此时左按钮应回到当前句开头重播，
+  /// 避免第一句停顿期 no-op、第二句停顿期跳回 0 点的反直觉行为。
+  Future<void> goToPrevious() async {
+    if (state.blindFlowState?.phase is BlindWaitingInterval) {
+      await _blindEngine.replayCurrentSentence();
+      return;
+    }
+    await goToSentence(state.currentSentenceIndex - 1);
+  }
 
   /// 跳转到指定句子（0-based）。
   ///
@@ -746,6 +755,11 @@ class IntensiveListenPlayer extends _$IntensiveListenPlayer
     // 等待用户/完成时不活跃 → 停保活、图标转暂停。回调槽已在 initialize 绑定一次，此处不再动。
     final active = phase is BlindPlayingPrompt || phase is BlindWaitingInterval;
     setSessionActive(active);
+
+    // 句间停顿倒计时期间冻结锁屏进度条：保活会话仍活跃（图标显示播放中），但音频不
+    // 前进，进度条应停在句尾而非按 playbackRate 继续外推（见 §7.16，与全文盲听同源）。
+    // 实际播放（BlindPlayingPrompt）时解冻，进度随播放前进。
+    setProgressFrozen(interval != null);
 
     if (phase is BlindWaitingForUser && _refreshBlindConfigWhenWaiting) {
       _refreshBlindConfigWhenWaiting = false;

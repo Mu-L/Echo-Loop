@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:echo_loop/database/enums.dart';
 import 'package:echo_loop/models/audio_engine_state.dart';
 import 'package:echo_loop/models/blind_listen_settings.dart';
+import 'package:echo_loop/models/intensive_listen_settings.dart';
 import 'package:echo_loop/models/learning_progress.dart';
 import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/providers/audio_engine/audio_engine_provider.dart';
@@ -71,6 +72,53 @@ class _FastTestAudioEngine extends TestAudioEngine {
     lastPlaySessionId = sessionId;
     // 失效当前 session，避免后续手动模式 / 段间停顿被触发，保持测试稳定
     _sessionId += 1;
+  }
+}
+
+/// 立即结束播放且保持 session 有效，用于测试自然播完后的段间倒计时。
+class _CompletingBlindTestAudioEngine extends TestAudioEngine {
+  int _sessionId = 0;
+  Duration? lastPlayStart;
+
+  @override
+  AudioEngineState build() => const AudioEngineState();
+
+  @override
+  Stream<Duration> get absolutePositionStream => const Stream.empty();
+
+  @override
+  Stream<ja.PlayerState> get playerStateStream => const Stream.empty();
+
+  @override
+  bool get isPlaying => true;
+
+  @override
+  Duration get currentPosition => Duration.zero;
+
+  @override
+  int newSession() {
+    _sessionId += 1;
+    return _sessionId;
+  }
+
+  @override
+  bool isActiveSession(int id) => id == _sessionId;
+
+  @override
+  Future<void> pauseKeepSession() async {}
+
+  @override
+  Future<void> setSpeed(double speed) async {}
+
+  @override
+  Future<void> playRangeOnce(
+    Duration start,
+    Duration end,
+    int sessionId, {
+    void Function()? onClipReady,
+  }) async {
+    lastPlayStart = start;
+    onClipReady?.call();
   }
 }
 
@@ -202,7 +250,7 @@ List<List<Sentence>> _buildParagraphs({
 }
 
 ProviderContainer _buildContainer({
-  required _FastTestAudioEngine engine,
+  required TestAudioEngine engine,
   TestLearningProgressNotifier? progressNotifier,
   bool isFreePlay = false,
 }) {
@@ -675,6 +723,37 @@ void main() {
       final state = container.read(blindListenPlayerProvider);
       expect(state.currentParagraphIndex, 0);
       expect(engine.lastPlayStart, paragraphs[0][0].startTime);
+    });
+
+    test('段间停顿期 goToPreviousParagraph 重播当前段，不跳到上一段', () async {
+      final engine = _CompletingBlindTestAudioEngine();
+      final container = _buildContainer(engine: engine);
+      addTearDown(container.dispose);
+      final notifier = container.read(blindListenPlayerProvider.notifier);
+
+      final paragraphs = _buildParagraphs(
+        paragraphCount: 2,
+        sentencesPerParagraph: 2,
+      );
+      notifier.initializeParagraphs(
+        paragraphs,
+        const BlindListenSettings(
+          pauseMode: PauseMode.fixed,
+          fixedPauseSeconds: 1,
+        ),
+        startParagraphIndex: 1,
+      );
+
+      await notifier.startPlaying();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(blindListenPlayerProvider).isPauseCountdown, true);
+
+      await notifier.goToPreviousParagraph();
+
+      final state = container.read(blindListenPlayerProvider);
+      expect(state.currentParagraphIndex, 1);
+      expect(engine.lastPlayStart, paragraphs[1][0].startTime);
     });
 
     test('初始 playingSentenceIndex == -1 时 pause 不写脏断点', () async {
