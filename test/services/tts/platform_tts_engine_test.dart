@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -313,6 +314,22 @@ void main() {
       await pumpEventQueue();
       await engine.stop();
       expect(await fut, isFalse);
+    });
+
+    test('completion 回调始终不来 → 超时后返回 true（不永挂，§7.25）', () {
+      fakeAsync((async) {
+        final engine = buildEngine();
+        engine.initialize();
+        async.flushMicrotasks();
+        bool? result;
+        // 从不调用 startHandler/completionHandler，模拟平台完成信号丢失。
+        engine.speakLive('hi').then((v) => result = v);
+        async.flushMicrotasks();
+        expect(result, isNull, reason: '超时前不返回');
+        async.elapse(const Duration(seconds: 11)); // 下限 10s
+        async.flushMicrotasks();
+        expect(result, isTrue, reason: '超时按已播完解除，不永挂');
+      });
     });
   });
 }

@@ -17,6 +17,37 @@ import 'tts_cache_store.dart';
 import 'tts_engine.dart';
 import 'tts_player.dart';
 
+/// 单次合成的超时上界，**按引擎 + 文本长度成比例**——仅作「native 永不返回」的安全
+/// 上界，不做精确计时，宁可偏松也不误杀长句。计时只覆盖单次合成本身（调度器已串行化，
+/// 排队等待不计入，见 [_synthAndStore]）。下限统一 12s（短词快速兜底）。
+///
+/// 各引擎速度差异大，系数分别取（含冷启动与慢机余量）：
+/// - **echoLoop（Kokoro）**：CPU 推理 RTF≈3，最慢——基础 10s + 300ms/字符，上限 90s
+///   （A06 上一句长例句合成可达 20–30s，固定小值会误判为挂起）。
+/// - **piper**：RTF≈0.1~0.3，快，含冷启数秒——基础 10s + 60ms/字符，上限 40s。
+/// - **platform（系统 TTS）**：合成近实时、快，主要防其挂起——基础 8s + 80ms/字符，上限 30s。
+Duration _synthTimeoutFor(TtsEngineKind kind, String text) {
+  final int baseMs;
+  final int perCharMs;
+  final int maxMs;
+  switch (kind) {
+    case TtsEngineKind.echoLoop:
+      baseMs = 10000;
+      perCharMs = 300;
+      maxMs = 90000;
+    case TtsEngineKind.piper:
+      baseMs = 10000;
+      perCharMs = 60;
+      maxMs = 40000;
+    case TtsEngineKind.platform:
+      baseMs = 8000;
+      perCharMs = 80;
+      maxMs = 30000;
+  }
+  final ms = baseMs + text.length * perCharMs;
+  return Duration(milliseconds: ms.clamp(12000, maxMs));
+}
+
 /// 合成任务优先级。
 ///
 /// 底层引擎（Kokoro worker isolate / 平台 synthesizeToFile）一次只能串行跑一条
@@ -309,12 +340,29 @@ class TtsCoordinator {
   ) async {
     final outputDir = await _cacheStore.reserveDir();
     final swSynth = Stopwatch()..start();
-    final result = await engine.synthesize(
-      text,
-      outputDir: outputDir,
-      baseName: cacheKey,
-      config: config,
-    );
+    // 给 native 合成设界：部分设备（如三星 A06）platform synthesizeToFile 与 sherpa
+    // Piper worker 推理在被打断/争用时会**永不返回**（flutter_tts 在 error/stop 分支
+    // 不兑现 Future），无超时会经单槽调度器冻死整条 TTS。超时判失败（返回 null，不抛出），
+    // 使调度器 whenComplete 复位、_render 清在途表、_renderAndPlay 降级 speakLive。见 §7.25。
+    TtsSynthesisResult? result;
+    try {
+      result = await engine
+          .synthesize(
+            text,
+            outputDir: outputDir,
+            baseName: cacheKey,
+            config: config,
+          )
+          .timeout(_synthTimeoutFor(kind, text));
+    } on TimeoutException {
+      swSynth.stop();
+      AppLogger.log(
+        'TtsCoordinator',
+        '⏱ synthesize 超时 ${swSynth.elapsedMilliseconds}ms engine=${kind.name} '
+            'textLen=${text.length} → 判失败降级',
+      );
+      return null;
+    }
     swSynth.stop();
     AppLogger.log(
       'TtsCoordinator',

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -776,6 +777,124 @@ void main() {
       expect(r1, isFalse, reason: 'task1 播放被 task2 抢占');
       expect(r2, isTrue);
       verify(() => player.playFileToEnd('/tmp/out.wav')).called(1);
+    });
+  });
+
+  group('合成超时兜底（§7.25：native 永不返回）', () {
+    void keyByText() {
+      when(
+        () => store.deriveKey(
+          text: any(named: 'text'),
+          engine: any(named: 'engine'),
+          voiceId: any(named: 'voiceId'),
+          speed: any(named: 'speed'),
+          modelTag: any(named: 'modelTag'),
+        ),
+      ).thenAnswer((inv) => 'key-${inv.namedArguments[#text]}');
+    }
+
+    test('synthesize 永不完成 → 超时后判失败、降级 speakLive、不永挂', () {
+      fakeAsync((async) {
+        when(
+          () => engine.synthesize(
+            any(),
+            outputDir: any(named: 'outputDir'),
+            baseName: any(named: 'baseName'),
+            config: any(named: 'config'),
+          ),
+        ).thenAnswer((_) => Completer<TtsSynthesisResult?>().future);
+
+        final c = build();
+        c.configure(TtsEngineKind.platform, _config);
+        async.flushMicrotasks();
+
+        bool? ok;
+        c.speak('hello').then((v) => ok = v);
+        async.flushMicrotasks();
+        expect(ok, isNull, reason: '超时前不应返回');
+
+        async.elapse(const Duration(seconds: 13));
+        async.flushMicrotasks();
+
+        expect(ok, isTrue, reason: '超时降级 speakLive 后返回');
+        verify(() => engine.speakLive('hello')).called(1);
+        verifyNever(() => player.playFileToEnd(any()));
+      });
+    });
+
+    test('一条合成永挂超时后调度器复位，后续不同 key 合成仍执行', () {
+      fakeAsync((async) {
+        keyByText();
+        when(
+          () => engine.synthesize(
+            any(),
+            outputDir: any(named: 'outputDir'),
+            baseName: any(named: 'baseName'),
+            config: any(named: 'config'),
+          ),
+        ).thenAnswer((inv) {
+          final text = inv.positionalArguments[0] as String;
+          return text == 'hang'
+              ? Completer<TtsSynthesisResult?>().future
+              : Future.value(
+                  const TtsSynthesisResult(
+                    filePath: '/tmp/out.wav',
+                    format: 'wav',
+                  ),
+                );
+        });
+
+        final c = build();
+        c.configure(TtsEngineKind.echoLoop, _config);
+        async.flushMicrotasks();
+
+        // hang 先占住单槽 worker；next 排队等待。
+        c.prewarm('hang', TtsEngineKind.echoLoop, _config);
+        bool? okNext;
+        c.speak('next').then((v) => okNext = v);
+        async.flushMicrotasks();
+        verifyNever(() => player.playFileToEnd(any()));
+
+        async.elapse(const Duration(seconds: 13)); // hang 超时 → worker 复位
+        async.flushMicrotasks();
+
+        expect(okNext, isTrue, reason: '调度器复位后 next 得以执行并播放');
+        verify(() => player.playFileToEnd('/tmp/out.wav')).called(1);
+      });
+    });
+
+    test('挂起 key 超时后不残留在途，同 key 可重新合成', () {
+      fakeAsync((async) {
+        var calls = 0;
+        when(
+          () => engine.synthesize(
+            any(),
+            outputDir: any(named: 'outputDir'),
+            baseName: any(named: 'baseName'),
+            config: any(named: 'config'),
+          ),
+        ).thenAnswer((_) {
+          calls++;
+          return Completer<TtsSynthesisResult?>().future; // 每次都挂
+        });
+
+        final c = build();
+        c.configure(TtsEngineKind.echoLoop, _config);
+        async.flushMicrotasks();
+
+        c.prewarm('hi', TtsEngineKind.echoLoop, _config); // 第 1 次
+        async.flushMicrotasks();
+        expect(calls, 1);
+
+        async.elapse(const Duration(seconds: 13)); // 超时 → 在途表移除
+        async.flushMicrotasks();
+
+        c.prewarm('hi', TtsEngineKind.echoLoop, _config); // 同 key 应重新合成
+        async.flushMicrotasks();
+        expect(calls, 2, reason: '超时后同 key 不复用已死 future，重新合成');
+
+        async.elapse(const Duration(seconds: 13)); // 收尾第 2 次，避免悬挂 timer
+      });
     });
   });
 

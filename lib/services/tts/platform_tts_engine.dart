@@ -235,7 +235,20 @@ class PlatformTtsEngine implements TtsEngine {
       _speakCompleter = null;
       return false;
     }
-    return completer.future;
+    // 兜底超时：flutter_tts 的完成回调在部分设备可能不到达（同 synth 路径的
+    // §7.25 缺陷），completer 永挂会拖住上层 speaking 状态。超时按「已播完」解除，
+    // 音频本身不受影响。按文本长度粗估、下限 10s。
+    final timeoutMs = text.length * 90;
+    return completer.future.timeout(
+      Duration(milliseconds: timeoutMs < 10000 ? 10000 : timeoutMs),
+      onTimeout: () {
+        if (_speakCompleter == completer) {
+          _started = false;
+          _speakCompleter = null;
+        }
+        return true;
+      },
+    );
   }
 
   /// live 完成/取消/出错统一回调。
