@@ -479,3 +479,18 @@ flutter test integration_test -d macos
   - **音色注入式可测**：`PlatformTtsEngine` 把「是否走原生」与「原生合成函数」做成注入参数（`NativeMacosSynthResolver`/`NativeMacosSynthesize`），单测无需真机/真通道；§7.19 遗留的 `accentAwareSynth`/`useDocumentsWorkaround`/`documentsDirResolver` 及 Documents 中转修法一并删除（macOS 不再经 flutter_tts 合成，Documents 中转无意义）。
 - **相关代码**：`macos/Runner/MacosTtsSynthHandler.swift`（新）、`macos/Runner/MainFlutterWindow.swift`（注册）、`macos/Runner.xcodeproj/project.pbxproj`（登记）、`lib/services/tts/platform_tts_engine.dart`（`_useNativeMacosSynth`/`_nativeMacosSynth`/`_synthesizeViaNativeMacos`）；测试 `test/services/tts/platform_tts_engine_test.dart`（原生成功/失败/空产出）
 - **修复时间**：2026-06-30
+
+### 7.25 词典交互：非 modal 常驻面板 + 词组选区手柄（设计约束）
+
+- **背景**：旧词典是 `showModalBottomSheet`（遮蔽、抢焦点，查下一个词必须先关弹窗），且只支持点单个单词。按业界标准（每日英语听力/LingQ/Kindle：高频查词一致用非 modal 面板 + 选区扩展）重设计。
+- **架构**：
+  - **面板宿主** `DictionaryPanelHost`：包在各宿主页 Scaffold body 外的 **Stack 内嵌常驻面板**（非 showBottomSheet——有 LocalHistoryEntry/返回键纠缠；非 OverlayEntry——命令式生命周期易泄漏）。面板状态是**页面局部 state**（谁创建谁销毁，页面 pop 即销毁，autoDispose 查词 controller 随之释放）。面板开着时正文可继续点词，`show()` 原地切换内容不重开。
+  - **词组选择 = 选区手柄**：`SelectableSentenceText`（统一了标注卡 RichText+recognizer 与盲听 Wrap+GestureDetector 两套旧实现）。点词即查并出现左右手柄（词级吸附），拖动扩选、松手查词组。手柄用 `ImmediateMultiDragGestureRecognizer` 按下即赢得竞技场（Flutter 系统选择手柄同款），不与滚动/PageView/长按冲突 → **「长按复制整句」保留不动**。
+  - **几何**：RichText + `RenderParagraph.getPositionForOffset`（命中）/`getBoxesForSelection`（手柄定位，post-frame 计算）。选区清理经宿主 `activeOwnerOf`（InheritedWidget 依赖面）：面板关闭或别处点词即自动清。
+- **规则**：
+  - **返回键**：已有 PopScope 的宿主在 `_handleExit` **首行**加 `closeIfOpen()` guard，**禁止**宿主内再注册第二个 PopScope（同路由多 PopScope 触发顺序无保证）；无 PopScope 的页面用宿主 `handleBackButton: true`。
+  - **不做「点空白关闭」**：非 modal 面板的价值就是查着词继续操作页面（业界一致），且需要 translucent Listener 与点词 show 的同帧时序去重，脆弱。关闭仅显式（X/下拉超阈值/返回键）。
+  - **词组查询管线**：`normalizeWord` 已折叠内部空白；controller 对含空格 key 默认选 AI 源；AI 缓存 key（`normalizeForCache`）天然兼容词组。**V1 不带句子上下文**——带则缓存 key/family key 必须复合 sentenceHash，命中率崩塌且后端要改协议（`DictionaryLookupRequest.sentence` 已预留）。
+  - 新增可点词渲染场景一律复用 `SelectableSentenceText`，不要再造分词/recognizer。
+- **相关代码**：`lib/widgets/dictionary/dictionary_panel_host.dart`、`dictionary_panel.dart`、`lib/widgets/practice/selectable_sentence_text.dart`、`sentence_word_selection.dart`、`lib/providers/dictionary/lookup_controller.dart`（`_resolveInitialSourceId`）、`lib/utils/text_normalize.dart`；测试 `test/widgets/dictionary/dictionary_panel_test.dart` 等
+- **完成时间**：2026-07-02
