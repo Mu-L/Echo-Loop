@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -154,6 +155,26 @@ class SavedWordDao extends DatabaseAccessor<AppDatabase>
             (t) => OrderingTerm(expression: t.createdAt, mode: timeOrder),
           ]))
         .watch();
+  }
+
+  /// 监听所有已收藏单词的 key 集合（用于正文收藏词标记）
+  ///
+  /// key 即 `word` 字段（小写 lemma 形式，可能含多词词组）。
+  /// 只查 word 一列（Set 无序，不需 orderBy）；内容级去重——练习统计等
+  /// 与 key 无关的表写入不会向下游重发相同集合。
+  Stream<Set<String>> watchSavedWordTexts() {
+    final query = selectOnly(savedWords)
+      ..addColumns([savedWords.word])
+      ..where(savedWords.deletedAt.isNull());
+    return query
+        .watch()
+        .map(
+          (rows) => rows
+              .map((r) => r.read(savedWords.word))
+              .whereType<String>()
+              .toSet(),
+        )
+        .distinct(const SetEquality<String>().equals);
   }
 
   /// 流式监听单词是否已收藏

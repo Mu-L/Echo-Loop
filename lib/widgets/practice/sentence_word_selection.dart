@@ -3,7 +3,13 @@
 /// 分词沿用标注卡既有正则 `\s+|[^\s]+`：把句子切成「空白段 / 非空白段」
 /// 交替的 token 序列，并记录每个 token 在原文中的字符区间，
 /// 供 RenderParagraph 的 position/box 几何查询与选区文本截取共用。
+///
+/// 另提供收藏词/词组/意群在句中的命中区间计算 [savedCharRanges]，
+/// 供正文收藏标记（点状下划线）渲染使用。
 library;
+
+import '../../utils/saved_text_index.dart';
+import '../../utils/text_normalize.dart';
 
 /// 句内 token（带原文字符区间）
 class WordToken {
@@ -113,4 +119,103 @@ int wordTokenAtChar(List<WordToken> tokens, int charOffset) {
     if (charOffset >= t.start && charOffset < t.end) return t.isWord ? i : -1;
   }
   return -1;
+}
+
+// -- 收藏词标记（正文点状下划线）命中计算 --
+
+/// Unicode 字母/数字判定（区间修边用；比匹配侧的 ASCII 规则宽——修边只是
+/// 显示裁剪，保留重音字母等词内字符，下划线不在词中间截断）
+final RegExp _letterOrDigit = RegExp(r'[\p{L}\p{N}]', unicode: true);
+
+/// 各类撇号（直/弯/变体，与 [normalizeWord] 的撇号折叠集合一致）；
+/// 修边时尾部撇号一律保留（所有格 dogs' / dogs’）
+const String _apostrophes = "'’‘ʼ＇`´";
+
+/// 收藏命中区间：索引中的收藏单词/词组/意群在 [text] 中命中的
+/// 字符区间 [start, end) 列表。
+///
+/// 匹配两侧统一 [normalizeWord]（key 已在 [SavedTextIndex.build] 归一化，
+/// 候选子串在此归一化），弯撇号/边缘标点/引号/多空格差异天然被折叠；
+/// 词间夹标点（如 "figure, out"）归一化后仍保留内部标点，不会误报。
+/// 窗口词数取索引实际条目词数、以句内词数为界，无静默丢弃。
+///
+/// 已知限制：收藏 key 是词典 lemma（如存 `run`），正文变形（`running`）
+/// 归一化后不相等、不会命中（无现成词形→原形映射）。
+List<(int, int)> savedCharRanges(
+  String text,
+  List<WordToken> tokens,
+  SavedTextIndex index,
+) {
+  if (index.isEmpty) return const [];
+  final wordIdx = <int>[
+    for (var i = 0; i < tokens.length; i++)
+      if (tokens[i].isWord) i,
+  ];
+  final ranges = <(int, int)>[];
+
+  // 单词命中
+  for (final i in wordIdx) {
+    final t = tokens[i];
+    if (index.singleWords.contains(normalizeWord(t.text))) {
+      _addTrimmedRange(text, t.start, t.end, ranges);
+    }
+  }
+
+  // 词组/意群命中：相邻 word token 滑动窗口
+  for (final n in index.phraseWordCounts) {
+    if (n > wordIdx.length) continue;
+    for (var s = 0; s + n - 1 < wordIdx.length; s++) {
+      final start = tokens[wordIdx[s]].start;
+      final end = tokens[wordIdx[s + n - 1]].end;
+      if (index.phrases.contains(normalizeWord(text.substring(start, end)))) {
+        _addTrimmedRange(text, start, end, ranges);
+      }
+    }
+  }
+  return ranges;
+}
+
+/// 区间修边后加入结果：两端剥非「字母/数字」字符，尾部撇号（直/弯）保留
+void _addTrimmedRange(String text, int start, int end, List<(int, int)> out) {
+  var s = start;
+  var e = end;
+  while (s < e && !_letterOrDigit.hasMatch(text[s])) {
+    s++;
+  }
+  while (e > s &&
+      !_letterOrDigit.hasMatch(text[e - 1]) &&
+      !_apostrophes.contains(text[e - 1])) {
+    e--;
+  }
+  if (s < e) out.add((s, e));
+}
+
+/// 区间列表 → 逐字符标记掩码（供 span 按边界切分渲染）
+List<bool> charMaskFromRanges(int length, List<(int, int)> ranges) {
+  final mask = List<bool>.filled(length, false);
+  for (final (start, end) in ranges) {
+    for (var i = start; i < end && i < length; i++) {
+      mask[i] = true;
+    }
+  }
+  return mask;
+}
+
+/// 把字符区间 [start, end) 按掩码翻转点切成 (子段起, 子段止, 是否命中) 列表。
+///
+/// 掩码短于 [end] 时越界部分视为未命中（掩码可为空列表 = 全句无命中）。
+List<(int, int, bool)> splitByMask(int start, int end, List<bool> mask) {
+  bool flagAt(int i) => i < mask.length && mask[i];
+  final result = <(int, int, bool)>[];
+  var subStart = start;
+  while (subStart < end) {
+    final flag = flagAt(subStart);
+    var subEnd = subStart + 1;
+    while (subEnd < end && flagAt(subEnd) == flag) {
+      subEnd++;
+    }
+    result.add((subStart, subEnd, flag));
+    subStart = subEnd;
+  }
+  return result;
 }

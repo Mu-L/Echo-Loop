@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -92,9 +93,23 @@ class SavedSenseGroupDao extends DatabaseAccessor<AppDatabase>
         .map((row) => row != null);
   }
 
-  /// 监听所有已收藏意群的归一化文本集合（用于 badge 染色）
+  /// 监听所有已收藏意群的归一化文本集合（用于 badge 染色与正文收藏标记）
+  ///
+  /// 只查 phraseText 一列（Set 无序，不需 orderBy）；内容级去重——练习
+  /// 统计等与 key 无关的表写入不会向下游重发相同集合。
   Stream<Set<String>> watchSavedPhraseTexts() {
-    return watchAll().map((list) => list.map((e) => e.phraseText).toSet());
+    final query = selectOnly(savedSenseGroups)
+      ..addColumns([savedSenseGroups.phraseText])
+      ..where(savedSenseGroups.deletedAt.isNull());
+    return query
+        .watch()
+        .map(
+          (rows) => rows
+              .map((r) => r.read(savedSenseGroups.phraseText))
+              .whereType<String>()
+              .toSet(),
+        )
+        .distinct(const SetEquality<String>().equals);
   }
 
   /// 更新 Flashcard 练习统计

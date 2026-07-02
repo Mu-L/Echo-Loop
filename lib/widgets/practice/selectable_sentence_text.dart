@@ -19,8 +19,11 @@ library;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/speech_practice_models.dart';
+import '../../providers/saved_word_provider.dart';
+import '../../utils/saved_text_index.dart';
 import '../dictionary/dictionary_panel_host.dart';
 import 'sentence_word_selection.dart';
 
@@ -61,7 +64,11 @@ class DictionaryLookupOrigin {
 }
 
 /// 可点词句子文本
-class SelectableSentenceText extends StatefulWidget {
+///
+/// 已收藏的单词/词组/意群渲染橙色点状下划线标记（低干扰，与选区背景、
+/// 跟读评分文字色正交可叠加）。收藏集合经 Riverpod 流式监听，
+/// 收藏/取消收藏时所有可见句子即时刷新。
+class SelectableSentenceText extends ConsumerStatefulWidget {
   /// 句子文本（无 [highlightedSegments] 时的渲染与分词来源）
   final String text;
 
@@ -88,10 +95,12 @@ class SelectableSentenceText extends StatefulWidget {
   });
 
   @override
-  State<SelectableSentenceText> createState() => _SelectableSentenceTextState();
+  ConsumerState<SelectableSentenceText> createState() =>
+      _SelectableSentenceTextState();
 }
 
-class _SelectableSentenceTextState extends State<SelectableSentenceText> {
+class _SelectableSentenceTextState
+    extends ConsumerState<SelectableSentenceText> {
   /// RichText 的 key，用于获取 RenderParagraph 做几何查询
   final GlobalKey _textKey = GlobalKey();
 
@@ -116,6 +125,12 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
 
   /// 已注册豁免区域的宿主（组件卸载时按同一实例注销）
   DictionaryPanelHostState? _host;
+
+  /// 收藏标记掩码缓存（(文本, 索引实例) 不变时复用，避免每帧重算；
+  /// 索引是 keepAlive provider 缓存的同一对象，identical 判等即可）
+  List<bool> _savedMask = const [];
+  String? _savedMaskText;
+  SavedTextIndex? _savedMaskIndex;
 
   /// 渲染文本：有高亮片段时为片段拼接，否则为原句
   String get _fullText {
@@ -321,6 +336,22 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
 
   // -- 构建 --
 
+  /// 收藏标记掩码：(文本, 索引) 不变时复用缓存，变化时重算命中区间
+  List<bool> _ensureSavedMask(SavedTextIndex index) {
+    final text = _fullText;
+    if (_savedMaskText == text && identical(_savedMaskIndex, index)) {
+      return _savedMask;
+    }
+    final ranges = savedCharRanges(text, _tokens, index);
+    final mask = ranges.isEmpty
+        ? const <bool>[]
+        : charMaskFromRanges(text.length, ranges);
+    _savedMask = mask;
+    _savedMaskText = text;
+    _savedMaskIndex = index;
+    return mask;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -330,9 +361,11 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
           height: 1.6,
           color: theme.colorScheme.onSurface,
         );
+    // 收藏索引流式监听：加载中/降级（测试环境无 DB）时为空索引 = 无标记
+    final savedMask = _ensureSavedMask(ref.watch(savedTextIndexProvider));
     final rich = RichText(
       key: _textKey,
-      text: TextSpan(style: style, children: _buildSpans(theme)),
+      text: TextSpan(style: style, children: _buildSpans(theme, savedMask)),
     );
     // 选区存在时布局可能变化（旋屏/字号），每帧后校正手柄位置
     if (_selection != null) _scheduleAnchorUpdate();
@@ -357,23 +390,46 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
     );
   }
 
-  /// 逐 token 构建 span：选区染背景色，评分片段染文字色
-  List<InlineSpan> _buildSpans(ThemeData theme) {
+  /// 逐 token 构建 span：选区染背景色，评分片段染文字色，收藏命中加点状下划线
+  ///
+  /// 收藏标记按 [savedMask] 的逐字符边界切分 token（如 "dog." 只给 "dog"
+  /// 加下划线、句号不加），下划线颜色沿用「橙色 = 收藏」视觉语言（与意群
+  /// 收藏色系一致），必须显式设 decorationColor（默认会跟随文字色）。
+  List<InlineSpan> _buildSpans(ThemeData theme, List<bool> savedMask) {
     final selectionColor = theme.colorScheme.primary.withValues(alpha: 0.15);
+    final savedColor = theme.brightness == Brightness.dark
+        ? Colors.orange.shade300
+        : Colors.orange.shade400;
     final (selStart, selEnd) = _selection?.charRangeOf(_tokens) ?? (-1, -1);
     final colorAt = _segmentColorLookup();
-    return [
-      for (final t in _tokens)
-        TextSpan(
-          text: t.text,
-          style: TextStyle(
-            color: colorAt(t.start),
-            backgroundColor: (t.start >= selStart && t.end <= selEnd)
-                ? selectionColor
-                : null,
+    final text = _fullText;
+    final spans = <InlineSpan>[];
+    for (final t in _tokens) {
+      final selected = t.start >= selStart && t.end <= selEnd;
+      // token 颜色按其起点判定（与旧版整 token 染色一致），
+      // 收藏掩码只切分下划线子段，不改变染色粒度
+      final color = colorAt(t.start);
+      for (final (subStart, subEnd, saved) in splitByMask(
+        t.start,
+        t.end,
+        savedMask,
+      )) {
+        spans.add(
+          TextSpan(
+            text: text.substring(subStart, subEnd),
+            style: TextStyle(
+              color: color,
+              backgroundColor: selected ? selectionColor : null,
+              decoration: saved ? TextDecoration.underline : null,
+              decorationStyle: saved ? TextDecorationStyle.dotted : null,
+              decorationColor: saved ? savedColor : null,
+              decorationThickness: saved ? 2 : null,
+            ),
           ),
-        ),
-    ];
+        );
+      }
+    }
+    return spans;
   }
 
   /// 评分片段颜色查询：字符偏移 → 文字色（无片段时恒 null）

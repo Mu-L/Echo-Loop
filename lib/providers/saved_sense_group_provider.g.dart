@@ -181,9 +181,14 @@ final savedSenseGroupListProvider =
 
 typedef _$SavedSenseGroupList = StreamNotifier<List<SavedSenseGroup>>;
 String _$savedSenseGroupTextsHash() =>
-    r'57b3e78bfea821f3dade82451dc1725d0c1ce22a';
+    r'503e0e742a707ad0c8e12871dd5647356fb58764';
 
-/// 监听已收藏意群的归一化文本集合（用于 badge 染色）
+/// 监听已收藏意群的归一化文本集合（用于 badge 染色与正文收藏标记）
+///
+/// 收藏标记是辅助功能：数据库未初始化（如宿主 widget 测试环境）时
+/// 降级为空集，不崩宿主页（CLAUDE.md §7.18 默认值降级规则）。
+/// 降级必须留日志——keepAlive 会把空集缓存整个会话，静默降级会把
+/// 真实 DB 故障伪装成「用户没有收藏意群」。
 ///
 /// Copied from [SavedSenseGroupTexts].
 @ProviderFor(SavedSenseGroupTexts)

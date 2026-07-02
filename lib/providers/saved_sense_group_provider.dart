@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/app_database.dart';
@@ -52,13 +53,23 @@ class SavedSenseGroupList extends _$SavedSenseGroupList {
   }
 }
 
-/// 监听已收藏意群的归一化文本集合（用于 badge 染色）
+/// 监听已收藏意群的归一化文本集合（用于 badge 染色与正文收藏标记）
+///
+/// 收藏标记是辅助功能：数据库未初始化（如宿主 widget 测试环境）时
+/// 降级为空集，不崩宿主页（CLAUDE.md §7.18 默认值降级规则）。
+/// 降级必须留日志——keepAlive 会把空集缓存整个会话，静默降级会把
+/// 真实 DB 故障伪装成「用户没有收藏意群」。
 @Riverpod(keepAlive: true)
 class SavedSenseGroupTexts extends _$SavedSenseGroupTexts {
   @override
   Stream<Set<String>> build() {
-    final dao = ref.watch(savedSenseGroupDaoProvider);
-    return dao.watchSavedPhraseTexts();
+    try {
+      final dao = ref.watch(savedSenseGroupDaoProvider);
+      return dao.watchSavedPhraseTexts();
+    } catch (e) {
+      debugPrint('[SavedSenseGroupTexts] 数据库不可用，收藏意群集合降级为空集: $e');
+      return Stream.value(const <String>{});
+    }
   }
 }
 

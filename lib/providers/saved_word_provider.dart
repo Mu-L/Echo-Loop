@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../analytics/audio_event_params.dart';
@@ -10,7 +11,9 @@ import '../database/app_database.dart';
 import '../database/providers.dart';
 import '../models/dict_entry.dart';
 import '../services/dictionary_service.dart';
+import '../utils/saved_text_index.dart';
 import 'notification_permission_provider.dart';
+import 'saved_sense_group_provider.dart';
 
 part 'saved_word_provider.g.dart';
 
@@ -69,6 +72,41 @@ class SavedWordList extends _$SavedWordList {
     final dao = ref.read(savedWordDaoProvider);
     await dao.removeWord(word);
   }
+}
+
+/// 监听已收藏单词的 key 集合（用于正文收藏词下划线标记）
+///
+/// 收藏标记是辅助功能：数据库未初始化（如宿主 widget 测试环境）时
+/// 降级为空集，不崩宿主页（CLAUDE.md §7.18 默认值降级规则）。
+/// 降级必须留日志——keepAlive 会把空集缓存整个会话，静默降级会把
+/// 真实 DB 故障伪装成「用户没有收藏词」。
+@Riverpod(keepAlive: true)
+class SavedWordTexts extends _$SavedWordTexts {
+  @override
+  Stream<Set<String>> build() {
+    try {
+      final dao = ref.watch(savedWordDaoProvider);
+      return dao.watchSavedWordTexts();
+    } catch (e) {
+      debugPrint('[SavedWordTexts] 数据库不可用，收藏词集合降级为空集: $e');
+      return Stream.value(const <String>{});
+    }
+  }
+}
+
+/// 收藏文本匹配索引（正文收藏标记的唯一消费入口）
+///
+/// 合并两张收藏表的 key 并统一归一化分桶（见 [SavedTextIndex]）。
+/// keepAlive + 派生自两个流 provider：索引只在收藏集合变化时重建，
+/// 被所有可见句子共享（避免每个句子组件各自重复归一化全部 key）。
+@Riverpod(keepAlive: true)
+SavedTextIndex savedTextIndex(SavedTextIndexRef ref) {
+  final words =
+      ref.watch(savedWordTextsProvider).valueOrNull ?? const <String>{};
+  final phrases =
+      ref.watch(savedSenseGroupTextsProvider).valueOrNull ?? const <String>{};
+  if (words.isEmpty && phrases.isEmpty) return const SavedTextIndex.empty();
+  return SavedTextIndex.build(savedWords: words, savedPhrases: phrases);
 }
 
 /// 收藏单词列表的批量字典条目

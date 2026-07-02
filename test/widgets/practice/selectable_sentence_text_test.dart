@@ -13,6 +13,8 @@ import 'package:echo_loop/models/speech_practice_models.dart';
 import 'package:echo_loop/providers/dictionary/dictionary_registry.dart';
 import 'package:echo_loop/providers/dictionary/lookup_controller.dart';
 import 'package:echo_loop/providers/dictionary/visible_sources_provider.dart';
+import 'package:echo_loop/providers/saved_sense_group_provider.dart';
+import 'package:echo_loop/providers/saved_word_provider.dart';
 import 'package:echo_loop/services/dictionary/dictionary_source.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
@@ -28,6 +30,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../helpers/mock_providers.dart';
 
 class _MockDictionaryService extends Mock implements DictionaryService {}
+
+/// 固定收藏单词集合的 fake（绕过 DB）
+class _FakeSavedWordTexts extends SavedWordTexts {
+  final Set<String> value;
+  _FakeSavedWordTexts(this.value);
+  @override
+  Stream<Set<String>> build() => Stream.value(value);
+}
+
+/// 固定收藏意群集合的 fake（绕过 DB）
+class _FakeSavedSenseGroupTexts extends SavedSenseGroupTexts {
+  final Set<String> value;
+  _FakeSavedSenseGroupTexts(this.value);
+  @override
+  Stream<Set<String>> build() => Stream.value(value);
+}
 
 /// 回显查询词的 fake 本地源（记录收到的查询）
 class _EchoLocalSource implements DictionarySource {
@@ -78,7 +96,10 @@ void main() {
     List<SpeechTranscriptSegment>? segments,
     VoidCallback? onBeforeLookup,
     Widget Function(Widget sentence)? layout,
+    List<Override> overrides = const [],
   }) => ProviderScope(
+    // 调用方 overrides 置于列表末尾：Riverpod 重复 override 为 last-wins，
+    // 保证调用方能覆盖同名默认 provider（与 createTestApp 约定一致）
     overrides: [
       analyticsOverride(),
       dictionaryOverride(),
@@ -92,6 +113,7 @@ void main() {
           targetLanguage: 'zh-CN',
         ),
       ),
+      ...overrides,
     ],
     child: MaterialApp(
       locale: const Locale('en'),
@@ -295,5 +317,116 @@ void main() {
     // beta 不染色
     final beta = spans.firstWhere((s) => s.text == 'beta');
     expect(beta.style?.color, isNull);
+  });
+
+  /// 取句子 RichText 的全部子 span
+  List<TextSpan> sentenceSpans(WidgetTester tester) {
+    final rich = tester.widget<RichText>(find.byType(RichText).first);
+    return (rich.text as TextSpan).children!.cast<TextSpan>();
+  }
+
+  testWidgets('收藏单词渲染橙色点状下划线，未收藏词无标记', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        overrides: [
+          savedWordTextsProvider.overrideWith(
+            () => _FakeSavedWordTexts({'beta'}),
+          ),
+        ],
+      ),
+    );
+    await tester.pump(); // 等收藏集合流发射
+
+    final spans = sentenceSpans(tester);
+    final beta = spans.firstWhere((s) => s.text == 'beta');
+    expect(beta.style?.decoration, TextDecoration.underline);
+    expect(beta.style?.decorationStyle, TextDecorationStyle.dotted);
+    expect(beta.style?.decorationColor, Colors.orange.shade400);
+    final alpha = spans.firstWhere((s) => s.text == 'alpha');
+    expect(alpha.style?.decoration, isNull);
+  });
+
+  testWidgets('收藏词组下划线连续横跨词间空白', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        overrides: [
+          savedWordTextsProvider.overrideWith(
+            () => _FakeSavedWordTexts({'beta gamma'}),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    final spans = sentenceSpans(tester);
+    // beta、词间空白、gamma 三个 span 都带下划线，alpha 及其后空白不带
+    for (final text in ['beta', ' ', 'gamma']) {
+      final span = spans.lastWhere((s) => s.text == text);
+      expect(
+        span.style?.decoration,
+        TextDecoration.underline,
+        reason: 'span "$text" 应带下划线',
+      );
+    }
+    final alpha = spans.firstWhere((s) => s.text == 'alpha');
+    expect(alpha.style?.decoration, isNull);
+    final firstSpace = spans.firstWhere((s) => s.text == ' ');
+    expect(firstSpace.style?.decoration, isNull);
+  });
+
+  testWidgets('收藏意群（normalizeSenseGroupPhrase 规则）也命中标记', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        overrides: [
+          savedSenseGroupTextsProvider.overrideWith(
+            () => _FakeSavedSenseGroupTexts({'alpha beta'}),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    final spans = sentenceSpans(tester);
+    expect(
+      spans.firstWhere((s) => s.text == 'alpha').style?.decoration,
+      TextDecoration.underline,
+    );
+    expect(
+      spans.firstWhere((s) => s.text == 'beta').style?.decoration,
+      TextDecoration.underline,
+    );
+    expect(
+      spans.firstWhere((s) => s.text == 'gamma').style?.decoration,
+      isNull,
+    );
+  });
+
+  testWidgets('收藏下划线与评分染色、选区背景叠加不互斥', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        segments: const [
+          SpeechTranscriptSegment(text: 'alpha ', isMatched: true),
+          SpeechTranscriptSegment(text: 'beta gamma', isMatched: false),
+        ],
+        overrides: [
+          savedWordTextsProvider.overrideWith(
+            () => _FakeSavedWordTexts({'alpha'}),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    // alpha 同时带评分绿色与收藏下划线
+    var alpha = sentenceSpans(tester).firstWhere((s) => s.text == 'alpha');
+    expect(alpha.style?.color, const Color(0xFF2E9B51));
+    expect(alpha.style?.decoration, TextDecoration.underline);
+
+    // 点选 alpha 后：选区背景与下划线并存
+    await tapWord(tester, 'alpha');
+    await tester.pumpAndSettle();
+    alpha = sentenceSpans(tester).firstWhere((s) => s.text == 'alpha');
+    expect(alpha.style?.backgroundColor, isNotNull);
+    expect(alpha.style?.decoration, TextDecoration.underline);
   });
 }

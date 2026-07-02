@@ -158,6 +158,37 @@ void main() {
       expect(await stream.first, true);
     });
 
+    test('watchSavedWordTexts 返回未删除收藏词集合（软删除词不出现）', () async {
+      await db.savedWordDao.saveWord(word: 'hello');
+      await db.savedWordDao.saveWord(word: 'figure out');
+      await db.savedWordDao.saveWord(word: 'lazy');
+      await db.savedWordDao.removeWord('lazy');
+
+      final texts = await db.savedWordDao.watchSavedWordTexts().first;
+      expect(texts, {'hello', 'figure out'});
+    });
+
+    test('watchSavedWordTexts 内容不变不重发（练习统计写入被去重）', () async {
+      final emissions = <Set<String>>[];
+      final sub = db.savedWordDao.watchSavedWordTexts().listen(emissions.add);
+      await pumpEventQueue();
+
+      await db.savedWordDao.saveWord(word: 'hello');
+      await pumpEventQueue();
+      // 练习统计只改与 key 无关的列，集合内容不变 → 不应重发
+      await db.savedWordDao.updatePracticeStats(word: 'hello', studyMs: 1000);
+      await pumpEventQueue();
+      await db.savedWordDao.saveWord(word: 'world');
+      await pumpEventQueue();
+
+      await sub.cancel();
+      expect(emissions, [
+        <String>{},
+        {'hello'},
+        {'hello', 'world'},
+      ]);
+    });
+
     test('clearContextForAudio 清除上下文但保留单词', () async {
       final now = DateTime.now();
       await db.audioItemDao.upsert(

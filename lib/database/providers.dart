@@ -78,6 +78,7 @@ void switchAppDatabase(AppDatabase newDb, WidgetRef ref) {
   ref.invalidate(collectionListProvider);
   ref.invalidate(learningProgressNotifierProvider);
   ref.invalidate(savedWordListProvider);
+  ref.invalidate(savedWordTextsProvider);
   ref.invalidate(savedSenseGroupListProvider);
   ref.invalidate(savedSenseGroupTextsProvider);
   ref.invalidate(tagListProvider);

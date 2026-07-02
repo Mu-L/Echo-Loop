@@ -1,7 +1,29 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-02（词典改非 modal 常驻面板 + 词组选区手柄）
+> 最后更新：2026-07-02（收藏词汇正文点状下划线标记）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：收藏词汇在句子中的下划线标记
+
+用户反馈：收藏过的词汇（单词/词组/意群）在正文里没有任何视觉标记，不知道哪些已收藏过。方案：所有可点词句子场景（`SelectableSentenceText`：标注卡普通模式 + 盲听/精听/补练/收藏复习偷看视图）给收藏命中文本渲染**橙色点状下划线**（业界低干扰标准；橙色沿用意群收藏既有视觉语言；不用背景色避免与选区背景同通道叠加浑浊、不用波浪线/实线避免拼写错误/链接歧义），与选区背景、跟读评分绿字正交可叠加。不区分收藏来源材料。意群色块模式已有收藏态视觉（橙底+边框），不动。
+
+- [x] 数据层：`SavedWordDao.watchSavedWordTexts()`（镜像意群 DAO 的 `watchSavedPhraseTexts`，流式返回未删除收藏词 key 集合）。
+- [x] Provider：新增 `SavedWordTexts`（keepAlive 流）；与既有 `SavedSenseGroupTexts` 一并做 §7.18 默认值降级（DB 未初始化时空集，不崩宿主测试）；`switchAppDatabase` 补 invalidate。
+- [x] 匹配纯逻辑：`sentence_word_selection.dart` 新增 `savedCharRanges`（单词逐 token 比对 + 词组/意群相邻 word token 滑动窗口，窗口词数取集合实际条目、封顶 8；两套归一化 `normalizeWord`/`normalizeSenseGroupPhrase` 分别对应两张表 key；命中区间修边不覆盖首尾标点）+ `charMaskFromRanges`。已知限制：收藏 key 是 lemma，正文变形（running vs run）不命中，V1 接受。
+- [x] 渲染：`SelectableSentenceText` 改 `ConsumerStatefulWidget` 流式监听两个收藏集合（收藏/取消即时刷新所有可见句子；宿主零改动）；`_buildSpans` 按掩码边界切分 token 子段加 `TextDecoration.underline` + dotted + 橙色（亮 shade400/暗 shade300）+ thickness 2；掩码按 (文本, 集合) 缓存。
+- [x] 测试：`sentence_word_selection_test.dart` 补 `savedCharRanges` 11 例（大小写/修边/撇号/词组横跨/夹标点不误报/意群规则/重叠/词数上限）；`selectable_sentence_text_test.dart` 补 4 例（单词下划线/词组连续横跨空白/意群命中/与评分染色+选区背景叠加）；`saved_word_dao_test.dart` 补软删除不出现在集合。
+- [x] 验证：`flutter analyze` 0 error（warning 均为预存在）；`flutter test` 全量 3513 passed（macOS integration_test 本机环境问题跳过，见 memory 基线记录）。
+- [x] **Review 修复（8 角度审查后第二轮，2026-07-02）**：
+  - **匹配统一归一化（消一整类漏报）**：新增 `lib/utils/saved_text_index.dart`（`SavedTextIndex`，两张表的 key 在索引构建时统一过 `normalizeWord`）+ `savedTextIndexProvider`（keepAlive 派生，全 App 共享，句子组件只 watch 一个 provider）。修复：本地词典 headword 带点号的 key（e.g.）永不命中、引号/括号语境意群漏标、候选多空格/换行不命中、两套归一化不对称。匹配签名改 `savedCharRanges(text, tokens, index)`（33 行，≤50 达标），去掉 sense_group_text 反向 import 与重复正则。**注意：函数式 riverpod provider 的 ref 必须标注生成类型（`SavedTextIndexRef`），untyped ref 上 `.valueOrNull` 是扩展 getter、dynamic 接收者直接 NoSuchMethodError**。
+  - **修边 Unicode 化**：`_addTrimmedRange` 改 `\p{L}\p{N}` + 撇号集（直/弯），修复弯撇号所有格（dogs’）被裁掉、重音词（café）下划线词中截断。
+  - **移除 kMaxSavedPhraseWords=8 静默上限**：窗口词数按索引实际条目、以句内词数为界——9+ 词意群此前「意群模式显示已收藏、正文永不下划线」的两视图不一致消除。
+  - **DAO 优化**：两个 watch*Texts 改 `selectOnly` 单列（去 orderBy）+ `distinct(SetEquality)` 内容去重（闪卡翻面 updatePracticeStats 不再触发全量重发）；pubspec 显式声明 `collection`。
+  - **降级可诊断**：两个 set provider 的 `catch` 补 `debugPrint` 日志（keepAlive 空集缓存整个会话，静默降级会把 DB 故障伪装成「无收藏」）。
+  - **其它小修**：评分染色恢复按 token 起点整词判定（子段切分不再改变染色粒度）；`_savedMask!` 断言消除；测试 `wrap()` 的调用方 overrides 移到列表末尾（Riverpod 重复 override last-wins，前置会被默认值覆盖）；子段切分下沉为纯函数 `splitByMask` 可单测。
+  - 测试：新增 `test/utils/saved_text_index_test.dart`（4 例）；`sentence_word_selection_test.dart` 重写扩至 17 例（弯撇号/e.g./café/引号语境/双空格/9 词意群/超句长安全/splitByMask）；`saved_word_dao_test.dart` 补「练习统计写入不重发」。全量 3526 passed。
+  - 遗留（有意不动）：`selectable_sentence_text.dart` 572 行仍超 500 行规则（本功能前已 516 行，拆分涉及真机调校过的手柄几何代码，留待独立重构）；收藏 key 为 lemma、正文变形词（running vs run）不命中为已知 V1 限制。
+
+  **完成时间**: 2026-07-02
 
 ## 已完成：词典改非 modal 常驻面板 + 词组选区手柄
 

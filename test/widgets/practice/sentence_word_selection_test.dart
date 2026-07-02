@@ -1,6 +1,7 @@
 /// 句内分词与词级选区纯逻辑测试
 library;
 
+import 'package:echo_loop/utils/saved_text_index.dart';
 import 'package:echo_loop/widgets/practice/sentence_word_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,6 +99,130 @@ void main() {
       const text = 'a bc d';
       final tokens = tokenizeSentence(text);
       expect(const WordSelection(0, 2).charRangeOf(tokens), (0, 4));
+    });
+  });
+
+  group('savedCharRanges', () {
+    /// 便捷调用：从原始 key 集合建索引，返回命中区间对应的原文子串列表
+    List<String> hitTexts(
+      String text, {
+      Set<String> words = const {},
+      Set<String> phrases = const {},
+    }) {
+      final index = SavedTextIndex.build(
+        savedWords: words,
+        savedPhrases: phrases,
+      );
+      final ranges = savedCharRanges(text, tokenizeSentence(text), index);
+      return ranges.map((r) => text.substring(r.$1, r.$2)).toList();
+    }
+
+    test('空集合返回空区间', () {
+      expect(hitTexts('The quick fox.'), isEmpty);
+    });
+
+    test('单词命中（大小写不敏感）', () {
+      expect(hitTexts('The Quick fox.', words: {'quick'}), ['Quick']);
+    });
+
+    test('未收藏词不命中', () {
+      expect(hitTexts('The quick fox.', words: {'lazy'}), isEmpty);
+    });
+
+    test('命中区间修边：不覆盖首尾标点', () {
+      expect(hitTexts('I saw a fox.', words: {'fox'}), ['fox']);
+      expect(hitTexts('He said "fox", right?', words: {'fox'}), ['fox']);
+    });
+
+    test('尾部直撇号保留（所有格，与 normalizeWord 一致）', () {
+      expect(hitTexts("the dogs' bone", words: {"dogs'"}), ["dogs'"]);
+    });
+
+    test('弯撇号命中且修边保留（排版文本 dogs’ 匹配直撇号 key）', () {
+      expect(hitTexts('the dogs’ bone', words: {"dogs'"}), ['dogs’']);
+    });
+
+    test('key 未归一化也命中（本地词典 headword 带点号，如 e.g.）', () {
+      expect(hitTexts('See e.g., the appendix.', words: {'e.g.'}), ['e.g']);
+    });
+
+    test('重音字母不被修边截断（café 经归一化 caf 命中后完整标记）', () {
+      expect(hitTexts('a café, nearby', words: {'caf'}), ['café']);
+    });
+
+    test('多词收藏词命中（滑动窗口，区间横跨词间空白）', () {
+      expect(
+        hitTexts('I need to figure out the answer.', words: {'figure out'}),
+        ['figure out'],
+      );
+    });
+
+    test('词间夹标点不误报', () {
+      expect(hitTexts('figure, out of ten', words: {'figure out'}), isEmpty);
+    });
+
+    test('候选内部多空格折叠后命中单空格 key', () {
+      expect(hitTexts('please figure  out now', words: {'figure out'}), [
+        'figure  out',
+      ]);
+    });
+
+    test('意群命中（key 与候选统一 normalizeWord 归一化）', () {
+      expect(
+        hitTexts('He jumps over the lazy dog.', phrases: {'over the lazy dog'}),
+        ['over the lazy dog'],
+      );
+    });
+
+    test('引号/括号语境的意群也命中（统一归一化剥边缘标点）', () {
+      expect(hitTexts('He said "beautiful" twice.', phrases: {'beautiful'}), [
+        'beautiful',
+      ]);
+      expect(
+        hitTexts('so ("over the lazy dog")!', phrases: {'over the lazy dog'}),
+        ['over the lazy dog'],
+      );
+    });
+
+    test('单词形式的意群也命中', () {
+      expect(hitTexts('Simply beautiful.', phrases: {'beautiful'}), [
+        'beautiful',
+      ]);
+    });
+
+    test('单词与词组重叠时两个区间都返回', () {
+      final hits = hitTexts('figure out now', words: {'figure', 'figure out'});
+      expect(hits, containsAll(['figure', 'figure out']));
+    });
+
+    test('长意群无词数上限（9 词意群正常命中）', () {
+      const phrase = 'one two three four five six seven eight nine';
+      expect(hitTexts('say $phrase again', phrases: {phrase}), [phrase]);
+    });
+
+    test('词组长于句子时安全不命中', () {
+      expect(hitTexts('too short', words: {'a b c d e'}), isEmpty);
+    });
+  });
+
+  group('charMaskFromRanges / splitByMask', () {
+    test('区间内为 true、区间外为 false，越界安全', () {
+      final mask = charMaskFromRanges(5, [(1, 3), (4, 9)]);
+      expect(mask, [false, true, true, false, true]);
+    });
+
+    test('splitByMask 按翻转点切分', () {
+      final mask = [false, true, true, false];
+      expect(splitByMask(0, 4, mask), [
+        (0, 1, false),
+        (1, 3, true),
+        (3, 4, false),
+      ]);
+    });
+
+    test('splitByMask 空掩码/越界视为未命中', () {
+      expect(splitByMask(2, 5, const []), [(2, 5, false)]);
+      expect(splitByMask(0, 4, [true, true]), [(0, 2, true), (2, 4, false)]);
     });
   });
 }
