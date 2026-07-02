@@ -180,6 +180,28 @@ void main() {
     expect(source.queries.last, 'gamma');
   });
 
+  testWidgets('面板开着时：点句子里另一个词切换查询（豁免放行），点句子外空白关面板', (tester) async {
+    await tester.pumpWidget(wrap());
+    await tapWord(tester, 'alpha');
+    await tester.pumpAndSettle();
+    expect(source.queries, ['alpha']);
+
+    // 点句子里另一个词：屏障豁免放行，切换查询、面板不关
+    await tapWord(tester, 'gamma');
+    await tester.pumpAndSettle();
+    expect(source.queries, ['alpha', 'gamma']);
+    expect(find.byKey(const Key('dict_sheet_sizer')), findsOneWidget);
+
+    // 点句子外空白（正文中部）：屏障关面板并吸收点击
+    await tester.tapAt(const Offset(400, 500));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dict_sheet_sizer')), findsNothing);
+    // 选区高亮/手柄一并清除
+    expect(find.byKey(const Key('word_handle_start')), findsNothing);
+    // 未发起新查询
+    expect(source.queries, ['alpha', 'gamma']);
+  });
+
   testWidgets('面板关闭后选区与手柄清除', (tester) async {
     await tester.pumpWidget(wrap());
     await tapWord(tester, 'beta');

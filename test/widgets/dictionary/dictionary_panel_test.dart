@@ -74,6 +74,9 @@ void main() {
   /// 记录 activeOwnerOf 的探针（建立依赖，随 owner 变化重建）
   final ownerLog = <Object?>[];
 
+  /// 正文点击计数（断言屏障吸收点击、不触发下层交互）
+  var bodyTaps = 0;
+
   Widget wrap({bool handleBackButton = false}) => ProviderScope(
     overrides: [
       analyticsOverride(),
@@ -106,7 +109,13 @@ void main() {
           child: Builder(
             builder: (context) {
               ownerLog.add(DictionaryPanelHost.activeOwnerOf(context));
-              return const Center(child: Text('正文'));
+              return Align(
+                alignment: Alignment.topCenter,
+                child: GestureDetector(
+                  onTap: () => bodyTaps++,
+                  child: const Text('正文'),
+                ),
+              );
             },
           ),
         ),
@@ -123,8 +132,26 @@ void main() {
 
     expect(find.byKey(const Key('dict_sheet_sizer')), findsOneWidget);
     expect(find.text('释义-run'), findsOneWidget);
-    // 正文仍在树中可交互（非 modal，无 barrier）
+    // 正文仍在树中可见（非 modal，无遮罩变暗）
     expect(find.text('正文'), findsOneWidget);
+  });
+
+  testWidgets('点面板外：关面板并吸收点击（不触发正文交互）；关闭后正文恢复可点', (tester) async {
+    bodyTaps = 0;
+    await tester.pumpWidget(wrap());
+    hostKey.currentState!.show(const DictionaryPanelQuery(word: 'run'));
+    await tester.pumpAndSettle();
+
+    // 面板开着：点正文 → 屏障关面板并吸收，正文 onTap 不触发
+    await tester.tap(find.text('正文'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dict_sheet_sizer')), findsNothing);
+    expect(bodyTaps, 0);
+
+    // 面板已关：正文恢复正常交互
+    await tester.tap(find.text('正文'));
+    await tester.pump();
+    expect(bodyTaps, 1);
   });
 
   testWidgets('面板开着时 show 新词：原地切换内容，面板不重开', (tester) async {

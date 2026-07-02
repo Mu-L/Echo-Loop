@@ -108,8 +108,14 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
   /// 手柄命中区边长
   static const double _kHandleHitSize = 36;
 
-  /// 手柄视觉圆点直径
-  static const double _kHandleDotSize = 11;
+  /// 手柄水滴视觉尺寸（Android 系统选择手柄同款：圆形去掉朝向边界的一角）
+  static const double _kHandleDropSize = 14;
+
+  /// 选区边界竖线宽度
+  static const double _kCaretWidth = 2;
+
+  /// 已注册豁免区域的宿主（组件卸载时按同一实例注销）
+  DictionaryPanelHostState? _host;
 
   /// 渲染文本：有高亮片段时为片段拼接，否则为原句
   String get _fullText {
@@ -140,6 +146,14 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // 向宿主注册屏障豁免区域：面板开着时点本组件（词/手柄）仍放行，
+    // 点区域外则由宿主屏障关面板并吸收点击。
+    final host = DictionaryPanelHost.maybeOf(context);
+    if (!identical(host, _host)) {
+      _host?.unregisterTapThroughRegion(_tapThroughRect);
+      _host = host;
+      _host?.registerTapThroughRegion(_tapThroughRect);
+    }
     // 面板关闭或别的组件发起了查词：清掉本组件的选区高亮/手柄。
     // （didChangeDependencies 本就处于重建流程，直接改字段即可）
     final owner = DictionaryPanelHost.activeOwnerOf(context);
@@ -148,6 +162,26 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
       _startAnchor = null;
       _endAnchor = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _host?.unregisterTapThroughRegion(_tapThroughRect);
+    super.dispose();
+  }
+
+  /// 屏障豁免区域（全局坐标）：组件自身 + 手柄外扩
+  /// （左右各半个命中区、底部一个命中区，覆盖越界的手柄）
+  Rect _tapThroughRect() {
+    final obj = context.findRenderObject();
+    if (obj is! RenderBox || !obj.attached || !obj.hasSize) return Rect.zero;
+    final topLeft = obj.localToGlobal(Offset.zero);
+    return Rect.fromLTRB(
+      topLeft.dx - _kHandleHitSize / 2,
+      topLeft.dy,
+      topLeft.dx + obj.size.width + _kHandleHitSize / 2,
+      topLeft.dy + obj.size.height + _kHandleHitSize,
+    );
   }
 
   void _clearSelection() {
@@ -285,18 +319,23 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
     );
     // 选区存在时布局可能变化（旋屏/字号），每帧后校正手柄位置
     if (_selection != null) _scheduleAnchorUpdate();
-    return Stack(
-      clipBehavior: Clip.none,
+    // 手柄悬在文本 bounds 之外（末行下方/行首左侧），普通 Stack 的命中测试
+    // 会在 size.contains 处提前剪裁——用越界命中 Stack 保证手柄全域可拖。
+    return _UnboundedHitStack(
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: _handleTapUp,
           child: rich,
         ),
-        if (_selection != null && _startAnchor != null)
+        if (_selection != null && _startAnchor != null) ...[
+          _buildCaretLine(theme, isStartHandle: true, anchor: _startAnchor!),
           _buildHandle(theme, isStartHandle: true, anchor: _startAnchor!),
-        if (_selection != null && _endAnchor != null)
+        ],
+        if (_selection != null && _endAnchor != null) ...[
+          _buildCaretLine(theme, isStartHandle: false, anchor: _endAnchor!),
           _buildHandle(theme, isStartHandle: false, anchor: _endAnchor!),
+        ],
       ],
     );
   }
@@ -342,15 +381,37 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
     };
   }
 
-  /// 选区边界手柄：视觉为主题色圆点，命中区 36dp；
-  /// 用 [ImmediateMultiDragGestureRecognizer] 按下即赢得手势竞技场，
-  /// 压制外层滚动/横滑/长按（Flutter 系统选择手柄同款思路）。
+  /// 选区边界竖线（caret，纯视觉）：贴选区首/末词行盒的边界，高度=行高
+  Widget _buildCaretLine(
+    ThemeData theme, {
+    required bool isStartHandle,
+    required Rect anchor,
+  }) {
+    final x = isStartHandle ? anchor.left : anchor.right;
+    return Positioned(
+      left: x - _kCaretWidth / 2,
+      top: anchor.top,
+      child: IgnorePointer(
+        child: Container(
+          width: _kCaretWidth,
+          height: anchor.height,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  /// 选区边界手柄：业界标准水滴形（圆形去掉朝向边界的上角，Android 系统
+  /// 选择手柄同款——起始手柄缺右上角、结束手柄缺左上角，缺角顶点即竖线
+  /// 下端）。命中区 36dp；用 [ImmediateMultiDragGestureRecognizer] 按下即
+  /// 赢得手势竞技场，压制外层滚动/横滑/长按（系统选择手柄同款思路）。
   Widget _buildHandle(
     ThemeData theme, {
     required bool isStartHandle,
     required Rect anchor,
   }) {
     final x = isStartHandle ? anchor.left : anchor.right;
+    final radius = Radius.circular(_kHandleDropSize / 2);
     return Positioned(
       left: x - _kHandleHitSize / 2,
       top: anchor.bottom - _kHandleHitSize / 2,
@@ -372,23 +433,70 @@ class _SelectableSentenceTextState extends State<SelectableSentenceText> {
           key: Key(isStartHandle ? 'word_handle_start' : 'word_handle_end'),
           width: _kHandleHitSize,
           height: _kHandleHitSize,
-          child: Center(
-            child: Container(
-              width: _kHandleDotSize,
-              height: _kHandleDotSize,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: theme.colorScheme.surface,
-                  width: 1.5,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // 水滴缺角顶点对齐命中区中心（= 边界 x、行底 y，即竖线下端）：
+              // 起始手柄悬在边界左下，结束手柄悬在边界右下
+              Positioned(
+                left: isStartHandle
+                    ? _kHandleHitSize / 2 - _kHandleDropSize
+                    : _kHandleHitSize / 2,
+                top: _kHandleHitSize / 2,
+                child: Container(
+                  width: _kHandleDropSize,
+                  height: _kHandleDropSize,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.only(
+                      topLeft: isStartHandle ? radius : Radius.zero,
+                      topRight: isStartHandle ? Radius.zero : radius,
+                      bottomLeft: radius,
+                      bottomRight: radius,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
+  }
+}
+
+/// 越界命中 Stack：不做自身 size 的提前剪裁，允许命中悬在文本 bounds
+/// 之外的选区手柄（末行下方、行首左侧）。仅用于本组件内部。
+class _UnboundedHitStack extends Stack {
+  const _UnboundedHitStack({super.children}) : super(clipBehavior: Clip.none);
+
+  @override
+  RenderStack createRenderObject(BuildContext context) =>
+      _RenderUnboundedHitStack(
+        textDirection: textDirection ?? Directionality.maybeOf(context),
+        alignment: alignment,
+        fit: fit,
+        clipBehavior: clipBehavior,
+      );
+}
+
+/// [_UnboundedHitStack] 的 render object
+class _RenderUnboundedHitStack extends RenderStack {
+  _RenderUnboundedHitStack({
+    super.textDirection,
+    super.alignment,
+    super.fit,
+    super.clipBehavior,
+  });
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    // 跳过 RenderBox 默认的 size.contains 剪裁，直接测试子节点
+    if (hitTestChildren(result, position: position)) {
+      result.add(BoxHitTestEntry(this, position));
+      return true;
+    }
+    return false;
   }
 }
 

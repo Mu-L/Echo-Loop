@@ -9,11 +9,14 @@
 ///   OverlayEntry（命令式生命周期易泄漏）；
 /// - 面板状态是页面局部 state（谁创建谁销毁）：页面 pop 即面板销毁，
 ///   查词 controller（autoDispose）随之释放，无跨页残留；
-/// - 关闭仅显式（关闭按钮 / 下拉超阈值 / 返回键），不做「点空白关闭」——
-///   非 modal 面板的价值就是查着词继续操作页面。
+/// - 面板开着时正文上盖一层**带词区域豁免的透明屏障**：点句子里的词/
+///   拖手柄照常放行（连续查词/扩选），点其它区域先关面板并吸收该次点击
+///   （不触发下层操作）。豁免区域由可点词组件经
+///   [DictionaryPanelHostState.registerTapThroughRegion] 注册。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'dictionary_panel.dart';
 
@@ -130,6 +133,28 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
     duration: const Duration(milliseconds: 250),
   );
 
+  /// 屏障豁免区域（全局坐标 getter 集合）。命中任一区域的点击穿透屏障
+  /// 直达下层（点词切换查询、拖手柄扩选）；未命中则关面板并吸收点击。
+  final Set<Rect Function()> _tapThroughRegions = {};
+
+  /// 注册屏障豁免区域（可点词组件在挂载时调用，getter 在命中测试时求值）
+  void registerTapThroughRegion(Rect Function() globalRect) {
+    _tapThroughRegions.add(globalRect);
+  }
+
+  /// 注销屏障豁免区域（组件卸载时调用，与注册的 getter 同一 tear-off）
+  void unregisterTapThroughRegion(Rect Function() globalRect) {
+    _tapThroughRegions.remove(globalRect);
+  }
+
+  /// 全局坐标是否落在任一豁免区域内
+  bool _hitsTapThroughRegion(Offset globalPosition) {
+    for (final rect in _tapThroughRegions) {
+      if (rect().contains(globalPosition)) return true;
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -189,6 +214,15 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
     Widget result = Stack(
       children: [
         widget.child,
+        // 关面板屏障：盖在正文上、面板下。点词区域（豁免）放行，
+        // 其余点击关面板并吸收（不触发下层操作）。滑出中即移除，页面立即可交互。
+        if (isOpen)
+          Positioned.fill(
+            child: _DismissBarrier(
+              shouldForward: _hitsTapThroughRegion,
+              onDismiss: close,
+            ),
+          ),
         if (_query != null)
           // 非 Positioned 子节点拿 Stack 的宽松约束：面板最大高度天然
           // 不超过正文区域，宽度经内部拉满。
@@ -240,4 +274,64 @@ class _DictionaryPanelScope extends InheritedWidget {
   @override
   bool updateShouldNotify(_DictionaryPanelScope oldWidget) =>
       oldWidget.owner != owner;
+}
+
+/// 关面板屏障：豁免区域内的点击穿透（不命中自身），其余点击按下即关面板。
+///
+/// 用 [Listener.onPointerDown]（非手势竞技场）保证即时、无歧义地吸收该次
+/// 点击——被吸收的手势后续事件仍归屏障，天然不会触发下层操作。
+class _DismissBarrier extends StatelessWidget {
+  /// 是否放行该全局坐标（命中词区域/手柄豁免区）
+  final bool Function(Offset globalPosition) shouldForward;
+
+  /// 关闭面板回调
+  final VoidCallback onDismiss;
+
+  const _DismissBarrier({required this.shouldForward, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TapThroughFilter(
+      shouldForward: shouldForward,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (_) => onDismiss(),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+/// 命中测试过滤器：[shouldForward] 为 true 的位置视为未命中，
+/// 事件穿透到 Stack 中位于屏障之下的正文。
+class _TapThroughFilter extends SingleChildRenderObjectWidget {
+  final bool Function(Offset globalPosition) shouldForward;
+
+  const _TapThroughFilter({required this.shouldForward, super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderTapThroughFilter(shouldForward);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderTapThroughFilter renderObject,
+  ) {
+    renderObject.shouldForward = shouldForward;
+  }
+}
+
+/// [_TapThroughFilter] 的 render object
+class _RenderTapThroughFilter extends RenderProxyBox {
+  /// 是否放行该全局坐标
+  bool Function(Offset globalPosition) shouldForward;
+
+  _RenderTapThroughFilter(this.shouldForward);
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    if (shouldForward(localToGlobal(position))) return false;
+    return super.hitTest(result, position: position);
+  }
 }
