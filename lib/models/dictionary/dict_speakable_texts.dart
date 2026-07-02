@@ -1,7 +1,7 @@
 /// 从词典查询结果提取「可点击发音」的英文文本（供后台预热）
 ///
 /// 词典弹窗里单词标题与每条例句都内嵌点击发音（`SpeakButton` / `_ExampleView`，
-/// 见 `word_dictionary_sheet.dart` 与 `ai_dict_result_view.dart`）。本函数把这些
+/// 见 `dictionary_panel.dart` 与 `ai_dict_result_view.dart`）。本函数把这些
 /// 文本按弹窗显示顺序收齐，交给统一 TTS 后台预热入缓存，用户点击即命中秒播。
 library;
 

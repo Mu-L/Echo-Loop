@@ -13,7 +13,8 @@ import 'package:echo_loop/providers/dictionary/visible_sources_provider.dart';
 import 'package:echo_loop/services/dictionary/dictionary_source.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
-import 'package:echo_loop/widgets/intensive_listen/word_dictionary_sheet.dart';
+import 'package:echo_loop/widgets/dictionary/dictionary_panel.dart';
+import 'package:echo_loop/widgets/dictionary/dictionary_panel_host.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,7 +125,12 @@ void main() {
           GlobalCupertinoLocalizations.delegate,
         ],
         theme: AppTheme.light(),
-        home: Scaffold(body: WordDictionarySheet(word: word)),
+        home: Scaffold(
+          body: DictionaryPanel(
+            query: DictionaryPanelQuery(word: word),
+            onClose: () {},
+          ),
+        ),
       ),
     );
   }

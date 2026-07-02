@@ -16,7 +16,8 @@ import 'package:echo_loop/services/dictionary/dictionary_source.dart';
 import 'package:echo_loop/services/dictionary/web_dictionary_source.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
-import 'package:echo_loop/widgets/intensive_listen/word_dictionary_sheet.dart';
+import 'package:echo_loop/widgets/dictionary/dictionary_panel.dart';
+import 'package:echo_loop/widgets/dictionary/dictionary_panel_host.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -140,24 +141,34 @@ void main() {
     ),
   );
 
-  Widget wrap({String defaultId = 'cambridge'}) =>
-      app(defaultId, const Scaffold(body: WordDictionarySheet(word: 'run')));
+  Widget wrap({String defaultId = 'cambridge'}) => app(
+    defaultId,
+    Scaffold(
+      body: DictionaryPanel(
+        query: const DictionaryPanelQuery(word: 'run'),
+        onClose: () {},
+      ),
+    ),
+  );
 
-  /// 以 modal 路由打开弹窗（使下滑关闭有可 pop 的路由）。返回打开弹窗的动作。
-  Future<void> pumpModal(WidgetTester tester, {String defaultId = 'ai'}) async {
+  /// 经宿主面板打开（下拉超阈值关闭断言面板从树中移除，而非路由 pop）
+  Future<void> pumpPanelHost(
+    WidgetTester tester, {
+    String defaultId = 'ai',
+  }) async {
     await tester.pumpWidget(
       app(
         defaultId,
-        Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: ElevatedButton(
-                onPressed: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => const WordDictionarySheet(word: 'run'),
+        Scaffold(
+          body: DictionaryPanelHost(
+            child: Center(
+              child: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => DictionaryPanelHost.of(
+                    context,
+                  ).show(const DictionaryPanelQuery(word: 'run')),
+                  child: const Text('open'),
                 ),
-                child: const Text('open'),
               ),
             ),
           ),
@@ -253,7 +264,7 @@ void main() {
   });
 
   testWidgets('下拉到底再继续下拉关闭弹窗', (tester) async {
-    await pumpModal(tester);
+    await pumpPanelHost(tester);
     expect(find.byKey(const Key('dict_sheet_sizer')), findsOneWidget);
 
     // 远超下限的下拉：缩到下限后继续下拉（overdrag）超阈值，松手关闭
@@ -266,7 +277,7 @@ void main() {
   });
 
   testWidgets('下拉到下限但未超 overdrag 阈值：仅缩小，不关闭', (tester) async {
-    await pumpModal(tester);
+    await pumpPanelHost(tester);
     final sizer = find.byKey(const Key('dict_sheet_sizer'));
     final screenH =
         tester.view.physicalSize.height / tester.view.devicePixelRatio;

@@ -1,4 +1,4 @@
-/// WordDictionarySheet Widget 测试
+/// DictionaryPanel 内容渲染测试（本地词典源各数据场景）
 ///
 /// 使用内存 SQLite 数据库替换 DictionaryService 单例，
 /// 验证弹窗在各种数据场景下的 UI 渲染。
@@ -13,11 +13,11 @@ import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/providers/tts/tts_controller_provider.dart';
 import 'package:echo_loop/services/dictionary_service.dart';
 import 'package:echo_loop/theme/app_theme.dart';
-import 'package:echo_loop/widgets/intensive_listen/word_dictionary_sheet.dart';
+import 'package:echo_loop/widgets/dictionary/dictionary_panel_host.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../helpers/mock_providers.dart';
+import '../../helpers/mock_providers.dart';
 
 /// 词典设置读取的 SharedPreferences（在 setUp 注入），供 [_buildTestPage] override
 late SharedPreferences _prefs;
@@ -39,6 +39,7 @@ class _StubTtsController extends TtsController {
   Future<void> prewarmTexts(List<String> texts) async {
     _prewarmCalls.add(texts);
   }
+
   @override
   void cancelTextsPrewarm() {}
   @override
@@ -67,7 +68,7 @@ Database _createTestDb() {
   return db;
 }
 
-/// 构建打开弹窗的测试页面
+/// 构建打开面板的测试页面（经 DictionaryPanelHost 非 modal 打开）
 Widget _buildTestPage(String word, {String? sentenceText}) {
   return ProviderScope(
     overrides: [
@@ -87,14 +88,14 @@ Widget _buildTestPage(String word, {String? sentenceText}) {
       ],
       theme: AppTheme.light(),
       home: Scaffold(
-        body: Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () => showWordDictionarySheet(
-              context: context,
-              word: word,
-              sentenceText: sentenceText,
+        body: DictionaryPanelHost(
+          child: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => DictionaryPanelHost.of(context).show(
+                DictionaryPanelQuery(word: word, sentenceText: sentenceText),
+              ),
+              child: const Text('Open'),
             ),
-            child: const Text('Open'),
           ),
         ),
       ),
@@ -133,7 +134,7 @@ void main() {
     db.dispose();
   });
 
-  group('WordDictionarySheet', () {
+  group('DictionaryPanel', () {
     testWidgets('显示完整词典内容（音标、释义、星级、标签）', (tester) async {
       await _openSheet(tester, 'abandon');
 
@@ -226,7 +227,7 @@ void main() {
       expect(find.text('/əbændən/'), findsOneWidget);
     });
 
-    // NOTE: AI 解析功能已暂时隐藏（见 word_dictionary_sheet.dart），
+    // NOTE: AI 解析功能已暂时隐藏（见 dictionary_panel.dart），
     // 相关测试待功能恢复后重新添加。
 
     testWidgets('打开弹窗即以单词本身预热（不等 AI 查询返回）', (tester) async {

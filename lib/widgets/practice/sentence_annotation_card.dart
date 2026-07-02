@@ -4,7 +4,6 @@
 /// 难句标记切换、三按钮工具栏（拆意群/翻译/解析）。
 library;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/sentence_ai_provider.dart';
@@ -18,7 +17,7 @@ import '../common/async_toggle_button.dart';
 import '../common/shimmer_placeholder.dart';
 import '../common/text_context_menu.dart';
 import '../guide_flow.dart';
-import '../intensive_listen/word_dictionary_sheet.dart';
+import 'selectable_sentence_text.dart';
 import 'sense_group_text.dart';
 
 /// 内容加载状态
@@ -29,8 +28,8 @@ enum SenseGroupMode { off, medium, fine }
 
 /// 标注模式句子卡片
 ///
-/// 使用 StatefulWidget 管理 TapGestureRecognizer 生命周期，
-/// 防止内存泄漏。内部管理翻译/解析的加载状态和意群显示开关。
+/// 句子文本经 [SelectableSentenceText] 渲染（点词查词 + 词组选区手柄），
+/// 内部管理翻译/解析的加载状态和意群显示开关。
 ///
 /// 工具栏可以通过 [showToolbar] 控制是否在卡片内部渲染。
 /// 当 [showToolbar] 为 false 时，外部可通过 [GlobalKey] 获取
@@ -166,12 +165,6 @@ class SentenceAnnotationCard extends StatefulWidget {
 
 /// [SentenceAnnotationCard] 的公开 State，支持外部调用 [buildToolbar]。
 class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
-  final List<TapGestureRecognizer> _recognizers = [];
-  static final RegExp _textPartPattern = RegExp(r'\s+|[^\s]+');
-
-  /// 当前被按压高亮的词索引（-1 表示无）
-  int _highlightedWordIndex = -1;
-
   /// 意群显示模式
   SenseGroupMode _senseGroupMode = SenseGroupMode.off;
 
@@ -277,14 +270,6 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         if (mounted) _notifyToolbar();
       });
     }
-  }
-
-  @override
-  void dispose() {
-    for (final r in _recognizers) {
-      r.dispose();
-    }
-    super.dispose();
   }
 
   // -- 按钮点击处理 --
@@ -443,131 +428,6 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     }
   }
 
-  // -- 词点击 --
-
-  /// 短暂高亮被点击的词（150ms 后自动清除）
-  void _flashWord(int index) {
-    setState(() => _highlightedWordIndex = index);
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) setState(() => _highlightedWordIndex = -1);
-    });
-  }
-
-  /// 每次 build 前清理旧 recognizer，创建新的
-  List<InlineSpan> _buildWordSpans(ThemeData theme) {
-    // 清理旧 recognizer
-    for (final r in _recognizers) {
-      r.dispose();
-    }
-    _recognizers.clear();
-
-    final parts = _textPartPattern
-        .allMatches(widget.text)
-        .map((match) => match.group(0) ?? '')
-        .toList();
-    final highlightColor = theme.colorScheme.primary.withValues(alpha: 0.1);
-    final result = <InlineSpan>[];
-    for (int i = 0; i < parts.length; i++) {
-      final part = parts[i];
-      final cleanWord = part.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
-      if (part.trim().isEmpty) {
-        result.add(TextSpan(text: part));
-        continue;
-      }
-      final wordIndex = i;
-      final recognizer = TapGestureRecognizer()
-        ..onTap = () {
-          if (cleanWord.isNotEmpty) {
-            _flashWord(wordIndex);
-            widget.onToolbarButtonTapped?.call();
-            showWordDictionarySheet(
-              context: context,
-              word: cleanWord,
-              audioItemId: widget.audioItemId,
-              sentenceIndex: widget.sentenceIndex,
-              sentenceText: widget.text,
-              sentenceStartMs: widget.sentenceStartMs,
-              sentenceEndMs: widget.sentenceEndMs,
-            );
-          }
-        };
-      _recognizers.add(recognizer);
-      result.add(
-        TextSpan(
-          text: part,
-          recognizer: recognizer,
-          style: _highlightedWordIndex == wordIndex
-              ? TextStyle(backgroundColor: highlightColor)
-              : null,
-        ),
-      );
-    }
-    return result;
-  }
-
-  /// 基于高亮片段生成可点击的富文本 span。
-  List<InlineSpan> _buildHighlightedWordSpans(ThemeData theme) {
-    final segments = widget.highlightedSegments;
-    if (segments == null || segments.isEmpty) {
-      return _buildWordSpans(theme);
-    }
-
-    for (final r in _recognizers) {
-      r.dispose();
-    }
-    _recognizers.clear();
-
-    final highlightColor = theme.colorScheme.primary.withValues(alpha: 0.1);
-    final spans = <InlineSpan>[];
-    int wordIndex = 0;
-    for (final segment in segments) {
-      final parts = _textPartPattern
-          .allMatches(segment.text)
-          .map((match) => match.group(0) ?? '')
-          .toList();
-      for (final part in parts) {
-        if (part.isEmpty) {
-          continue;
-        }
-        if (part.trim().isEmpty) {
-          spans.add(TextSpan(text: part));
-          continue;
-        }
-        final cleanWord = part.replaceAll(RegExp(r'[.,!?;:\-—…、，。！？；：]'), '');
-        final currentIndex = wordIndex++;
-        final recognizer = TapGestureRecognizer()
-          ..onTap = () {
-            if (cleanWord.isNotEmpty) {
-              _flashWord(currentIndex);
-              widget.onToolbarButtonTapped?.call();
-              showWordDictionarySheet(
-                context: context,
-                word: cleanWord,
-                audioItemId: widget.audioItemId,
-                sentenceIndex: widget.sentenceIndex,
-                sentenceText: widget.text,
-                sentenceStartMs: widget.sentenceStartMs,
-                sentenceEndMs: widget.sentenceEndMs,
-              );
-            }
-          };
-        _recognizers.add(recognizer);
-        final isHighlighted = _highlightedWordIndex == currentIndex;
-        spans.add(
-          TextSpan(
-            text: part,
-            recognizer: recognizer,
-            style: TextStyle(
-              color: segment.isMatched ? const Color(0xFF2E9B51) : null,
-              backgroundColor: isHighlighted ? highlightColor : null,
-            ),
-          ),
-        );
-      }
-    }
-    return spans;
-  }
-
   // -- 工具栏相关 --
 
   bool get _isSenseGroupEnabled => widget.onRequestSenseGroups != null;
@@ -684,14 +544,21 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
               details.globalPosition,
               widget.text,
             ),
-            child: RichText(
-              text: TextSpan(
-                style: theme.textTheme.titleMedium?.copyWith(
-                  height: 1.6,
-                  color: theme.colorScheme.onSurface,
-                ),
-                children: _buildHighlightedWordSpans(theme),
+            child: SelectableSentenceText(
+              text: widget.text,
+              style: theme.textTheme.titleMedium?.copyWith(
+                height: 1.6,
+                color: theme.colorScheme.onSurface,
               ),
+              highlightedSegments: widget.highlightedSegments,
+              origin: DictionaryLookupOrigin(
+                audioItemId: widget.audioItemId,
+                sentenceIndex: widget.sentenceIndex,
+                sentenceText: widget.text,
+                sentenceStartMs: widget.sentenceStartMs,
+                sentenceEndMs: widget.sentenceEndMs,
+              ),
+              onBeforeLookup: () => widget.onToolbarButtonTapped?.call(),
             ),
           );
 

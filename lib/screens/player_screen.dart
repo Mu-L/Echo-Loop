@@ -24,6 +24,7 @@ import '../widgets/common/paragraph_sentence_list_card.dart';
 import '../widgets/common/audio_app_bar_title.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/player_hotkey_scope.dart';
+import '../widgets/dictionary/dictionary_panel_host.dart';
 import '../widgets/practice/annotation_content_view.dart';
 import 'sentence_detail_screen.dart';
 
@@ -131,9 +132,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           title: _buildAppBarTitle(playerState, l10n),
           actions: const [SleepTimerButton()],
         ),
-        body: !playerState.hasAudio
-            ? Center(child: Text(l10n.noAudioLoaded))
-            : _buildLayout(context, playerState),
+        // 词典面板宿主：面板内嵌 body、非 modal（显示期间正文可继续点词）。
+        // 页面自身无 PopScope，由宿主代管返回键（面板开着时先关面板）。
+        body: DictionaryPanelHost(
+          handleBackButton: true,
+          child: !playerState.hasAudio
+              ? Center(child: Text(l10n.noAudioLoaded))
+              : _buildLayout(context, playerState),
+        ),
       ),
     );
   }

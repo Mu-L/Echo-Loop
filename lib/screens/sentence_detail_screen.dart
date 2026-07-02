@@ -26,6 +26,7 @@ import '../providers/sentence_ai_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/bookmark_toggle_row.dart';
 import '../widgets/common/tappable_wrapper.dart';
+import '../widgets/dictionary/dictionary_panel_host.dart';
 import '../widgets/practice/annotation_content_view.dart';
 
 /// 句子详情页面参数
@@ -254,75 +255,80 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(args.audioName), centerTitle: true),
-      body: Column(
-        children: [
-          // 句子时间信息
-          Padding(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.l,
-              right: AppSpacing.l,
-              top: AppSpacing.m,
-            ),
-            child: Row(
-              children: [
-                Text(
-                  timeRangeText,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  durationText,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.m),
-
-          // 收藏标记行
-          if (_bookmarkLoaded)
+      // 词典面板宿主：面板内嵌 body、非 modal（显示期间正文可继续点词）。
+      // 页面自身无 PopScope，由宿主代管返回键（面板开着时先关面板）。
+      body: DictionaryPanelHost(
+        handleBackButton: true,
+        child: Column(
+          children: [
+            // 句子时间信息
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-              child: BookmarkToggleRow(
-                isDifficult: _isBookmarked,
-                onTap: _toggleBookmark,
+              padding: const EdgeInsets.only(
+                left: AppSpacing.l,
+                right: AppSpacing.l,
+                top: AppSpacing.m,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    timeRangeText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    durationText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-          const SizedBox(height: AppSpacing.m),
+            const SizedBox(height: AppSpacing.m),
 
-          // 主体内容：解析/翻译/意群 + 句子文本
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
-              child: AnnotationContentView(
-                text: args.sentenceText,
-                aiNotifier: ref.read(sentenceAiNotifierProvider),
-                audioItemId: args.audioItemId,
-                sentenceIndex: args.sentenceIndex,
-                sentenceStartMs: args.startTimeMs,
-                sentenceEndMs: args.endTimeMs,
-                onStopMainPlayer: () {
-                  if (_isPlaying) {
-                    ref.read(audioEngineProvider.notifier).stop();
-                    setState(() => _isPlaying = false);
-                  }
-                },
+            // 收藏标记行
+            if (_bookmarkLoaded)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+                child: BookmarkToggleRow(
+                  isDifficult: _isBookmarked,
+                  onTap: _toggleBookmark,
+                ),
+              ),
+
+            const SizedBox(height: AppSpacing.m),
+
+            // 主体内容：解析/翻译/意群 + 句子文本
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
+                child: AnnotationContentView(
+                  text: args.sentenceText,
+                  aiNotifier: ref.read(sentenceAiNotifierProvider),
+                  audioItemId: args.audioItemId,
+                  sentenceIndex: args.sentenceIndex,
+                  sentenceStartMs: args.startTimeMs,
+                  sentenceEndMs: args.endTimeMs,
+                  onStopMainPlayer: () {
+                    if (_isPlaying) {
+                      ref.read(audioEngineProvider.notifier).stop();
+                      setState(() => _isPlaying = false);
+                    }
+                  },
+                ),
               ),
             ),
-          ),
 
-          // 底部播放按钮
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.m, bottom: 64),
-            child: _PlayButton(isPlaying: _isPlaying, onTap: _playSentence),
-          ),
-        ],
+            // 底部播放按钮
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.m, bottom: 64),
+              child: _PlayButton(isPlaying: _isPlaying, onTap: _playSentence),
+            ),
+          ],
+        ),
       ),
     );
   }

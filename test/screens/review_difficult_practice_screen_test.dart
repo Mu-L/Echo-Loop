@@ -430,9 +430,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 逐词可点击布局：每个单词是单独的 Text
-      expect(find.text('sentence '), findsOneWidget);
-      expect(find.text('number '), findsOneWidget);
+      // 统一可点词组件：整句渲染为单个 RichText
+      expect(
+        find.text('Test sentence number 1.', findRichText: true),
+        findsOneWidget,
+      );
     });
 
     testWidgets('偷看字幕点击切换 — 初始隐藏显示听觉图标', (tester) async {
@@ -465,8 +467,11 @@ void main() {
       await tester.tap(find.byType(PracticeNormalModeView));
       await tester.pumpAndSettle();
 
-      // 逐词可点击布局：每个单词是单独的 Text
-      expect(find.text('sentence '), findsOneWidget);
+      // 统一可点词组件：整句渲染为单个 RichText
+      expect(
+        find.text('Test sentence number 1.', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
     });
 
@@ -484,12 +489,18 @@ void main() {
       // 点击显示
       await tester.tap(find.byType(PracticeNormalModeView));
       await tester.pumpAndSettle();
-      expect(find.text('sentence '), findsOneWidget);
+      expect(
+        find.text('Test sentence number 1.', findRichText: true),
+        findsOneWidget,
+      );
 
       // 再次点击隐藏
       await tester.tap(find.text('Peek'));
       await tester.pumpAndSettle();
-      expect(find.text('sentence '), findsNothing);
+      expect(
+        find.text('Test sentence number 1.', findRichText: true),
+        findsNothing,
+      );
       expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
     });
 

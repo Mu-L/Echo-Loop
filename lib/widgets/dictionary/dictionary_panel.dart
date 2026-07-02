@@ -1,9 +1,13 @@
-/// 词典查询底部弹窗
+/// 词典查询面板（非 modal 常驻底部面板的内容体）
 ///
-/// 点击单词时弹出。右上角下拉切换数据源（本地 / AI / Cambridge），
-/// 内容区按选中源渲染对应结果。标题行的单词、发音、收藏跨源恒定。
+/// 由 [DictionaryPanelHost] 内嵌渲染。右上角下拉切换数据源
+/// （本地 / AI / Cambridge），内容区按选中源渲染对应结果，
+/// 标题行的单词、发音、收藏、关闭跨源恒定。
 /// 本组件是「组装器」：查词逻辑在 [DictionaryLookupController]，
 /// 各源渲染在 dictionary/ 视图组件，本文件只负责布局与回调分发。
+///
+/// 切词：宿主 show() 新查询时经 [didUpdateWidget] 原地切换（重建查词
+/// controller 订阅、预热新词 TTS），不重播面板入场动画。
 library;
 
 import 'package:flutter/material.dart';
@@ -18,168 +22,130 @@ import '../../providers/dictionary/lookup_controller.dart';
 import '../../providers/dictionary_provider.dart';
 import '../../providers/saved_word_provider.dart';
 import '../../providers/tts/tts_controller_provider.dart';
+import '../../services/dictionary/ai_dictionary_source.dart';
 import '../../services/dictionary/web_dictionary_source.dart';
 import '../../utils/text_normalize.dart';
 import '../tts/speak_button.dart';
 import '../../theme/app_theme.dart';
 import '../animated_bookmark_icon.dart';
 import '../common/text_context_menu.dart';
-import '../dictionary/dictionary_result_view.dart';
-import '../dictionary/source_switcher.dart';
+import 'dictionary_panel_host.dart';
+import 'dictionary_result_view.dart';
+import 'source_switcher.dart';
 
-/// 显示词典底部弹窗
-///
-/// [audioItemId]、[sentenceIndex]、[sentenceText] 为可选来源信息，
-/// 用于收藏单词时记录来源。
-Future<void> showWordDictionarySheet({
-  required BuildContext context,
-  required String word,
-  String? audioItemId,
-  int? sentenceIndex,
-  String? sentenceText,
-  int? sentenceStartMs,
-  int? sentenceEndMs,
-}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    // 默认占屏幕 2/3；网页源可经拖拽指示条上拉放大，故 modal 上限放到 95%
-    // 以容纳上拉后的高度。文本源仍内部限回 2/3、按内容自适应。
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.95,
-    ),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => WordDictionarySheet(
-      word: word,
-      audioItemId: audioItemId,
-      sentenceIndex: sentenceIndex,
-      sentenceText: sentenceText,
-      sentenceStartMs: sentenceStartMs,
-      sentenceEndMs: sentenceEndMs,
-    ),
-  );
-}
+/// 词典面板内容
+class DictionaryPanel extends ConsumerStatefulWidget {
+  /// 当前查询（查询文本 + 收藏来源信息）
+  final DictionaryPanelQuery query;
 
-/// 词典弹窗内容
-class WordDictionarySheet extends ConsumerStatefulWidget {
-  /// 查询的单词
-  final String word;
+  /// 关闭回调（下拉超阈值 / 关闭按钮触发；由宿主移除面板）
+  final VoidCallback onClose;
 
-  /// 来源音频 ID（可选）
-  final String? audioItemId;
+  /// 面板入场动画（宿主传入）。滑入期间内容区不套过渡动画，
+  /// 避免缓存命中结果到达时高度动画与滑入叠加产生闪烁。
+  final Animation<double>? entryAnimation;
 
-  /// 来源句子索引（可选）
-  final int? sentenceIndex;
-
-  /// 来源句子文本（可选）
-  final String? sentenceText;
-
-  /// 来源句子起始时间（毫秒）
-  final int? sentenceStartMs;
-
-  /// 来源句子结束时间（毫秒）
-  final int? sentenceEndMs;
-
-  const WordDictionarySheet({
+  const DictionaryPanel({
     super.key,
-    required this.word,
-    this.audioItemId,
-    this.sentenceIndex,
-    this.sentenceText,
-    this.sentenceStartMs,
-    this.sentenceEndMs,
+    required this.query,
+    required this.onClose,
+    this.entryAnimation,
   });
 
   @override
-  ConsumerState<WordDictionarySheet> createState() =>
-      _WordDictionarySheetState();
+  ConsumerState<DictionaryPanel> createState() => _DictionaryPanelState();
 }
 
-class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
-  /// 弹窗滑入动画是否已结束。
+class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
+  /// 面板滑入动画是否已结束。
   ///
   /// 滑入期间内容区不套 AnimatedSize/AnimatedSwitcher——否则缓存命中（L2）的
   /// 结果在滑入途中到达时，内容区高度增长动画会与滑入叠加，视觉上「闪烁一下」。
   /// 滑入期间内容直接定型（被滑入运动掩盖），滑入结束后才启用切换源的平滑过渡。
   bool _entered = false;
 
-  /// 监听的弹窗路由滑入动画（用于在滑入结束时刷新启用过渡）
-  Animation<double>? _routeAnimation;
-
   /// 统一 TTS 控制器（build 时缓存，供 [dispose] 取消词典预热——
   /// `ConsumerState.dispose` 内不可用 `ref`，见 CLAUDE.md §7.14）。
   TtsController? _ttsController;
 
-  /// 网页源弹窗的当前高度（像素）。仅网页源使用：默认 2/3 屏高，
+  /// 可拉伸源面板的当前高度（像素）。默认 2/3 屏高，
   /// 用户上拉拖拽指示条可放大、下拉可缩小（夹在 [_minSheetHeight] 与
-  /// [_maxSheetHeight] 之间）。文本源不用此值（按内容自适应）。
+  /// [_maxSheetHeight] 之间）。文本本地源不用此值（按内容自适应）。
   double? _sheetHeight;
 
   /// 拖拽过程中的「逻辑高度」（仅手势期间有值，可低于 [_minSheetHeight]）。
   ///
   /// 渲染用的 [_sheetHeight] 夹在 [_minSheetHeight] 上，不会真的缩到更小（避免
   /// 内容溢出）；而本字段如实记录手指位置，低于下限的部分即「关闭意图」。
-  /// 松手时若低于下限超过 [_kDismissOverdrag] 则关闭弹窗，实现标准底部弹窗的
+  /// 松手时若低于下限超过 [_kDismissOverdrag] 则关闭面板，实现标准底部面板的
   /// 下滑关闭手感。如此从手指真实位置计算，单步/多步拖拽结果一致。
   double? _dragLogicalHeight;
 
   /// 触发下滑关闭的 overdrag 阈值（像素）：低于下限再多拉这么多即关闭。
   static const double _kDismissOverdrag = 80;
 
-  /// 网页源弹窗高度下限：屏高 40%
+  /// 面板高度下限：屏高 40%
   double get _minSheetHeight => MediaQuery.sizeOf(context).height * 0.4;
 
-  /// 网页源弹窗高度上限：屏高 95%（与 modal constraints 一致）
+  /// 面板高度上限：屏高 95%（嵌入正文时再受宿主 Stack 约束自然封顶）
   double get _maxSheetHeight => MediaQuery.sizeOf(context).height * 0.95;
 
-  /// 网页源弹窗默认高度：屏高 2/3
+  /// 面板默认高度：屏高 2/3
   double get _defaultSheetHeight => MediaQuery.sizeOf(context).height * 2 / 3;
 
   @override
   void initState() {
     super.initState();
-    // 单词本身在弹窗打开时即已知，立即后台预热，不必等 AI 查询返回。
+    // 查询文本在面板打开时即已知，立即后台预热，不必等 AI 查询返回。
     // 标题行 SpeakButton 加载前发的就是 _normalizedWord；AI 返回后
     // prewarmTexts 的完整批次会把 headword 排首位，命中缓存/在途去重不重复合成。
     ref.read(ttsControllerProvider.notifier).prewarmTexts([_normalizedWord]);
+    _watchEntryAnimation();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final anim = ModalRoute.of(context)?.animation;
-    if (identical(anim, _routeAnimation)) return;
-    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
-    _routeAnimation = anim;
+  /// 监听入场动画：结束时启用内容区过渡。无动画（测试直连）视为已入场。
+  void _watchEntryAnimation() {
+    final anim = widget.entryAnimation;
     if (anim == null || anim.status == AnimationStatus.completed) {
       _entered = true;
     } else {
-      anim.addStatusListener(_onRouteAnimationStatus);
+      anim.addStatusListener(_onEntryAnimationStatus);
     }
   }
 
   /// 滑入完成后启用内容区过渡并刷新
-  void _onRouteAnimationStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed && !_entered) {
+  void _onEntryAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_entered && mounted) {
       setState(() => _entered = true);
     }
   }
 
   @override
+  void didUpdateWidget(DictionaryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldWord = normalizeWord(oldWidget.query.word);
+    if (oldWord != _normalizedWord) {
+      // 切词：停掉旧词的在途预热/朗读，立即预热新词。
+      // 用户调整过的面板高度保留（连续查词不跳动）。
+      _ttsController?.cancelTextsPrewarm();
+      _ttsController?.stop();
+      ref.read(ttsControllerProvider.notifier).prewarmTexts([_normalizedWord]);
+    }
+  }
+
+  @override
   void dispose() {
-    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
-    // 弹窗关闭即停在途预热，避免离开后继续占用 CPU 合成用不到的例句。
+    widget.entryAnimation?.removeStatusListener(_onEntryAnimationStatus);
+    // 面板关闭即停在途预热，避免离开后继续占用 CPU 合成用不到的例句。
     _ttsController?.cancelTextsPrewarm();
-    // 弹窗关闭即停止正在朗读的单词/例句，避免离开后声音继续播到尾。
+    // 面板关闭即停止正在朗读的单词/例句，避免离开后声音继续播到尾。
     _ttsController?.stop();
     super.dispose();
   }
 
   /// 当前选中源是否为网页词典源
   ///
-  /// 网页源内容为固定像素的 WebView，需要弹窗给出明确高度并支持上拉放大；
+  /// 网页源内容为固定像素的 WebView，需要面板给出明确高度并支持上拉放大；
   /// 文本源（本地/AI）按内容自适应，不走拖拽逻辑。
   bool _isWebSource(String sourceId) =>
       ref.read(dictionarySourcesByIdProvider)[sourceId] is WebDictionarySource;
@@ -189,7 +155,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     _dragLogicalHeight = _sheetHeight ?? _defaultSheetHeight;
   }
 
-  /// 拖拽 header 调整弹窗高度：上拉（delta.dy<0）放大，下拉缩小。
+  /// 拖拽 header 调整面板高度：上拉（delta.dy<0）放大，下拉缩小。
   /// 逻辑高度可低于下限（记录手指真实位置），渲染高度夹在下限上。
   void _onHandleDrag(DragUpdateDetails details) {
     final base = _dragLogicalHeight ?? _sheetHeight ?? _defaultSheetHeight;
@@ -201,18 +167,19 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     });
   }
 
-  /// 拖拽结束：逻辑高度低于下限超过阈值（下拉到底再继续拉）则关闭弹窗。
+  /// 拖拽结束：逻辑高度低于下限超过阈值（下拉到底再继续拉）则关闭面板。
   void _onHandleDragEnd(DragEndDetails details) {
     final logical = _dragLogicalHeight ?? _minSheetHeight;
     _dragLogicalHeight = null;
     if (_minSheetHeight - logical > _kDismissOverdrag && mounted) {
-      Navigator.of(context).maybePop();
+      widget.onClose();
     }
   }
 
-  /// 归一化后的词形，用于查询（family key）与展示，
-  /// 与各词典源、后端共用同一 [normalizeWord]（trim + 剥首尾标点[右撇号除外] + 小写）
-  String get _normalizedWord => normalizeWord(widget.word);
+  /// 归一化后的词形（单词或词组），用于查询（family key）与展示，
+  /// 与各词典源、后端共用同一 [normalizeWord]
+  /// （trim + 剥首尾标点[右撇号除外] + 小写 + 内部空白折叠）
+  String get _normalizedWord => normalizeWord(widget.query.word);
 
   /// 标题展示词：优先用当前结果的 headword（本地原形/AI 词头），否则用归一化词形
   String _displayWord(DictionaryLookupState state) {
@@ -237,11 +204,11 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     } else {
       await notifier.saveWord(
         word: lemma,
-        audioItemId: widget.audioItemId,
-        sentenceIndex: widget.sentenceIndex,
-        sentenceText: widget.sentenceText,
-        sentenceStartMs: widget.sentenceStartMs,
-        sentenceEndMs: widget.sentenceEndMs,
+        audioItemId: widget.query.audioItemId,
+        sentenceIndex: widget.query.sentenceIndex,
+        sentenceText: widget.query.sentenceText,
+        sentenceStartMs: widget.query.sentenceStartMs,
+        sentenceEndMs: widget.query.sentenceEndMs,
       );
     }
   }
@@ -293,38 +260,49 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
     final displayWord = _displayWord(state);
     final isWeb = _isWebSource(state.selectedSourceId);
     // AI 与网页源内容丰富，默认 2/3 屏高且可上拉放大；本地源内容短，按内容自适应。
-    final isResizable = isWeb || state.selectedSourceId == 'ai';
+    final isResizable =
+        isWeb || state.selectedSourceId == AiDictionarySource.sourceId;
 
-    return SafeArea(
-      child: SizedBox(
-        key: const Key('dict_sheet_sizer'),
-        // 可拉伸源用显式高度（默认 2/3，可拖拽指示条调整）；本地源按内容自适应。
-        height: isResizable ? (_sheetHeight ?? _defaultSheetHeight) : null,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.l,
-            6,
-            AppSpacing.l,
-            AppSpacing.s,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // header（指示条 + 数据源行 + 标题行）：可拉伸源时整块可上下拖拽调整高度
-              _buildHeader(
-                theme,
-                state,
-                notifier,
-                displayWord,
-                lemma,
-                isResizable,
-              ),
-              const SizedBox(height: AppSpacing.s),
+    // 非 modal 嵌入渲染：自带表面（顶部圆角 + 阴影），原 modal 容器不复存在。
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 12,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          key: const Key('dict_sheet_sizer'),
+          // 可拉伸源用显式高度（默认 2/3，可拖拽指示条调整）；本地源按内容自适应。
+          height: isResizable ? (_sheetHeight ?? _defaultSheetHeight) : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.l,
+              6,
+              AppSpacing.l,
+              AppSpacing.s,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // header（指示条 + 数据源行 + 标题行）：可拉伸源时整块可上下拖拽调整高度
+                _buildHeader(
+                  theme,
+                  state,
+                  notifier,
+                  displayWord,
+                  lemma,
+                  isResizable,
+                ),
+                const SizedBox(height: AppSpacing.s),
 
-              // 内容区：按选中源渲染。
-              _buildResultArea(state, word, notifier, isWeb, isResizable),
-            ],
+                // 内容区：按选中源渲染。
+                _buildResultArea(state, word, notifier, isWeb, isResizable),
+              ],
+            ),
           ),
         ),
       ),
@@ -332,7 +310,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   }
 
   /// 内容区：按源类型决定填充策略。
-  /// - 网页源（[isWeb]）：填满弹窗剩余高度且占满宽度，WebView 跟随上拉一起放大；
+  /// - 网页源（[isWeb]）：填满面板剩余高度且占满宽度，WebView 跟随上拉一起放大；
   /// - AI 源（[isResizable] 且非网页）：填满剩余高度并内部滚动，跟随上拉显示更多；
   /// - 本地源：按内容自适应、限高 2/3 并内部滚动。
   Widget _buildResultArea(
@@ -378,7 +356,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   /// header 整块：指示条 + 数据源选择行 + 标题行。
   ///
   /// [resizable] 为 true（AI/网页源）时，整块 header（含指示条、数据源行、
-  /// 标题行及行间留白）都可上下拖拽调整弹窗高度——竖向拖拽由外层
+  /// 标题行及行间留白）都可上下拖拽调整面板高度——竖向拖拽由外层
   /// [GestureDetector] 接管，内部按钮/长按只用 tap/longPress，经手势竞技场天然
   /// 区分（纯点击→按钮赢，有竖向位移→拖拽赢），不破坏现有交互。
   Widget _buildHeader(
@@ -417,7 +395,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         ),
         const SizedBox(height: 8),
 
-        // 标题行：单词 + 发音 + 收藏（跨源恒定）
+        // 标题行：单词 + 发音 + 收藏 + 关闭（跨源恒定）
         _buildTitleRow(theme, displayWord, lemma),
       ],
     );
@@ -452,7 +430,7 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
   }
 
   /// 内容区包装：滑入结束前直接返回内容（无过渡，被滑入运动掩盖）；
-  /// 滑入结束后套 AnimatedSize + AnimatedSwitcher，使切换数据源时平滑过渡。
+  /// 滑入结束后套 AnimatedSize + AnimatedSwitcher，使切换数据源/切词时平滑过渡。
   Widget _buildContent(String sourceId, Widget content) {
     if (!_entered) return content;
     return AnimatedSize(
@@ -460,12 +438,16 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
       alignment: Alignment.topCenter,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
-        child: KeyedSubtree(key: ValueKey(sourceId), child: content),
+        // 切源与切词都触发过渡
+        child: KeyedSubtree(
+          key: ValueKey('$_normalizedWord|$sourceId'),
+          child: content,
+        ),
       ),
     );
   }
 
-  /// 标题行：单词（可长按复制）+ TTS + 收藏
+  /// 标题行：单词（可长按复制）+ TTS + 收藏 + 关闭
   Widget _buildTitleRow(ThemeData theme, String word, String lemma) {
     final isSaved = ref.watch(isWordSavedProvider(lemma)).valueOrNull ?? false;
     return Row(
@@ -490,6 +472,13 @@ class _WordDictionarySheetState extends ConsumerState<WordDictionarySheet> {
         AnimatedBookmarkIcon(
           isSaved: isSaved,
           onPressed: () => _toggleSave(lemma, isSaved),
+        ),
+        IconButton(
+          key: const Key('dict_panel_close'),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          icon: const Icon(Icons.close),
+          visualDensity: VisualDensity.compact,
+          onPressed: widget.onClose,
         ),
       ],
     );

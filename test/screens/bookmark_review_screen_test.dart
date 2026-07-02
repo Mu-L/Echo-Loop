@@ -543,9 +543,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 逐词可点击布局：每个单词是单独的 Text
-      expect(find.text('Bookmark'), findsOneWidget);
-      expect(find.text('sentence '), findsOneWidget);
+      // 统一可点词组件：整句渲染为单个 RichText
+      expect(
+        find.text('Bookmark sentence number 1.', findRichText: true),
+        findsOneWidget,
+      );
     });
 
     testWidgets('偷看切换隐藏句子文本', (tester) async {
@@ -561,7 +563,10 @@ void main() {
 
       // 非 revealed 时显示隐藏占位
       expect(find.byIcon(Icons.hearing), findsOneWidget);
-      expect(find.text('sentence '), findsNothing);
+      expect(
+        find.text('Bookmark sentence number 1.', findRichText: true),
+        findsNothing,
+      );
     });
 
     testWidgets('点击偷看切换文本可见性', (tester) async {
@@ -579,8 +584,11 @@ void main() {
       await tester.tap(find.text('Peek'));
       await tester.pumpAndSettle();
 
-      // 逐词可点击布局：每个单词是单独的 Text
-      expect(find.text('sentence '), findsOneWidget);
+      // 统一可点词组件：整句渲染为单个 RichText
+      expect(
+        find.text('Bookmark sentence number 1.', findRichText: true),
+        findsOneWidget,
+      );
     });
 
     testWidgets('盲听模式打开设置会进入 WaitingForUser', (tester) async {

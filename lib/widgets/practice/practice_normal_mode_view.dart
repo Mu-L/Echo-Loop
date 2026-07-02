@@ -16,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/common/tappable_wrapper.dart';
 import '../../widgets/common/text_context_menu.dart';
 import '../../widgets/guide_flow.dart';
+import 'selectable_sentence_text.dart';
 
 /// 普通模式视图（文字遮盖 / 偷看）
 class PracticeNormalModeView extends StatelessWidget {
@@ -51,8 +52,11 @@ class PracticeNormalModeView extends StatelessWidget {
   /// 当前句子文本
   final String? sentenceText;
 
-  /// 点击单词查词回调（null 时不启用逐词点击）
-  final void Function(String word)? onWordTap;
+  /// 查词来源上下文（null 时不启用点词/词组选择，渲染纯文本）
+  final DictionaryLookupOrigin? lookupOrigin;
+
+  /// 查词前副作用钩子（如进入等待用户态），点词与词组松手时触发
+  final VoidCallback? onBeforeLookup;
 
   /// 可选：新手引导步骤，用于给「听不太懂」按钮挂 Showcase
   final GuideStep? cantUnderstandStep;
@@ -69,7 +73,8 @@ class PracticeNormalModeView extends StatelessWidget {
     required this.onToggleMark,
     this.isDifficult = true,
     this.sentenceText,
-    this.onWordTap,
+    this.lookupOrigin,
+    this.onBeforeLookup,
     this.cantUnderstandStep,
   });
 
@@ -134,15 +139,14 @@ class PracticeNormalModeView extends StatelessWidget {
                                   details.globalPosition,
                                   sentenceText!,
                                 ),
-                            child: onWordTap != null
-                                ? _TappableText(
+                            child: lookupOrigin != null
+                                ? SelectableSentenceText(
                                     text: sentenceText!,
-                                    style:
-                                        theme.textTheme.bodyLarge?.copyWith(
-                                          height: 1.6,
-                                        ) ??
-                                        const TextStyle(),
-                                    onWordTap: onWordTap!,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      height: 1.6,
+                                    ),
+                                    origin: lookupOrigin!,
+                                    onBeforeLookup: onBeforeLookup,
                                   )
                                 : Text(
                                     sentenceText!,
@@ -314,87 +318,6 @@ class _PeekLabel extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 去除单词两端的标点符号
-String _cleanWord(String word) => word.replaceAll(
-  RegExp(
-    r'[.,!?;:\-—…、，。！？；："""'
-    '()]',
-  ),
-  '',
-);
-
-/// 逐词可点击的文本（Wrap 布局，点击单词触发查词，带按压高亮反馈）
-class _TappableText extends StatelessWidget {
-  final String text;
-  final TextStyle style;
-  final void Function(String word) onWordTap;
-
-  const _TappableText({
-    required this.text,
-    required this.style,
-    required this.onWordTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = text.split(RegExp(r'\s+'));
-    return Wrap(
-      alignment: WrapAlignment.start,
-      children: tokens.map((token) {
-        final clean = _cleanWord(token);
-        if (clean.isEmpty) return Text('$token ', style: style);
-        return _TappableWord(
-          token: '$token ',
-          style: style,
-          onTap: () => onWordTap(clean),
-        );
-      }).toList(),
-    );
-  }
-}
-
-/// 单个可点击单词（按压时显示浅色背景高亮）
-class _TappableWord extends StatefulWidget {
-  final String token;
-  final TextStyle style;
-  final VoidCallback onTap;
-
-  const _TappableWord({
-    required this.token,
-    required this.style,
-    required this.onTap,
-  });
-
-  @override
-  State<_TappableWord> createState() => _TappableWordState();
-}
-
-class _TappableWordState extends State<_TappableWord> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final highlightColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: 0.1);
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        decoration: BoxDecoration(
-          color: _isPressed ? highlightColor : null,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(widget.token, style: widget.style),
-      ),
     );
   }
 }

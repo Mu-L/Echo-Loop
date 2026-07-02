@@ -40,6 +40,7 @@ import '../widgets/dialogs/free_play_complete_dialog.dart';
 import '../widgets/dialogs/step_complete_dialog.dart';
 import '../widgets/review/review_briefing_sheet.dart';
 import '../widgets/player_hotkey_scope.dart';
+import '../widgets/dictionary/dictionary_panel_host.dart';
 import '../widgets/practice/annotation_content_view.dart';
 import '../widgets/common/practice_playback_footer.dart';
 import '../widgets/common/recording_button.dart' show RecordingButtonMode;
@@ -71,6 +72,10 @@ class _ListenAndRepeatPlayerScreenState
     with WakelockMixin {
   /// 是否正在退出页面，防止退出过程中 listener 触发弹窗
   bool _isExiting = false;
+
+  /// 词典面板宿主（返回/退出时先关面板的 guard 用）
+  final GlobalKey<DictionaryPanelHostState> _dictPanelHostKey =
+      GlobalKey<DictionaryPanelHostState>();
 
   /// 是否正在显示完成弹窗，防止重复弹窗
   bool _isShowingDialog = false;
@@ -151,6 +156,8 @@ class _ListenAndRepeatPlayerScreenState
 
   /// 处理退出（close 按钮 / 系统返回）
   Future<void> _handleExit() async {
+    // 词典面板开着时本次返回只关面板，不退出页面
+    if (_dictPanelHostKey.currentState?.closeIfOpen() ?? false) return;
     _isExiting = true;
     final ctrl = ref.read(listenAndRepeatControllerProvider.notifier);
     ctrl.enterWaitingForUser();
@@ -461,165 +468,173 @@ class _ListenAndRepeatPlayerScreenState
                 ),
               ],
             ),
-            body: Column(
-              children: [
-                // 进度条
-                PracticeProgressSection(
-                  current: ctrlState.sentenceIndex + 1,
-                  total: ctrlState.totalSentences,
-                  progressText: l10n.listenAndRepeatProgress(
-                    ctrlState.sentenceIndex + 1,
-                    ctrlState.totalSentences,
-                  ),
-                  durationText: durationText,
-                  showAudioSource: false,
-                  onSeek: (i) => ref
-                      .read(listenAndRepeatControllerProvider.notifier)
-                      .goToSentence(i),
-                ),
-
-                // 主体内容：书签行 + 标注内容
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.l,
+            // 词典面板宿主：面板内嵌 body、非 modal（显示期间正文可继续点词）
+            body: DictionaryPanelHost(
+              key: _dictPanelHostKey,
+              child: Column(
+                children: [
+                  // 进度条
+                  PracticeProgressSection(
+                    current: ctrlState.sentenceIndex + 1,
+                    total: ctrlState.totalSentences,
+                    progressText: l10n.listenAndRepeatProgress(
+                      ctrlState.sentenceIndex + 1,
+                      ctrlState.totalSentences,
                     ),
-                    child: currentSentence != null
-                        ? Column(
-                            children: [
-                              const SizedBox(height: AppSpacing.s),
-                              BookmarkToggleRow(
-                                isDifficult:
-                                    ctrlState.currentSentenceBookmarked,
-                                onTap: () => ref
-                                    .read(
-                                      listenAndRepeatControllerProvider
-                                          .notifier,
-                                    )
-                                    .toggleCurrentBookmark(),
-                              ),
-                              const SizedBox(height: AppSpacing.m),
-                              Expanded(
-                                child: AnnotationContentView(
-                                  text: currentSentence.text,
-                                  aiNotifier: ref.read(
-                                    sentenceAiNotifierProvider,
-                                  ),
-                                  audioItemId: widget.audioItemId,
-                                  sentenceIndex: ctrlState.sentenceIndex,
-                                  sentenceStartMs:
-                                      currentSentence.startTime.inMilliseconds,
-                                  sentenceEndMs:
-                                      currentSentence.endTime.inMilliseconds,
-                                  highlightedSegments:
-                                      currentAttempt?.referenceSegments,
-                                  onStopMainPlayer: () {
-                                    ctrl.enterWaitingForUser();
-                                  },
-                                  onToolbarButtonTapped: () {
-                                    AppLogger.log('L&R Screen', '工具栏点击: 打断流程');
-                                    ctrl.onUserInteraction();
-                                  },
-                                ),
-                              ),
-                            ],
-                          )
-                        : const SizedBox.shrink(),
+                    durationText: durationText,
+                    showAudioSource: false,
+                    onSeek: (i) => ref
+                        .read(listenAndRepeatControllerProvider.notifier)
+                        .goToSentence(i),
                   ),
-                ),
 
-                // 底部区域：评分 + 录音/倒计时 + 播放控制 + 遍数
-                RepeatPracticePanel(
-                  l10n: l10n,
-                  theme: theme,
-                  recordingMode: recordingMode,
-                  isProcessing: isProcessing,
-                  currentAttempt: currentAttempt,
-                  hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
-                  showCountdown: showCountdown,
-                  isInPause: isInPause,
-                  countdownWidget: showCountdown
-                      ? Center(
-                          child: Consumer(
-                            builder: (context, ref, _) {
-                              final phase = ref.watch(
-                                listenAndRepeatControllerProvider.select(
-                                  (s) => s.phase,
+                  // 主体内容：书签行 + 标注内容
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.l,
+                      ),
+                      child: currentSentence != null
+                          ? Column(
+                              children: [
+                                const SizedBox(height: AppSpacing.s),
+                                BookmarkToggleRow(
+                                  isDifficult:
+                                      ctrlState.currentSentenceBookmarked,
+                                  onTap: () => ref
+                                      .read(
+                                        listenAndRepeatControllerProvider
+                                            .notifier,
+                                      )
+                                      .toggleCurrentBookmark(),
                                 ),
-                              );
-                              if (phase is! WaitingInterval) {
-                                return const SizedBox.shrink();
-                              }
-                              return CountdownChip(
-                                total: phase.total,
-                                isPaused: phase.isPaused,
-                                isFastForward: phase.speed > 1.0,
-                                onPause: ctrl.pauseInterval,
-                                onResume: ctrl.resumeInterval,
-                              );
-                            },
-                          ),
-                        )
-                      : null,
-                  onRecordTap: () => ctrl.onRecordButtonTapped(),
-                  onFastForward:
-                      showCountdown &&
-                          ctrlState.phase is WaitingInterval &&
-                          !(ctrlState.phase as WaitingInterval).isPaused
-                      ? ctrl.fastForwardInterval
-                      : null,
-                  onBeforePlayback: () => ref
-                      .read(listenAndRepeatControllerProvider.notifier)
-                      .prepareForPlayback(),
-                ),
-                PracticePlaybackFooter(
-                  canGoPrev: !ctrlState.isFirstSentence,
-                  isLast: ctrlState.isLastSentence,
-                  centerIcon: isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  onPrevious: () {
-                    ref
-                        .read(speechRecordingControllerProvider.notifier)
-                        .clearRecording();
-                    unawaited(ctrl.previousSentence());
-                  },
-                  onNext: () {
-                    ref
-                        .read(speechRecordingControllerProvider.notifier)
-                        .clearRecording();
-                    if (ctrlState.isLastSentence) {
-                      ctrl.stopSession();
-                      _handleCompleted();
-                    } else {
-                      unawaited(ctrl.nextSentence());
-                    }
-                  },
-                  onCenter: () {
-                    if (isInPause) {
+                                const SizedBox(height: AppSpacing.m),
+                                Expanded(
+                                  child: AnnotationContentView(
+                                    text: currentSentence.text,
+                                    aiNotifier: ref.read(
+                                      sentenceAiNotifierProvider,
+                                    ),
+                                    audioItemId: widget.audioItemId,
+                                    sentenceIndex: ctrlState.sentenceIndex,
+                                    sentenceStartMs: currentSentence
+                                        .startTime
+                                        .inMilliseconds,
+                                    sentenceEndMs:
+                                        currentSentence.endTime.inMilliseconds,
+                                    highlightedSegments:
+                                        currentAttempt?.referenceSegments,
+                                    onStopMainPlayer: () {
+                                      ctrl.enterWaitingForUser();
+                                    },
+                                    onToolbarButtonTapped: () {
+                                      AppLogger.log(
+                                        'L&R Screen',
+                                        '工具栏点击: 打断流程',
+                                      );
+                                      ctrl.onUserInteraction();
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+
+                  // 底部区域：评分 + 录音/倒计时 + 播放控制 + 遍数
+                  RepeatPracticePanel(
+                    l10n: l10n,
+                    theme: theme,
+                    recordingMode: recordingMode,
+                    isProcessing: isProcessing,
+                    currentAttempt: currentAttempt,
+                    hintText: isPlaying ? l10n.listenAndRepeatListenHint : null,
+                    showCountdown: showCountdown,
+                    isInPause: isInPause,
+                    countdownWidget: showCountdown
+                        ? Center(
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                final phase = ref.watch(
+                                  listenAndRepeatControllerProvider.select(
+                                    (s) => s.phase,
+                                  ),
+                                );
+                                if (phase is! WaitingInterval) {
+                                  return const SizedBox.shrink();
+                                }
+                                return CountdownChip(
+                                  total: phase.total,
+                                  isPaused: phase.isPaused,
+                                  isFastForward: phase.speed > 1.0,
+                                  onPause: ctrl.pauseInterval,
+                                  onResume: ctrl.resumeInterval,
+                                );
+                              },
+                            ),
+                          )
+                        : null,
+                    onRecordTap: () => ctrl.onRecordButtonTapped(),
+                    onFastForward:
+                        showCountdown &&
+                            ctrlState.phase is WaitingInterval &&
+                            !(ctrlState.phase as WaitingInterval).isPaused
+                        ? ctrl.fastForwardInterval
+                        : null,
+                    onBeforePlayback: () => ref
+                        .read(listenAndRepeatControllerProvider.notifier)
+                        .prepareForPlayback(),
+                  ),
+                  PracticePlaybackFooter(
+                    canGoPrev: !ctrlState.isFirstSentence,
+                    isLast: ctrlState.isLastSentence,
+                    centerIcon: isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    onPrevious: () {
                       ref
                           .read(speechRecordingControllerProvider.notifier)
                           .clearRecording();
-                      ctrl.replayCurrentSentence();
-                    } else if (isPlaying) {
-                      ctrl.enterWaitingForUser();
-                    } else {
-                      ctrl.replayCurrentSentence();
-                    }
-                  },
-                  isManualMode: isManualMode,
-                  playCountText: formatPracticePlayCount(
-                    l10n,
-                    currentCount: ctrlState.repeatIndex + 1,
-                    totalCount: ctrlState.totalRepeats,
+                      unawaited(ctrl.previousSentence());
+                    },
+                    onNext: () {
+                      ref
+                          .read(speechRecordingControllerProvider.notifier)
+                          .clearRecording();
+                      if (ctrlState.isLastSentence) {
+                        ctrl.stopSession();
+                        _handleCompleted();
+                      } else {
+                        unawaited(ctrl.nextSentence());
+                      }
+                    },
+                    onCenter: () {
+                      if (isInPause) {
+                        ref
+                            .read(speechRecordingControllerProvider.notifier)
+                            .clearRecording();
+                        ctrl.replayCurrentSentence();
+                      } else if (isPlaying) {
+                        ctrl.enterWaitingForUser();
+                      } else {
+                        ctrl.replayCurrentSentence();
+                      }
+                    },
+                    isManualMode: isManualMode,
+                    playCountText: formatPracticePlayCount(
+                      l10n,
+                      currentCount: ctrlState.repeatIndex + 1,
+                      totalCount: ctrlState.totalRepeats,
+                    ),
+                    statusSuffixText: _formatSpeed(
+                      ref.watch(listenAndRepeatSettingsProvider).playbackSpeed,
+                    ),
+                    l10n: l10n,
+                    theme: theme,
                   ),
-                  statusSuffixText: _formatSpeed(
-                    ref.watch(listenAndRepeatSettingsProvider).playbackSpeed,
-                  ),
-                  l10n: l10n,
-                  theme: theme,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
