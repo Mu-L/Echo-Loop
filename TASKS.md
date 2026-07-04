@@ -1,7 +1,19 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-04（词典面板查询标题与多词含义标题）
+> 最后更新：2026-07-05（词组选区手柄拖拽放大镜）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：词组选区手柄拖拽放大镜
+
+响应真机文本选区反馈：拖拽词组选区手柄时手指会挡住文字，接入 Flutter 内置平台自适应文本放大镜。
+
+- [x] **放大镜接入**：`SelectableSentenceText` 的手柄拖拽开始时显示 `TextMagnifier.adaptiveMagnifierConfiguration`，拖动中按当前词边界更新 `MagnifierInfo`，松手/取消/清选区/dispose 时隐藏 overlay。
+- [x] **几何对齐**：复用 `RenderParagraph.getBoxesForSelection` 计算 caret 与文本 bounds，保持词级吸附；触点 Y 归一到 caret 中心，避免结束手柄在文字下方时触发 iOS 放大镜隐藏阈值。
+- [x] **手柄命中区**：圆点视觉位置保持贴词边界，透明命中区覆盖圆点 + 选区竖线；命中区尽量收进组件 bounds，避免左手柄实际可抓面积变小。
+- [x] **测试**：补充 Android 平台拖拽显示/松手隐藏、取消拖拽清理 overlay、左手柄命中区与竖线命中范围回归用例。
+- [x] **验证**：`flutter analyze lib/widgets/practice/selectable_sentence_text.dart test/widgets/practice/selectable_sentence_text_test.dart` 0 问题；`flutter test test/widgets/practice/selectable_sentence_text_test.dart` 全过（16 例）。
+
+  **完成时间**: 2026-07-05
 
 ## 已完成：词典面板查询标题与多词含义标题
 

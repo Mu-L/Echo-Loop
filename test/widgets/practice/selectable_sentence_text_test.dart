@@ -177,6 +177,81 @@ void main() {
     expect(find.byKey(const Key('word_handle_end')), findsOneWidget);
   });
 
+  testWidgets('行首左手柄命中区收进文本 bounds，避免一半落到左侧不可点区域', (tester) async {
+    await tester.pumpWidget(wrap());
+    await tapWord(tester, 'alpha');
+    await tester.pumpAndSettle();
+
+    final textRect = tester.getRect(find.byType(RichText).first);
+    final startHandleRect = tester.getRect(
+      find.byKey(const Key('word_handle_start')),
+    );
+
+    expect(startHandleRect.left, greaterThanOrEqualTo(textRect.left));
+    expect(startHandleRect.width, 36);
+  });
+
+  testWidgets('左右手柄命中区覆盖竖线，不只是圆点周围', (tester) async {
+    await tester.pumpWidget(wrap());
+    await tapWord(tester, 'beta');
+    await tester.pumpAndSettle();
+
+    final startHandleRect = tester.getRect(
+      find.byKey(const Key('word_handle_start')),
+    );
+    final endHandleRect = tester.getRect(
+      find.byKey(const Key('word_handle_end')),
+    );
+
+    expect(startHandleRect.height, greaterThan(36));
+    expect(endHandleRect.height, greaterThan(36));
+  });
+
+  testWidgets(
+    'Android 手柄拖拽中显示放大镜，松手后隐藏',
+    (tester) async {
+      await tester.pumpWidget(wrap());
+      await tapWord(tester, 'alpha');
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('word_handle_end'))),
+      );
+      await tester.pump();
+      expect(find.byType(TextMagnifier), findsOneWidget);
+
+      await gesture.moveBy(const Offset(240, 0));
+      await tester.pump();
+      expect(find.byType(TextMagnifier), findsOneWidget);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(TextMagnifier), findsNothing);
+      expect(source.queries.last, 'alpha beta gamma');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    '手柄拖拽取消时清理放大镜 overlay',
+    (tester) async {
+      await tester.pumpWidget(wrap());
+      await tapWord(tester, 'beta');
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('word_handle_end'))),
+      );
+      await tester.pump();
+      expect(find.byType(TextMagnifier), findsOneWidget);
+
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(find.byType(TextMagnifier), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets('拖动右手柄扩选到句尾：松手查询词组', (tester) async {
     await tester.pumpWidget(wrap());
     await tapWord(tester, 'alpha');
@@ -184,8 +259,8 @@ void main() {
     expect(source.queries, ['alpha']);
 
     // 向右远拖：吸附到最后一个词 gamma，选区 = alpha beta gamma
-    await tester.drag(
-      find.byKey(const Key('word_handle_end')),
+    await tester.dragFrom(
+      tester.getCenter(find.byKey(const Key('word_handle_end'))),
       const Offset(600, 0),
     );
     await tester.pumpAndSettle();
@@ -198,8 +273,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 右手柄向左远拖：clamp 到不越过起始词，选区仍是 gamma
-    await tester.drag(
-      find.byKey(const Key('word_handle_end')),
+    await tester.dragFrom(
+      tester.getCenter(find.byKey(const Key('word_handle_end'))),
       const Offset(-600, 0),
     );
     await tester.pumpAndSettle();

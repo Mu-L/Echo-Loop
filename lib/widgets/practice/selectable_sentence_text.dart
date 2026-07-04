@@ -16,6 +16,8 @@
 /// （[DictionaryPanelHost.activeOwnerOf] 变化）时自动清除。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -124,6 +126,11 @@ class _SelectableSentenceTextState
   /// 选区边界竖线宽度
   static const double _kCaretWidth = 2;
 
+  /// Flutter 内置文本放大镜：移动端按平台渲染 iOS/Android 样式，桌面端自动不显示。
+  final MagnifierController _magnifierController = MagnifierController();
+  final ValueNotifier<MagnifierInfo> _magnifierInfo =
+      ValueNotifier<MagnifierInfo>(MagnifierInfo.empty);
+
   /// 已注册豁免区域的宿主（组件卸载时按同一实例注销）
   DictionaryPanelHostState? _host;
 
@@ -183,6 +190,8 @@ class _SelectableSentenceTextState
   @override
   void dispose() {
     _host?.unregisterTapThroughHitTest(_hitsTapThrough);
+    _hideMagnifier();
+    _magnifierInfo.dispose();
     super.dispose();
   }
 
@@ -201,26 +210,63 @@ class _SelectableSentenceTextState
         _handleHitRect(isStartHandle: false).contains(local);
   }
 
-  /// 手柄命中区矩形（组件局部坐标），与 [_buildHandle] 的定位公式一致：
-  /// 36dp 见方、以圆点为中心；无锚点（无选区/未完成 post-frame 定位）时为空
+  /// 手柄命中区矩形（组件局部坐标），与 [_buildHandle] 的定位公式一致。
+  /// 视觉圆点贴词边界，但命中区覆盖圆点 + 选区竖线，而不是只围绕圆点；
+  /// 这样抓蓝色竖线附近也能拖动，左右手柄体感更接近系统文本选择。
   Rect _handleHitRect({required bool isStartHandle}) {
     final anchor = isStartHandle ? _startAnchor : _endAnchor;
     if (anchor == null) return Rect.zero;
+    final dotCenter = _handleDotCenter(isStartHandle: isStartHandle);
+    if (dotCenter == null) return Rect.zero;
+    final obj = context.findRenderObject();
+    final bounds = obj is RenderBox && obj.hasSize
+        ? Offset.zero & obj.size
+        : Rect.zero;
+    return _shiftRectInsideBounds(
+      Rect.fromLTRB(
+        dotCenter.dx - _kHandleHitSize / 2,
+        isStartHandle ? dotCenter.dy - _kHandleHitSize / 2 : anchor.top,
+        dotCenter.dx + _kHandleHitSize / 2,
+        isStartHandle ? anchor.bottom : dotCenter.dy + _kHandleHitSize / 2,
+      ),
+      bounds,
+    );
+  }
+
+  /// 手柄圆点视觉中心（组件局部坐标）。命中区可偏移，视觉位置不可偏移，
+  /// 否则选区边界会看起来脱离文字。
+  Offset? _handleDotCenter({required bool isStartHandle}) {
+    final anchor = isStartHandle ? _startAnchor : _endAnchor;
+    if (anchor == null) return null;
     final x = isStartHandle ? anchor.left : anchor.right;
     final dotCenterY = isStartHandle
         ? anchor.top - _kHandleDotSize / 2
         : anchor.bottom + _kHandleDotSize / 2;
-    return Rect.fromCenter(
-      center: Offset(x, dotCenterY),
-      width: _kHandleHitSize,
-      height: _kHandleHitSize,
-    );
+    return Offset(x, dotCenterY);
+  }
+
+  Rect _shiftRectInsideBounds(Rect rect, Rect bounds) {
+    if (bounds.isEmpty) return rect;
+    var dx = 0.0;
+    if (rect.left < bounds.left) {
+      dx = bounds.left - rect.left;
+    } else if (rect.right > bounds.right) {
+      dx = bounds.right - rect.right;
+    }
+    var dy = 0.0;
+    if (rect.top < bounds.top) {
+      dy = bounds.top - rect.top;
+    } else if (rect.bottom > bounds.bottom) {
+      dy = bounds.bottom - rect.bottom;
+    }
+    return rect.shift(Offset(dx, dy));
   }
 
   void _clearSelection() {
     _selection = null;
     _startAnchor = null;
     _endAnchor = null;
+    _hideMagnifier();
   }
 
   // -- 查词触发 --
@@ -260,6 +306,15 @@ class _SelectableSentenceTextState
 
   // -- 手柄拖拽 --
 
+  /// 手柄拖拽开始：显示 Flutter 平台自适应放大镜，降低手指遮挡文字的问题。
+  void _handleDragStart(bool isStartHandle, Offset globalPosition) {
+    _showOrUpdateMagnifier(
+      isStartHandle,
+      globalPosition,
+      selection: _selection,
+    );
+  }
+
   /// 手柄拖拽中把手指位置换算为文本内字符偏移并做词级吸附
   void _updateSelectionFromDrag(bool isStartHandle, Offset globalPosition) {
     final para = _paragraph;
@@ -283,16 +338,96 @@ class _SelectableSentenceTextState
       setState(() => _selection = next);
       _scheduleAnchorUpdate();
     }
+    _showOrUpdateMagnifier(isStartHandle, globalPosition, selection: next);
   }
 
   /// 手柄松手：以当前选区文本查询（与上次查询相同则不重复触发）
   void _handleDragEnd() {
+    _hideMagnifier();
     final sel = _selection;
     if (sel == null) return;
     widget.onBeforeLookup?.call();
     DictionaryPanelHost.of(
       context,
     ).show(widget.origin.queryFor(sel.textOf(_fullText, _tokens)), owner: this);
+  }
+
+  void _handleDragCancel() {
+    _hideMagnifier();
+  }
+
+  /// 显示或更新放大镜。坐标按 Flutter [TextMagnifier] 约定转换到 root overlay；
+  /// 触点 Y 使用 caret 中心，避免结束手柄位于文字下方时被 iOS 阈值判断为隐藏。
+  void _showOrUpdateMagnifier(
+    bool isStartHandle,
+    Offset globalPosition, {
+    required WordSelection? selection,
+  }) {
+    final info = _magnifierInfoForHandle(
+      isStartHandle,
+      globalPosition,
+      selection: selection,
+    );
+    if (info == null) return;
+    _magnifierInfo.value = info;
+    if (_magnifierController.overlayEntry != null) return;
+
+    final builtMagnifier = TextMagnifier.adaptiveMagnifierConfiguration
+        .magnifierBuilder(context, _magnifierController, _magnifierInfo);
+    if (builtMagnifier == null) return;
+    _magnifierController.show(
+      context: context,
+      debugRequiredFor: widget,
+      builder: (_) => builtMagnifier,
+    );
+  }
+
+  MagnifierInfo? _magnifierInfoForHandle(
+    bool isStartHandle,
+    Offset globalPosition, {
+    required WordSelection? selection,
+  }) {
+    final para = _paragraph;
+    if (para == null || selection == null) return null;
+    final overlay = Overlay.of(
+      context,
+      rootOverlay: true,
+    ).context.findRenderObject();
+    if (overlay is! RenderBox) return null;
+
+    final token =
+        _tokens[isStartHandle ? selection.startToken : selection.endToken];
+    final boxes = para.getBoxesForSelection(
+      TextSelection(baseOffset: token.start, extentOffset: token.end),
+    );
+    if (boxes.isEmpty) return null;
+
+    final anchor = isStartHandle ? boxes.first.toRect() : boxes.last.toRect();
+    final caretX = isStartHandle ? anchor.left : anchor.right;
+    final localCaret = Rect.fromLTWH(caretX, anchor.top, 0, anchor.height);
+    final transformToOverlay = para.getTransformTo(overlay);
+    final caretRect = MatrixUtils.transformRect(transformToOverlay, localCaret);
+    final fieldBounds = MatrixUtils.transformRect(
+      transformToOverlay,
+      para.paintBounds,
+    );
+    final overlayGesture = overlay.globalToLocal(globalPosition);
+
+    return MagnifierInfo(
+      globalGesturePosition: Offset(overlayGesture.dx, caretRect.center.dy),
+      caretRect: caretRect,
+      fieldBounds: fieldBounds,
+      currentLineBoundaries: Rect.fromLTRB(
+        fieldBounds.left,
+        caretRect.top,
+        fieldBounds.right,
+        caretRect.bottom,
+      ),
+    );
+  }
+
+  void _hideMagnifier() {
+    unawaited(_magnifierController.hide());
   }
 
   // -- 手柄几何 --
@@ -481,6 +616,8 @@ class _SelectableSentenceTextState
     // 命中区矩形与屏障豁免判定共用同一公式（[_handleHitRect]），保证
     // 「能拖到的位置」与「屏障放行的位置」永远一致
     final hitRect = _handleHitRect(isStartHandle: isStartHandle);
+    final dotCenter = _handleDotCenter(isStartHandle: isStartHandle);
+    if (dotCenter == null) return const SizedBox.shrink();
     return Positioned(
       left: hitRect.left,
       top: hitRect.top,
@@ -492,25 +629,34 @@ class _SelectableSentenceTextState
                 ImmediateMultiDragGestureRecognizer
               >(ImmediateMultiDragGestureRecognizer.new, (recognizer) {
                 recognizer.onStart = (offset) => _HandleDrag(
+                  onStart: () => _handleDragStart(isStartHandle, offset),
                   onUpdate: (d) =>
                       _updateSelectionFromDrag(isStartHandle, d.globalPosition),
                   onEnd: _handleDragEnd,
+                  onCancel: _handleDragCancel,
                 );
               }),
         },
         child: SizedBox(
           key: Key(isStartHandle ? 'word_handle_start' : 'word_handle_end'),
-          width: _kHandleHitSize,
-          height: _kHandleHitSize,
-          child: Center(
-            child: Container(
-              width: _kHandleDotSize,
-              height: _kHandleDotSize,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
+          width: hitRect.width,
+          height: hitRect.height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: dotCenter.dx - hitRect.left - _kHandleDotSize / 2,
+                top: dotCenter.dy - hitRect.top - _kHandleDotSize / 2,
+                child: Container(
+                  width: _kHandleDotSize,
+                  height: _kHandleDotSize,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -555,10 +701,19 @@ class _RenderUnboundedHitStack extends RenderStack {
 
 /// 手柄拖拽会话（ImmediateMultiDrag 的 Drag 回调载体）
 class _HandleDrag extends Drag {
+  final VoidCallback onStart;
   final void Function(DragUpdateDetails) onUpdate;
   final VoidCallback onEnd;
+  final VoidCallback onCancel;
 
-  _HandleDrag({required this.onUpdate, required this.onEnd});
+  _HandleDrag({
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+    required this.onCancel,
+  }) {
+    onStart();
+  }
 
   @override
   void update(DragUpdateDetails details) => onUpdate(details);
@@ -567,5 +722,5 @@ class _HandleDrag extends Drag {
   void end(DragEndDetails details) => onEnd();
 
   @override
-  void cancel() {}
+  void cancel() => onCancel();
 }
