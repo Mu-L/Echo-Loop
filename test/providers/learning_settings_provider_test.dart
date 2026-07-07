@@ -37,6 +37,7 @@ void main() {
       expect(settings.listenAndRepeatRatingEnabled, isTrue);
       expect(settings.retellRatingEnabled, isTrue);
       expect(settings.retellAutoPlaybackPromptShown, isFalse);
+      expect(settings.pdfExportReminderShown, isFalse);
     });
 
     test('SP 已写入时同步返回保存值', () async {
@@ -46,6 +47,7 @@ void main() {
         LearningSettingsKeys.listenAndRepeatRatingEnabled: false,
         LearningSettingsKeys.retellRatingEnabled: false,
         LearningSettingsKeys.retellAutoPlaybackPromptShown: true,
+        LearningSettingsKeys.pdfExportReminderShown: true,
       });
       final prefs = await SharedPreferences.getInstance();
       final settings = LearningSettings.fromPrefsSync(prefs);
@@ -54,6 +56,7 @@ void main() {
       expect(settings.listenAndRepeatRatingEnabled, isFalse);
       expect(settings.retellRatingEnabled, isFalse);
       expect(settings.retellAutoPlaybackPromptShown, isTrue);
+      expect(settings.pdfExportReminderShown, isTrue);
     });
   });
 
@@ -185,6 +188,25 @@ void main() {
         isTrue,
       );
     });
+    test('markPdfExportReminderShown 写 SP + 翻转 state', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final container = makeContainer(prefs);
+      addTearDown(container.dispose);
+
+      final notifier = container.read(learningSettingsProvider.notifier);
+      await notifier.markPdfExportReminderShown();
+
+      expect(
+        container.read(learningSettingsProvider).pdfExportReminderShown,
+        isTrue,
+      );
+      expect(
+        prefs.getBool(LearningSettingsKeys.pdfExportReminderShown),
+        isTrue,
+      );
+    });
+
     test('reloadFromPrefs 回灌外部删除的 SP（首次提示标记复位）', () async {
       // 初始：已提示过 + 功能已开。
       SharedPreferences.setMockInitialValues({

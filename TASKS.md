@@ -3,6 +3,18 @@
 > 最后更新：2026-07-07（版本号升级到 1.0.24）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
 
+## 已完成：PDF 导出策略调整（首次提醒 + 选项文案/顺序）
+
+PDF 是首次学习（精听/跟读/盲听）的补充复习材料。用户首次进入导出预览时弹一次性提醒，说明建议先完成首次学习、搞懂难点、感知正确发音，这样 PDF 才能带上查看过的翻译、解析、收藏词汇；点「知道了」后不再提醒。同时调整导出选项文案与顺序。
+
+- [x] `lib/providers/learning_settings_provider.dart`：新增 `pdfExportReminderShown` 标志（key/字段/fromPrefsSync/copyWith/==/hashCode）+ `markPdfExportReminderShown()`，复用现有 `retellAutoPlaybackPromptShown` bool 模式。
+- [x] `lib/screens/pdf_preview_screen.dart`：首屏 `_maybeShowExportReminder()`（未提醒过时弹 `AlertDialog` + 「知道了」，关闭后标记并继续加载）；导出选项顺序改为 难句译文 → 难句讲解 → 收藏词汇释义。
+- [x] 文案（ARB + gen-l10n）：译文→难句译文、句子讲解→难句讲解、单词释义→收藏词汇释义；新增 `pdfExportReminderTitle/Message/Confirm`。
+- [x] 测试：`learning_settings_provider_test.dart` 补 `markPdfExportReminderShown`/fromPrefsSync 用例；`pdf_preview_screen_test.dart` 补首次弹提醒/已提醒不弹、更新新文案断言；`mock_providers.dart` 的 `learningSettingsOverrides` 加 `pdfExportReminderShown` 入参。
+- [x] 验证：`flutter analyze`（改动文件 0 问题）；`flutter test test/screens/pdf_preview_screen_test.dart test/providers/learning_settings_provider_test.dart` 全过。
+
+  **完成时间**: 2026-07-07
+
 ## 已完成：版本号升级到 1.0.24
 
 按“版本 +1”要求，将 Flutter 应用版本从 `1.0.23` 升级到 `1.0.24`。当前仓库的 Android `versionName` 跟随 Flutter `versionName`，iOS/macOS 标准构建链路使用 Flutter build name，本次只需更新 `pubspec.yaml` 即可同步到应用构建版本。

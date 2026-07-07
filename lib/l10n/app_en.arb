@@ -1487,17 +1487,29 @@
   "@pdfShare": {
     "description": "Share action on the PDF export preview screen"
   },
-  "pdfOptionTranslation": "Translation",
+  "pdfOptionTranslation": "Key Sentence Translation",
   "@pdfOptionTranslation": {
-    "description": "PDF content option: include sentence translations"
+    "description": "PDF content option: include key sentence translations"
   },
-  "pdfOptionVocab": "Word Definitions",
+  "pdfOptionVocab": "Saved Word Definitions",
   "@pdfOptionVocab": {
-    "description": "PDF content option: include vocabulary notes"
+    "description": "PDF content option: include saved vocabulary definitions"
   },
-  "pdfOptionAnalysis": "Sentence Analysis",
+  "pdfOptionAnalysis": "Key Sentence Analysis",
   "@pdfOptionAnalysis": {
-    "description": "PDF content option: include sentence analysis appendix"
+    "description": "PDF content option: include key sentence analysis appendix"
+  },
+  "pdfExportReminderTitle": "The PDF is your review notes",
+  "@pdfExportReminderTitle": {
+    "description": "Title of the one-time reminder shown on first PDF export"
+  },
+  "pdfExportReminderMessage": "We recommend exporting the PDF after completing your first study.\n\nIntensive listening, shadowing, and blind listening help you master the content, and the PDF gathers your translations, analysis, and saved words for later review.",
+  "@pdfExportReminderMessage": {
+    "description": "Body of the one-time reminder shown on first PDF export"
+  },
+  "pdfExportReminderConfirm": "Got it",
+  "@pdfExportReminderConfirm": {
+    "description": "Dismiss button for the first-time PDF export reminder"
   },
 
   "exportData": "Export Data",

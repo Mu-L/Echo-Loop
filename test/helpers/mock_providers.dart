@@ -309,6 +309,7 @@ List<Override> learningSettingsOverrides({
   bool listenAndRepeatRatingEnabled = true,
   bool retellRatingEnabled = true,
   bool retellAutoPlaybackPromptShown = false,
+  bool pdfExportReminderShown = false,
   SharedPreferences? prefs,
 }) {
   return [
@@ -320,6 +321,7 @@ List<Override> learningSettingsOverrides({
         listenAndRepeatRatingEnabled: listenAndRepeatRatingEnabled,
         retellRatingEnabled: retellRatingEnabled,
         retellAutoPlaybackPromptShown: retellAutoPlaybackPromptShown,
+        pdfExportReminderShown: pdfExportReminderShown,
       ),
     ),
     if (prefs != null) sharedPreferencesProvider.overrideWithValue(prefs),

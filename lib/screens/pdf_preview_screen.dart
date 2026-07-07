@@ -26,6 +26,7 @@ import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart';
 import '../models/pdf_export/study_pdf_data.dart';
 import '../models/pdf_export/study_pdf_options.dart';
+import '../providers/learning_settings_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/app_logger.dart';
 import '../services/audio_export_service.dart';
@@ -113,8 +114,39 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _awaitEntranceTransition();
       if (!mounted) return;
+      await _maybeShowExportReminder();
+      if (!mounted) return;
       unawaited(_loadAndGenerate());
     });
+  }
+
+  /// 首次进入导出预览时提醒：PDF 是首次学习的补充复习材料。
+  ///
+  /// 仅在从未提示过时弹出一次；点「知道了」后标记，永不再弹。提醒不阻断导出，
+  /// 关闭后照常继续加载生成。
+  Future<void> _maybeShowExportReminder() async {
+    if (ref.read(learningSettingsProvider).pdfExportReminderShown || !mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.pdfExportReminderTitle),
+        content: Text(l10n.pdfExportReminderMessage),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.pdfExportReminderConfirm),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    await ref
+        .read(learningSettingsProvider.notifier)
+        .markPdfExportReminderShown();
   }
 
   /// 等待进场路由转场动画结束（无动画 / 已完成 / 被中断时立即返回）
@@ -384,17 +416,17 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
             ),
           ),
           row(
-            label: l10n.pdfOptionVocab,
-            checked: _options.includeVocabNotes,
-            onTap: () => _setOptions(
-              _options.copyWith(includeVocabNotes: !_options.includeVocabNotes),
-            ),
-          ),
-          row(
             label: l10n.pdfOptionAnalysis,
             checked: _options.includeAnalysis,
             onTap: () => _setOptions(
               _options.copyWith(includeAnalysis: !_options.includeAnalysis),
+            ),
+          ),
+          row(
+            label: l10n.pdfOptionVocab,
+            checked: _options.includeVocabNotes,
+            onTap: () => _setOptions(
+              _options.copyWith(includeVocabNotes: !_options.includeVocabNotes),
             ),
           ),
         ],

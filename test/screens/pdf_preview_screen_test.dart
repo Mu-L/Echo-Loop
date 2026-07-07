@@ -20,6 +20,7 @@ import 'package:echo_loop/services/pdf_export/study_pdf_export_service.dart';
 import 'package:echo_loop/services/pdf_export/study_pdf_loader.dart';
 
 import '../helpers/shared/test_fixtures.dart';
+import '../helpers/mock_providers.dart';
 import '../helpers/test_app.dart';
 
 class _MockLoader extends Mock implements StudyPdfLoader {}
@@ -64,7 +65,8 @@ void main() {
     ).thenAnswer((_) async => Uint8List.fromList([1, 2, 3]));
   });
 
-  Widget buildScreen() {
+  // [reminderShown] 默认 true：跳过首次导出提醒弹窗，聚焦预览/选项断言。
+  Widget buildScreen({bool reminderShown = true}) {
     return createTestApp(
       PdfPreviewScreen(
         audioItem: createTestAudioItem(),
@@ -72,6 +74,9 @@ void main() {
         exportService: exportService,
         // 预览替身：把选项位掩码渲染成文本，便于断言刷新
         previewBuilder: (context, bytes, bitmask) => Text('preview-$bitmask'),
+      ),
+      overrides: learningSettingsOverrides(
+        pdfExportReminderShown: reminderShown,
       ),
     );
   }
@@ -111,9 +116,9 @@ void main() {
     expect(items, hasLength(3));
     // 全选态：三行行尾都有打勾
     expect(items.every((item) => item.trailing != null), isTrue);
-    expect(find.text('Translation'), findsOneWidget);
-    expect(find.text('Word Definitions'), findsOneWidget);
-    expect(find.text('Sentence Analysis'), findsOneWidget);
+    expect(find.text('Key Sentence Translation'), findsOneWidget);
+    expect(find.text('Saved Word Definitions'), findsOneWidget);
+    expect(find.text('Key Sentence Analysis'), findsOneWidget);
   });
 
   testWidgets('取消勾选译文触发重新生成，恢复勾选命中缓存', (tester) async {
@@ -124,7 +129,7 @@ void main() {
     // 取消勾选「译文」→ bitmask 6，重新生成（气泡菜单点选后保持打开）
     await tester.tap(find.byIcon(CupertinoIcons.ellipsis));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Translation'));
+    await tester.tap(find.text('Key Sentence Translation'));
     await tester.pumpAndSettle();
 
     expect(find.text('preview-6'), findsOneWidget);
@@ -133,7 +138,7 @@ void main() {
     ).called(2);
 
     // 恢复勾选 → bitmask 7 命中缓存，不再调用 buildBytes
-    await tester.tap(find.text('Translation'));
+    await tester.tap(find.text('Key Sentence Translation'));
     await tester.pumpAndSettle();
 
     expect(find.text('preview-7'), findsOneWidget);
@@ -148,7 +153,7 @@ void main() {
 
     await tester.tap(find.byIcon(CupertinoIcons.ellipsis));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sentence Analysis'));
+    await tester.tap(find.text('Key Sentence Analysis'));
     await tester.pumpAndSettle();
 
     // 选项确实生效（bitmask 7→3），但文档没有重新加载
@@ -178,6 +183,34 @@ void main() {
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
+    expect(find.text('preview-7'), findsOneWidget);
+  });
+
+  testWidgets('首次导出弹补充复习材料提醒，点「知道了」后进入预览', (tester) async {
+    await tester.pumpWidget(buildScreen(reminderShown: false));
+    // 提醒弹窗打开期间预览区是 loading 转圈（持续动画），不能 pumpAndSettle，
+    // 用固定时长 pump 让 postFrame 回调 + 弹窗过场完成。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 提醒弹窗展示，预览尚未生成
+    expect(find.text('The PDF is your review notes'), findsOneWidget);
+    expect(find.text('Got it'), findsOneWidget);
+    expect(find.text('preview-7'), findsNothing);
+
+    await tester.tap(find.text('Got it'));
+    await tester.pumpAndSettle();
+
+    // 关闭提醒后照常加载生成预览
+    expect(find.text('The PDF is your review notes'), findsNothing);
+    expect(find.text('preview-7'), findsOneWidget);
+  });
+
+  testWidgets('已提醒过则不再弹出，直接进入预览', (tester) async {
+    await tester.pumpWidget(buildScreen(reminderShown: true));
+    await tester.pumpAndSettle();
+
+    expect(find.text('The PDF is your review notes'), findsNothing);
     expect(find.text('preview-7'), findsOneWidget);
   });
 }

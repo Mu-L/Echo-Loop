@@ -2789,13 +2789,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pdfShare => 'Share';
 
   @override
-  String get pdfOptionTranslation => 'Translation';
+  String get pdfOptionTranslation => 'Key Sentence Translation';
 
   @override
-  String get pdfOptionVocab => 'Word Definitions';
+  String get pdfOptionVocab => 'Saved Word Definitions';
 
   @override
-  String get pdfOptionAnalysis => 'Sentence Analysis';
+  String get pdfOptionAnalysis => 'Key Sentence Analysis';
+
+  @override
+  String get pdfExportReminderTitle => 'The PDF is your review notes';
+
+  @override
+  String get pdfExportReminderMessage =>
+      'We recommend exporting the PDF after completing your first study.\n\nIntensive listening, shadowing, and blind listening help you master the content, and the PDF gathers your translations, analysis, and saved words for later review.';
+
+  @override
+  String get pdfExportReminderConfirm => 'Got it';
 
   @override
   String get exportData => 'Export Data';

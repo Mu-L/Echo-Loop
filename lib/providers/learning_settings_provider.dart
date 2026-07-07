@@ -40,6 +40,7 @@ abstract final class LearningSettingsKeys {
   static const retellRatingEnabled = 'learning_retell_rating_enabled';
   static const retellAutoPlaybackPromptShown =
       'learning_retell_auto_playback_prompt_shown';
+  static const pdfExportReminderShown = 'learning_pdf_export_reminder_shown';
 
   /// 历史 SP key，启动期会被清理。
   static const legacyOfflineAsrEnabled = 'offline_asr_enabled';
@@ -69,6 +70,9 @@ class LearningSettings {
   /// 是否已经展示过复述录音自动回放的首次提示（默认 false）。
   final bool retellAutoPlaybackPromptShown;
 
+  /// 是否已经展示过首次导出 PDF 的补充复习材料提醒（默认 false）。
+  final bool pdfExportReminderShown;
+
   const LearningSettings({
     this.autoSkipRetell = false,
     this.autoExpandCachedAnnotation = true,
@@ -76,6 +80,7 @@ class LearningSettings {
     this.listenAndRepeatRatingEnabled = true,
     this.retellRatingEnabled = true,
     this.retellAutoPlaybackPromptShown = false,
+    this.pdfExportReminderShown = false,
   });
 
   /// 同步从 [SharedPreferences] 派生当前状态，用于启动期 override 注入。
@@ -99,6 +104,8 @@ class LearningSettings {
       retellAutoPlaybackPromptShown:
           prefs.getBool(LearningSettingsKeys.retellAutoPlaybackPromptShown) ??
           false,
+      pdfExportReminderShown:
+          prefs.getBool(LearningSettingsKeys.pdfExportReminderShown) ?? false,
     );
   }
 
@@ -109,6 +116,7 @@ class LearningSettings {
     bool? listenAndRepeatRatingEnabled,
     bool? retellRatingEnabled,
     bool? retellAutoPlaybackPromptShown,
+    bool? pdfExportReminderShown,
   }) {
     return LearningSettings(
       autoSkipRetell: autoSkipRetell ?? this.autoSkipRetell,
@@ -122,6 +130,8 @@ class LearningSettings {
       retellRatingEnabled: retellRatingEnabled ?? this.retellRatingEnabled,
       retellAutoPlaybackPromptShown:
           retellAutoPlaybackPromptShown ?? this.retellAutoPlaybackPromptShown,
+      pdfExportReminderShown:
+          pdfExportReminderShown ?? this.pdfExportReminderShown,
     );
   }
 
@@ -136,7 +146,9 @@ class LearningSettings {
               other.autoPlayRetellRecordingAfterCompletion &&
           listenAndRepeatRatingEnabled == other.listenAndRepeatRatingEnabled &&
           retellRatingEnabled == other.retellRatingEnabled &&
-          retellAutoPlaybackPromptShown == other.retellAutoPlaybackPromptShown;
+          retellAutoPlaybackPromptShown ==
+              other.retellAutoPlaybackPromptShown &&
+          pdfExportReminderShown == other.pdfExportReminderShown;
 
   @override
   int get hashCode => Object.hash(
@@ -146,6 +158,7 @@ class LearningSettings {
     listenAndRepeatRatingEnabled,
     retellRatingEnabled,
     retellAutoPlaybackPromptShown,
+    pdfExportReminderShown,
   );
 }
 
@@ -250,6 +263,21 @@ class LearningSettingsNotifier extends Notifier<LearningSettings> {
       AppLogger.log(
         'LearningSettings',
         'markRetellAutoPlaybackPromptShown 写 SP 失败: $e',
+      );
+    }
+  }
+
+  /// 标记首次导出 PDF 的补充复习材料提醒已展示。
+  Future<void> markPdfExportReminderShown() async {
+    if (state.pdfExportReminderShown) return;
+    state = state.copyWith(pdfExportReminderShown: true);
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.setBool(LearningSettingsKeys.pdfExportReminderShown, true);
+    } catch (e) {
+      AppLogger.log(
+        'LearningSettings',
+        'markPdfExportReminderShown 写 SP 失败: $e',
       );
     }
   }

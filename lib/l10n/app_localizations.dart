@@ -4910,23 +4910,41 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get pdfShare;
 
-  /// PDF content option: include sentence translations
+  /// PDF content option: include key sentence translations
   ///
   /// In en, this message translates to:
-  /// **'Translation'**
+  /// **'Key Sentence Translation'**
   String get pdfOptionTranslation;
 
-  /// PDF content option: include vocabulary notes
+  /// PDF content option: include saved vocabulary definitions
   ///
   /// In en, this message translates to:
-  /// **'Word Definitions'**
+  /// **'Saved Word Definitions'**
   String get pdfOptionVocab;
 
-  /// PDF content option: include sentence analysis appendix
+  /// PDF content option: include key sentence analysis appendix
   ///
   /// In en, this message translates to:
-  /// **'Sentence Analysis'**
+  /// **'Key Sentence Analysis'**
   String get pdfOptionAnalysis;
+
+  /// Title of the one-time reminder shown on first PDF export
+  ///
+  /// In en, this message translates to:
+  /// **'The PDF is your review notes'**
+  String get pdfExportReminderTitle;
+
+  /// Body of the one-time reminder shown on first PDF export
+  ///
+  /// In en, this message translates to:
+  /// **'We recommend exporting the PDF after completing your first study.\n\nIntensive listening, shadowing, and blind listening help you master the content, and the PDF gathers your translations, analysis, and saved words for later review.'**
+  String get pdfExportReminderMessage;
+
+  /// Dismiss button for the first-time PDF export reminder
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get pdfExportReminderConfirm;
 
   /// No description provided for @exportData.
   ///

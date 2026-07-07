@@ -2672,13 +2672,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pdfShare => '分享';
 
   @override
-  String get pdfOptionTranslation => '译文';
+  String get pdfOptionTranslation => '难句译文';
 
   @override
-  String get pdfOptionVocab => '单词释义';
+  String get pdfOptionVocab => '收藏词汇释义';
 
   @override
-  String get pdfOptionAnalysis => '句子讲解';
+  String get pdfOptionAnalysis => '难句讲解';
+
+  @override
+  String get pdfExportReminderTitle => 'PDF 是你的复习笔记';
+
+  @override
+  String get pdfExportReminderMessage =>
+      '建议完成首次学习后再导出 PDF。\n\n精听、跟读、盲听帮助你掌握内容，PDF 会整理你的翻译、解析和收藏词汇，方便之后复习。';
+
+  @override
+  String get pdfExportReminderConfirm => '知道了';
 
   @override
   String get exportData => '导出数据';
