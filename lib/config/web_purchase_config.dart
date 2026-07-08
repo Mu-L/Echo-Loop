@@ -2,7 +2,7 @@
 //
 // 面向**无商店内购通道**的分发渠道：Android 侧载 APK、macOS 官网/GitHub 下载、
 // Windows。这些端没有可用的 RevenueCat 原生 SDK，购买改为在浏览器打开
-// RevenueCat 托管的 Web Purchase Link（Stripe 结账），权益仍由 RC webhook 落库、
+// RevenueCat 托管的 Web Purchase Link（底层计费引擎为 Paddle，作为 MoR），权益仍由 RC webhook 落库、
 // 客户端经后端 `/api/entitlements` 读回（见 `entitlement_repository.dart`）。
 //
 // **Google Play 政策洁净（关键）**：网页支付入口**只能进「非商店」构建**。是否启用

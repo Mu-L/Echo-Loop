@@ -1,7 +1,7 @@
 /// 网页支付渠道的购买服务（侧载 APK / macOS 官网 / Windows）。
 ///
 /// 这些端**没有可用的 RevenueCat 原生 SDK**：购买在浏览器打开 RevenueCat 托管的
-/// Web Purchase Link（Stripe 结账），本进程内无法同步拿到购买结果。因此本服务
+/// Web Purchase Link（底层计费引擎为 Paddle），本进程内无法同步拿到购买结果。因此本服务
 /// 只作为 [SubscriptionController] 的最小占位，**权益一律经后端
 /// `/api/entitlements`（[BackendEntitlementRepository]）读回**：
 ///

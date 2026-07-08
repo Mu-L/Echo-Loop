@@ -109,7 +109,7 @@ String? get manageSubscriptionsUrl {
   final override = debugManageSubscriptionsUrlOverride;
   if (override != null) return override();
   if (kIsWeb) return null;
-  // 网页支付渠道优先：这类订阅经 Stripe 结账，**不**走商店订阅页（侧载 APK 仍是
+  // 网页支付渠道优先：这类订阅经 Paddle 结账，**不**走商店订阅页（侧载 APK 仍是
   // Android，但绝不能跳 Google Play 订阅管理）。v1 无稳定的自助管理深链时返回
   // 可选注入的 [webManageUrl]，缺省为 null（Paywall 据此隐藏「管理订阅」按钮）。
   if (isWebCheckoutConfigured) {
@@ -126,6 +126,6 @@ String? get manageSubscriptionsUrl {
 
 /// 网页支付订阅的自助管理页 URL（可选，`--dart-define=WEB_MANAGE_URL=` 注入）。
 ///
-/// RevenueCat Billing 的客户自助管理链接是按客户下发的，无 SDK 时拿不到稳定 URL；
+/// Paddle 客户门户的自助管理链接按客户下发、带临时 token 会过期，无 SDK 时拿不到稳定 URL；
 /// 若你有统一的账户/管理页可注入此项，否则「管理订阅」按钮隐藏。
 const webManageUrl = String.fromEnvironment('WEB_MANAGE_URL');
