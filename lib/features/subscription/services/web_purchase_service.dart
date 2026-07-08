@@ -55,6 +55,13 @@ class WebPurchaseService implements PurchaseService {
   }
 
   @override
+  Future<bool> ensureIdentified(String userId) async {
+    // 网页渠道结账时以 supabase user_id 作 app_user_id，身份不经 RC 匿名机制，
+    // 无匿名购买风险，门禁直接通过。
+    return true;
+  }
+
+  @override
   Future<void> invalidateCustomerInfoCache() async {}
 
   @override

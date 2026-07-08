@@ -420,6 +420,11 @@ class _EchoLoopAppState extends ConsumerState<EchoLoopApp>
     // 预加载词典（触发下载或打开本地词典）
     ref.read(dictionaryProvider);
 
+    // 启动即建订阅控制器：配合其 fireImmediately 监听，在启动阶段就把 RevenueCat
+    // 身份绑定到当前登录用户（执行 logIn），不必等用户打开付费墙才触发；
+    // 也修复已受影响用户——下次启动即重绑 / 把匿名购买 Transfer 到其 Supabase UUID。
+    ref.read(subscriptionControllerProvider);
+
     _authSessionSubscription = ref.listenManual<AsyncValue<Session?>>(
       supabaseSessionProvider,
       (previous, next) {

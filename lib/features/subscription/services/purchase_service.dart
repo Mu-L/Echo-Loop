@@ -50,6 +50,14 @@ abstract class PurchaseService {
   /// 将购买服务绑定到指定用户（如 RevenueCat `logIn`）。匿名为 null。
   Future<void> identify(String? userId);
 
+  /// 确保购买服务已绑定到 [userId]，并**核对绑定确已生效**。
+  ///
+  /// 购买 / 恢复前的 fail-closed 校验入口：权益必须挂在 Supabase user_id 上，
+  /// 绝不允许落在 RevenueCat 匿名身份（否则 webhook 无法映射用户、Supabase 无记录）。
+  /// RC 实现：`logIn(userId)` 后核对 `Purchases.appUserID == userId`；
+  /// 未就绪 / 不匹配 / 异常一律返回 false，调用方据此中止购买。
+  Future<bool> ensureIdentified(String userId);
+
   /// 使平台 SDK 的 CustomerInfo 本地缓存失效，强制下次回源服务端。
   ///
   /// 调试用：后台删除订阅后，SDK 仍会优先返回本地缓存的 CustomerInfo，
@@ -95,6 +103,9 @@ class StubPurchaseService implements PurchaseService {
 
   @override
   Future<void> identify(String? userId) async {}
+
+  @override
+  Future<bool> ensureIdentified(String userId) async => false;
 
   @override
   Future<void> invalidateCustomerInfoCache() async {}

@@ -150,6 +150,25 @@ class RevenueCatPurchaseService implements PurchaseService {
   }
 
   @override
+  Future<bool> ensureIdentified(String userId) async {
+    // 购买前 fail-closed 校验：logIn（幂等）后核对 RC 当前 App User ID 确为
+    // 该 Supabase user_id，绑不上宁可返回 false 让上层报错，也不产生匿名购买。
+    try {
+      await Purchases.logIn(userId);
+      final current = await Purchases.appUserID;
+      final ok = current == userId;
+      AppLogger.log(
+        'Subscription',
+        'ensureIdentified: 期望=$userId 实际=$current → ${ok ? "已绑定" : "未匹配"}',
+      );
+      return ok;
+    } catch (e) {
+      AppLogger.log('Subscription', 'ensureIdentified 失败: $e');
+      return false;
+    }
+  }
+
+  @override
   Future<void> invalidateCustomerInfoCache() async {
     await Purchases.invalidateCustomerInfoCache();
     AppLogger.log('Subscription', 'invalidateCustomerInfoCache: 已使 RC 缓存失效');

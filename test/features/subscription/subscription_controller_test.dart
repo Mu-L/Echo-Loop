@@ -46,6 +46,15 @@ class FakePurchaseService implements PurchaseService {
   Object? purchaseError;
   final List<String?> identifyCalls = [];
 
+  /// ensureIdentified 返回值（默认已绑定，购买门禁通过）。
+  bool ensureIdentifiedResult = true;
+
+  /// ensureIdentified 调用记录。
+  final List<String> ensureIdentifiedCalls = [];
+
+  /// purchase 实际被调次数（验证门禁不通过时不成交）。
+  int purchaseCalls = 0;
+
   /// invalidateCustomerInfoCache 调用次数（验证清缓存动作）。
   int invalidateCalls = 0;
 
@@ -64,6 +73,7 @@ class FakePurchaseService implements PurchaseService {
 
   @override
   Future<Entitlement> purchase(String planId) async {
+    purchaseCalls++;
     final error = purchaseError;
     if (error != null) throw error;
     return purchaseResult;
@@ -74,6 +84,12 @@ class FakePurchaseService implements PurchaseService {
 
   @override
   Future<void> identify(String? userId) async => identifyCalls.add(userId);
+
+  @override
+  Future<bool> ensureIdentified(String userId) async {
+    ensureIdentifiedCalls.add(userId);
+    return ensureIdentifiedResult;
+  }
 
   @override
   Future<void> invalidateCustomerInfoCache() async => invalidateCalls++;
@@ -340,6 +356,88 @@ void main() {
         container.read(subscriptionControllerProvider).status,
         EntitlementStatus.premium,
       );
+    });
+  });
+
+  test('fail-closed：身份未绑定 → purchase 报错且不成交', () async {
+    await withClock(Clock.fixed(now), () async {
+      final purchases = FakePurchaseService()
+        ..purchaseResult = proEntitlement
+        ..ensureIdentifiedResult = false; // 绑定未就绪
+      final container = makeContainer(
+        identity: signedIn,
+        repo: FakeEntitlementRepository((_) async => null),
+        cache: FakeEntitlementCache(),
+        purchases: purchases,
+      );
+      final controller = container.read(
+        subscriptionControllerProvider.notifier,
+      );
+      await pumpEventQueue();
+
+      await expectLater(
+        controller.purchase('pro_yearly'),
+        throwsA(isA<PurchaseException>()),
+      );
+      // 门禁被调用，但实际购买未发起。
+      expect(purchases.ensureIdentifiedCalls, contains('u1'));
+      expect(purchases.purchaseCalls, 0);
+    });
+  });
+
+  test('fail-closed：身份未绑定 → restore 报错且不发起恢复', () async {
+    await withClock(Clock.fixed(now), () async {
+      final purchases = FakePurchaseService()..ensureIdentifiedResult = false;
+      final container = makeContainer(
+        identity: signedIn,
+        repo: FakeEntitlementRepository((_) async => null),
+        cache: FakeEntitlementCache(),
+        purchases: purchases,
+      );
+      final controller = container.read(
+        subscriptionControllerProvider.notifier,
+      );
+      await pumpEventQueue();
+
+      await expectLater(
+        controller.restore(),
+        throwsA(isA<PurchaseException>()),
+      );
+      expect(purchases.ensureIdentifiedCalls, contains('u1'));
+    });
+  });
+
+  test('已登录冷启动 → build 即绑定 RC 身份（logIn）', () async {
+    await withClock(Clock.fixed(now), () async {
+      final purchases = FakePurchaseService();
+      final container = makeContainer(
+        identity: signedIn,
+        repo: FakeEntitlementRepository((_) async => null),
+        cache: FakeEntitlementCache(),
+        purchases: purchases,
+      );
+      container.read(subscriptionControllerProvider);
+      await pumpEventQueue();
+
+      // fireImmediately 令 build 即以当前已登录身份触发 identify(logIn)。
+      expect(purchases.identifyCalls, contains('u1'));
+    });
+  });
+
+  test('匿名冷启动 → 不误调 logOut', () async {
+    await withClock(Clock.fixed(now), () async {
+      final purchases = FakePurchaseService()..currentResult = Entitlement.free;
+      final container = makeContainer(
+        identity: SubscriptionIdentity.anonymous,
+        repo: FakeEntitlementRepository((_) async => null),
+        cache: FakeEntitlementCache(),
+        purchases: purchases,
+      );
+      container.read(subscriptionControllerProvider);
+      await pumpEventQueue();
+
+      // 匿名→匿名无变化，_onIdentityChanged 提前 return，不应调 logOut(null)。
+      expect(purchases.identifyCalls, isEmpty);
     });
   });
 

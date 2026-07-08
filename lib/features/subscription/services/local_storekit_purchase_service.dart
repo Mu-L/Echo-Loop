@@ -175,6 +175,12 @@ class LocalStoreKitPurchaseService implements PurchaseService {
   }
 
   @override
+  Future<bool> ensureIdentified(String userId) async {
+    // 本地 StoreKit 测试态，不经 RC 匿名机制，门禁直接通过。
+    return true;
+  }
+
+  @override
   Future<void> invalidateCustomerInfoCache() async {
     // 无 RC 缓存可失效；以重建活跃集合作为「回源刷新」（删交易/取消后能正确降级）。
     await _rebuildActiveFromStore();

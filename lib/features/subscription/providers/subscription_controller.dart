@@ -39,9 +39,12 @@ class SubscriptionController extends _$SubscriptionController {
   @override
   EntitlementState build() {
     // 监听身份变化：登出清权益、切换用户重对账。
+    // fireImmediately：build 时立即以当前身份触发一次，确保已登录用户即使在
+    // 「身份早已落定后」才首次创建本 controller，也会执行一次 Purchases.logIn 绑定
+    // （否则默认只在值变化时回调 → 老用户登录态无变化 → logIn 从不执行 → 匿名购买）。
     ref.listen(subscriptionIdentityProvider, (previous, next) {
       _onIdentityChanged(previous, next);
-    });
+    }, fireImmediately: true);
     // 监听平台侧权益变化（续费 / 退款 / 试用转正），运行期实时刷新。
     final sub = _purchases.entitlementStream.listen((_) => refresh());
     ref.onDispose(sub.cancel);
@@ -118,6 +121,7 @@ class SubscriptionController extends _$SubscriptionController {
       'Subscription',
       '发起购买: planId=$planId userId=${_identity.userId ?? "匿名"}',
     );
+    await _ensurePurchaseIdentity(); // fail-closed：未绑定 Supabase user_id 直接中止。
     try {
       final entitlement = await _purchases.purchase(planId);
       await _applyEntitlement(entitlement, _identity.userId);
@@ -145,6 +149,7 @@ class SubscriptionController extends _$SubscriptionController {
   /// 恢复购买。
   Future<void> restore() async {
     AppLogger.log('Subscription', '发起恢复购买: userId=${_identity.userId ?? "匿名"}');
+    await _ensurePurchaseIdentity(); // fail-closed：未绑定 Supabase user_id 直接中止。
     try {
       final entitlement = await _purchases.restore();
       await _applyEntitlement(entitlement, _identity.userId);
@@ -217,6 +222,24 @@ class SubscriptionController extends _$SubscriptionController {
       isStale: false,
     );
     await _writeCache(entitlement, userId);
+  }
+
+  /// 购买 / 恢复前的 fail-closed 身份门禁。
+  ///
+  /// 权益必须绑定到 Supabase user_id（跨设备、可恢复、能被 webhook 落库）。
+  /// 未登录，或购买服务无法确认已绑定到该用户（RC 仍是匿名 / 绑定异常）时，
+  /// 抛 [PurchaseException] 中止，**绝不允许在匿名身份上成交**。
+  Future<void> _ensurePurchaseIdentity() async {
+    final userId = _identity.userId;
+    if (userId == null) {
+      AppLogger.log('Subscription', '购买中止：未登录，无法绑定 Supabase user_id');
+      throw PurchaseException('订阅需先登录账号');
+    }
+    final bound = await _purchases.ensureIdentified(userId);
+    if (!bound) {
+      AppLogger.log('Subscription', '购买中止：身份未就绪（未绑定到 userId=$userId）');
+      throw PurchaseException('订阅身份未就绪，请稍后重试');
+    }
   }
 
   /// 响应订阅身份变化。
