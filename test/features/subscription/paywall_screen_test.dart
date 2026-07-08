@@ -1,3 +1,4 @@
+import 'package:echo_loop/config/revenuecat_config.dart';
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
 import 'package:echo_loop/features/subscription/models/entitlement.dart';
 import 'package:echo_loop/features/subscription/models/subscription_plan.dart';
@@ -86,6 +87,14 @@ Widget _harness({
 }
 
 void main() {
+  // manageSubscriptionsUrl 依赖 Platform（Linux CI 恒为 null），固定为商店链接使
+  // 「管理订阅」按钮的断言不随宿主平台漂移。
+  setUp(() {
+    debugManageSubscriptionsUrlOverride =
+        () => 'https://apps.apple.com/account/subscriptions';
+  });
+  tearDown(() => debugManageSubscriptionsUrlOverride = null);
+
   testWidgets('平台未启用订阅：渲染占位页，不展示套餐与购买 CTA', (tester) async {
     await tester.pumpWidget(
       _harness(state: const EntitlementState.free(), available: false),

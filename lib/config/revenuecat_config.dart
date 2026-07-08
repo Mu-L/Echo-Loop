@@ -95,10 +95,19 @@ bool get isSubscriptionSupported =>
 /// 仅供本地开发/测试使用；release 构建不应注入此 define。
 const bool useLocalStoreKit = bool.fromEnvironment('USE_LOCAL_STOREKIT');
 
+/// 测试注入点：覆盖 [manageSubscriptionsUrl] 的解析结果。
+///
+/// 该 URL 依赖 `Platform.isIOS/isAndroid/...`，在 Linux CI 上恒为 null，
+/// 导致依赖「管理订阅」按钮的 widget 测试随宿主平台漂移。测试可覆盖此项获得
+/// 确定结果，`null` 表示走真实平台判定。
+String? Function()? debugManageSubscriptionsUrlOverride;
+
 /// 平台订阅管理页 URL（「管理订阅」跳转用）。
 ///
 /// iOS 走 App Store 订阅管理深链；Android 走 Google Play 订阅页。
 String? get manageSubscriptionsUrl {
+  final override = debugManageSubscriptionsUrlOverride;
+  if (override != null) return override();
   if (kIsWeb) return null;
   // 网页支付渠道优先：这类订阅经 Stripe 结账，**不**走商店订阅页（侧载 APK 仍是
   // Android，但绝不能跳 Google Play 订阅管理）。v1 无稳定的自助管理深链时返回
