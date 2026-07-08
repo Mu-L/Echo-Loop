@@ -79,6 +79,12 @@ class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
   }
 
   @override
+  Future<void> markPdfExportReminderShown() async {
+    if (state.pdfExportReminderShown) return;
+    state = state.copyWith(pdfExportReminderShown: true);
+  }
+
+  @override
   Future<void> setRetellRatingEnabled(bool enabled) async {
     if (state.retellRatingEnabled == enabled) return;
     state = state.copyWith(retellRatingEnabled: enabled);
