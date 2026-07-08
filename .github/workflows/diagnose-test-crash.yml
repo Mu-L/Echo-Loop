@@ -1,0 +1,92 @@
+name: Diagnose Test Crash
+
+# 一次性诊断：定位「全部用例通过但 flutter test 以 1 退出」的 Ubuntu 收尾崩溃根因。
+# 手动触发（Actions ▸ Diagnose Test Crash ▸ Run workflow）。同时抓两路证据：
+#   1. flutter test -v verbose 日志 —— 看 flutter 工具判定 exit 1 的具体原因
+#      （子 flutter_tester 进程退出码/信号，verbose 直接打印）。
+#   2. core dump + gdb backtrace —— 若子进程是 signal 崩溃，定位崩在哪个 native 库。
+# 结果全部作为 artifact 上传。
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.41.5'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          cache-key: flutter-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Install gdb
+        run: sudo apt-get update && sudo apt-get install -y gdb
+
+      - name: Configure core dumps
+        run: |
+          sudo mkdir -p /tmp/cores
+          sudo chmod 777 /tmp/cores
+          # 覆盖内核 core_pattern 为绝对路径（默认可能被 apport 拦截）。
+          sudo sysctl -w kernel.core_pattern=/tmp/cores/core.%e.%p.%s.%t
+          # 关闭 apport（若存在）避免它吃掉 core。
+          sudo systemctl stop apport.service 2>/dev/null || true
+          cat /proc/sys/kernel/core_pattern
+
+      - name: Run tests (verbose, capture crash)
+        run: |
+          # ulimit 只在当前 shell 生效，必须与 flutter test 同 step（子进程继承）。
+          ulimit -c unlimited
+          set +e
+          flutter test -v --concurrency=1 \
+            --file-reporter=json:test-results.json \
+            > flutter-test-verbose.log 2>&1
+          echo "flutter test exit code: $?" | tee flutter-test-exitcode.txt
+          # 只回显 verbose 日志尾部关键片段（子进程退出/崩溃信息通常在收尾）。
+          echo '===== tail of verbose log ====='
+          tail -300 flutter-test-verbose.log
+          echo '===== grep for exit/crash/signal ====='
+          grep -inE "exit|crash|signal|shell|tester|unexpected|segfault|sigsegv|sigabrt" \
+            flutter-test-verbose.log | tail -80 || true
+
+      - name: Analyze core dumps
+        if: always()
+        run: |
+          echo '===== cores ====='
+          ls -la /tmp/cores/ || echo 'no cores dir'
+          FLUTTER_ROOT=$(flutter --version --machine | python3 -c 'import json,sys;print(json.load(sys.stdin)["flutterRoot"])')
+          TESTER=$(find "$FLUTTER_ROOT/bin/cache/artifacts/engine" -name flutter_tester 2>/dev/null | head -1)
+          echo "flutter_tester: $TESTER"
+          shopt -s nullglob
+          found=0
+          for core in /tmp/cores/core.*; do
+            found=1
+            echo "===== backtrace: $core ====="
+            gdb -batch -ex "thread apply all bt" "$TESTER" "$core" 2>&1 | tail -300 \
+              | tee "$core.bt.txt"
+          done
+          [ "$found" = 0 ] && echo 'no core files produced (子进程可能非 signal 崩溃，看 verbose 日志)'
+          true
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-crash-diagnostics
+          path: |
+            flutter-test-verbose.log
+            flutter-test-exitcode.txt
+            test-results.json
+            /tmp/cores/
+          if-no-files-found: warn
