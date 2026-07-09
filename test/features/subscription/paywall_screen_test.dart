@@ -90,8 +90,8 @@ void main() {
   // manageSubscriptionsUrl 依赖 Platform（Linux CI 恒为 null），固定为商店链接使
   // 「管理订阅」按钮的断言不随宿主平台漂移。
   setUp(() {
-    debugManageSubscriptionsUrlOverride =
-        () => 'https://apps.apple.com/account/subscriptions';
+    debugManageSubscriptionsUrlOverride = () =>
+        'https://apps.apple.com/account/subscriptions';
   });
   tearDown(() => debugManageSubscriptionsUrlOverride = null);
 
@@ -121,6 +121,12 @@ void main() {
     // 网页结账 CTA + 说明，不出现商店套餐卡
     expect(
       find.widgetWithText(FilledButton, 'Continue to checkout'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Plans, current prices, and offers are shown on the secure checkout page.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Monthly'), findsNothing);
@@ -199,6 +205,41 @@ void main() {
     expect(find.text('Privacy Policy'), findsNothing);
     // 恢复购买已移到 AppBar，两态均可用（已订阅用户偶尔也需恢复）
     expect(find.text('Restore Purchases'), findsOneWidget);
+  });
+
+  testWidgets('年付首期促销：展示首年价、续费价与相对月付折扣', (tester) async {
+    const promoPlans = [
+      SubscriptionPlan(
+        planId: 'monthly',
+        title: 'Monthly',
+        priceString: r'$8.99',
+        period: SubscriptionPeriod.monthly,
+      ),
+      SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$59.99',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'US$30.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'US$59.99',
+        ),
+      ),
+    ];
+    await tester.pumpWidget(
+      _harness(state: const EntitlementState.free(), plans: promoPlans),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(r'First year US$30.00, then US$59.99/yr'), findsOneWidget);
+    expect(find.text(r'US$30.00'), findsOneWidget);
+    expect(find.text('/first yr'), findsOneWidget);
+    expect(find.text('Save 72%'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
   });
 
   testWidgets('会员（年付续订中）：展示年度会员套餐、有效状态与续订日期', (tester) async {

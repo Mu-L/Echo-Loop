@@ -21,14 +21,19 @@ const YearlyValue _empty = (perMonth: null, savePercent: null);
 
 /// 根据月付与年付套餐计算年付的「每月折合价」与「节省百分比」。
 ///
-/// 仅当两个价格都能解析为正数、且年付确实比「月付×12」便宜时才返回有效值，
-/// 否则返回 [_empty]。
+/// 折扣按用户首年实际支付价计算：年付有付费首期促销时使用促销价，
+/// 否则使用普通年付价。仅当价格都能解析为正数、且年付首年价确实比
+/// 「月付×12」便宜时才返回有效值，否则返回 [_empty]。
 YearlyValue computeYearlyValue(
   SubscriptionPlan monthly,
   SubscriptionPlan yearly,
 ) {
   final monthlyAmount = _parseAmount(monthly.priceString);
-  final yearlyAmount = _parseAmount(yearly.priceString);
+  final effectiveYearlyPrice =
+      yearly.introOffer != null && !yearly.introOffer!.isFreeTrial
+      ? yearly.introOffer!.priceString
+      : yearly.priceString;
+  final yearlyAmount = _parseAmount(effectiveYearlyPrice);
   if (monthlyAmount == null || yearlyAmount == null) return _empty;
   if (monthlyAmount <= 0 || yearlyAmount <= 0) return _empty;
 
@@ -37,7 +42,7 @@ YearlyValue computeYearlyValue(
 
   final savePercent = ((1 - yearlyAmount / fullPrice) * 100).round();
   final perMonthAmount = yearlyAmount / 12;
-  final perMonth = _formatLike(yearly.priceString, perMonthAmount);
+  final perMonth = _formatLike(effectiveYearlyPrice, perMonthAmount);
   return (perMonth: perMonth, savePercent: savePercent);
 }
 

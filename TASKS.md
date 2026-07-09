@@ -1,7 +1,43 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-07（版本号升级到 1.0.24）
+> 最后更新：2026-07-09（订阅价格与 offer 诊断日志）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——**仍未解决**
+
+## 已完成：订阅价格与 offer 诊断日志
+
+为排查 App Store / Google Play / Web(Paddle) 各渠道订阅价格与 offer 展示问题，补齐订阅链路关键诊断日志。日志覆盖 RevenueCat Offering、package、商品本地化价格、introductory price、Google Play default/subscription options、pricing phases、映射后的业务 plan、Paywall 最终显示价格/后缀/副标题/折扣，以及 Web Purchase Link 模板配置状态。关键空值会明确打印为 `null` / `empty`。
+
+- [x] **RevenueCat 诊断**：`fetchPlans()` 打印 package、product、introductoryPrice、defaultOption、subscriptionOptions、pricing phases 和映射后的 `SubscriptionPlan`。
+- [x] **Paywall 诊断**：打印当前 `webMode/isPremium`、plan card 最终显示价、价格后缀、副标题、折扣、首期 offer。
+- [x] **Web/Paddle 诊断**：打印渠道、模板是否配置、是否含 `{app_user_id}`、URL 是否构建成功；不打印完整 user id。
+- [x] **验证**：`flutter analyze` 相关文件 0 问题；`flutter test test/features/subscription/paywall_screen_test.dart test/features/subscription/web_purchase_test.dart test/features/subscription/utils/plan_pricing_test.dart` 全过。
+
+  **完成时间**: 2026-07-09
+
+## 已完成：修正订阅页首年优惠价与折扣展示
+
+用户真机验证发现订阅页在 Google Play 首期 offer 下存在三处问题：免费试用文案出现「之后 之后」重复；年付有首年优惠时右侧仍显示续费价而非首年实付价；年付优惠 offer 隐藏了折扣徽标。按订阅页标准展示口径修正：有年付付费首期 offer 时主价格显示首年价，后缀显示「/首年」；折扣按「首年实付价 vs 月付×12」计算；无 offer 时保持普通年付折扣逻辑。
+
+- [x] **文案修正**：续费价格片段改为纯周期价，外层模板负责「之后 / then」，避免重复。
+- [x] **主价格修正**：付费首期 offer 显示 `introOffer.priceString`，免费试用仍显示续费价。
+- [x] **折扣口径修正**：`computeYearlyValue` 使用年付首年有效价计算折扣；年付有 offer 时隐藏每月折合价但保留折扣徽标。
+- [x] **测试**：补充年付首期 offer 折扣计算单测，更新 Paywall widget 断言首年价、`/first yr` 和相对月付折扣。
+- [x] **验证**：`flutter analyze` 相关文件 0 问题；`flutter test test/features/subscription/paywall_screen_test.dart test/features/subscription/utils/plan_pricing_test.dart test/features/subscription/web_purchase_test.dart` 全过。
+
+  **完成时间**: 2026-07-09
+
+## 已完成：订阅页首期促销展示 + Web/Paddle 托管 Paywall
+
+订阅页按渠道拆分促销展示：App Store / Google Play 继续使用原生 Paywall，并从 RevenueCat 商品元数据动态展示平台配置的免费试用、首年促销价和续费价；Web/Paddle 渠道不在 Flutter 端复刻 Paddle 价格与折扣，未订阅用户直接用 in-app browser 打开 RevenueCat 托管 Web Paywall，已订阅用户继续显示原生会员 active 页面。
+
+- [x] **促销 DTO**：`SubscriptionPlan` 新增 `SubscriptionIntroOffer`，表达首期价、免费试用、周期、次数和续费价；Paywall 不直接依赖 RevenueCat SDK 类型。
+- [x] **RevenueCat 映射**：iOS/macOS 读取 `introductoryPrice` 并用 intro eligibility 过滤；Google Play 读取当前 package 的 `defaultOption` pricing phases。
+- [x] **Paywall 展示**：商店模式有促销时显示 `First year $29.99, then $59.99/yr` / 中文对应文案，并隐藏年付折算徽标；Web/Paddle 模式只显示托管结账 CTA 和提示。
+- [x] **Web Purchase Link**：网页支付只认 `WEB_PURCHASE_LINK_TEMPLATE=https://pay.rev.cat/<token>/{app_user_id}/paywall`，替换 `{app_user_id}` 后用现有 in-app browser 打开。
+- [x] **配置与文档**：Release workflow 改为注入 `WEB_PURCHASE_LINK_TEMPLATE`；`docs/subscription-setup.md` 补充 Web/Paddle 托管 Paywall 配置与促销维护说明。
+- [x] **验证**：`flutter analyze` 订阅相关改动文件 0 问题；`flutter test test/features/subscription/paywall_screen_test.dart test/features/subscription/web_purchase_test.dart` 全过。
+
+  **完成时间**: 2026-07-09
 
 ## 已完成：PDF 导出策略调整（首次提醒 + 选项文案/顺序）
 

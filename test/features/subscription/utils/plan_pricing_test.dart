@@ -50,6 +50,30 @@ void main() {
       expect(v.perMonth, '3.33 €');
     });
 
+    test(r'年付有首期促销时，按首年实际支付价计算折扣', () {
+      const yearly = SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'US$59.99',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'US$30.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'US$59.99',
+        ),
+      );
+      final v = computeYearlyValue(
+        _plan(r'US$8.99', SubscriptionPeriod.monthly),
+        yearly,
+      );
+      // 1 - 30/(8.99*12)=0.7219 → 72%
+      expect(v.savePercent, 72);
+      expect(v.perMonth, r'US$2.50');
+    });
+
     test('千分位整数（1,000）按整数解析', () {
       final v = computeYearlyValue(
         _plan(r'$100', SubscriptionPeriod.monthly),

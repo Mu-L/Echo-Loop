@@ -132,7 +132,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumWebCheckoutHint =>
-      'You\'ll complete payment securely in your browser, then return to the app.';
+      'Plans, current prices, and offers are shown on the secure checkout page.';
 
   @override
   String get premiumWebVerifying => 'Waiting for payment to be confirmed…';
@@ -167,6 +167,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumPriceSuffixYear => '/yr';
 
   @override
+  String get premiumPriceSuffixFirstYear => '/first yr';
+
+  @override
   String get premiumPriceSuffixLifetime => 'One-time';
 
   @override
@@ -177,6 +180,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String premiumPerMonthEquivalent(String price) {
     return '≈ $price/mo';
+  }
+
+  @override
+  String premiumIntroFirstYear(String price) {
+    return 'First year $price';
+  }
+
+  @override
+  String premiumIntroFirstMonth(String price) {
+    return 'First month $price';
+  }
+
+  @override
+  String premiumIntroFirstPeriod(String price) {
+    return 'First period $price';
+  }
+
+  @override
+  String premiumRenewalPricePerYear(String price) {
+    return '$price/yr';
+  }
+
+  @override
+  String premiumRenewalPricePerMonth(String price) {
+    return '$price/mo';
+  }
+
+  @override
+  String premiumRenewalPricePerPeriod(String price) {
+    return '$price';
+  }
+
+  @override
+  String premiumTryFreeThen(int days, String renewal) {
+    return 'Try free for $days days, then $renewal';
+  }
+
+  @override
+  String premiumOfferThen(String intro, String renewal) {
+    return '$intro, then $renewal';
   }
 
   @override

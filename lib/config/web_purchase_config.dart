@@ -12,6 +12,8 @@ library;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
+import '../services/app_logger.dart';
+
 /// 分发渠道（编译期注入）。
 ///
 /// - `apk`：Android 侧载直装包 → 启用网页支付。
@@ -19,14 +21,17 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 /// - `play` / 空：Google Play / App Store 等商店构建 → **不**启用网页支付（政策洁净）。
 const _distributionChannel = String.fromEnvironment('DISTRIBUTION_CHANNEL');
 
-/// RevenueCat Web Purchase Link 的 base（**到 token 为止、不含末尾用户 ID**）。
+/// RevenueCat Web Purchase Link 模板。
 ///
-/// 注意 prod / sandbox 结构不同，故整段 base 由构建注入而非只注入 token：
-/// - Production：`https://pay.rev.cat/<token>`
-/// - Sandbox：`https://pay.rev.cat/sandbox/<token>`（多一段 `sandbox`）
+/// 模板必须包含 `{app_user_id}` 占位符，例如：
+/// `https://pay.rev.cat/<token>/{app_user_id}/paywall`
 ///
-/// release 注入 production base，debug/测试注入 sandbox base；不注入则网页支付不可用。
-const webPurchaseLinkBase = String.fromEnvironment('WEB_PURCHASE_LINK_BASE');
+/// release 注入 production 模板，debug/测试注入 sandbox 模板；不注入则网页支付不可用。
+const webPurchaseLinkTemplate = String.fromEnvironment(
+  'WEB_PURCHASE_LINK_TEMPLATE',
+);
+
+const _appUserIdPlaceholder = '{app_user_id}';
 
 /// 当前构建是否属于「启用网页支付」的分发渠道（仅编译期判定，Play 版恒 false）。
 bool get isWebCheckoutChannel =>
@@ -34,9 +39,10 @@ bool get isWebCheckoutChannel =>
 
 /// 网页支付是否可用（渠道启用 **且** 已注入 Purchase Link base）。
 ///
-/// 二者缺一即不可用：渠道未开 → 政策洁净不暴露入口；base 缺失 → 无处结账。
+/// 二者缺一即不可用：渠道未开 → 政策洁净不暴露入口；模板缺失 → 无处结账。
 bool get isWebCheckoutConfigured =>
-    isWebCheckoutChannel && webPurchaseLinkBase.isNotEmpty;
+    isWebCheckoutChannel &&
+    webPurchaseLinkTemplate.contains(_appUserIdPlaceholder);
 
 /// 拼出携带用户身份的 Web Purchase Link。
 ///
@@ -44,18 +50,43 @@ bool get isWebCheckoutConfigured =>
 /// RevenueCat 返回 404（见官方文档），且权益无法绑定到用户。调用方须保证已登录。
 /// [userId] 为空时返回 null（调用方应先要求登录，不发起结账）。
 Uri? buildWebPurchaseUri(String userId) {
-  if (!isWebCheckoutConfigured || userId.isEmpty) return null;
-  return composeWebPurchaseUri(webPurchaseLinkBase, userId);
+  final uri = isWebCheckoutConfigured && userId.isNotEmpty
+      ? composeWebPurchaseUri(webPurchaseLinkTemplate, userId)
+      : null;
+  logWebPurchaseConfig(stage: 'buildWebPurchaseUri', userId: userId, uri: uri);
+  return uri;
 }
 
-/// 纯函数：把 base 与 userId 拼成结账 URL（[buildWebPurchaseUri] 的可测内核）。
+/// 纯函数：把模板中的 `{app_user_id}` 替换成已编码的用户 ID。
 ///
-/// 去掉 base 末尾多余的 '/' 防双斜杠；userId 做 URL-encode。base 为空返回 null。
+/// 模板为空、缺占位符或 [userId] 为空时返回 null。
 @visibleForTesting
-Uri? composeWebPurchaseUri(String base, String userId) {
-  if (base.isEmpty || userId.isEmpty) return null;
-  final trimmed = base.endsWith('/')
-      ? base.substring(0, base.length - 1)
-      : base;
-  return Uri.parse('$trimmed/${Uri.encodeComponent(userId)}');
+Uri? composeWebPurchaseUri(String template, String userId) {
+  if (template.isEmpty ||
+      userId.isEmpty ||
+      !template.contains(_appUserIdPlaceholder)) {
+    return null;
+  }
+  return Uri.parse(
+    template.replaceAll(_appUserIdPlaceholder, Uri.encodeComponent(userId)),
+  );
+}
+
+/// 记录网页支付关键配置状态。
+///
+/// 不打印完整 userId，避免日志导出时泄露用户标识；模板本身是公开 purchase link，
+/// 这里仅打印是否配置和占位符状态。
+void logWebPurchaseConfig({required String stage, String? userId, Uri? uri}) {
+  AppLogger.log(
+    'Subscription',
+    'webPurchase[$stage] channel=$_distributionChannel '
+        'isWebCheckoutChannel=$isWebCheckoutChannel '
+        'templateConfigured=${webPurchaseLinkTemplate.isNotEmpty} '
+        'templateHasAppUserId=${webPurchaseLinkTemplate.contains(_appUserIdPlaceholder)} '
+        'isWebCheckoutConfigured=$isWebCheckoutConfigured '
+        'userIdPresent=${userId != null && userId.isNotEmpty} '
+        'userIdLength=${userId?.length ?? 0} '
+        'uriBuilt=${uri != null} uriHost=${uri?.host ?? "null"} '
+        'uriPath=${uri?.path ?? "null"}',
+  );
 }

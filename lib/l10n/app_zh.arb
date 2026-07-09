@@ -52,7 +52,7 @@
   "premiumRestoreNone": "未找到可恢复的购买。",
   "premiumRestored": "已恢复购买。",
   "premiumWebCheckoutCta": "前往订阅结账",
-  "premiumWebCheckoutHint": "将在浏览器中安全完成支付，随后返回 App。",
+  "premiumWebCheckoutHint": "套餐、当前价格和优惠会在安全结账页显示。",
   "premiumWebVerifying": "正在等待支付结果确认…",
   "premiumWebCheckDone": "我已完成支付",
   "premiumWebOpenFailed": "无法打开结账页面，请重试。",
@@ -63,6 +63,7 @@
   "premiumPeriodLifetime": "终身",
   "premiumPriceSuffixMonth": "/月",
   "premiumPriceSuffixYear": "/年",
+  "premiumPriceSuffixFirstYear": "/首年",
   "premiumPriceSuffixLifetime": "一次性",
   "premiumSavePercent": "立省 {percent}%",
   "@premiumSavePercent": {
@@ -74,6 +75,56 @@
   "@premiumPerMonthEquivalent": {
     "placeholders": {
       "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstYear": "首年 {price}",
+  "@premiumIntroFirstYear": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstMonth": "首月 {price}",
+  "@premiumIntroFirstMonth": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstPeriod": "首期 {price}",
+  "@premiumIntroFirstPeriod": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerYear": "{price}/年",
+  "@premiumRenewalPricePerYear": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerMonth": "{price}/月",
+  "@premiumRenewalPricePerMonth": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerPeriod": "{price}",
+  "@premiumRenewalPricePerPeriod": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumTryFreeThen": "免费试用 {days} 天，之后 {renewal}",
+  "@premiumTryFreeThen": {
+    "placeholders": {
+      "days": { "type": "int" },
+      "renewal": { "type": "String" }
+    }
+  },
+  "premiumOfferThen": "{intro}，之后 {renewal}",
+  "@premiumOfferThen": {
+    "placeholders": {
+      "intro": { "type": "String" },
+      "renewal": { "type": "String" }
     }
   },
   "practiceControlModeAuto": "自动",

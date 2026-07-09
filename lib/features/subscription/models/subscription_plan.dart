@@ -18,6 +18,24 @@ enum SubscriptionPeriod {
   lifetime,
 }
 
+/// 促销价格周期。
+enum SubscriptionOfferPeriod {
+  /// 天。
+  day,
+
+  /// 周。
+  week,
+
+  /// 月。
+  month,
+
+  /// 年。
+  year,
+
+  /// 未知周期。
+  unknown,
+}
+
 /// 从商品 ID 字符串**启发式**推断订阅周期，判不出返回 null。
 ///
 /// 仅作兜底：周期的权威来源是平台的 packageType（购买时可得），已解析出的周期会存进
@@ -55,6 +73,9 @@ class SubscriptionPlan {
   /// 免费试用天数（[hasFreeTrial] 为 false 时为 0）。
   final int trialDays;
 
+  /// 平台配置的首期促销（免费试用 / 首期折扣），为空表示当前用户不应看到促销价。
+  final SubscriptionIntroOffer? introOffer;
+
   const SubscriptionPlan({
     required this.planId,
     required this.title,
@@ -62,6 +83,7 @@ class SubscriptionPlan {
     required this.period,
     this.hasFreeTrial = false,
     this.trialDays = 0,
+    this.introOffer,
   });
 
   @override
@@ -73,9 +95,68 @@ class SubscriptionPlan {
           priceString == other.priceString &&
           period == other.period &&
           hasFreeTrial == other.hasFreeTrial &&
-          trialDays == other.trialDays;
+          trialDays == other.trialDays &&
+          introOffer == other.introOffer;
 
   @override
-  int get hashCode =>
-      Object.hash(planId, title, priceString, period, hasFreeTrial, trialDays);
+  int get hashCode => Object.hash(
+    planId,
+    title,
+    priceString,
+    period,
+    hasFreeTrial,
+    trialDays,
+    introOffer,
+  );
+}
+
+/// 单个套餐的首期促销展示信息。
+class SubscriptionIntroOffer {
+  /// 首期促销价（本地化价格字符串）；免费试用时通常为 `$0.00`。
+  final String priceString;
+
+  /// 促销周期单位。
+  final SubscriptionOfferPeriod period;
+
+  /// 促销周期单位数量，例如 `1 year` / `3 months`。
+  final int periodNumberOfUnits;
+
+  /// 促销周期重复次数。
+  final int cycles;
+
+  /// 是否为免费试用。
+  final bool isFreeTrial;
+
+  /// 促销结束后的续费价（本地化价格字符串）。
+  final String renewalPriceString;
+
+  const SubscriptionIntroOffer({
+    required this.priceString,
+    required this.period,
+    required this.periodNumberOfUnits,
+    required this.cycles,
+    required this.isFreeTrial,
+    required this.renewalPriceString,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SubscriptionIntroOffer &&
+          priceString == other.priceString &&
+          period == other.period &&
+          periodNumberOfUnits == other.periodNumberOfUnits &&
+          cycles == other.cycles &&
+          isFreeTrial == other.isFreeTrial &&
+          renewalPriceString == other.renewalPriceString;
+
+  @override
+  int get hashCode => Object.hash(
+    priceString,
+    period,
+    periodNumberOfUnits,
+    cycles,
+    isFreeTrial,
+    renewalPriceString,
+  );
 }

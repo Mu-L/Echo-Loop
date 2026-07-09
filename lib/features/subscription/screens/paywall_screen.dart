@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../config/revenuecat_config.dart';
 import '../../../config/web_purchase_config.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../services/app_logger.dart';
 import '../../auth/sign_in_required_dialog.dart';
 import '../../../theme/app_theme.dart';
 import '../models/entitlement.dart';
@@ -75,6 +76,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final isPremium = subState.isActive;
     // 网页支付渠道（侧载 APK / 桌面）：购买改为浏览器结账 + 回流对账，不展示商店套餐卡。
     final webMode = ref.watch(webCheckoutModeProvider);
+    AppLogger.log(
+      'Subscription',
+      'paywall build: isPremium=$isPremium webMode=$webMode '
+          'status=${subState.status} waitingForWeb=$_waitingForWeb busy=$_busy',
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -230,9 +236,10 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     );
   }
 
-  /// 网页支付购买区：无商店套餐卡，改为「浏览器结账 + 回流对账」。
+  /// 网页支付购买区：无商店套餐卡，改为「托管 Paywall + 回流对账」。
   ///
-  /// 套餐与本地化价格由 RevenueCat 托管结账页展示（客户端不硬编码价格）。
+  /// 套餐、本地化价格与 Paddle 促销由 RevenueCat 托管 Paywall 展示，
+  /// 客户端不硬编码也不复刻 Paddle discount。
   Widget _buildWebPurchaseArea(AppLocalizations l10n) {
     final theme = Theme.of(context);
     return Column(
@@ -295,17 +302,25 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     );
   }
 
-  /// 发起网页结账：登录 → 拼带 user_id 的 Web Purchase Link → 外部浏览器打开 →
+  /// 发起网页结账：登录 → 拼带 user_id 的 Web Purchase Link → in-app browser 打开 →
   /// 进入等待态并轮询后端对账（不阻塞 UI，用户可点「我已完成支付」立即复核）。
   Future<void> _startWebCheckout() async {
     if (!await _ensureSignedIn() || !mounted) return;
     final userId = ref.read(subscriptionIdentityProvider).userId;
     final uri = userId == null ? null : buildWebPurchaseUri(userId);
     if (uri == null) {
+      AppLogger.log(
+        'Subscription',
+        'web checkout open skipped: userIdPresent=${userId != null} uri=null',
+      );
       _showMessage(AppLocalizations.of(context)!.premiumWebOpenFailed);
       return;
     }
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final opened = await launchUrl(uri);
+    AppLogger.log(
+      'Subscription',
+      'web checkout open result: opened=$opened host=${uri.host} path=${uri.path}',
+    );
     if (!mounted) return;
     if (!opened) {
       _showMessage(AppLocalizations.of(context)!.premiumWebOpenFailed);
@@ -588,20 +603,49 @@ class _PlanCard extends StatelessWidget {
     SubscriptionPeriod.lifetime => l10n.premiumPriceSuffixLifetime,
   };
 
+  /// 卡片右侧主价格：付费首期优惠展示用户首年实际支付价；免费试用仍展示续费价。
+  String _displayPrice() {
+    final offer = plan.introOffer;
+    if (offer != null && !offer.isFreeTrial) return offer.priceString;
+    return plan.priceString;
+  }
+
+  /// 卡片右侧价格后缀：付费首年优惠需要明确这是首年价格。
+  String _displayPriceSuffix() {
+    final offer = plan.introOffer;
+    if (offer != null &&
+        !offer.isFreeTrial &&
+        plan.period == SubscriptionPeriod.yearly) {
+      return l10n.premiumPriceSuffixFirstYear;
+    }
+    return _priceSuffix();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final accent = AppTheme.premiumAccent(theme.brightness);
+    final offer = plan.introOffer;
     final savePercent = yearlyValue?.savePercent;
-    final perMonth = yearlyValue?.perMonth;
+    final perMonth = offer == null ? yearlyValue?.perMonth : null;
 
-    // 副标题优先级：每月折合价 > 试用提示。
-    final String? subtitle = perMonth != null
-        ? l10n.premiumPerMonthEquivalent(perMonth)
-        : (plan.hasFreeTrial && plan.trialDays > 0
-              ? l10n.premiumStartTrial(plan.trialDays)
-              : null);
+    // 副标题优先级：平台首期促销 > 每月折合价 > 试用提示。
+    final String? subtitle = offer != null
+        ? _offerSubtitle(l10n, offer)
+        : (perMonth != null
+              ? l10n.premiumPerMonthEquivalent(perMonth)
+              : (plan.hasFreeTrial && plan.trialDays > 0
+                    ? l10n.premiumStartTrial(plan.trialDays)
+                    : null));
+    AppLogger.log(
+      'Subscription',
+      'plan card display: id=${plan.planId} period=${plan.period} '
+          'rawPrice=${plan.priceString} displayPrice=${_displayPrice()} '
+          'suffix=${_displayPriceSuffix()} subtitle=${subtitle ?? "null"} '
+          'savePercent=${savePercent ?? "null"} perMonth=${perMonth ?? "null"} '
+          'introOffer=${_introLog(offer)}',
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -675,13 +719,13 @@ class _PlanCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        plan.priceString,
+                        _displayPrice(),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        _priceSuffix(),
+                        _displayPriceSuffix(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -695,6 +739,45 @@ class _PlanCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _offerSubtitle(AppLocalizations l10n, SubscriptionIntroOffer offer) {
+    final renewal = _renewalLabel(l10n, offer);
+    if (offer.isFreeTrial && plan.trialDays > 0) {
+      return l10n.premiumTryFreeThen(plan.trialDays, renewal);
+    }
+    return l10n.premiumOfferThen(_introLabel(l10n, offer), renewal);
+  }
+
+  String _introLabel(AppLocalizations l10n, SubscriptionIntroOffer offer) {
+    return switch (offer.period) {
+      SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
+        l10n.premiumIntroFirstYear(offer.priceString),
+      SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
+        l10n.premiumIntroFirstMonth(offer.priceString),
+      _ => l10n.premiumIntroFirstPeriod(offer.priceString),
+    };
+  }
+
+  String _renewalLabel(AppLocalizations l10n, SubscriptionIntroOffer offer) {
+    return switch (plan.period) {
+      SubscriptionPeriod.yearly => l10n.premiumRenewalPricePerYear(
+        offer.renewalPriceString,
+      ),
+      SubscriptionPeriod.monthly => l10n.premiumRenewalPricePerMonth(
+        offer.renewalPriceString,
+      ),
+      SubscriptionPeriod.lifetime => l10n.premiumRenewalPricePerPeriod(
+        offer.renewalPriceString,
+      ),
+    };
+  }
+
+  String _introLog(SubscriptionIntroOffer? offer) {
+    if (offer == null) return 'null';
+    return '{price=${offer.priceString}, period=${offer.period}, '
+        'units=${offer.periodNumberOfUnits}, cycles=${offer.cycles}, '
+        'free=${offer.isFreeTrial}, renewal=${offer.renewalPriceString}}';
   }
 }
 

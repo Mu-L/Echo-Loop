@@ -8,7 +8,9 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -60,11 +62,7 @@ class RevenueCatPurchaseService implements PurchaseService {
         );
       }
       for (final p in current.availablePackages) {
-        AppLogger.log(
-          'Subscription',
-          'offering package=${p.identifier} type=${p.packageType} '
-              'product=${p.storeProduct.identifier} price=${p.storeProduct.priceString}',
-        );
+        _logPackageDiagnostics(p, stage: 'fetchPlans:offering');
       }
       await _logDirectProductsForDiagnostics(
         current.availablePackages
@@ -73,7 +71,14 @@ class RevenueCatPurchaseService implements PurchaseService {
             .toList(),
         stage: 'fetchPlans:directProducts',
       );
-      return current.availablePackages.map(_packageToPlan).toList();
+      final eligibility = await _introEligibilityFor(current.availablePackages);
+      final plans = current.availablePackages
+          .map((p) => _packageToPlan(p, eligibility[p.storeProduct.identifier]))
+          .toList();
+      for (final plan in plans) {
+        _logMappedPlan(plan, stage: 'fetchPlans:mappedPlan');
+      }
+      return plans;
     } catch (e) {
       AppLogger.log('Subscription', 'getOfferings 异常: $e');
       rethrow;
@@ -206,10 +211,33 @@ class RevenueCatPurchaseService implements PurchaseService {
     return null;
   }
 
-  SubscriptionPlan _packageToPlan(Package package) {
+  Future<Map<String, IntroEligibilityStatus>> _introEligibilityFor(
+    List<Package> packages,
+  ) async {
+    if (kIsWeb || !(Platform.isIOS || Platform.isMacOS)) return const {};
+    final productIds = packages
+        .where((p) => p.storeProduct.introductoryPrice != null)
+        .map((p) => p.storeProduct.identifier)
+        .toList();
+    if (productIds.isEmpty) return const {};
+    try {
+      final result = await Purchases.checkTrialOrIntroductoryPriceEligibility(
+        productIds,
+      );
+      return result.map((key, value) => MapEntry(key, value.status));
+    } catch (e) {
+      AppLogger.log('Subscription', 'intro eligibility 查询失败: $e');
+      return const {};
+    }
+  }
+
+  SubscriptionPlan _packageToPlan(
+    Package package,
+    IntroEligibilityStatus? introEligibility,
+  ) {
     final product = package.storeProduct;
-    final intro = product.introductoryPrice;
-    final hasFreeTrial = intro != null && intro.price == 0;
+    final intro = _introOfferFrom(product, introEligibility);
+    final hasFreeTrial = intro != null && intro.isFreeTrial;
     final period = _periodFrom(package.packageType);
     // 记录商品 ID → 周期，供已购权益（CustomerInfo 无周期字段）标注准确套餐名。
     // storeProduct.identifier 与 EntitlementInfo.productIdentifier 同源可对应。
@@ -221,6 +249,110 @@ class RevenueCatPurchaseService implements PurchaseService {
       period: period,
       hasFreeTrial: hasFreeTrial,
       trialDays: hasFreeTrial ? _trialDays(intro) : 0,
+      introOffer: intro,
+    );
+  }
+
+  void _logPackageDiagnostics(Package package, {required String stage}) {
+    final product = package.storeProduct;
+    final intro = product.introductoryPrice;
+    AppLogger.log(
+      'Subscription',
+      'package[$stage] package=${package.identifier} type=${package.packageType} '
+          'product=${product.identifier} title=${product.title} '
+          'price=${product.priceString} rawPrice=${product.price} '
+          'currency=${product.currencyCode} subscriptionPeriod=${product.subscriptionPeriod ?? "null"} '
+          'pricePerMonth=${product.pricePerMonthString ?? "null"} '
+          'pricePerYear=${product.pricePerYearString ?? "null"} '
+          'introductoryPrice=${intro == null ? "null" : _introPriceSummary(intro)} '
+          'defaultOption=${_optionSummary(product.defaultOption)} '
+          'subscriptionOptions=${_optionsSummary(product.subscriptionOptions)}',
+    );
+  }
+
+  void _logMappedPlan(SubscriptionPlan plan, {required String stage}) {
+    AppLogger.log(
+      'Subscription',
+      'plan[$stage] id=${plan.planId} title=${plan.title} '
+          'period=${plan.period} price=${plan.priceString} '
+          'hasFreeTrial=${plan.hasFreeTrial} trialDays=${plan.trialDays} '
+          'introOffer=${_mappedIntroSummary(plan.introOffer)}',
+    );
+  }
+
+  String _introPriceSummary(IntroductoryPrice intro) {
+    return '{price=${intro.priceString}, raw=${intro.price}, period=${intro.period}, '
+        'unit=${intro.periodUnit}, units=${intro.periodNumberOfUnits}, cycles=${intro.cycles}}';
+  }
+
+  String _optionsSummary(List<SubscriptionOption>? options) {
+    if (options == null) return 'null';
+    if (options.isEmpty) return 'empty';
+    return options.map(_optionSummary).join(' | ');
+  }
+
+  String _optionSummary(SubscriptionOption? option) {
+    if (option == null) return 'null';
+    return '{id=${option.id}, storeProductId=${option.storeProductId}, '
+        'productId=${option.productId}, isBasePlan=${option.isBasePlan}, '
+        'billingPeriod=${_periodSummary(option.billingPeriod)}, '
+        'tags=${option.tags}, fullPrice=${_phaseSummary(option.fullPricePhase)}, '
+        'free=${_phaseSummary(option.freePhase)}, intro=${_phaseSummary(option.introPhase)}, '
+        'phases=[${option.pricingPhases.map(_phaseSummary).join(", ")}]}';
+  }
+
+  String _phaseSummary(PricingPhase? phase) {
+    if (phase == null) return 'null';
+    return '{price=${phase.price.formatted}, micros=${phase.price.amountMicros}, '
+        'currency=${phase.price.currencyCode}, period=${_periodSummary(phase.billingPeriod)}, '
+        'recurrence=${phase.recurrenceMode}, cycles=${phase.billingCycleCount}, '
+        'paymentMode=${phase.offerPaymentMode}}';
+  }
+
+  String _periodSummary(Period? period) {
+    if (period == null) return 'null';
+    return '${period.iso8601}/${period.value}${period.unit}';
+  }
+
+  String _mappedIntroSummary(SubscriptionIntroOffer? offer) {
+    if (offer == null) return 'null';
+    return '{price=${offer.priceString}, period=${offer.period}, '
+        'units=${offer.periodNumberOfUnits}, cycles=${offer.cycles}, '
+        'isFreeTrial=${offer.isFreeTrial}, renewal=${offer.renewalPriceString}}';
+  }
+
+  SubscriptionIntroOffer? _introOfferFrom(
+    StoreProduct product,
+    IntroEligibilityStatus? introEligibility,
+  ) {
+    final defaultOption = product.defaultOption;
+    final introPhase = defaultOption?.introPhase ?? defaultOption?.freePhase;
+    final fullPricePhase = defaultOption?.fullPricePhase;
+    if (introPhase != null && fullPricePhase != null) {
+      return SubscriptionIntroOffer(
+        priceString: introPhase.price.formatted,
+        period: _offerPeriodFromPricingPhase(introPhase),
+        periodNumberOfUnits: introPhase.billingPeriod?.value ?? 1,
+        cycles: introPhase.billingCycleCount ?? 1,
+        isFreeTrial: introPhase.price.amountMicros == 0,
+        renewalPriceString: fullPricePhase.price.formatted,
+      );
+    }
+
+    final intro = product.introductoryPrice;
+    if (intro == null) return null;
+    // iOS/macOS 无法确认资格时不展示促销，避免误导；Android 不走本分支。
+    if (introEligibility !=
+        IntroEligibilityStatus.introEligibilityStatusEligible) {
+      return null;
+    }
+    return SubscriptionIntroOffer(
+      priceString: intro.priceString,
+      period: _offerPeriodFromIntro(intro),
+      periodNumberOfUnits: intro.periodNumberOfUnits,
+      cycles: intro.cycles,
+      isFreeTrial: intro.price == 0,
+      renewalPriceString: product.priceString,
     );
   }
 
@@ -232,14 +364,34 @@ class RevenueCatPurchaseService implements PurchaseService {
     };
   }
 
-  int _trialDays(IntroductoryPrice intro) {
-    final units = intro.periodNumberOfUnits;
+  int _trialDays(SubscriptionIntroOffer intro) {
+    final units = intro.periodNumberOfUnits * intro.cycles;
+    return switch (intro.period) {
+      SubscriptionOfferPeriod.day => units,
+      SubscriptionOfferPeriod.week => units * 7,
+      SubscriptionOfferPeriod.month => units * 30,
+      SubscriptionOfferPeriod.year => units * 365,
+      SubscriptionOfferPeriod.unknown => units,
+    };
+  }
+
+  SubscriptionOfferPeriod _offerPeriodFromIntro(IntroductoryPrice intro) {
     return switch (intro.periodUnit) {
-      PeriodUnit.day => units,
-      PeriodUnit.week => units * 7,
-      PeriodUnit.month => units * 30,
-      PeriodUnit.year => units * 365,
-      PeriodUnit.unknown => units,
+      PeriodUnit.day => SubscriptionOfferPeriod.day,
+      PeriodUnit.week => SubscriptionOfferPeriod.week,
+      PeriodUnit.month => SubscriptionOfferPeriod.month,
+      PeriodUnit.year => SubscriptionOfferPeriod.year,
+      PeriodUnit.unknown => SubscriptionOfferPeriod.unknown,
+    };
+  }
+
+  SubscriptionOfferPeriod _offerPeriodFromPricingPhase(PricingPhase phase) {
+    return switch (phase.billingPeriod?.unit) {
+      PeriodUnit.day => SubscriptionOfferPeriod.day,
+      PeriodUnit.week => SubscriptionOfferPeriod.week,
+      PeriodUnit.month => SubscriptionOfferPeriod.month,
+      PeriodUnit.year => SubscriptionOfferPeriod.year,
+      PeriodUnit.unknown || null => SubscriptionOfferPeriod.unknown,
     };
   }
 

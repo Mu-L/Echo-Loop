@@ -323,7 +323,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumWebCheckoutHint.
   ///
   /// In en, this message translates to:
-  /// **'You\'ll complete payment securely in your browser, then return to the app.'**
+  /// **'Plans, current prices, and offers are shown on the secure checkout page.'**
   String get premiumWebCheckoutHint;
 
   /// No description provided for @premiumWebVerifying.
@@ -386,6 +386,12 @@ abstract class AppLocalizations {
   /// **'/yr'**
   String get premiumPriceSuffixYear;
 
+  /// No description provided for @premiumPriceSuffixFirstYear.
+  ///
+  /// In en, this message translates to:
+  /// **'/first yr'**
+  String get premiumPriceSuffixFirstYear;
+
   /// No description provided for @premiumPriceSuffixLifetime.
   ///
   /// In en, this message translates to:
@@ -403,6 +409,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'≈ {price}/mo'**
   String premiumPerMonthEquivalent(String price);
+
+  /// No description provided for @premiumIntroFirstYear.
+  ///
+  /// In en, this message translates to:
+  /// **'First year {price}'**
+  String premiumIntroFirstYear(String price);
+
+  /// No description provided for @premiumIntroFirstMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'First month {price}'**
+  String premiumIntroFirstMonth(String price);
+
+  /// No description provided for @premiumIntroFirstPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'First period {price}'**
+  String premiumIntroFirstPeriod(String price);
+
+  /// No description provided for @premiumRenewalPricePerYear.
+  ///
+  /// In en, this message translates to:
+  /// **'{price}/yr'**
+  String premiumRenewalPricePerYear(String price);
+
+  /// No description provided for @premiumRenewalPricePerMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'{price}/mo'**
+  String premiumRenewalPricePerMonth(String price);
+
+  /// No description provided for @premiumRenewalPricePerPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'{price}'**
+  String premiumRenewalPricePerPeriod(String price);
+
+  /// No description provided for @premiumTryFreeThen.
+  ///
+  /// In en, this message translates to:
+  /// **'Try free for {days} days, then {renewal}'**
+  String premiumTryFreeThen(int days, String renewal);
+
+  /// No description provided for @premiumOfferThen.
+  ///
+  /// In en, this message translates to:
+  /// **'{intro}, then {renewal}'**
+  String premiumOfferThen(String intro, String renewal);
 
   /// No description provided for @practiceControlModeAuto.
   ///

@@ -6,38 +6,46 @@ import 'package:flutter_test/flutter_test.dart';
 /// 网页支付渠道单测：URL 拼接内核 + [WebPurchaseService] 的占位契约。
 void main() {
   group('composeWebPurchaseUri', () {
-    test('prod base + userId → 追加 URL-encoded userId', () {
+    test('template + userId → 替换 URL-encoded userId', () {
       final uri = composeWebPurchaseUri(
-        'https://pay.rev.cat/bwnqefbrodyrornl',
+        'https://pay.rev.cat/lfxuaqpjhntezffc/{app_user_id}/paywall',
         'a1b2-c3',
       );
-      expect(uri.toString(), 'https://pay.rev.cat/bwnqefbrodyrornl/a1b2-c3');
+      expect(
+        uri.toString(),
+        'https://pay.rev.cat/lfxuaqpjhntezffc/a1b2-c3/paywall',
+      );
     });
 
-    test('sandbox base（含 /sandbox 段）保持结构', () {
+    test('sandbox template（含 /sandbox 段）保持结构', () {
       final uri = composeWebPurchaseUri(
-        'https://pay.rev.cat/sandbox/dlgtqpwowmzoingm',
+        'https://pay.rev.cat/sandbox/dlgtqpwowmzoingm/{app_user_id}/paywall',
         'uid',
       );
       expect(
         uri.toString(),
-        'https://pay.rev.cat/sandbox/dlgtqpwowmzoingm/uid',
+        'https://pay.rev.cat/sandbox/dlgtqpwowmzoingm/uid/paywall',
       );
     });
 
-    test('base 末尾多余 / 被去掉，不出现双斜杠', () {
-      final uri = composeWebPurchaseUri('https://pay.rev.cat/tok/', 'uid');
-      expect(uri.toString(), 'https://pay.rev.cat/tok/uid');
-    });
-
     test('userId 做 URL-encode（含特殊字符）', () {
-      final uri = composeWebPurchaseUri('https://pay.rev.cat/tok', 'a b/c');
-      expect(uri.toString(), 'https://pay.rev.cat/tok/a%20b%2Fc');
+      final uri = composeWebPurchaseUri(
+        'https://pay.rev.cat/tok/{app_user_id}/paywall',
+        'a b/c',
+      );
+      expect(uri.toString(), 'https://pay.rev.cat/tok/a%20b%2Fc/paywall');
     });
 
-    test('base 或 userId 为空 → null', () {
+    test('template 为空、缺占位符或 userId 为空 → null', () {
       expect(composeWebPurchaseUri('', 'uid'), isNull);
-      expect(composeWebPurchaseUri('https://pay.rev.cat/tok', ''), isNull);
+      expect(composeWebPurchaseUri('https://pay.rev.cat/tok', 'uid'), isNull);
+      expect(
+        composeWebPurchaseUri(
+          'https://pay.rev.cat/tok/{app_user_id}/paywall',
+          '',
+        ),
+        isNull,
+      );
     });
   });
 

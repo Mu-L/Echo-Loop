@@ -52,7 +52,7 @@
   "premiumRestoreNone": "No purchases found to restore.",
   "premiumRestored": "Purchases restored.",
   "premiumWebCheckoutCta": "Continue to checkout",
-  "premiumWebCheckoutHint": "You'll complete payment securely in your browser, then return to the app.",
+  "premiumWebCheckoutHint": "Plans, current prices, and offers are shown on the secure checkout page.",
   "premiumWebVerifying": "Waiting for payment to be confirmed…",
   "premiumWebCheckDone": "I've completed payment",
   "premiumWebOpenFailed": "Couldn't open the checkout page. Please try again.",
@@ -63,6 +63,7 @@
   "premiumPeriodLifetime": "Lifetime",
   "premiumPriceSuffixMonth": "/mo",
   "premiumPriceSuffixYear": "/yr",
+  "premiumPriceSuffixFirstYear": "/first yr",
   "premiumPriceSuffixLifetime": "One-time",
   "premiumSavePercent": "Save {percent}%",
   "@premiumSavePercent": {
@@ -74,6 +75,56 @@
   "@premiumPerMonthEquivalent": {
     "placeholders": {
       "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstYear": "First year {price}",
+  "@premiumIntroFirstYear": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstMonth": "First month {price}",
+  "@premiumIntroFirstMonth": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumIntroFirstPeriod": "First period {price}",
+  "@premiumIntroFirstPeriod": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerYear": "{price}/yr",
+  "@premiumRenewalPricePerYear": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerMonth": "{price}/mo",
+  "@premiumRenewalPricePerMonth": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumRenewalPricePerPeriod": "{price}",
+  "@premiumRenewalPricePerPeriod": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "premiumTryFreeThen": "Try free for {days} days, then {renewal}",
+  "@premiumTryFreeThen": {
+    "placeholders": {
+      "days": { "type": "int" },
+      "renewal": { "type": "String" }
+    }
+  },
+  "premiumOfferThen": "{intro}, then {renewal}",
+  "@premiumOfferThen": {
+    "placeholders": {
+      "intro": { "type": "String" },
+      "renewal": { "type": "String" }
     }
   },
   "practiceControlModeAuto": "Auto",

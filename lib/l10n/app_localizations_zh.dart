@@ -126,7 +126,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumWebCheckoutCta => '前往订阅结账';
 
   @override
-  String get premiumWebCheckoutHint => '将在浏览器中安全完成支付，随后返回 App。';
+  String get premiumWebCheckoutHint => '套餐、当前价格和优惠会在安全结账页显示。';
 
   @override
   String get premiumWebVerifying => '正在等待支付结果确认…';
@@ -159,6 +159,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumPriceSuffixYear => '/年';
 
   @override
+  String get premiumPriceSuffixFirstYear => '/首年';
+
+  @override
   String get premiumPriceSuffixLifetime => '一次性';
 
   @override
@@ -169,6 +172,46 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String premiumPerMonthEquivalent(String price) {
     return '≈ $price/月';
+  }
+
+  @override
+  String premiumIntroFirstYear(String price) {
+    return '首年 $price';
+  }
+
+  @override
+  String premiumIntroFirstMonth(String price) {
+    return '首月 $price';
+  }
+
+  @override
+  String premiumIntroFirstPeriod(String price) {
+    return '首期 $price';
+  }
+
+  @override
+  String premiumRenewalPricePerYear(String price) {
+    return '$price/年';
+  }
+
+  @override
+  String premiumRenewalPricePerMonth(String price) {
+    return '$price/月';
+  }
+
+  @override
+  String premiumRenewalPricePerPeriod(String price) {
+    return '$price';
+  }
+
+  @override
+  String premiumTryFreeThen(int days, String renewal) {
+    return '免费试用 $days 天，之后 $renewal';
+  }
+
+  @override
+  String premiumOfferThen(String intro, String renewal) {
+    return '$intro，之后 $renewal';
   }
 
   @override
