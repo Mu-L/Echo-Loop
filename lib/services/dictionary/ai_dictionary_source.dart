@@ -82,6 +82,9 @@ class AiDictionarySource implements DictionarySource {
     final word = request.word;
     final cacheWord = normalizeWord(word);
     final key = hashText('$cacheWord|$language');
+    // 单词 / 词组是两条独立功能，类型仅由查询是否含空白决定（同后端 resolveQueryType）；
+    // 缓存读取与端点路由都据此选择具体模型，不靠 originalExpression 结构嗅探。
+    final isPhrase = cacheWord.contains(' ');
 
     // L1 内存（即时整块返回，不模拟流式）
     final mem = _memCache[key];
@@ -97,7 +100,9 @@ class AiDictionarySource implements DictionarySource {
       try {
         final decoded = jsonDecode(cached);
         if (decoded is Map<String, dynamic>) {
-          final entry = AiDictionaryEntry.fromJson(decoded);
+          final entry = isPhrase
+              ? MultiWordDictionaryEntry.fromJson(decoded)
+              : DictionaryEntry.fromJson(decoded);
           _memCache[key] = entry;
           yield AiDictResult(entry);
           return;
@@ -107,9 +112,8 @@ class AiDictionarySource implements DictionarySource {
       }
     }
 
-    // L3 流式 API：按是否含空白分流到单词/词组端点（同后端 resolveQueryType）
+    // L3 流式 API：按 isPhrase 分流到单词/词组端点
     final apiClient = _apiClient();
-    final isPhrase = cacheWord.contains(' ');
     final stream = isPhrase
         ? apiClient.lookupPhraseStreamFrames(
             word,

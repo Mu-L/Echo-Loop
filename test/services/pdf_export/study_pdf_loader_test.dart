@@ -194,20 +194,30 @@ void main() {
     test('缓存命中填充翻译与解析三字段', () async {
       await insertAudio();
       final hash = hashText('This is a test.');
+      // 翻译键 = 上下文相关哈希（前句 Hello world. + 本句 + 后句 Goodbye now.）
+      final translationHash = translationContextHash(
+        'This is a test.',
+        previous: 'Hello world.',
+        next: 'Goodbye now.',
+      );
       await db.sentenceAiCacheDao.upsert(
-        hash,
-        'translation:zh-CN',
+        translationHash,
+        'translation_v2:zh-CN',
         jsonEncode({'translation': '这是一个测试。'}),
       );
       await db.sentenceAiCacheDao.upsert(
         hash,
-        'analysis:zh-CN',
+        'analysis_v2:zh-CN',
         jsonEncode({
-          'analysis': {
-            'grammar': '主系表结构',
-            'vocabulary': 'test 测试',
-            'listening': 'this is 连读',
-          },
+          'grammar': [
+            {'point': '主系表结构', 'explanation': ''},
+          ],
+          'vocabulary': [
+            {'term': 'test', 'note': '测试'},
+          ],
+          'listening': [
+            {'phrase': 'this is', 'note': '连读'},
+          ],
         }),
       );
 
@@ -215,15 +225,19 @@ void main() {
       final s = doc.paragraphs.expand((p) => p).toList()[1];
       expect(s.translation, '这是一个测试。');
       expect(s.grammar, '主系表结构');
-      expect(s.vocabulary, 'test 测试');
-      expect(s.listening, 'this is 连读');
+      expect(s.vocabulary, 'test: 测试');
+      expect(s.listening, 'this is: 连读');
     });
 
     test('targetLanguage 隔离：zh-CN 缓存不命中 en 查询', () async {
       await insertAudio();
       await db.sentenceAiCacheDao.upsert(
-        hashText('This is a test.'),
-        'translation:zh-CN',
+        translationContextHash(
+          'This is a test.',
+          previous: 'Hello world.',
+          next: 'Goodbye now.',
+        ),
+        'translation_v2:zh-CN',
         jsonEncode({'translation': '这是一个测试。'}),
       );
 
@@ -235,8 +249,17 @@ void main() {
     test('坏 JSON 视作未命中不抛异常', () async {
       await insertAudio();
       final hash = hashText('This is a test.');
-      await db.sentenceAiCacheDao.upsert(hash, 'translation:zh-CN', '{broken');
-      await db.sentenceAiCacheDao.upsert(hash, 'analysis:zh-CN', '[]');
+      final translationHash = translationContextHash(
+        'This is a test.',
+        previous: 'Hello world.',
+        next: 'Goodbye now.',
+      );
+      await db.sentenceAiCacheDao.upsert(
+        translationHash,
+        'translation_v2:zh-CN',
+        '{broken',
+      );
+      await db.sentenceAiCacheDao.upsert(hash, 'analysis_v2:zh-CN', '[]');
 
       final doc = await buildLoader().load('audio-1', targetLanguage: 'zh-CN');
       final s = doc.paragraphs.expand((p) => p).toList()[1];

@@ -289,6 +289,17 @@ class _AiEntryContent extends StatelessWidget {
       );
     }
 
+    // 词形变化（屈折形式）——置于词族之前，与后端 reveal 字段顺序一致
+    if (entry.forms.isNotEmpty) {
+      children.add(
+        _Section(
+          title: l10n.dictAiForms,
+          icon: Icons.text_fields_rounded,
+          child: _FormsGrid(forms: entry.forms),
+        ),
+      );
+    }
+
     // 词族
     if (entry.wordFamily.isNotEmpty) {
       children.add(
@@ -308,29 +319,7 @@ class _AiEntryContent extends StatelessWidget {
       );
     }
 
-    // 词形变化（屈折形式）
-    if (entry.forms.isNotEmpty) {
-      children.add(
-        _Section(
-          title: l10n.dictAiForms,
-          icon: Icons.text_fields_rounded,
-          child: _FormsGrid(forms: entry.forms),
-        ),
-      );
-    }
-
-    // 词源
-    if (entry.etymology.isNotEmpty) {
-      children.add(
-        _Section(
-          title: l10n.dictAiEtymology,
-          icon: Icons.history_edu_outlined,
-          child: _bodyText(theme, entry.etymology),
-        ),
-      );
-    }
-
-    // 学习提示（逐条项目符号）
+    // 学习提示（逐条项目符号）——置于词源之前，与后端 reveal 字段顺序一致
     if (entry.learnerTips.isNotEmpty) {
       children.add(
         _Section(
@@ -345,6 +334,17 @@ class _AiEntryContent extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      );
+    }
+
+    // 词源（置于最底部）
+    if (entry.etymology.isNotEmpty) {
+      children.add(
+        _Section(
+          title: l10n.dictAiEtymology,
+          icon: Icons.history_edu_outlined,
+          child: _bodyText(theme, entry.etymology),
         ),
       );
     }

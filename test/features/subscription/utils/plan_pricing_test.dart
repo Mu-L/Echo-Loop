@@ -102,4 +102,106 @@ void main() {
       expect(v.perMonth, isNull);
     });
   });
+
+  group('computeIntroOfferDiscountPercent', () {
+    test('付费首期优惠按续费价计算折扣百分比', () {
+      const plan = SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$98.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$49.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$98.00',
+        ),
+      );
+
+      expect(computeIntroOfferDiscountPercent(plan), 50);
+      expect(isIntroOfferDiscounted(plan), isTrue);
+    });
+
+    test('非 50% 折扣同样动态返回真实百分比', () {
+      const plan = SubscriptionPlan(
+        planId: 'monthly',
+        title: 'Monthly',
+        priceString: r'$12.00',
+        period: SubscriptionPeriod.monthly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$3.00',
+          period: SubscriptionOfferPeriod.month,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$12.00',
+        ),
+      );
+
+      expect(computeIntroOfferDiscountPercent(plan), 75);
+      expect(isIntroOfferDiscounted(plan), isTrue);
+    });
+
+    test('免费试用不作为顶部付费优惠展示', () {
+      const plan = SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$98.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$0.00',
+          period: SubscriptionOfferPeriod.week,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: true,
+          renewalPriceString: r'$98.00',
+        ),
+      );
+
+      expect(computeIntroOfferDiscountPercent(plan), isNull);
+      expect(isIntroOfferDiscounted(plan), isNull);
+    });
+
+    test('首期价不低于续费价时返回空', () {
+      const plan = SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$98.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$98.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$98.00',
+        ),
+      );
+
+      expect(computeIntroOfferDiscountPercent(plan), isNull);
+      expect(isIntroOfferDiscounted(plan), isFalse);
+    });
+
+    test('价格无法解析时返回空', () {
+      const plan = SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$98.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: 'Special',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$98.00',
+        ),
+      );
+
+      expect(computeIntroOfferDiscountPercent(plan), isNull);
+      expect(isIntroOfferDiscounted(plan), isNull);
+    });
+  });
 }

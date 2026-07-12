@@ -202,6 +202,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final gold = AppTheme.premiumGold(theme.brightness);
     final isPremium = ref.watch(subscriptionControllerProvider).isActive;
+    final upgradeBadgeBackground = theme.brightness == Brightness.dark
+        ? const Color(0xFFD8B11E)
+        : const Color(0xFFFCE76B);
+    const upgradeBadgeTextColor = Color(0xFF111111);
 
     return ListTile(
       leading: Icon(Icons.workspace_premium, color: gold),
@@ -226,17 +230,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             )
           else
-            // 未订阅：高亮金色「升级」徽章，引导开通。
+            // 未订阅：与订阅页优惠条统一为高对比实底徽章，引导开通。
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: gold,
-                borderRadius: BorderRadius.circular(6),
+                color: upgradeBadgeBackground,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 l10n.premiumEntryBadgeUpgrade,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white,
+                  color: upgradeBadgeTextColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),

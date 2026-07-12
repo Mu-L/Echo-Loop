@@ -528,6 +528,9 @@ class TtsController extends Notifier<TtsControllerState> {
   /// 收藏页下次 rebuild 重新触发，届时多已缓存）。
   int _textsPrewarmToken = 0;
 
+  /// 已提交过后台预热的文本（增量预热去重，切词/关闭时清空）。
+  final Set<String> _incrementalPrewarmed = {};
+
   /// 后台预热一批文本（如词典「单词 + 例句」、收藏「单词 + 意群」，按显示顺序）。
   ///
   /// fire-and-forget、背景优先、命中缓存即跳过；用当前选中引擎/配置合成（经
@@ -547,9 +550,33 @@ class TtsController extends Notifier<TtsControllerState> {
     }
   }
 
+  /// 增量预热：只对尚未提交过的新文本各触发一次幂等合成，不重置批次 token，
+  /// 不打断已在推进的预热。供流式词典逐帧调用——每帧传当前完整可发音列表，
+  /// 已提交的自动跳过，只有新出现的例句真正进合成队列。
+  ///
+  /// 与 [prewarmTexts]（一次性全量、`++token` 重置）不同：此处沿用当前 token，
+  /// [_incrementalPrewarmed] 在同步段去重（每条只提交一次），多帧并发调用互不
+  /// 重复提交；worker 串行由协调器内部排队。取消经 [cancelTextsPrewarm] 统一处理。
+  Future<void> prewarmTextsIncremental(List<String> texts) async {
+    final token = _textsPrewarmToken; // 沿用当前，不 ++
+    for (final text in texts) {
+      if (text.trim().isEmpty) continue;
+      if (!_incrementalPrewarmed.add(text)) continue; // 同步段去重：每条只提交一次
+      try {
+        await _coordinator.prewarmCurrent(text);
+      } catch (e, st) {
+        AppLogger.log('TtsController', '✗ 增量预热异常: $e\n$st');
+      }
+      if (token != _textsPrewarmToken) return; // 切词/关闭后停止推进
+    }
+  }
+
   /// 取消在途批量文本预热（页面离开时调用），使预热循环下轮即停。
+  ///
+  /// 同时清空增量预热去重集合，使切词/关闭后新一轮从头预热。
   void cancelTextsPrewarm() {
     _textsPrewarmToken++;
+    _incrementalPrewarmed.clear();
   }
 
   /// 停止当前发音。

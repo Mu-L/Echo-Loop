@@ -4,6 +4,8 @@
 /// 不包含 UI 状态或播放逻辑，由 [AnnotationContentView] 内部使用。
 library;
 
+import 'package:dio/dio.dart';
+
 import '../database/daos/audio_item_dao.dart';
 import '../models/audio_item.dart';
 import '../models/sense_group_result.dart';
@@ -73,26 +75,35 @@ class SenseGroupService {
     return null;
   }
 
-  /// 请求 AI 拆分意群
+  /// 流式请求 AI 拆分意群
   ///
-  /// 返回拆分结果和对应的时间范围。有词级时间戳时精确计算，否则按词数均分。
-  Future<(SenseGroupResult result, List<SenseGroupTiming> timings)>
-  requestSenseGroups({
+  /// 逐帧 yield（拆分结果, 对应 medium 时间范围）：medium 意群随流渐显，每帧按最新 medium
+  /// 重算时间范围（有词级时间戳时精确匹配，否则按词数均分）。流结束（含 final）后自然结束。
+  /// 缓存/计费/校验由 [SentenceAiNotifier.getSenseGroupsStream] 负责，本服务只做时间范围计算。
+  Stream<(SenseGroupResult result, List<SenseGroupTiming> timings)>
+  streamSenseGroups({
     required String text,
     required SentenceAiNotifier ai,
     required String? accessToken,
     required int sentenceStartMs,
     required int sentenceEndMs,
     List<WordTimestamp>? wordTimestamps,
-  }) async {
-    final result = await ai.getSenseGroups(text, accessToken: accessToken);
-    final timings = computeTimings(
-      chunks: result.medium,
-      wordTimestamps: wordTimestamps ?? const [],
-      sentenceStartMs: sentenceStartMs,
-      sentenceEndMs: sentenceEndMs,
+    CancelToken? cancelToken,
+  }) async* {
+    final stream = ai.getSenseGroupsStream(
+      text,
+      accessToken: accessToken,
+      cancelToken: cancelToken,
     );
-    return (result, timings);
+    await for (final result in stream) {
+      final timings = computeTimings(
+        chunks: result.medium,
+        wordTimestamps: wordTimestamps ?? const [],
+        sentenceStartMs: sentenceStartMs,
+        sentenceEndMs: sentenceEndMs,
+      );
+      yield (result, timings);
+    }
   }
 
   /// 计算意群时间范围

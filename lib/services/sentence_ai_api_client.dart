@@ -15,10 +15,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../analytics/geo_interceptor.dart';
 import '../config/api_config.dart';
 import '../providers/package_info_provider.dart';
-import 'api_log_interceptor.dart';
+import 'ai_http_client_adapter.dart';
 import 'app_logger.dart';
-import 'client_info.dart';
+import 'backend_dio.dart';
 import 'dictionary/dictionary_source.dart';
+import 'ndjson_object_stream.dart';
 import 'ndjson_stream.dart';
 import '../models/sentence_ai_result.dart';
 import '../models/sense_group_result.dart';
@@ -37,77 +38,268 @@ class AiDictionaryStreamFrame {
   const AiDictionaryStreamFrame({required this.entry, required this.isFinal});
 }
 
+/// AI 句子解析流式协议帧。
+///
+/// [isFinal] 只在后端完整成功末帧为 true；调用方只有收到 final 才能把最后
+/// 一帧视为可缓存的完整结果。
+class SentenceAnalysisStreamFrame {
+  final SentenceAnalysis analysis;
+  final bool isFinal;
+
+  const SentenceAnalysisStreamFrame({
+    required this.analysis,
+    required this.isFinal,
+  });
+}
+
+/// 句子解析流内错误（`{"__error":...}` 或行损坏）。
+class SentenceAnalysisStreamException implements Exception {
+  const SentenceAnalysisStreamException();
+
+  @override
+  String toString() => 'SentenceAnalysisStreamException';
+}
+
+/// AI 句子翻译流式协议帧。
+///
+/// [isFinal] 只在后端完整成功末帧为 true；调用方只有收到 final 才能把最后
+/// 一帧视为可缓存的完整译文。
+class SentenceTranslationStreamFrame {
+  final SentenceTranslation translation;
+  final bool isFinal;
+
+  const SentenceTranslationStreamFrame({
+    required this.translation,
+    required this.isFinal,
+  });
+}
+
+/// 句子翻译流内错误（`{"__error":...}` 或行损坏）。
+class SentenceTranslationStreamException implements Exception {
+  const SentenceTranslationStreamException();
+
+  @override
+  String toString() => 'SentenceTranslationStreamException';
+}
+
+/// AI 意群拆分流式协议帧。
+///
+/// [isFinal] 只在后端完整成功末帧为 true；调用方只有收到 final 才能把最后一帧
+/// 视为可缓存的完整结果（并做 concat 最终校验）。后端按 medium → fine 顺序流出。
+class SenseGroupsStreamFrame {
+  final SenseGroupResult result;
+  final bool isFinal;
+
+  const SenseGroupsStreamFrame({required this.result, required this.isFinal});
+}
+
+/// 意群拆分流内错误（`{"__error":...}` 或行损坏）。
+class SenseGroupsStreamException implements Exception {
+  const SenseGroupsStreamException();
+
+  @override
+  String toString() => 'SenseGroupsStreamException';
+}
+
 /// AI 句子翻译/解析 API 客户端
 class SentenceAiApiClient {
   final Dio _dio;
+  final void Function(String message) _streamLogPrint;
 
   /// [appVersion] 随请求以 `x-app-version` 上报（版本灰度预留），可为 null。
-  /// 平台标识 `x-app-platform` 恒定携带——后端据此按平台决定是否限额。
-  SentenceAiApiClient({required String baseUrl, String? appVersion})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 60),
-          headers: clientInfoHeaders(appVersion: appVersion),
-        ),
-      ) {
+  /// 平台与渠道标识会随请求携带，后端据此按组合决定是否限额。
+  SentenceAiApiClient({
+    required String baseUrl,
+    String? appVersion,
+    bool http2Enabled = aiHttp2EnabledByDefault,
+    void Function(String message)? streamLogPrint,
+  }) : _dio = createBackendDio(
+         baseUrl: baseUrl,
+         appVersion: appVersion,
+         connectTimeout: const Duration(seconds: 15),
+         // h2 下只约束「到首个响应头」（后端 NDJSON 响应头立即 flush，30s 极充裕）；
+         // 帧间停顿由 aiHttpStreamIdleTimeout 独立兜底。
+         receiveTimeout: const Duration(seconds: 30),
+         apiLogTag: 'AI-API',
+       ),
+       _streamLogPrint =
+           streamLogPrint ?? ((message) => AppLogger.log('AI-API', message)) {
+    configureAiHttpClientAdapter(
+      _dio,
+      baseUrl: baseUrl,
+      http2Enabled: http2Enabled,
+    );
     // 异步添加 GeoInterceptor（SharedPreferences 在 main() 中已初始化，几乎同步返回）
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
     );
-    _dio.interceptors.add(ApiLogInterceptor(tag: 'AI-API'));
   }
 
   /// 用于测试的构造函数，允许注入 Dio 实例
-  SentenceAiApiClient.withDio(this._dio);
+  SentenceAiApiClient.withDio(
+    this._dio, {
+    void Function(String message)? streamLogPrint,
+  }) : _streamLogPrint =
+           streamLogPrint ?? ((message) => AppLogger.log('AI-API', message));
 
   /// 请求公共 headers（仅测试用，验证平台/版本标识已随请求携带）。
   @visibleForTesting
   Map<String, dynamic> get defaultHeaders => _dio.options.headers;
 
-  /// 翻译句子
+  /// 当前 Dio adapter（仅测试用，锁定 AI API transport 配置）。
+  @visibleForTesting
+  HttpClientAdapter get debugHttpClientAdapter => _dio.httpClientAdapter;
+
+  /// 翻译句子（流式，单句 + 上下文）
   ///
-  /// 调用后端 AI 翻译接口，返回目标语言的翻译结果。
+  /// 调用后端 `POST /api/v1/stream/translate`（需登录态），`translation` 单字段随
+  /// NDJSON 逐帧渐显。只译目标句 [text]，[previousText]/[nextText] 仅作上下文（缺失
+  /// 即首/末句，可为 null）。协议与错误处理同 [analyzeStream]（同款 `ops` transport）。
   /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
-  Future<SentenceTranslation> translate(
+  Stream<SentenceTranslationStreamFrame> translateStream(
     String text, {
     required String accessToken,
+    String? previousText,
+    String? nextText,
     String? targetLanguage,
     CancelToken? cancelToken,
-  }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v2/ai/translate',
+  }) async* {
+    final response = await _dio.post<ResponseBody>(
+      '/api/v1/stream/translate',
       data: {
         'text': text,
+        if (previousText != null) 'previousText': previousText,
+        if (nextText != null) 'nextText': nextText,
         if (targetLanguage != null) 'targetLanguage': targetLanguage,
       },
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      options: Options(
+        responseType: ResponseType.stream,
+        validateStatus: (_) => true,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
       cancelToken: cancelToken,
     );
-    return SentenceTranslation.fromJson(response.data!);
+
+    final body = response.data;
+    final status = response.statusCode ?? 0;
+    if (body == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    if (status != 200) {
+      final errorMap = await _decodeErrorBody(body);
+      _logStreamHttpError(
+        response.requestOptions,
+        status: status,
+        errorMap: errorMap,
+      );
+      // 402（额度）等：抛带状态码的 DioException，由 provider 的 _callWithQuotaMapping
+      // 映射为额度超限；其余非 200 一并作为 badResponse 上抛。
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: Response(
+          requestOptions: response.requestOptions,
+          statusCode: status,
+          data: errorMap,
+        ),
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    // 单字段 translation 渐显：{"ops":[{"p":["translation"],"v":..}]} / {"done":true} /
+    // {"__error":..}，委托通用层累积（协议见后端 stream/_shared.ts）。
+    try {
+      final frames = accumulateNdjsonObject<SentenceTranslation>(
+        _decodeLoggedNdjson(body, response.requestOptions),
+        fromJson: SentenceTranslation.fromJson,
+      );
+      await for (final f in frames) {
+        yield SentenceTranslationStreamFrame(
+          translation: f.value,
+          isFinal: f.isFinal,
+        );
+      }
+    } on NdjsonStreamException {
+      throw const SentenceTranslationStreamException();
+    }
   }
 
-  /// 解析句子
+  /// 解析句子（流式）
   ///
-  /// 调用后端 AI 解析接口，返回语法、词汇和听力分析。
+  /// 调用后端 `POST /api/v1/stream/analyze`（需登录态），字段级增量流式（NDJSON）：
+  /// grammar/vocabulary/listening 各要点随流逐条渐显。协议与错误处理见
+  /// [_streamDictionaryFrames]（同款 NDJSON transport）。
   /// [targetLanguage] 为 BCP 47 代码（如 'zh-CN'），不传则由后端决定默认值。
-  Future<SentenceAnalysis> analyze(
+  Stream<SentenceAnalysisStreamFrame> analyzeStream(
     String text, {
     required String accessToken,
     String? targetLanguage,
     CancelToken? cancelToken,
-  }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v2/ai/analyze',
+  }) async* {
+    final response = await _dio.post<ResponseBody>(
+      '/api/v1/stream/analyze',
       data: {
         'text': text,
         if (targetLanguage != null) 'targetLanguage': targetLanguage,
       },
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      options: Options(
+        responseType: ResponseType.stream,
+        validateStatus: (_) => true,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
       cancelToken: cancelToken,
     );
-    return SentenceAnalysis.fromJson(response.data!);
+
+    final body = response.data;
+    final status = response.statusCode ?? 0;
+    if (body == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    if (status != 200) {
+      final errorMap = await _decodeErrorBody(body);
+      _logStreamHttpError(
+        response.requestOptions,
+        status: status,
+        errorMap: errorMap,
+      );
+      // 402（额度）等：抛带状态码的 DioException，由 provider 的 _callWithQuotaMapping
+      // 映射为额度超限；其余非 200 一并作为 badResponse 上抛。
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: Response(
+          requestOptions: response.requestOptions,
+          statusCode: status,
+          data: errorMap,
+        ),
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    // 字段级增量累积委托通用层 accumulateNdjsonObject：
+    // {"ops":[{"p":["grammar",0,"point"],"v":..}]} 增量批 / {"done":true} / {"__error":..}
+    try {
+      final frames = accumulateNdjsonObject<SentenceAnalysis>(
+        _decodeLoggedNdjson(body, response.requestOptions),
+        fromJson: SentenceAnalysis.fromJson,
+      );
+      await for (final f in frames) {
+        yield SentenceAnalysisStreamFrame(
+          analysis: f.value,
+          isFinal: f.isFinal,
+        );
+      }
+    } on NdjsonStreamException {
+      throw const SentenceAnalysisStreamException();
+    }
   }
 
   /// AI 词典释义（单词，流式）
@@ -136,6 +328,7 @@ class SentenceAiApiClient {
   }) => _streamDictionaryFrames(
     '/api/v1/stream/lookup-word',
     word,
+    fromJson: DictionaryEntry.fromJson,
     accessToken: accessToken,
     targetLanguage: targetLanguage,
     cancelToken: cancelToken,
@@ -167,6 +360,7 @@ class SentenceAiApiClient {
   }) => _streamDictionaryFrames(
     '/api/v1/stream/lookup-phrase',
     phrase,
+    fromJson: MultiWordDictionaryEntry.fromJson,
     accessToken: accessToken,
     targetLanguage: targetLanguage,
     cancelToken: cancelToken,
@@ -182,6 +376,7 @@ class SentenceAiApiClient {
   Stream<AiDictionaryStreamFrame> _streamDictionaryFrames(
     String path,
     String query, {
+    required AiDictionaryEntry Function(Map<String, dynamic>) fromJson,
     required String accessToken,
     String? targetLanguage,
     CancelToken? cancelToken,
@@ -212,6 +407,11 @@ class SentenceAiApiClient {
 
     if (status != 200) {
       final errorMap = await _decodeErrorBody(body);
+      _logStreamHttpError(
+        response.requestOptions,
+        status: status,
+        errorMap: errorMap,
+      );
       if (status == 400 && errorMap?['code'] == 'phrase_too_long') {
         throw const DictionaryPhraseTooLongException();
       }
@@ -230,95 +430,20 @@ class SentenceAiApiClient {
       );
     }
 
-    // 字段级增量累积：逐事件写入 acc，整体 fromJson 后 yield 完整帧。
-    // 协议见后端 stream/_shared.ts：
-    //   {"q":..} 元信息 / {"ops":[{"p":[...],"v":..},...]} 增量批 / {"done":true} / {"__error":..}
-    final acc = <String, dynamic>{};
+    // 字段级增量累积委托给通用层 accumulateNdjsonObject：
+    // {"ops":[...]} 增量批 / {"done":true} / {"__error":..}
+    // （协议见后端 stream/_shared.ts）。类型由调用端点决定（单词/词组各传具体
+    // fromJson），客户端不做结构嗅探。
     try {
-      await for (final ev in decodeNdjson(body.stream)) {
-        // 调试：打印每个下发行原样，核对是否每 ≥500ms 一批、无重发。验证后删。
-        AppLogger.log('DictStream', jsonEncode(ev));
-        if (ev.containsKey('__error')) {
-          throw const DictionaryStreamException();
-        }
-        if (ev['done'] == true) {
-          yield AiDictionaryStreamFrame(
-            entry: AiDictionaryEntry.fromJson(acc),
-            isFinal: true,
-          );
-          break;
-        }
-        final q = ev['q'];
-        if (q is String) {
-          acc['queryType'] = q;
-          continue; // 元信息不单独渲染
-        }
-        final ops = ev['ops'];
-        if (ops is! List) {
-          continue; // 未知事件，忽略
-        }
-        // 一行内可能含多个叶子（一次 flush 的批量），全部应用后只 yield 一帧
-        for (final op in ops) {
-          if (op is Map && op['p'] is List) {
-            _setPath(acc, op['p'] as List<dynamic>, op['v']);
-          }
-        }
-        yield AiDictionaryStreamFrame(
-          entry: AiDictionaryEntry.fromJson(acc),
-          isFinal: false,
-        );
+      final frames = accumulateNdjsonObject<AiDictionaryEntry>(
+        _decodeLoggedNdjson(body, response.requestOptions),
+        fromJson: fromJson,
+      );
+      await for (final f in frames) {
+        yield AiDictionaryStreamFrame(entry: f.value, isFinal: f.isFinal);
       }
-    } on FormatException {
+    } on NdjsonStreamException {
       throw const DictionaryStreamException();
-    }
-  }
-
-  /// 按路径写入累积对象：沿 [path] 逐段下行，按**下一段类型**自动建容器
-  /// （下一段是 int → 当前应为 `List` 并扩容到该下标；是 String → 应为 `Map`），
-  /// 末段直接赋值。生成顺序保证下标从 0 递增无空洞。
-  static void _setPath(
-    Map<String, dynamic> root,
-    List<dynamic> path,
-    Object? value,
-  ) {
-    if (path.isEmpty) return;
-    dynamic cur = root;
-    for (var i = 0; i < path.length - 1; i++) {
-      final seg = path[i];
-      final next = path[i + 1];
-      final child = _childAt(cur, seg);
-      if (next is int) {
-        if (child is! List) {
-          _assign(cur, seg, <dynamic>[]);
-        }
-      } else if (child is! Map<String, dynamic>) {
-        _assign(cur, seg, <String, dynamic>{});
-      }
-      cur = _childAt(cur, seg);
-    }
-    _assign(cur, path.last, value);
-  }
-
-  /// 读取容器 [cur] 在段 [seg]（int 下标 / String 键）处的子节点，越界/缺失回 null。
-  static dynamic _childAt(dynamic cur, dynamic seg) {
-    if (seg is int && cur is List) {
-      return (seg >= 0 && seg < cur.length) ? cur[seg] : null;
-    }
-    if (seg is String && cur is Map) {
-      return cur[seg];
-    }
-    return null;
-  }
-
-  /// 向容器 [cur] 的段 [seg] 赋值：List 按需用 null 扩容到 [seg]，Map 直接置键。
-  static void _assign(dynamic cur, dynamic seg, Object? value) {
-    if (seg is int && cur is List) {
-      while (cur.length <= seg) {
-        cur.add(null);
-      }
-      cur[seg] = value;
-    } else if (seg is String && cur is Map) {
-      cur[seg] = value;
     }
   }
 
@@ -333,25 +458,111 @@ class SentenceAiApiClient {
     }
   }
 
-  /// 拆分意群
+  /// 流式非 2xx 响应需在消费错误 JSON 后补日志，公共拦截器不能提前读取响应流。
+  void _logStreamHttpError(
+    RequestOptions request, {
+    required int status,
+    required Map<String, dynamic>? errorMap,
+  }) {
+    _streamLogPrint(
+      '流式请求失败 ${request.method} ${request.uri} '
+      'status=$status code=${errorMap?['code'] ?? '(空)'} '
+      'error=${errorMap?['error'] ?? '(空)'}',
+    );
+  }
+
+  /// AI 意群拆分（流式）
   ///
-  /// 调用后端 AI 意群拆分接口，返回意群列表（含中文翻译）。
-  Future<SenseGroupResult> splitSenseGroups(
+  /// 调用后端 `POST /api/v1/stream/sense-groups`（需登录态），字段级增量流式（NDJSON，
+  /// 协议与错误处理见 [analyzeStream]）：medium 意群先逐个渐显，fine 意群随后。
+  /// **无 targetLanguage**——意群是原句子串的切分，与目标语言无关。
+  Stream<SenseGroupsStreamFrame> senseGroupsStream(
     String text, {
     required String accessToken,
     CancelToken? cancelToken,
-  }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/api/v2/ai/sense-groups',
+  }) async* {
+    final response = await _dio.post<ResponseBody>(
+      '/api/v1/stream/sense-groups',
       data: {'text': text},
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      options: Options(
+        responseType: ResponseType.stream,
+        validateStatus: (_) => true,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
       cancelToken: cancelToken,
     );
-    return SenseGroupResult.fromJson(response.data!);
+
+    final body = response.data;
+    final status = response.statusCode ?? 0;
+    if (body == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    if (status != 200) {
+      final errorMap = await _decodeErrorBody(body);
+      _logStreamHttpError(
+        response.requestOptions,
+        status: status,
+        errorMap: errorMap,
+      );
+      // 402（额度）等：抛带状态码的 DioException，由 provider 的 _callWithQuotaMapping
+      // 映射为额度超限；其余非 200 一并作为 badResponse 上抛。
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: Response(
+          requestOptions: response.requestOptions,
+          statusCode: status,
+          data: errorMap,
+        ),
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    // 字段级增量累积委托通用层：{"ops":[{"p":["medium",0],"v":".."}]} / {"done":true} / {"__error":..}
+    try {
+      final frames = accumulateNdjsonObject<SenseGroupResult>(
+        _decodeLoggedNdjson(body, response.requestOptions),
+        fromJson: SenseGroupResult.fromJson,
+      );
+      await for (final f in frames) {
+        yield SenseGroupsStreamFrame(result: f.value, isFinal: f.isFinal);
+      }
+    } on NdjsonStreamException {
+      throw const SenseGroupsStreamException();
+    }
   }
 
   /// 释放资源
   void dispose() => _dio.close();
+
+  /// 流式响应体只能被消费一次；这里在 NDJSON 解码入口旁路打印原始帧，
+  /// 既能看到每次服务端推送的响应内容，又不会破坏后续业务解析。
+  Stream<Map<String, dynamic>> _decodeLoggedNdjson(
+    ResponseBody body,
+    RequestOptions request,
+  ) {
+    return decodeNdjson(
+      body.stream,
+      idleTimeout: aiHttpStreamIdleTimeout,
+      onLine: (line) {
+        _streamLogPrint(
+          '  流式响应帧 ${request.method} ${request.uri}: '
+          '${_truncateStreamLog(line)}',
+        );
+      },
+    );
+  }
+
+  /// 单帧过长时截断，避免一条日志挤爆控制台和应用内环形缓冲。
+  String _truncateStreamLog(String text) {
+    const maxLength = 2000;
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}…（已截断，共 ${text.length} 字符）';
+  }
 }
 
 /// AI API 客户端单例 Provider
@@ -359,18 +570,8 @@ class SentenceAiApiClient {
 SentenceAiApiClient sentenceAiApiClient(Ref ref) {
   final client = SentenceAiApiClient(
     baseUrl: apiBaseUrl,
-    appVersion: _readAppVersion(ref),
+    appVersion: readAppVersion(ref),
   );
   ref.onDispose(client.dispose);
   return client;
-}
-
-/// 读取 app 版本号；packageInfoProvider 未 override（如部分测试环境）时降级为
-/// null（省略版本 header），不让辅助信息阻断客户端构建（同 §7.18 惰性降级原则）。
-String? _readAppVersion(Ref ref) {
-  try {
-    return ref.read(packageInfoProvider).version;
-  } catch (_) {
-    return null;
-  }
 }

@@ -117,7 +117,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 权益列表仍展示
-    expect(find.text('Unlimited AI translation'), findsOneWidget);
+    expect(find.text('More AI subtitle transcription'), findsOneWidget);
+    expect(find.text('Special offer:'), findsNothing);
     // 网页结账 CTA + 说明，不出现商店套餐卡
     expect(
       find.widgetWithText(FilledButton, 'Continue to checkout'),
@@ -141,8 +142,34 @@ void main() {
     await tester.pumpAndSettle();
 
     // 权益列表
-    expect(find.text('Unlimited AI translation'), findsOneWidget);
+    expect(find.text('Get more AI-powered learning'), findsOneWidget);
     expect(find.text('More AI subtitle transcription'), findsOneWidget);
+    expect(find.text('More AI translation'), findsOneWidget);
+    expect(find.text('More AI word explanation'), findsOneWidget);
+    expect(find.text('More AI sentence breakdown'), findsOneWidget);
+    expect(find.text('More AI sentence chunking'), findsOneWidget);
+    expect(find.text('Special offer:'), findsNothing);
+    expect(find.byKey(const ValueKey('paywall_header_logo')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('More AI subtitle transcription')).dy <
+          tester.getTopLeft(find.text('More AI translation')).dy,
+      isTrue,
+    );
+    expect(
+      tester.getTopLeft(find.text('More AI translation')).dy <
+          tester.getTopLeft(find.text('More AI word explanation')).dy,
+      isTrue,
+    );
+    expect(
+      tester.getTopLeft(find.text('More AI word explanation')).dy <
+          tester.getTopLeft(find.text('More AI sentence breakdown')).dy,
+      isTrue,
+    );
+    expect(
+      tester.getTopLeft(find.text('More AI sentence breakdown')).dy <
+          tester.getTopLeft(find.text('More AI sentence chunking')).dy,
+      isTrue,
+    );
     // 套餐卡片用派生简洁名（非冗长商店标题）
     expect(find.text('Monthly'), findsOneWidget);
     expect(find.text('Yearly'), findsOneWidget);
@@ -153,6 +180,8 @@ void main() {
     // 年付折算：每月折合价 + 推荐徽标含立省百分比（$4.99 vs $39.99 → 33%、$3.33/mo）
     expect(find.text(r'≈ $3.33/mo'), findsOneWidget);
     expect(find.text('Save 33%'), findsOneWidget);
+    final saveBadge = tester.widget<Text>(find.text('Save 33%'));
+    expect(saveBadge.style?.color, const Color(0xFF111111));
     // 默认选中年付（带试用）→ CTA 为试用文案
     expect(
       find.widgetWithText(FilledButton, 'Start 7-day free trial'),
@@ -160,15 +189,23 @@ void main() {
     );
     // 恢复购买入口（合规必需）
     expect(find.text('Restore Purchases'), findsOneWidget);
-    // 购买相关法律链接应跟随购买内容一起滚动，而不是固定在页面底部。
-    expect(find.text('Terms of Service'), findsOneWidget);
-    expect(find.text('Privacy Policy'), findsOneWidget);
+    // 购买相关信息固定在底部，避免权益列表变长时 CTA 被挤出首屏。
+    expect(find.text('Terms'), findsOneWidget);
+    expect(find.text('Privacy'), findsOneWidget);
+    expect(
+      find.text('Auto-renews. Manage or cancel in your App Store account.'),
+      findsNothing,
+    );
     expect(
       find.ancestor(
-        of: find.text('Terms of Service'),
-        matching: find.byType(ListView),
+        of: find.text('Terms'),
+        matching: find.byKey(const ValueKey('paywall_fixed_purchase_panel')),
       ),
       findsOneWidget,
+    );
+    expect(
+      find.ancestor(of: find.text('Yearly'), matching: find.byType(ListView)),
+      findsNothing,
     );
   });
 
@@ -201,8 +238,8 @@ void main() {
     expect(find.text('Membership'), findsOneWidget);
     // 购买套餐卡不应出现
     expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
-    expect(find.text('Terms of Service'), findsNothing);
-    expect(find.text('Privacy Policy'), findsNothing);
+    expect(find.text('Terms'), findsNothing);
+    expect(find.text('Privacy'), findsNothing);
     // 恢复购买已移到 AppBar，两态均可用（已订阅用户偶尔也需恢复）
     expect(find.text('Restore Purchases'), findsOneWidget);
   });
@@ -236,10 +273,118 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(r'First year US$30.00, then US$59.99/yr'), findsOneWidget);
+    final offerSubtitle = tester.widget<Text>(
+      find.text(r'First year US$30.00, then US$59.99/yr'),
+    );
+    expect(offerSubtitle.maxLines, 1);
+    expect(find.text('Special offer: 50% off your first year'), findsOneWidget);
+    final offerHeadline = tester.widget<Text>(
+      find.text('Special offer: 50% off your first year'),
+    );
+    expect(offerHeadline.style?.color, const Color(0xFF111111));
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('paywall_special_offer')),
+        matching: find.byKey(const ValueKey('paywall_benefit_card')),
+      ),
+      findsNothing,
+    );
+    expect(
+      tester
+              .getTopLeft(find.byKey(const ValueKey('paywall_special_offer')))
+              .dy <
+          tester
+              .getTopLeft(find.byKey(const ValueKey('paywall_benefit_card')))
+              .dy,
+      isTrue,
+    );
     expect(find.text(r'US$30.00'), findsOneWidget);
     expect(find.text('/first yr'), findsOneWidget);
     expect(find.text('Save 72%'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
+  });
+
+  testWidgets('非 50% 首期促销：顶部优惠条动态显示真实折扣', (tester) async {
+    const promoPlans = [
+      SubscriptionPlan(
+        planId: 'monthly',
+        title: 'Monthly',
+        priceString: r'$12.00',
+        period: SubscriptionPeriod.monthly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$3.00',
+          period: SubscriptionOfferPeriod.month,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$12.00',
+        ),
+      ),
+    ];
+    await tester.pumpWidget(
+      _harness(state: const EntitlementState.free(), plans: promoPlans),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Special offer: 75% off your first month'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('首期价不低于续费价：不显示顶部优惠条', (tester) async {
+    const promoPlans = [
+      SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$98.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$98.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$98.00',
+        ),
+      ),
+    ];
+    await tester.pumpWidget(
+      _harness(state: const EntitlementState.free(), plans: promoPlans),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Special offer:'), findsNothing);
+  });
+
+  testWidgets('小屏购买区保持紧凑，CTA 可见且法律链接弱化显示', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_harness(state: const EntitlementState.free()));
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const ValueKey('paywall_fixed_purchase_panel'));
+    expect(tester.getSize(panel).height, lessThan(360));
+    expect(
+      find.widgetWithText(FilledButton, 'Start 7-day free trial').hitTestable(),
+      findsOneWidget,
+    );
+
+    final terms = tester.widget<Text>(find.text('Terms'));
+    final privacy = tester.widget<Text>(find.text('Privacy'));
+    expect(terms.style?.color, isNot(ThemeData().colorScheme.primary));
+    expect(privacy.style?.color, terms.style?.color);
+    final panelTop = tester.getTopLeft(panel).dy;
+    final monthlyTop = tester.getTopLeft(find.text('Monthly')).dy;
+    final yearlyTop = tester.getTopLeft(find.text('Yearly')).dy;
+    final monthlyHeight = tester.getSize(find.text('Monthly')).height;
+    final termsRight = tester.getTopRight(find.text('Terms')).dx;
+    final privacyLeft = tester.getTopLeft(find.text('Privacy')).dx;
+    expect(monthlyTop - panelTop, lessThan(32));
+    expect(yearlyTop - (monthlyTop + monthlyHeight), greaterThanOrEqualTo(24));
+    expect(privacyLeft - termsRight, greaterThanOrEqualTo(24));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('会员（年付续订中）：展示年度会员套餐、有效状态与续订日期', (tester) async {

@@ -46,6 +46,36 @@ YearlyValue computeYearlyValue(
   return (perMonth: perMonth, savePercent: savePercent);
 }
 
+/// 计算平台付费首期优惠相对续费价的折扣百分比。
+///
+/// 仅处理非免费试用的 intro offer；免费试用由 CTA 和套餐卡副标题披露，避免在
+/// 顶部促销条重复展示。价格解析失败、首期价不低于续费价时返回 null。
+int? computeIntroOfferDiscountPercent(SubscriptionPlan plan) {
+  if (isIntroOfferDiscounted(plan) != true) return null;
+
+  final offer = plan.introOffer;
+  if (offer == null) return null;
+  final introAmount = _parseAmount(offer.priceString);
+  final renewalAmount = _parseAmount(offer.renewalPriceString);
+  if (introAmount == null || renewalAmount == null) return null;
+  return ((1 - introAmount / renewalAmount) * 100).round();
+}
+
+/// 判断付费首期价格是否低于续费价。
+///
+/// 返回 true 表示可确认有折扣；false 表示可确认没有价格优势；null 表示无付费
+/// intro offer 或价格字符串无法可靠解析，调用方可选择隐藏或回退为具体条款文案。
+bool? isIntroOfferDiscounted(SubscriptionPlan plan) {
+  final offer = plan.introOffer;
+  if (offer == null || offer.isFreeTrial) return null;
+
+  final introAmount = _parseAmount(offer.priceString);
+  final renewalAmount = _parseAmount(offer.renewalPriceString);
+  if (introAmount == null || renewalAmount == null) return null;
+  if (introAmount <= 0 || renewalAmount <= 0) return null;
+  return introAmount < renewalAmount;
+}
+
 /// 从本地化价格串中提取数值金额，无法解析返回 null。
 ///
 /// 处理思路：先取出所有数字与分隔符（`. ,`），再根据「最后一个分隔符」判定它是

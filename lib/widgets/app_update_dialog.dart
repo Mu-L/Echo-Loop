@@ -12,10 +12,29 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import '../models/app_update_info.dart';
 
+/// 当前是否已有更新弹窗在显示。
+///
+/// 更新弹窗有多个触发点（冷启动/回前台的 MainShell listener、设置页手动检查），
+/// 用模块级标志单点守卫，避免不同触发点在已有弹窗上再叠一个。
+bool _updateDialogVisible = false;
+
+/// 测试用：复位「弹窗已显示」标志，避免模块级状态跨测试污染。
+@visibleForTesting
+void debugResetUpdateDialogVisible() => _updateDialogVisible = false;
+
+/// 判断更新弹窗是否真正阻断（不可关闭）。
+///
+/// 仅当强制更新 **且** 有可用下载链接时才阻断。若强更但 downloadUrl 缺失
+/// （清单配置异常），阻断只会得到一个点了没反应的"立即更新"按钮，把用户彻底
+/// 卡死；此时退化为可关闭，作为兜底逃生。
+bool _isBlocking(bool isForceUpdate, String? downloadUrl) =>
+    isForceUpdate && downloadUrl != null && downloadUrl.isNotEmpty;
+
 /// 显示版本更新对话框
 ///
-/// [isForceUpdate] 控制是否为强制更新（不可关闭）。
-/// [onDismiss] 在 soft update 时用户点击"稍后"触发。
+/// [isForceUpdate] 标识是否为强制更新；实际是否不可关闭还取决于是否有可用
+/// 下载链接（见 [_isBlocking]）。
+/// [onDismiss] 在可关闭时用户点击"稍后"触发。
 /// [downloadUrl] 当前平台的下载链接。
 Future<void> showAppUpdateDialog({
   required BuildContext context,
@@ -25,11 +44,16 @@ Future<void> showAppUpdateDialog({
   Future<void> Function()? onUpdate,
   VoidCallback? onDismiss,
 }) {
+  // 已有更新弹窗时忽略重复请求，防止叠加。
+  if (_updateDialogVisible) return Future<void>.value();
+  _updateDialogVisible = true;
+
+  final blocking = _isBlocking(isForceUpdate, downloadUrl);
   return showDialog(
     context: context,
-    barrierDismissible: !isForceUpdate,
+    barrierDismissible: !blocking,
     builder: (context) => PopScope(
-      canPop: !isForceUpdate,
+      canPop: !blocking,
       child: _AppUpdateDialogContent(
         info: info,
         isForceUpdate: isForceUpdate,
@@ -38,7 +62,7 @@ Future<void> showAppUpdateDialog({
         onDismiss: onDismiss,
       ),
     ),
-  );
+  ).whenComplete(() => _updateDialogVisible = false);
 }
 
 class _AppUpdateDialogContent extends StatelessWidget {
@@ -61,6 +85,10 @@ class _AppUpdateDialogContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context).languageCode;
     final theme = Theme.of(context);
+
+    // 是否真正阻断（不可关闭）：与 showAppUpdateDialog 同一公式。
+    // 强更但无下载链接时退化为可关闭，给出"稍后"退出按钮。
+    final blocking = _isBlocking(isForceUpdate, downloadUrl);
 
     // 标题
     final title = isForceUpdate
@@ -114,8 +142,8 @@ class _AppUpdateDialogContent extends StatelessWidget {
         ),
       ),
       actions: [
-        // soft update: 稍后提醒
-        if (!isForceUpdate)
+        // 可关闭时（软更新，或强更但无可用下载链接的兜底）：稍后提醒
+        if (!blocking)
           TextButton(
             onPressed: () {
               onDismiss?.call();
@@ -136,10 +164,16 @@ class _AppUpdateDialogContent extends StatelessWidget {
     if (onUpdate != null) {
       await onUpdate!();
     } else if (downloadUrl != null) {
-      await launchUrl(
-        Uri.parse(downloadUrl!),
-        mode: LaunchMode.externalApplication,
-      );
+      // 无 handler / 非法 URL 时 launchUrl 会抛异常，吞掉避免未捕获异步错误
+      // （对齐 AppUpdateLauncher._tryLaunch 的语义）。
+      try {
+        await launchUrl(
+          Uri.parse(downloadUrl!),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        // 打开失败静默处理，用户仍可用"复制下载链接"逃生
+      }
     }
     // soft update 时关闭对话框
     if (!isForceUpdate && context.mounted) {

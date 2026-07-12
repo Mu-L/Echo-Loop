@@ -21,6 +21,7 @@ import '../features/usage/usage_providers.dart';
 import '../models/audio_item.dart';
 import '../database/providers.dart';
 import '../providers/audio_library_provider.dart';
+import '../providers/audio_sentences_provider.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/listening_practice/listening_practice_provider.dart';
 import '../providers/new_user_guide_provider.dart';
@@ -1941,6 +1942,9 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     final audioDao = ref.read(audioItemDaoProvider);
     await audioDao.updateTranscriptSrt(audioItem.id, null);
     await audioDao.updateWordTimestamps(audioItem.id, null);
+    // 字幕已变更（清空）→ 失效共享字幕投影，令其按新真相源（空）重解析。
+    // autoDispose 通常已在离开本页时释放该 provider，此处为显式兜底保证同步。
+    ref.invalidate(audioSentencesProvider(audioItem.id));
 
     // 4. 更新本地数据库：清除字幕相关字段
     ref

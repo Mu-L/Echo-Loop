@@ -1,6 +1,6 @@
 /// AI 多词表达结果视图
 ///
-/// 展示后端 `queryType=multi_word` 的结构化分析。视觉语言与单词视图
+/// 展示 AI 多词表达结构化分析。视觉语言与单词视图
 /// [AiDictResultView] 完全对齐：顶部类别标签 → 词义区（序号 + 对译 + 例句，
 /// 主内容，无卡片包裹）→ 学习要点（主内容，无卡片包裹）→ 补充卡片（纠错 /
 /// 发音 / 相似表达 / 背景，图标徽章 + 主色小标题 + 柔和卡片）。空字段整段隐藏。
@@ -28,6 +28,17 @@ class AiMultiWordResultView extends StatelessWidget {
     // 类别标签是多词表达的元信息，不参与主要内容区排序。
     if (entry.category.isNotEmpty) {
       children.add(_CategoryTag(text: entry.category));
+    }
+
+    // 纠错提示（置于词义之前；表达自然时后端返回空则整段隐藏）
+    if (entry.naturalness.isNotEmpty) {
+      children.add(
+        _Section(
+          title: l10n.dictAiMultiNaturalness,
+          icon: Icons.tips_and_updates_outlined,
+          child: _bodyText(Theme.of(context), entry.naturalness),
+        ),
+      );
     }
 
     // 词义（主内容）：多义项显示序号，义项之间细分隔，直接渲染不套卡片
@@ -85,17 +96,6 @@ class AiMultiWordResultView extends StatelessWidget {
               ],
             ],
           ),
-        ),
-      );
-    }
-
-    // 纠错提示（表达自然时后端返回空则整段隐藏）
-    if (entry.naturalness.isNotEmpty) {
-      children.add(
-        _Section(
-          title: l10n.dictAiMultiNaturalness,
-          icon: Icons.tips_and_updates_outlined,
-          child: _bodyText(Theme.of(context), entry.naturalness),
         ),
       );
     }

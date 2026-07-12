@@ -190,10 +190,9 @@ void main() {
     });
   });
 
-  group('AiDictionaryEntry.fromJson', () {
-    test('queryType=multi_word 解析新多词表达结构', () {
-      final entry = AiDictionaryEntry.fromJson({
-        'queryType': 'multi_word',
+  group('MultiWordDictionaryEntry.fromJson', () {
+    test('解析新多词表达结构', () {
+      final entry = MultiWordDictionaryEntry.fromJson({
         'originalExpression': 'pretty busy',
         'naturalness': '',
         'category': '搭配',
@@ -227,9 +226,7 @@ void main() {
         'background': '',
       });
 
-      expect(entry, isA<MultiWordDictionaryEntry>());
-      final multi = entry as MultiWordDictionaryEntry;
-      expect(multi.queryType, AiDictionaryQueryType.multiWord);
+      final multi = entry;
       expect(multi.headword, 'pretty busy');
       expect(multi.category, '搭配');
       expect(multi.pronunciationTips, ['pretty 可弱读。']);
@@ -249,46 +246,31 @@ void main() {
       expect(multi.isEmpty, isFalse);
     });
 
-    test('originalExpression 可识别多词表达，兼容 queryType 缺失的新缓存', () {
-      final entry = AiDictionaryEntry.fromJson({
-        'originalExpression': 'pretty busy',
-        'category': '搭配',
-      });
-
-      expect(entry, isA<MultiWordDictionaryEntry>());
-      expect(entry.headword, 'pretty busy');
-    });
-
-    test('旧缓存缺 queryType 默认解析为单词', () {
-      final entry = AiDictionaryEntry.fromJson({
-        'headword': 'run',
-        'meanings': [
-          {'partOfSpeech': 'v.', 'definition': 'move fast'},
+    test('字段缺失/类型不符防御性回退', () {
+      final entry = MultiWordDictionaryEntry.fromJson({
+        'originalExpression': 123,
+        'meanings': 'bad',
+        'similarExpressions': [
+          {'expression': 'very busy'},
+          'bad',
         ],
       });
-
-      expect(entry, isA<DictionaryEntry>());
-      expect(entry.queryType, AiDictionaryQueryType.singleWord);
-    });
-
-    test('多词表达字段缺失/类型不符防御性回退', () {
-      final entry =
-          AiDictionaryEntry.fromJson({
-                'queryType': 'multi_word',
-                'originalExpression': 123,
-                'meanings': 'bad',
-                'similarExpressions': [
-                  {'expression': 'very busy'},
-                  'bad',
-                ],
-              })
-              as MultiWordDictionaryEntry;
 
       expect(entry.headword, '');
       expect(entry.meanings, isEmpty);
       expect(entry.similarExpressions, hasLength(1));
       expect(entry.similarExpressions.first.expression, 'very busy');
       expect(entry.similarExpressions.first.difference, '');
+    });
+
+    test('toJson 不再写入 queryType 字段', () {
+      final single = DictionaryEntry.fromJson({'headword': 'run'}).toJson();
+      final multi = MultiWordDictionaryEntry.fromJson({
+        'originalExpression': 'break a leg',
+      }).toJson();
+
+      expect(single, isNot(contains('queryType')));
+      expect(multi, isNot(contains('queryType')));
     });
   });
 }

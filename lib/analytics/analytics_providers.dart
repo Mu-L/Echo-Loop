@@ -7,13 +7,13 @@ library;
 
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import '../services/backend_dio.dart';
 import 'analytics_channel.dart';
 import 'analytics_service.dart';
 import 'channels/firebase_channel.dart';
@@ -77,11 +77,9 @@ Future<bool> resolveIsMainlandChina(SharedPreferences prefs) async {
 
   // 2. 无缓存：调 geo API
   try {
-    final response = await Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 2),
-        receiveTimeout: const Duration(seconds: 2),
-      ),
+    final response = await createBackendDio(
+      connectTimeout: const Duration(seconds: 2),
+      receiveTimeout: const Duration(seconds: 2),
     ).get('$apiBaseUrl/api/v1/user/geo');
     final data = response.data;
     final country = data is Map ? data['country'] as String? : null;

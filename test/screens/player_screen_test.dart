@@ -56,6 +56,11 @@ class _TestAudioItemDao implements AudioItemDao {
   @override
   Future<void> updateWordTimestamps(String audioItemId, String? json) async {}
 
+  // AnnotationContentView 经 audioSentencesProvider 读字幕做翻译上下文；
+  // 单句模式测试无需真实字幕，返回 null（前后句为空）。
+  @override
+  Future<String?> getTranscriptSrt(String audioItemId) async => null;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }
@@ -514,31 +519,35 @@ void main() {
         await _disposeTree(tester);
       });
 
-      testWidgets('点击句子主体进入讲解页', (tester) async {
+      testWidgets('点击句子主体先切换焦点再进入讲解页', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 3);
+        final player = _RecordingListeningPractice(
+          ListeningPracticeState(
+            currentAudioItem: item,
+            sentences: sentences,
+            currentFullIndex: 0,
+          ),
+        );
 
         await tester.pumpWidget(
           createTestScreen(
             const PlayerScreen(),
-            overrides: _audioOverrides(
-              practiceState: ListeningPracticeState(
-                currentAudioItem: item,
-                sentences: sentences,
-                currentFullIndex: 0,
-              ),
-            ),
+            overrides: _recordingOverrides(player),
           ),
         );
         await tester.pumpAndSettle();
 
-        // 点击第 1 句主体区，避开左侧编号播放热区
+        // 点击非当前句主体区，避开左侧编号播放热区。
         await tester.tap(
-          find.byKey(const ValueKey('$kMaskedSentenceBodyHitAreaKeyPrefix-0')),
+          find.byKey(const ValueKey('$kMaskedSentenceBodyHitAreaKeyPrefix-2')),
         );
         await tester.pumpAndSettle();
 
-        // 导航到讲解页 stub
+        // 正文点击只切换焦点，不自动播放；返回时列表会跟随新焦点。
+        expect(player.selectFullCalls, [(index: 2, autoPlay: false)]);
+        expect(player.state.currentFullIndex, 2);
+        // 导航到讲解页 stub。
         expect(find.text('Sentence Detail'), findsOneWidget);
         await _disposeTree(tester);
       });

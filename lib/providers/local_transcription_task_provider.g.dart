@@ -54,7 +54,7 @@ final localTranscriptionTranscodeServiceProvider =
 typedef LocalTranscriptionTranscodeServiceRef =
     ProviderRef<AudioTranscodeService>;
 String _$localTranscriptionTaskManagerHash() =>
-    r'407e75eb7bea39ffb152a0040d393bb212440d3a';
+    r'f10ecaf4ca8eea714a61fec04c3e750634b1506a';
 
 /// 本地转录任务管理器。
 ///

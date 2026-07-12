@@ -166,4 +166,58 @@ void main() {
       expect(hash.length, 64);
     });
   });
+
+  group('translationContextHash', () {
+    test('64 字符十六进制、确定性', () {
+      final h = translationContextHash('Hello.', previous: 'A.', next: 'B.');
+      expect(RegExp(r'^[0-9a-f]{64}$').hasMatch(h), isTrue);
+      expect(
+        h,
+        translationContextHash('Hello.', previous: 'A.', next: 'B.'),
+      );
+    });
+
+    test('前句/后句/目标句任一变则哈希变', () {
+      final base = translationContextHash('Hello.', previous: 'A.', next: 'B.');
+      expect(
+        base,
+        isNot(translationContextHash('Hello.', previous: 'X.', next: 'B.')),
+      );
+      expect(
+        base,
+        isNot(translationContextHash('Hello.', previous: 'A.', next: 'Y.')),
+      );
+      expect(
+        base,
+        isNot(translationContextHash('Hi.', previous: 'A.', next: 'B.')),
+      );
+    });
+
+    test('前/后句归一后相同则哈希相同（缓存命中）', () {
+      expect(
+        translationContextHash('Hello.', previous: 'A.', next: 'B.'),
+        translationContextHash(
+          '  HELLO.  ',
+          previous: '  a.  ',
+          next: 'B.',
+        ),
+      );
+    });
+
+    test('缺前/后句（首/末句）用空段，与显式空串等价', () {
+      expect(
+        translationContextHash('Hello.'),
+        translationContextHash('Hello.', previous: '', next: ''),
+      );
+      // 有后句无前句（首句）与全无上下文不同
+      expect(
+        translationContextHash('Hello.'),
+        isNot(translationContextHash('Hello.', next: 'B.')),
+      );
+    });
+
+    test('版本号进哈希：与裸句子哈希不同（旧缓存天然失效）', () {
+      expect(translationContextHash('Hello.'), isNot(hashText('Hello.')));
+    });
+  });
 }

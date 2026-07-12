@@ -10,7 +10,9 @@ import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
 import 'package:echo_loop/database/daos/saved_sense_group_dao.dart';
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
+import 'package:echo_loop/features/subscription/providers/subscription_availability.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
+import 'package:echo_loop/models/sentence_ai_result.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/router/app_router.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
@@ -20,6 +22,32 @@ import '../helpers/mock_providers.dart';
 
 class _NoopSentenceAiApiClient extends SentenceAiApiClient {
   _NoopSentenceAiApiClient() : super.withDio(_UnusedDio());
+}
+
+class _QuotaSentenceAiNotifier extends SentenceAiNotifier {
+  _QuotaSentenceAiNotifier({required super.cacheDao, required super.apiClient});
+
+  @override
+  Stream<SentenceTranslation> getTranslationStream(
+    String text, {
+    required String targetLanguage,
+    String? previous,
+    String? next,
+    String? accessToken,
+    CancelToken? cancelToken,
+  }) async* {
+    throw const AiFeatureQuotaExceededException();
+  }
+
+  @override
+  Stream<SentenceAnalysis> getAnalysisStream(
+    String text, {
+    required String targetLanguage,
+    String? accessToken,
+    CancelToken? cancelToken,
+  }) async* {
+    throw const AiFeatureQuotaExceededException();
+  }
 }
 
 class _UnusedDio extends MockDio {}
@@ -35,6 +63,7 @@ void main() {
     WidgetTester tester, {
     required SentenceAiCacheDao cacheDao,
     required SavedSenseGroupDao savedSenseGroupDao,
+    SentenceAiNotifier? aiNotifier,
   }) async {
     final router = GoRouter(
       initialLocation: '/',
@@ -44,16 +73,23 @@ void main() {
           builder: (context, state) => Scaffold(
             body: AnnotationContentView(
               text: 'Hello world.',
-              aiNotifier: SentenceAiNotifier(
-                cacheDao: cacheDao,
-                apiClient: _NoopSentenceAiApiClient(),
-              ),
+              aiNotifier:
+                  aiNotifier ??
+                  SentenceAiNotifier(
+                    cacheDao: cacheDao,
+                    apiClient: _NoopSentenceAiApiClient(),
+                  ),
             ),
           ),
         ),
         GoRoute(
           path: AppRoutes.login,
           builder: (context, state) => const Scaffold(body: Text('Login page')),
+        ),
+        GoRoute(
+          path: AppRoutes.paywall,
+          builder: (context, state) =>
+              const Scaffold(body: Text('Paywall page')),
         ),
       ],
     );
@@ -68,6 +104,7 @@ void main() {
             (ref) => Stream<Session?>.value(null),
           ),
           savedSenseGroupDaoProvider.overrideWithValue(savedSenseGroupDao),
+          subscriptionAvailabilityProvider.overrideWithValue(true),
         ],
         child: MaterialApp.router(
           locale: const Locale('en'),
@@ -142,4 +179,34 @@ void main() {
     expect(find.text('Cancel'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
   });
+
+  for (final button in ['Translate', 'Analysis']) {
+    testWidgets('$button 超出额度时立即进入订阅页', (tester) async {
+      final cacheDao = _MockCacheDao();
+      final savedSenseGroupDao = _MockSavedSenseGroupDao();
+      when(
+        () => cacheDao.getByHash(any(), any()),
+      ).thenAnswer((_) async => null);
+      when(
+        savedSenseGroupDao.watchSavedPhraseTexts,
+      ).thenAnswer((_) => Stream<Set<String>>.value(const {}));
+
+      await pumpAuthTestApp(
+        tester,
+        cacheDao: cacheDao,
+        savedSenseGroupDao: savedSenseGroupDao,
+        aiNotifier: _QuotaSentenceAiNotifier(
+          cacheDao: cacheDao,
+          apiClient: _NoopSentenceAiApiClient(),
+        ),
+      );
+
+      final buttonKey = button == 'Translate' ? 'translation' : 'analysis';
+      await tester.tap(find.byKey(ValueKey(buttonKey)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Paywall page'), findsOneWidget);
+    });
+  }
 }

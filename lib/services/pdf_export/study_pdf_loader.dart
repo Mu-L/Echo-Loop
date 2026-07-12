@@ -35,8 +35,7 @@ import '../../widgets/practice/sentence_word_selection.dart'
 /// 单词逐个查会对 dict.db 反复全表扫描（`WHERE word=? COLLATE NOCASE`，
 /// 索引常因 NOCASE 用不上），几十词即秒级。改为一次性批量查（单条 IN 查询），
 /// 把 N 次全表扫描收敛为 1 次。返回 `原始输入词 → 词条` 映射，未命中不含。
-typedef LocalDictLookup =
-    Map<String, DictEntry> Function(List<String> words);
+typedef LocalDictLookup = Map<String, DictEntry> Function(List<String> words);
 
 /// 词条笔记中间记录：笔记 + 查询键（全局标记计算 / 标号分配用）
 ///
@@ -158,9 +157,9 @@ StudyPdfDocument _assembleStudyPdfDocument(_AssembleRequest req) {
             ? const []
             : savedCharRanges(s.text, tokens, savedIndex),
         translation: translation,
-        grammar: _nonEmptyOrNull(analysis?.grammar),
-        vocabulary: _nonEmptyOrNull(analysis?.vocabulary),
-        listening: _nonEmptyOrNull(analysis?.listening),
+        grammar: _nonEmptyOrNull(analysis?.grammarText),
+        vocabulary: _nonEmptyOrNull(analysis?.vocabularyText),
+        listening: _nonEmptyOrNull(analysis?.listeningText),
         vocabNotes: req.notesBySentence[s.index] ?? const [],
         vocabMarkers: tokens == null
             ? const []
@@ -214,7 +213,9 @@ SentenceAnalysis? _decodeAnalysis(String? raw) {
   if (raw == null) return null;
   try {
     final decoded = jsonDecode(raw);
-    if (decoded is Map<String, dynamic>) return SentenceAnalysis.fromJson(decoded);
+    if (decoded is Map<String, dynamic>) {
+      return SentenceAnalysis.fromJson(decoded);
+    }
   } catch (_) {
     // 损坏数据视作未命中
   }
@@ -388,8 +389,13 @@ class StudyPdfLoader {
     final aiHashes = {
       for (final c in candidates) hashText('${c.lookupKey}|$targetLanguage'),
     };
-    final aiDictRaw = await _aiCacheDao.getManyByHash(aiHashes, 'ai_dictionary');
-    final localDict = _localDictLookup([for (final c in candidates) c.lookupKey]);
+    final aiDictRaw = await _aiCacheDao.getManyByHash(
+      aiHashes,
+      'ai_dictionary',
+    );
+    final localDict = _localDictLookup([
+      for (final c in candidates) c.lookupKey,
+    ]);
     AppLogger.log(
       'PdfExport',
       '  词典批量查 ${sw.elapsedMilliseconds}ms '
@@ -409,7 +415,12 @@ class StudyPdfLoader {
     for (final c in candidates) {
       final dedupKey = '${c.isPhrase ? 'p' : 'w'}|${c.lookupKey}';
       if (!seenKeys.add(dedupKey)) continue;
-      final note = _buildVocabNoteFromCache(c, aiDictRaw, targetLanguage, localDict);
+      final note = _buildVocabNoteFromCache(
+        c,
+        aiDictRaw,
+        targetLanguage,
+        localDict,
+      );
       if (note != null) {
         seeds.add(_VocabNoteSeed(note, c.lookupKey, c.isPhrase, c.idx));
       }
@@ -420,7 +431,9 @@ class StudyPdfLoader {
     // 据此升序（首现更早者标号更小、右栏更靠前），笔记归到首现句的右栏
     // （不再归到收藏来源句——用户在末句收藏的词若更早出现，标号/位置都应靠前）。
     // 任何句均未命中的变形词排最后（保留插入序），归回收藏来源句。
-    final tokensBySentence = [for (final s in sentences) tokenizeSentence(s.text)];
+    final tokensBySentence = [
+      for (final s in sentences) tokenizeSentence(s.text),
+    ];
     (int order, int charStart, int sentenceIndex)? firstOccurrence(
       _VocabNoteSeed seed,
     ) {
@@ -441,8 +454,12 @@ class StudyPdfLoader {
 
     // (seed, 原插入序, 首现位置)，按首现位置升序；未命中的 order 视为最大
     final located =
-        seeds.asMap().entries
-            .map((e) => (seed: e.value, ord: e.key, occ: firstOccurrence(e.value)))
+        seeds
+            .asMap()
+            .entries
+            .map(
+              (e) => (seed: e.value, ord: e.key, occ: firstOccurrence(e.value)),
+            )
             .toList()
           ..sort((a, b) {
             final oa = a.occ, ob = b.occ;
@@ -461,7 +478,9 @@ class StudyPdfLoader {
       final seed = item.seed;
       final number = numberedTerms.length + 1;
       final placementIndex = item.occ?.$3 ?? seed.sourceIndex;
-      (notesBySentence[placementIndex] ??= []).add(seed.note.withNumber(number));
+      (notesBySentence[placementIndex] ??= []).add(
+        seed.note.withNumber(number),
+      );
       numberedTerms.add(_NumberedTerm(seed.lookupKey, seed.isPhrase, number));
     }
 
@@ -475,23 +494,33 @@ class StudyPdfLoader {
       ..start();
 
     // 翻译/解析批量读一次（原逐句 getByHash 会产生 O(句数) 串行往返 +
-    // 每读一条附带一次 UPDATE 写放大；这里合并为按句子文本哈希的两次查询）
-    final sentenceHashes = [for (final s in sentences) hashText(s.text)];
+    // 每读一条附带一次 UPDATE 写放大；这里合并为两次批量查询）。
+    // 翻译键 = 上下文相关哈希（前句+本句+后句+version，type=translation_v2），与运行时
+    // getTranslationStream 缓存契约一致；解析键 = 单句哈希（type=analysis_v2）。
+    final translationHashes = [
+      for (var i = 0; i < sentences.length; i++)
+        translationContextHash(
+          sentences[i].text,
+          previous: i > 0 ? sentences[i - 1].text : null,
+          next: i < sentences.length - 1 ? sentences[i + 1].text : null,
+        ),
+    ];
+    final analysisHashes = [for (final s in sentences) hashText(s.text)];
     final translationRaw = await _aiCacheDao.getManyByHash(
-      sentenceHashes,
-      'translation:$targetLanguage',
+      translationHashes,
+      'translation_v2:$targetLanguage',
     );
     final analysisRaw = await _aiCacheDao.getManyByHash(
-      sentenceHashes,
-      'analysis:$targetLanguage',
+      analysisHashes,
+      'analysis_v2:$targetLanguage',
     );
     final translationJson = <int, String>{};
     final analysisJson = <int, String>{};
-    for (final s in sentences) {
-      final hash = hashText(s.text);
-      final t = translationRaw[hash];
+    for (var i = 0; i < sentences.length; i++) {
+      final s = sentences[i];
+      final t = translationRaw[translationHashes[i]];
       if (t != null) translationJson[s.index] = t;
-      final a = analysisRaw[hash];
+      final a = analysisRaw[analysisHashes[i]];
       if (a != null) analysisJson[s.index] = a;
     }
 
@@ -652,7 +681,6 @@ class StudyPdfLoader {
     }
     return null;
   }
-
 
   /// 本地词典行首词性剥离：`n. 生日` → pos `n.` + text `生日`
   ///

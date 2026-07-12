@@ -15,7 +15,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumTitle => 'Echo Loop Membership';
 
   @override
-  String get premiumTagline => 'Unlock unlimited AI-powered learning';
+  String get premiumTagline => 'Get more AI-powered learning';
 
   @override
   String get aiQuotaExceededTitle =>
@@ -45,16 +45,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumActive => 'You\'re a member';
 
   @override
-  String get premiumBenefitTranslation => 'Unlimited AI translation';
+  String get premiumBenefitTranslation => 'More AI translation';
 
   @override
-  String get premiumBenefitAnalysis => 'Unlimited AI sentence analysis';
+  String get premiumBenefitAnalysis => 'More AI sentence breakdown';
 
   @override
-  String get premiumBenefitWordAnalysis => 'Unlimited AI word analysis';
+  String get premiumBenefitWordAnalysis => 'More AI word explanation';
 
   @override
   String get premiumBenefitTranscription => 'More AI subtitle transcription';
+
+  @override
+  String get premiumBenefitSenseGroups => 'More AI sentence chunking';
 
   @override
   String get premiumSubscribe => 'Subscribe';
@@ -108,10 +111,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumLifetimeAccessNote => 'Lifetime access, no renewal needed';
 
   @override
-  String get premiumAutoRenewNotice =>
-      'Auto-renews. Manage or cancel in your App Store account.';
-
-  @override
   String get premiumNoPlans =>
       'No plans available right now. Please try again later.';
 
@@ -143,10 +142,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get premiumWebOpenFailed =>
       'Couldn\'t open the checkout page. Please try again.';
-
-  @override
-  String get premiumWebAutoRenewNotice =>
-      'Auto-renews. Manage or cancel from your account page or the confirmation email.';
 
   @override
   String get premiumRefresh => 'Refresh';
@@ -221,6 +216,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String premiumOfferThen(String intro, String renewal) {
     return '$intro, then $renewal';
   }
+
+  @override
+  String premiumSpecialOfferPercent(int percent, String period) {
+    return 'Special offer: $percent% off your first $period';
+  }
+
+  @override
+  String premiumSpecialOfferIntro(String intro, String renewal) {
+    return 'Special offer: $intro, then $renewal';
+  }
+
+  @override
+  String get premiumOfferPeriodYear => 'year';
+
+  @override
+  String get premiumOfferPeriodMonth => 'month';
+
+  @override
+  String get premiumOfferPeriodGeneric => 'period';
+
+  @override
+  String get premiumTermsShort => 'Terms';
+
+  @override
+  String get premiumPrivacyShort => 'Privacy';
 
   @override
   String get practiceControlModeAuto => 'Auto';

@@ -12,7 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../analytics/geo_interceptor.dart';
 import '../../../config/api_config.dart';
+import '../../../providers/package_info_provider.dart';
 import '../../../services/app_logger.dart';
+import '../../../services/backend_dio.dart';
 import '../../../services/refresh_coordinator.dart';
 import '../models/catalog.dart';
 
@@ -84,13 +86,13 @@ class OfficialCatalogService {
   /// 防重入：并发 refresh 复用同一个 future。
   late final RefreshCoordinator<String, CatalogRefreshOutcome> _refresh;
 
-  OfficialCatalogService({required String baseUrl})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
+  OfficialCatalogService({required String baseUrl, String? appVersion})
+    : _dio = createBackendDio(
+        baseUrl: baseUrl,
+        appVersion: appVersion,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        apiLogTag: 'OFFICIAL-CATALOG',
       ),
       _resolveDir = _defaultDir {
     _refresh = RefreshCoordinator<String, CatalogRefreshOutcome>();
@@ -298,7 +300,10 @@ class OfficialCatalogService {
 /// catalog service Provider（keepAlive；进程内单例）。
 @Riverpod(keepAlive: true)
 OfficialCatalogService officialCatalogService(Ref ref) {
-  return OfficialCatalogService(baseUrl: apiBaseUrl);
+  return OfficialCatalogService(
+    baseUrl: apiBaseUrl,
+    appVersion: readAppVersion(ref),
+  );
 }
 
 /// catalog 内存快照 provider。

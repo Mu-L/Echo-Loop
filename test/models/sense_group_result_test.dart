@@ -38,6 +38,19 @@ void main() {
       expect(result.fine, isEmpty);
     });
 
+    test('fromJson 容忍流式中间帧的 null 洞（whereType 过滤），不抛', () {
+      // 模拟 accumulateNdjsonObject 的 setPath 用 null 扩容 List：
+      // medium[2] 先到达，medium[0/1] 尚未到达 → [null, null, 'c']
+      final json = {
+        'medium': <dynamic>[null, null, 'c'],
+        'fine': <dynamic>['a', null],
+      };
+      final result = SenseGroupResult.fromJson(json);
+
+      expect(result.medium, ['c']);
+      expect(result.fine, ['a']);
+    });
+
     test('toJson 正确序列化', () {
       const result = SenseGroupResult(
         medium: ['Hello', 'World'],

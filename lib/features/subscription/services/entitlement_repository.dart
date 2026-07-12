@@ -11,8 +11,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/api_config.dart';
-import '../../../services/api_log_interceptor.dart';
+import '../../../providers/package_info_provider.dart';
 import '../../../services/app_logger.dart';
+import '../../../services/backend_dio.dart';
 import '../models/entitlement.dart';
 import '../models/subscription_plan.dart';
 
@@ -55,16 +56,14 @@ class StubEntitlementRepository implements EntitlementRepository {
 ///   允许后端据此**降级**，而非误判为「获取失败」）。
 /// - 网络异常 / 非 2xx / 解析失败 → 返回 **null**（走缓存 / RC 兜底，绝不误降级）。
 class BackendEntitlementRepository implements EntitlementRepository {
-  BackendEntitlementRepository({required String baseUrl})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 15),
-        ),
-      ) {
-    _dio.interceptors.add(ApiLogInterceptor(tag: 'ENTITLEMENT'));
-  }
+  BackendEntitlementRepository({required String baseUrl, String? appVersion})
+    : _dio = createBackendDio(
+        baseUrl: baseUrl,
+        appVersion: appVersion,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+        apiLogTag: 'ENTITLEMENT',
+      );
 
   /// 测试用构造：注入 Dio。
   BackendEntitlementRepository.withDio(this._dio);
@@ -130,5 +129,8 @@ class BackendEntitlementRepository implements EntitlementRepository {
 
 /// 后端权益仓库 Provider（测试可 override 注入 Fake）。
 final entitlementRepositoryProvider = Provider<EntitlementRepository>((ref) {
-  return BackendEntitlementRepository(baseUrl: apiBaseUrl);
+  return BackendEntitlementRepository(
+    baseUrl: apiBaseUrl,
+    appVersion: readAppVersion(ref),
+  );
 });

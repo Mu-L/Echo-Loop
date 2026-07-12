@@ -1288,6 +1288,10 @@ class ListeningPractice extends _$ListeningPractice {
     _setLogicalPlaying(false);
     _sentenceRepeatsDone = 0;
     final pos = _currentPos;
+    // 讲解页/意群试听会旁路驱动共享引擎。返回播放器时若底层仍处于
+    // playing=true，直接 seek 会从句首漏出一小段声音；先 pause 并失效外来
+    // session，确保本方法只做位置对齐，不隐式起播。
+    await _engine.pause();
     await _engine.clearClip();
     if (pos != null) {
       await _engine.seek(_playable[pos].startTime);

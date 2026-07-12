@@ -15,11 +15,15 @@ class SenseGroupResult {
   const SenseGroupResult({required this.medium, required this.fine});
 
   /// 从 API 响应 JSON 反序列化
+  ///
+  /// 容忍流式中间帧的 null 洞：`accumulateNdjsonObject` 的 `setPath` 会用 null 扩容 List
+  /// （如 medium[2] 先到、medium[0/1] 尚未到达），故用 `whereType<String>()` 过滤非字符串占位，
+  /// 保证半成品累积快照永不抛。
   factory SenseGroupResult.fromJson(Map<String, dynamic> json) {
     final medium = (json['medium'] as List? ?? [])
-        .map((e) => e as String)
+        .whereType<String>()
         .toList();
-    final fine = (json['fine'] as List? ?? []).map((e) => e as String).toList();
+    final fine = (json['fine'] as List? ?? []).whereType<String>().toList();
     return SenseGroupResult(medium: medium, fine: fine);
   }
 

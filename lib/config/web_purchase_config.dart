@@ -6,20 +6,14 @@
 // 客户端经后端 `/api/entitlements` 读回（见 `entitlement_repository.dart`）。
 //
 // **Google Play 政策洁净（关键）**：网页支付入口**只能进「非商店」构建**。是否启用
-// 由编译期 `--dart-define=DISTRIBUTION_CHANNEL` 决定——APK/桌面构建注入 `apk`/`desktop`
+// 由编译期 `--dart-define=DISTRIBUTION_CHANNEL` 决定——APK/桌面构建注入 `direct`
 // 才启用；Play 版（appbundle）不注入或注入 `play`，构建里根本不含引导外部支付的路径。
 library;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../services/app_logger.dart';
-
-/// 分发渠道（编译期注入）。
-///
-/// - `apk`：Android 侧载直装包 → 启用网页支付。
-/// - `desktop`：macOS 官网/GitHub、Windows → 启用网页支付。
-/// - `play` / 空：Google Play / App Store 等商店构建 → **不**启用网页支付（政策洁净）。
-const _distributionChannel = String.fromEnvironment('DISTRIBUTION_CHANNEL');
+import 'client_distribution.dart';
 
 /// RevenueCat Web Purchase Link 模板。
 ///
@@ -35,7 +29,7 @@ const _appUserIdPlaceholder = '{app_user_id}';
 
 /// 当前构建是否属于「启用网页支付」的分发渠道（仅编译期判定，Play 版恒 false）。
 bool get isWebCheckoutChannel =>
-    _distributionChannel == 'apk' || _distributionChannel == 'desktop';
+    clientPaymentChannel == ClientPaymentChannel.web;
 
 /// 网页支付是否可用（渠道启用 **且** 已注入 Purchase Link base）。
 ///
@@ -79,7 +73,7 @@ Uri? composeWebPurchaseUri(String template, String userId) {
 void logWebPurchaseConfig({required String stage, String? userId, Uri? uri}) {
   AppLogger.log(
     'Subscription',
-    'webPurchase[$stage] channel=$_distributionChannel '
+    'webPurchase[$stage] channel=$rawDistributionChannel '
         'isWebCheckoutChannel=$isWebCheckoutChannel '
         'templateConfigured=${webPurchaseLinkTemplate.isNotEmpty} '
         'templateHasAppUserId=${webPurchaseLinkTemplate.contains(_appUserIdPlaceholder)} '

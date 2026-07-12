@@ -6,6 +6,9 @@ import 'package:echo_loop/models/app_update_info.dart';
 import 'package:echo_loop/widgets/app_update_dialog.dart';
 
 void main() {
+  // 弹窗用模块级标志防叠加；每个用例结束后复位，避免跨测试污染。
+  tearDown(debugResetUpdateDialogVisible);
+
   const info = AppUpdateInfo(
     latestVersion: '2.0.0',
     minimumVersion: '1.5.0',
@@ -115,6 +118,45 @@ void main() {
     });
   });
 
+  group('防弹窗叠加', () {
+    testWidgets('已有更新弹窗时重复调用被忽略，只出现一个', (tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          child: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                // 连续两次请求：第二次应被模块级守卫忽略
+                showAppUpdateDialog(
+                  context: context,
+                  info: info,
+                  isForceUpdate: false,
+                  downloadUrl: 'https://example.com/download',
+                );
+                showAppUpdateDialog(
+                  context: context,
+                  info: info,
+                  isForceUpdate: false,
+                  downloadUrl: 'https://example.com/download',
+                );
+              },
+              child: const Text('Show'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Update Now'), findsOneWidget);
+
+      // 关闭弹窗，复位模块级守卫，避免污染后续用例
+      await tester.tap(find.text('Later'));
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('Force update 对话框', () {
     testWidgets('不显示稍后按钮，显示复制链接', (tester) async {
       await tester.pumpWidget(
@@ -171,6 +213,38 @@ void main() {
 
       // 对话框仍然存在
       expect(find.text('Update Required'), findsOneWidget);
+    });
+
+    testWidgets('无可用下载链接时退化为可关闭', (tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          child: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => showAppUpdateDialog(
+                context: context,
+                info: info,
+                isForceUpdate: true,
+                downloadUrl: null,
+              ),
+              child: const Text('Show'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show'));
+      await tester.pumpAndSettle();
+
+      // 强更但无下载链接：仍显示强更标题，但给出退出按钮
+      expect(find.text('Update Required'), findsOneWidget);
+      expect(find.text('Later'), findsOneWidget);
+
+      // 可通过返回键关闭，避免用户被配置缺失卡死
+      final dynamic widgetsBinding = tester.binding;
+      await widgetsBinding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Update Required'), findsNothing);
     });
   });
 }

@@ -15,6 +15,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../../../config/client_distribution.dart';
 import '../../../config/revenuecat_config.dart';
 import '../../../config/web_purchase_config.dart';
 import '../../../services/app_logger.dart';
@@ -140,8 +141,17 @@ class RevenueCatPurchaseService implements PurchaseService {
   @override
   Future<Entitlement> restore() async {
     AppLogger.log('Subscription', 'RC restorePurchases 发起');
-    final info = await Purchases.restorePurchases();
-    return _entitlementFrom(info);
+    try {
+      final info = await Purchases.restorePurchases();
+      return _entitlementFrom(info);
+    } on PlatformException catch (e) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code == PurchasesErrorCode.purchaseCancelledError) {
+        throw PurchaseException('用户取消恢复', cancelled: true);
+      }
+      AppLogger.log('Subscription', 'restore 失败 code=$code msg=${e.message}');
+      throw PurchaseException(e.message ?? '恢复失败');
+    }
   }
 
   @override
@@ -493,16 +503,46 @@ class RevenueCatPurchaseService implements PurchaseService {
 /// 4. 否则回退 Stub（匿名可运行）。
 /// 测试通过 override 注入 Fake。
 final purchaseServiceProvider = Provider<PurchaseService>((ref) {
-  if (useLocalStoreKit) {
+  final serviceType = purchaseServiceTypeFor(
+    channel: clientPaymentChannel,
+    useLocalStoreKit: useLocalStoreKit,
+    nativeStoreConfigured: isRevenueCatConfigured,
+    webConfigured: isWebCheckoutConfigured,
+  );
+  if (serviceType == PurchaseServiceType.localStoreKit) {
     final service = LocalStoreKitPurchaseService();
     ref.onDispose(service.dispose);
     return service;
   }
-  if (isWebCheckoutConfigured) {
+  if (serviceType == PurchaseServiceType.web) {
     return const WebPurchaseService();
   }
-  if (isRevenueCatConfigured) {
+  if (serviceType == PurchaseServiceType.revenueCat) {
     return RevenueCatPurchaseService();
   }
   return const StubPurchaseService();
 });
+
+/// 购买服务实现类型，供 provider 与单测共享同一裁决规则。
+enum PurchaseServiceType { localStoreKit, revenueCat, web, stub }
+
+/// 按本地渠道选择购买服务；配置只对匹配的渠道生效。
+PurchaseServiceType purchaseServiceTypeFor({
+  required ClientPaymentChannel channel,
+  required bool useLocalStoreKit,
+  required bool nativeStoreConfigured,
+  required bool webConfigured,
+}) {
+  if (useLocalStoreKit && channel == ClientPaymentChannel.appleStore) {
+    return PurchaseServiceType.localStoreKit;
+  }
+  return switch (channel) {
+    ClientPaymentChannel.appleStore || ClientPaymentChannel.googlePlay =>
+      nativeStoreConfigured
+          ? PurchaseServiceType.revenueCat
+          : PurchaseServiceType.stub,
+    ClientPaymentChannel.web =>
+      webConfigured ? PurchaseServiceType.web : PurchaseServiceType.stub,
+    ClientPaymentChannel.unavailable => PurchaseServiceType.stub,
+  };
+}

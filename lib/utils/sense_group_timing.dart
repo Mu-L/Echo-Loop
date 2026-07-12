@@ -44,12 +44,15 @@ List<SenseGroupTiming> mapSenseGroupTimings({
 
   final timings = <SenseGroupTiming>[];
   var wordCursor = 0;
+  var matchedCount = 0;
 
   for (final chunk in chunks) {
+    // 前一意群结束时间：空意群/匹配不上的意群塌缩到此点（零长度、非播放），保持与 chunks 下标对齐
+    final prevEnd = timings.isNotEmpty ? timings.last.end : sentenceStart;
+
     final groupTokens = _tokenize(chunk);
     if (groupTokens.isEmpty) {
       // 空意群，使用前一个意群的结束时间作为起始
-      final prevEnd = timings.isNotEmpty ? timings.last.end : sentenceStart;
       timings.add(SenseGroupTiming(start: prevEnd, end: prevEnd));
       continue;
     }
@@ -62,8 +65,10 @@ List<SenseGroupTiming> mapSenseGroupTimings({
     );
 
     if (matchStart == null) {
-      // 匹配失败，回退到均分
-      return _fallbackTimings(chunks, sentenceStart, sentenceEnd);
+      // 单个意群匹配不上：静默跳过——占位零长度 timing（非播放），cursor 不前移，
+      // 继续匹配后续意群。保证「匹配上的用真实时间、匹配不上的不乱播」，且下标与 chunks 对齐。
+      timings.add(SenseGroupTiming(start: prevEnd, end: prevEnd));
+      continue;
     }
 
     // 从 matchStart 开始，匹配整个意群的词数
@@ -80,6 +85,13 @@ List<SenseGroupTiming> mapSenseGroupTimings({
     );
 
     wordCursor = matchEnd + 1;
+    matchedCount += 1;
+  }
+
+  // 无任何意群匹配上（词级数据与本句完全错位）：退化为整句按词数均分，
+  // 好过全部零长度不可播。个别意群匹配不上则走上面的逐意群占位、不进此分支。
+  if (matchedCount == 0) {
+    return _fallbackTimings(chunks, sentenceStart, sentenceEnd);
   }
 
   return timings;

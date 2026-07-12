@@ -6,6 +6,7 @@ library;
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -355,6 +356,8 @@ void main() {
         // 订阅行标题（沿用 premiumEntryTitle）+ 未订阅高亮「升级」徽章
         expect(find.text('Subscription'), findsOneWidget);
         expect(find.text('Upgrade'), findsOneWidget);
+        final upgradeBadge = tester.widget<Text>(find.text('Upgrade'));
+        expect(upgradeBadge.style?.color, const Color(0xFF111111));
         // 顶部不再有大金卡的「会员」状态徽章
         expect(find.text('Member'), findsNothing);
       });

@@ -147,20 +147,21 @@ class DictionaryLookupController extends _$DictionaryLookupController {
   final Map<String, CancelToken> _tokens = {};
 
   /// 是否已销毁。销毁后在途请求回调一律丢弃，避免写已销毁的 Notifier 抛错。
-  /// （AI 源忽略 token、请求在后台跑完，其回调会晚于 dispose 到达）
+  /// （取消是异步的：cancel 到流真正抛 DioException 之间仍有窗口，回调可能到达）
   bool _disposed = false;
 
   @override
-  DictionaryLookupState build(String word) {
+  DictionaryLookupState build(String word, {String? preferredSourceId}) {
     ref.onDispose(() {
       _disposed = true;
-      // 取消在途请求：网页源（如 Cambridge）据此中断抓取；
-      // AI 源忽略 token，仍在后台跑完并落缓存，供下次重查复用。
+      // 取消在途请求（关闭面板即取消查询）：网页源（如 Cambridge）据此中断抓取；
+      // AI 流式源据此关流 → 后端 request.signal abort → 中断 LLM，止损 token，
+      // 未完成不落缓存（流式已不再支持「后台跑完」，区别于旧同步 API）。
       for (final t in _tokens.values) {
         if (!t.isCancelled) t.cancel('controller disposed');
       }
     });
-    final defaultId = _resolveInitialSourceId();
+    final defaultId = _resolveInitialSourceId(preferredSourceId);
     // 进入即查默认源；其它源懒加载（切到才查）
     Future.microtask(() => _lookup(defaultId));
     return DictionaryLookupState(
@@ -170,10 +171,17 @@ class DictionaryLookupController extends _$DictionaryLookupController {
   }
 
   /// 初始选中源，优先级：
-  /// 1. 会话粘滞源（本次面板会话内用户手动选过且仍可见）——切词不回退默认源；
-  /// 2. 词组（含空格的多词查询）优先 AI 源——本地词典对多词短语覆盖有限；
-  /// 3. 全局默认源。
-  String _resolveInitialSourceId() {
+  /// 1. 调用方显式指定的初始源（如意群快捷 lookup 强制 AI），且该源仍可见；
+  /// 2. 会话粘滞源（本次面板会话内用户手动选过且仍可见）——切词不回退默认源；
+  /// 3. 词组（含空格的多词查询）优先 AI 源——本地词典对多词短语覆盖有限；
+  /// 4. 全局默认源。
+  String _resolveInitialSourceId(String? preferredSourceId) {
+    if (preferredSourceId != null && preferredSourceId.isNotEmpty) {
+      final visible = ref.read(visibleDictionarySourcesProvider);
+      if (visible.any((s) => s.id == preferredSourceId)) {
+        return preferredSourceId;
+      }
+    }
     final session = ref.read(dictionarySessionSourceProvider);
     if (session != null) {
       final visible = ref.read(visibleDictionarySourcesProvider);
@@ -226,7 +234,10 @@ class DictionaryLookupController extends _$DictionaryLookupController {
       if (source is AiDictionarySource) {
         // AI 源：流式逐帧渲染，完成后转 Loaded。每帧套用防竞态守卫。
         DictionaryLookupResult? last;
-        await for (final r in source.lookupStream(request, cancelToken: token)) {
+        await for (final r in source.lookupStream(
+          request,
+          cancelToken: token,
+        )) {
           if (_dropResult(id, seq)) return;
           last = r;
           if (r != null) _setState(id, LookupStreaming(r));

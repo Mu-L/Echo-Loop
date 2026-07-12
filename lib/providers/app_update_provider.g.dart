@@ -6,7 +6,7 @@ part of 'app_update_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appUpdateHash() => r'2390af1af3d2505e81d7f24ff8d18d23db8d1e70';
+String _$appUpdateHash() => r'dc065c2f040be60e5085dd2edbd287cb1e4cbc38';
 
 /// App 版本更新 Provider
 ///

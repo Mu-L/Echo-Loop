@@ -53,7 +53,7 @@ final dictionarySessionSourceProvider =
 
 typedef _$DictionarySessionSource = Notifier<String?>;
 String _$dictionaryLookupControllerHash() =>
-    r'ca8b104d7cee000b10cd8ff2e246d9bdbefa4a8c';
+    r'4f9f11d06b2a998282c5d91acd33e18b34398af7';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -79,8 +79,9 @@ class _SystemHash {
 abstract class _$DictionaryLookupController
     extends BuildlessAutoDisposeNotifier<DictionaryLookupState> {
   late final String word;
+  late final String? preferredSourceId;
 
-  DictionaryLookupState build(String word);
+  DictionaryLookupState build(String word, {String? preferredSourceId});
 }
 
 /// 查词会话 controller（family by word，autoDispose）
@@ -101,15 +102,21 @@ class DictionaryLookupControllerFamily extends Family<DictionaryLookupState> {
   /// 查词会话 controller（family by word，autoDispose）
   ///
   /// Copied from [DictionaryLookupController].
-  DictionaryLookupControllerProvider call(String word) {
-    return DictionaryLookupControllerProvider(word);
+  DictionaryLookupControllerProvider call(
+    String word, {
+    String? preferredSourceId,
+  }) {
+    return DictionaryLookupControllerProvider(
+      word,
+      preferredSourceId: preferredSourceId,
+    );
   }
 
   @override
   DictionaryLookupControllerProvider getProviderOverride(
     covariant DictionaryLookupControllerProvider provider,
   ) {
-    return call(provider.word);
+    return call(provider.word, preferredSourceId: provider.preferredSourceId);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -139,9 +146,11 @@ class DictionaryLookupControllerProvider
   /// 查词会话 controller（family by word，autoDispose）
   ///
   /// Copied from [DictionaryLookupController].
-  DictionaryLookupControllerProvider(String word)
+  DictionaryLookupControllerProvider(String word, {String? preferredSourceId})
     : this._internal(
-        () => DictionaryLookupController()..word = word,
+        () => DictionaryLookupController()
+          ..word = word
+          ..preferredSourceId = preferredSourceId,
         from: dictionaryLookupControllerProvider,
         name: r'dictionaryLookupControllerProvider',
         debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -151,6 +160,7 @@ class DictionaryLookupControllerProvider
         allTransitiveDependencies:
             DictionaryLookupControllerFamily._allTransitiveDependencies,
         word: word,
+        preferredSourceId: preferredSourceId,
       );
 
   DictionaryLookupControllerProvider._internal(
@@ -161,15 +171,17 @@ class DictionaryLookupControllerProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.word,
+    required this.preferredSourceId,
   }) : super.internal();
 
   final String word;
+  final String? preferredSourceId;
 
   @override
   DictionaryLookupState runNotifierBuild(
     covariant DictionaryLookupController notifier,
   ) {
-    return notifier.build(word);
+    return notifier.build(word, preferredSourceId: preferredSourceId);
   }
 
   @override
@@ -177,13 +189,16 @@ class DictionaryLookupControllerProvider
     return ProviderOverride(
       origin: this,
       override: DictionaryLookupControllerProvider._internal(
-        () => create()..word = word,
+        () => create()
+          ..word = word
+          ..preferredSourceId = preferredSourceId,
         from: from,
         name: null,
         dependencies: null,
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         word: word,
+        preferredSourceId: preferredSourceId,
       ),
     );
   }
@@ -199,13 +214,16 @@ class DictionaryLookupControllerProvider
 
   @override
   bool operator ==(Object other) {
-    return other is DictionaryLookupControllerProvider && other.word == word;
+    return other is DictionaryLookupControllerProvider &&
+        other.word == word &&
+        other.preferredSourceId == preferredSourceId;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, word.hashCode);
+    hash = _SystemHash.combine(hash, preferredSourceId.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -217,6 +235,9 @@ mixin DictionaryLookupControllerRef
     on AutoDisposeNotifierProviderRef<DictionaryLookupState> {
   /// The parameter `word` of this provider.
   String get word;
+
+  /// The parameter `preferredSourceId` of this provider.
+  String? get preferredSourceId;
 }
 
 class _DictionaryLookupControllerProviderElement
@@ -230,6 +251,9 @@ class _DictionaryLookupControllerProviderElement
 
   @override
   String get word => (origin as DictionaryLookupControllerProvider).word;
+  @override
+  String? get preferredSourceId =>
+      (origin as DictionaryLookupControllerProvider).preferredSourceId;
 }
 
 // ignore_for_file: type=lint

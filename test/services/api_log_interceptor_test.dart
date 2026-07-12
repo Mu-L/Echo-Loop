@@ -69,6 +69,25 @@ void main() {
       expect(log, contains('ms)'));
     });
 
+    test('响应阶段：有协议版本时打印实际 HTTP 版本', () {
+      final options = RequestOptions(
+        path: '/api/v1/stream/analyze',
+        method: 'POST',
+        baseUrl: 'https://api.test',
+      );
+      final response = Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: '(stream)',
+      )..extra[HttpClientAdapter.extraKeyHttpVersion] = '2.0';
+
+      final log = capture(
+        () => interceptor.onResponse(response, ResponseInterceptorHandler()),
+      );
+
+      expect(log, contains('HTTP/2.0'));
+    });
+
     test('带响应体的错误：打印状态码和服务器响应体', () {
       final err = DioException(
         requestOptions: RequestOptions(
@@ -138,6 +157,34 @@ void main() {
 
       expect(log, contains('已截断'));
       expect(log, contains('共 5000 字符'));
+    });
+
+    test('请求与响应体中的凭据、用户标识和预签名 URL 会脱敏', () {
+      final options = RequestOptions(
+        path: '/api/test',
+        method: 'POST',
+        data: {
+          'accessToken': 'secret-token',
+          'userId': 'full-user-id',
+          'nested': {'uploadUrl': 'https://signed.example/private'},
+        },
+      );
+      final response = Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'app_user_id': 'another-user-id'},
+      );
+
+      final log = capture(() {
+        interceptor.onRequest(options, RequestInterceptorHandler());
+        interceptor.onResponse(response, ResponseInterceptorHandler());
+      });
+
+      expect(log, contains('***'));
+      expect(log, isNot(contains('secret-token')));
+      expect(log, isNot(contains('full-user-id')));
+      expect(log, isNot(contains('signed.example')));
+      expect(log, isNot(contains('another-user-id')));
     });
   });
 }

@@ -89,7 +89,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 44;
+  static const currentSchemaVersion = 46;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -180,6 +180,25 @@ class AppDatabase extends _$AppDatabase {
         // v13→v14：新增 sentence_ai_cache 表（AI 翻译/解析缓存）
         if (from < 14) {
           await m.createTable(sentenceAiCache);
+        }
+        // v44→v45：句子解析改为流式结构化结果，旧解析缓存与新 Prompt /
+        // 展示契约不兼容。只清理句子解析缓存，保留翻译、查词和意群缓存。
+        if (from < 45) {
+          await customStatement('''
+            DELETE FROM sentence_ai_cache
+            WHERE type LIKE 'analysis:%'
+               OR type LIKE 'analysis_v2:%'
+          ''');
+        }
+        // v45→v46：翻译改为流式单句 + 上下文（context hash）+ prompt version，
+        // 旧翻译缓存（裸 `translation:` type、上下文无关 hash）与新契约不兼容。
+        // 只清理翻译缓存，保留解析、查词和意群。新代 type 为 `translation_v2:$lang`，
+        // 旧行天然不再命中，此处一并删除回收空间（双保险）。
+        if (from < 46) {
+          await customStatement('''
+            DELETE FROM sentence_ai_cache
+            WHERE type LIKE 'translation:%'
+          ''');
         }
         // v14→v15：新增 saved_words 表（收藏单词）
         if (from < 15) {

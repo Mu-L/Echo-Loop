@@ -184,6 +184,21 @@ void main() {
     expect(find.byKey(const Key('dict_sheet_sizer')), findsNothing);
   });
 
+  testWidgets('openStateListener 在打开和关闭时通知', (tester) async {
+    final states = <bool>[];
+    await tester.pumpWidget(wrap());
+    void listener() => states.add(hostKey.currentState!.isOpen);
+    hostKey.currentState!.addOpenStateListener(listener);
+    addTearDown(() => hostKey.currentState?.removeOpenStateListener(listener));
+
+    hostKey.currentState!.show(const DictionaryPanelQuery(word: 'run'));
+    await tester.pumpAndSettle();
+    hostKey.currentState!.close();
+    await tester.pumpAndSettle();
+
+    expect(states, containsAllInOrder([true, false]));
+  });
+
   testWidgets('点击关闭按钮关闭面板', (tester) async {
     await tester.pumpWidget(wrap());
     hostKey.currentState!.show(const DictionaryPanelQuery(word: 'run'));

@@ -5,6 +5,7 @@
 library;
 
 import 'package:echo_loop/features/subscription/providers/subscription_availability.dart';
+import 'package:echo_loop/config/client_distribution.dart';
 import 'package:echo_loop/features/subscription/widgets/feature_gate.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/router/app_router.dart';
@@ -52,6 +53,69 @@ Widget _harness({required bool available}) {
 }
 
 void main() {
+  group('本地渠道支付裁决', () {
+    test('app_store / play 只认原生商店配置', () {
+      for (final channel in [
+        ClientPaymentChannel.appleStore,
+        ClientPaymentChannel.googlePlay,
+      ]) {
+        expect(
+          subscriptionAvailableFor(
+            channel: channel,
+            nativeStoreConfigured: true,
+            webConfigured: false,
+          ),
+          isTrue,
+        );
+        expect(
+          subscriptionAvailableFor(
+            channel: channel,
+            nativeStoreConfigured: false,
+            webConfigured: true,
+          ),
+          isFalse,
+        );
+      }
+    });
+
+    test('direct 只认 Web checkout 配置', () {
+      expect(
+        subscriptionAvailableFor(
+          channel: ClientPaymentChannel.web,
+          nativeStoreConfigured: true,
+          webConfigured: false,
+        ),
+        isFalse,
+      );
+      expect(
+        subscriptionAvailableFor(
+          channel: ClientPaymentChannel.web,
+          nativeStoreConfigured: false,
+          webConfigured: true,
+        ),
+        isTrue,
+      );
+      expect(
+        webCheckoutModeFor(
+          channel: ClientPaymentChannel.web,
+          webConfigured: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('未知 identity 保守隐藏', () {
+      expect(
+        subscriptionAvailableFor(
+          channel: ClientPaymentChannel.unavailable,
+          nativeStoreConfigured: true,
+          webConfigured: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   testWidgets('平台未启用订阅：openPaywall 不导航，弹平台不支持提示', (tester) async {
     await tester.pumpWidget(_harness(available: false));
     await tester.pumpAndSettle();

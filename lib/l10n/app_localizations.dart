@@ -113,7 +113,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumTagline.
   ///
   /// In en, this message translates to:
-  /// **'Unlock unlimited AI-powered learning'**
+  /// **'Get more AI-powered learning'**
   String get premiumTagline;
 
   /// No description provided for @aiQuotaExceededTitle.
@@ -167,19 +167,19 @@ abstract class AppLocalizations {
   /// No description provided for @premiumBenefitTranslation.
   ///
   /// In en, this message translates to:
-  /// **'Unlimited AI translation'**
+  /// **'More AI translation'**
   String get premiumBenefitTranslation;
 
   /// No description provided for @premiumBenefitAnalysis.
   ///
   /// In en, this message translates to:
-  /// **'Unlimited AI sentence analysis'**
+  /// **'More AI sentence breakdown'**
   String get premiumBenefitAnalysis;
 
   /// No description provided for @premiumBenefitWordAnalysis.
   ///
   /// In en, this message translates to:
-  /// **'Unlimited AI word analysis'**
+  /// **'More AI word explanation'**
   String get premiumBenefitWordAnalysis;
 
   /// No description provided for @premiumBenefitTranscription.
@@ -187,6 +187,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More AI subtitle transcription'**
   String get premiumBenefitTranscription;
+
+  /// No description provided for @premiumBenefitSenseGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'More AI sentence chunking'**
+  String get premiumBenefitSenseGroups;
 
   /// No description provided for @premiumSubscribe.
   ///
@@ -278,12 +284,6 @@ abstract class AppLocalizations {
   /// **'Lifetime access, no renewal needed'**
   String get premiumLifetimeAccessNote;
 
-  /// No description provided for @premiumAutoRenewNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto-renews. Manage or cancel in your App Store account.'**
-  String get premiumAutoRenewNotice;
-
   /// No description provided for @premiumNoPlans.
   ///
   /// In en, this message translates to:
@@ -343,12 +343,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t open the checkout page. Please try again.'**
   String get premiumWebOpenFailed;
-
-  /// No description provided for @premiumWebAutoRenewNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto-renews. Manage or cancel from your account page or the confirmation email.'**
-  String get premiumWebAutoRenewNotice;
 
   /// No description provided for @premiumRefresh.
   ///
@@ -457,6 +451,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{intro}, then {renewal}'**
   String premiumOfferThen(String intro, String renewal);
+
+  /// No description provided for @premiumSpecialOfferPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Special offer: {percent}% off your first {period}'**
+  String premiumSpecialOfferPercent(int percent, String period);
+
+  /// No description provided for @premiumSpecialOfferIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Special offer: {intro}, then {renewal}'**
+  String premiumSpecialOfferIntro(String intro, String renewal);
+
+  /// No description provided for @premiumOfferPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'year'**
+  String get premiumOfferPeriodYear;
+
+  /// No description provided for @premiumOfferPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'month'**
+  String get premiumOfferPeriodMonth;
+
+  /// No description provided for @premiumOfferPeriodGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'period'**
+  String get premiumOfferPeriodGeneric;
+
+  /// No description provided for @premiumTermsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get premiumTermsShort;
+
+  /// No description provided for @premiumPrivacyShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get premiumPrivacyShort;
 
   /// No description provided for @practiceControlModeAuto.
   ///

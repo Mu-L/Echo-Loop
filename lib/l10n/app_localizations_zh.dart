@@ -15,7 +15,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumTitle => 'Echo Loop 会员';
 
   @override
-  String get premiumTagline => '解锁无限 AI 学习能力';
+  String get premiumTagline => '使用更多 AI，学习更高效。';
 
   @override
   String get aiQuotaExceededTitle => '本月免费额度已用完';
@@ -42,16 +42,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumActive => '你已是会员';
 
   @override
-  String get premiumBenefitTranslation => '无限 AI 翻译';
+  String get premiumBenefitTranslation => '更多 AI 翻译';
 
   @override
-  String get premiumBenefitAnalysis => '无限 AI 句子解析';
+  String get premiumBenefitAnalysis => '更多 AI 句子拆解';
 
   @override
-  String get premiumBenefitWordAnalysis => '无限 AI 单词解析';
+  String get premiumBenefitWordAnalysis => '更多 AI 单词讲解';
 
   @override
-  String get premiumBenefitTranscription => '更多 AI 字幕转录额度';
+  String get premiumBenefitTranscription => '更多 AI 字幕转录';
+
+  @override
+  String get premiumBenefitSenseGroups => '更多 AI 句子意群拆分';
 
   @override
   String get premiumSubscribe => '订阅';
@@ -105,9 +108,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumLifetimeAccessNote => '永久有效，无需续订';
 
   @override
-  String get premiumAutoRenewNotice => '自动续费，可在 App Store 账户中管理或取消。';
-
-  @override
   String get premiumNoPlans => '暂无可用套餐，请稍后再试。';
 
   @override
@@ -136,9 +136,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get premiumWebOpenFailed => '无法打开结账页面，请重试。';
-
-  @override
-  String get premiumWebAutoRenewNotice => '自动续费。可在账户页或结账确认邮件中管理或取消。';
 
   @override
   String get premiumRefresh => '刷新';
@@ -213,6 +210,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String premiumOfferThen(String intro, String renewal) {
     return '$intro，之后 $renewal';
   }
+
+  @override
+  String premiumSpecialOfferPercent(int percent, String period) {
+    return '特别优惠：首$period立减 $percent%';
+  }
+
+  @override
+  String premiumSpecialOfferIntro(String intro, String renewal) {
+    return '特别优惠：$intro，之后 $renewal';
+  }
+
+  @override
+  String get premiumOfferPeriodYear => '年';
+
+  @override
+  String get premiumOfferPeriodMonth => '月';
+
+  @override
+  String get premiumOfferPeriodGeneric => '期';
+
+  @override
+  String get premiumTermsShort => '服务条款';
+
+  @override
+  String get premiumPrivacyShort => '隐私政策';
 
   @override
   String get practiceControlModeAuto => '自动';

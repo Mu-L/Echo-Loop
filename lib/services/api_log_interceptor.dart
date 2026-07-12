@@ -53,7 +53,8 @@ class ApiLogInterceptor extends Interceptor {
     final buffer = StringBuffer()
       ..writeln(
         '← ${request.method} ${request.uri} '
-        '${response.statusCode}${_elapsedSuffix(request)}',
+        '${response.statusCode}${_elapsedSuffix(request)}'
+        '${_httpVersionSuffix(response.extra)}',
       );
     // 流式响应体是未消费的 ResponseBody，序列化它会破坏流；只记状态行。
     if (request.responseType == ResponseType.stream) {
@@ -110,12 +111,21 @@ class ApiLogInterceptor extends Interceptor {
     return ' (${elapsed}ms)';
   }
 
+  /// 记录底层 adapter 回填的实际 HTTP 协议版本。
+  ///
+  /// Dio 默认 IO adapter 与 HTTP/2 adapter 都会尽量写入该字段；没有取到时不打印，
+  /// 避免 mock 或特殊平台下产生误导。
+  String _httpVersionSuffix(Map<String, dynamic> extra) {
+    final version = extra[HttpClientAdapter.extraKeyHttpVersion];
+    return version is String && version.isNotEmpty ? ' HTTP/$version' : '';
+  }
+
   /// 将请求/响应体安全地转为字符串，截断过长内容避免日志爆炸
   String _stringifyBody(Object? data) {
     if (data == null) return '(空)';
     String text;
     try {
-      text = data is String ? data : jsonEncode(data);
+      text = data is String ? data : jsonEncode(_sanitize(data));
     } catch (_) {
       text = data.toString();
     }
@@ -124,5 +134,30 @@ class ApiLogInterceptor extends Interceptor {
       return '${text.substring(0, maxLength)}…（已截断，共 ${text.length} 字符）';
     }
     return text;
+  }
+
+  /// 递归遮蔽凭据、用户标识和预签名上传地址，日志只保留字段存在性。
+  Object? _sanitize(Object? value) {
+    if (value is Map) {
+      return <String, Object?>{
+        for (final entry in value.entries)
+          entry.key.toString(): _isSensitiveKey(entry.key.toString())
+              ? '***'
+              : _sanitize(entry.value),
+      };
+    }
+    if (value is Iterable) return value.map(_sanitize).toList();
+    return value;
+  }
+
+  bool _isSensitiveKey(String key) {
+    final normalized = key.toLowerCase().replaceAll(RegExp(r'[_-]'), '');
+    return normalized.contains('authorization') ||
+        normalized.contains('accesstoken') ||
+        normalized == 'token' ||
+        normalized.contains('userid') ||
+        normalized.contains('appuserid') ||
+        normalized.contains('uploadurl') ||
+        normalized.contains('presignedurl');
   }
 }

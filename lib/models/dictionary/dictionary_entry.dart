@@ -18,23 +18,13 @@ List<String> _strList(Object? raw) {
 Map<String, dynamic> _map(Object? raw) =>
     raw is Map<String, dynamic> ? raw : const {};
 
-/// AI 词典条目类型
-enum AiDictionaryQueryType {
-  /// 单词词典释义
-  singleWord,
-
-  /// 多词表达分析
-  multiWord,
-}
-
 /// AI 词典结果联合类型。
 ///
-/// 后端 `analysis.queryType` 区分单词与多词表达。旧缓存没有 `queryType`，
-/// 默认按单词条目解析，保证历史缓存仍可读取。
+/// 单词与多词表达是两条完全独立的功能/端点，各自解析为对应的具体子类
+/// （[DictionaryEntry] / [MultiWordDictionaryEntry]）——调用方（API 端点、
+/// 缓存读取）在编译期即知道类型，直接调具体 `fromJson`，不做运行期结构嗅探。
+/// 联合类型仅用于渲染层 `switch` 的编译期穷尽分派（按 Dart 类型，非字段）。
 sealed class AiDictionaryEntry {
-  /// 查询类型
-  AiDictionaryQueryType get queryType;
-
   /// 词头 / 表达本体
   String get headword;
 
@@ -43,22 +33,10 @@ sealed class AiDictionaryEntry {
 
   /// 序列化为后端 `analysis` 同构 JSON
   Map<String, dynamic> toJson();
-
-  /// 从后端 `analysis` 对象反序列化（防御性）
-  factory AiDictionaryEntry.fromJson(Map<String, dynamic> json) {
-    if (json['queryType'] == 'multi_word' ||
-        json.containsKey('originalExpression')) {
-      return MultiWordDictionaryEntry.fromJson(json);
-    }
-    return DictionaryEntry.fromJson(json);
-  }
 }
 
 /// AI 词典完整条目
 class DictionaryEntry implements AiDictionaryEntry {
-  @override
-  AiDictionaryQueryType get queryType => AiDictionaryQueryType.singleWord;
-
   /// 词典词头（原形）
   @override
   final String headword;
@@ -136,7 +114,6 @@ class DictionaryEntry implements AiDictionaryEntry {
   /// 序列化（用于本地 SQLite 缓存存储，保持与后端 `analysis` 同构）
   @override
   Map<String, dynamic> toJson() => {
-    'queryType': 'single_word',
     'headword': headword,
     'pronunciation': pronunciation.toJson(),
     'meanings': meanings.map((m) => m.toJson()).toList(),
@@ -353,9 +330,6 @@ class WordForm {
 
 /// AI 多词表达分析条目
 class MultiWordDictionaryEntry implements AiDictionaryEntry {
-  @override
-  AiDictionaryQueryType get queryType => AiDictionaryQueryType.multiWord;
-
   /// 表达本体
   final String originalExpression;
 
@@ -428,7 +402,6 @@ class MultiWordDictionaryEntry implements AiDictionaryEntry {
 
   @override
   Map<String, dynamic> toJson() => {
-    'queryType': 'multi_word',
     'originalExpression': originalExpression,
     'naturalness': naturalness,
     'category': category,
@@ -488,10 +461,7 @@ class MultiWordMeaning {
   /// 例句
   final List<ExampleSentence> examples;
 
-  const MultiWordMeaning({
-    required this.translation,
-    required this.examples,
-  });
+  const MultiWordMeaning({required this.translation, required this.examples});
 
   factory MultiWordMeaning.fromJson(Map<String, dynamic> json) {
     final examples = json['examples'];

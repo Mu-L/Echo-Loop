@@ -11,6 +11,10 @@ String _formatPlaybackSpeedLabel(double speed) =>
     formatPlaybackSpeedLabel(speed);
 
 class PlaybackControls extends ConsumerWidget {
+  static const double _controlButtonSize = 56;
+  static const double _mainControlGap = 48;
+  static const double _compactControlGap = 12;
+
   const PlaybackControls({super.key});
 
   @override
@@ -56,9 +60,9 @@ class PlaybackControls extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildSeekButton(controller, Icons.replay_10, -10, 32),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: _mainControlGap),
                   _buildPlayPauseButton(context, playerState, controller),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: _mainControlGap),
                   _buildSeekButton(controller, Icons.forward_10, 10, 32),
                 ],
               ),
@@ -91,9 +95,9 @@ class PlaybackControls extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: _compactControlGap),
               const _SpeedButton(),
-              const SizedBox(width: 12),
+              const SizedBox(width: _compactControlGap),
               _buildToggleButton(
                 context,
                 icon: playerState.settings.showTranscript
@@ -108,7 +112,7 @@ class PlaybackControls extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: _compactControlGap),
               const _LoopButton(),
             ],
           ),
@@ -118,17 +122,15 @@ class PlaybackControls extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.skip_previous),
-                  iconSize: 32,
+                _buildNavButton(
+                  icon: Icons.skip_previous,
                   onPressed: () => controller.previousSentence(),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: _mainControlGap),
                 _buildPlayPauseButton(context, playerState, controller),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: const Icon(Icons.skip_next),
-                  iconSize: 32,
+                const SizedBox(width: _mainControlGap),
+                _buildNavButton(
+                  icon: Icons.skip_next,
                   onPressed: () => controller.nextSentence(),
                 ),
               ],
@@ -155,9 +157,9 @@ class PlaybackControls extends ConsumerWidget {
             const _SpeedButton(),
             const SizedBox(width: 16),
             _buildSeekButton(controller, Icons.replay_10, -10, 28),
-            const SizedBox(width: 6),
+            const SizedBox(width: _mainControlGap),
             _buildPlayPauseButton(context, playerState, controller),
-            const SizedBox(width: 6),
+            const SizedBox(width: _mainControlGap),
             _buildSeekButton(controller, Icons.forward_10, 10, 28),
             const SizedBox(width: 16),
             const _LoopButton(),
@@ -188,16 +190,16 @@ class PlaybackControls extends ConsumerWidget {
           const SizedBox(width: 6),
           const _SpeedButton(),
           const SizedBox(width: 16),
-          IconButton(
-            icon: const Icon(Icons.skip_previous),
+          _buildNavButton(
+            icon: Icons.skip_previous,
             iconSize: 28,
             onPressed: () => controller.previousSentence(),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: _mainControlGap),
           _buildPlayPauseButton(context, playerState, controller),
-          const SizedBox(width: 6),
-          IconButton(
-            icon: const Icon(Icons.skip_next),
+          const SizedBox(width: _mainControlGap),
+          _buildNavButton(
+            icon: Icons.skip_next,
             iconSize: 28,
             onPressed: () => controller.nextSentence(),
           ),
@@ -230,10 +232,25 @@ class PlaybackControls extends ConsumerWidget {
     int seconds,
     double size,
   ) {
-    return IconButton(
-      icon: Icon(icon),
+    return _buildNavButton(
+      icon: icon,
       iconSize: size,
       onPressed: () => controller.seekRelative(Duration(seconds: seconds)),
+    );
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    double iconSize = 32,
+  }) {
+    return SizedBox.square(
+      dimension: _controlButtonSize,
+      child: IconButton(
+        icon: Icon(icon),
+        iconSize: iconSize,
+        onPressed: onPressed,
+      ),
     );
   }
 
@@ -245,22 +262,25 @@ class PlaybackControls extends ConsumerWidget {
     // 图标读 controller 的逻辑播放态（唯一真相源），不读 just_audio 的瞬时
     // `playing`——后者在自然播完后仍为 true，会让图标停在「暂停」。
     final isPlaying = playerState.isPlaying;
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-        iconSize: 36,
-        color: Theme.of(context).colorScheme.onPrimary,
-        onPressed: () {
-          if (isPlaying) {
-            controller.pause();
-          } else {
-            controller.play();
-          }
-        },
+    return SizedBox.square(
+      dimension: _controlButtonSize,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          shape: BoxShape.circle,
+        ),
+        child: IconButton(
+          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+          iconSize: 36,
+          color: Theme.of(context).colorScheme.onPrimary,
+          onPressed: () {
+            if (isPlaying) {
+              controller.pause();
+            } else {
+              controller.play();
+            }
+          },
+        ),
       ),
     );
   }

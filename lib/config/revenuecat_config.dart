@@ -16,7 +16,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 
-import 'web_purchase_config.dart';
+import 'client_distribution.dart';
 
 /// Apple App Store 平台的 RevenueCat 公开 API Key（iOS / macOS）。
 const _revenueCatApiKeyApple = String.fromEnvironment(
@@ -41,12 +41,20 @@ const revenueCatEntitlementId = String.fromEnvironment(
 ///
 /// iOS 与 macOS 都属于 Apple App Store / StoreKit 购买通道，统一由
 /// `REVENUECAT_API_KEY_APPLE` 控制；Android 由 Google Play key 控制。
+///
+/// ⚠️ **发布陷阱**：返回 key 前先按 [clientPaymentChannel] 门控——即**必须同时注入
+/// 匹配的 `DISTRIBUTION_CHANNEL`**（iOS→`app_store`、Android→`play`、桌面直装→`direct`）。
+/// 只注入 `REVENUECAT_API_KEY_APPLE`/`_GOOGLE` 而漏注入或注错 `DISTRIBUTION_CHANNEL`
+/// 时，channel 解析为 `unavailable` → 本 getter 返回空串 → [isRevenueCatConfigured]
+/// 为 false → RC 静默不初始化、订阅整体不可用。打包脚本务必两者成对注入。
 String get revenueCatApiKey {
+  final paymentChannel = clientPaymentChannel;
   return revenueCatApiKeyForPlatform(
     isWeb: kIsWeb,
-    isIOS: !kIsWeb && Platform.isIOS,
-    isMacOS: !kIsWeb && Platform.isMacOS,
-    isAndroid: !kIsWeb && Platform.isAndroid,
+    isIOS: paymentChannel == ClientPaymentChannel.appleStore && Platform.isIOS,
+    isMacOS:
+        paymentChannel == ClientPaymentChannel.appleStore && Platform.isMacOS,
+    isAndroid: paymentChannel == ClientPaymentChannel.googlePlay,
     appleKey: _revenueCatApiKeyApple,
     googleKey: _revenueCatApiKeyGoogle,
   );
@@ -74,16 +82,6 @@ String revenueCatApiKeyForPlatform({
 /// 当前平台是否已配置 RevenueCat（决定是否初始化 SDK / 启用真实购买）。
 bool get isRevenueCatConfigured => revenueCatApiKey.isNotEmpty;
 
-/// 当前平台是否支持订阅（订阅 UI 展示的总闸）。
-///
-/// 「某平台是否启用订阅」由编译期配置表达：
-/// - 商店渠道：注入 RC key → 走原生内购；
-/// - 非商店渠道（侧载 APK / 桌面）：注入 `DISTRIBUTION_CHANNEL` + `WEB_PURCHASE_LINK_BASE`
-///   → 走网页支付（[isWebCheckoutConfigured]）；
-/// - 本地 StoreKit 测试模式视为支持（开发调试用）。
-bool get isSubscriptionSupported =>
-    useLocalStoreKit || isRevenueCatConfigured || isWebCheckoutConfigured;
-
 /// 本地 StoreKit 测试模式开关（`--dart-define=USE_LOCAL_STOREKIT=true`）。
 ///
 /// 开启后：
@@ -108,20 +106,26 @@ String? Function()? debugManageSubscriptionsUrlOverride;
 String? get manageSubscriptionsUrl {
   final override = debugManageSubscriptionsUrlOverride;
   if (override != null) return override();
-  if (kIsWeb) return null;
-  // 网页支付渠道优先：这类订阅经 Paddle 结账，**不**走商店订阅页（侧载 APK 仍是
-  // Android，但绝不能跳 Google Play 订阅管理）。v1 无稳定的自助管理深链时返回
-  // 可选注入的 [webManageUrl]，缺省为 null（Paywall 据此隐藏「管理订阅」按钮）。
-  if (isWebCheckoutConfigured) {
-    return webManageUrl.isNotEmpty ? webManageUrl : null;
-  }
-  if (Platform.isIOS || Platform.isMacOS) {
-    return 'https://apps.apple.com/account/subscriptions';
-  }
-  if (Platform.isAndroid) {
-    return 'https://play.google.com/store/account/subscriptions';
-  }
-  return null;
+  return manageSubscriptionsUrlForChannel(
+    clientPaymentChannel,
+    webManageUrl: webManageUrl,
+  );
+}
+
+/// 按本地支付实现选择订阅管理入口。
+@visibleForTesting
+String? manageSubscriptionsUrlForChannel(
+  ClientPaymentChannel channel, {
+  required String webManageUrl,
+}) {
+  return switch (channel) {
+    ClientPaymentChannel.appleStore =>
+      'https://apps.apple.com/account/subscriptions',
+    ClientPaymentChannel.googlePlay =>
+      'https://play.google.com/store/account/subscriptions',
+    ClientPaymentChannel.web => webManageUrl.isNotEmpty ? webManageUrl : null,
+    ClientPaymentChannel.unavailable => null,
+  };
 }
 
 /// 网页支付订阅的自助管理页 URL（可选，`--dart-define=WEB_MANAGE_URL=` 注入）。

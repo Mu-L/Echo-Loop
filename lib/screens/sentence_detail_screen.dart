@@ -89,11 +89,12 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
 
   @override
   void dispose() {
-    // 延迟到帧结束后再停止音频：返回上一页时，监听 audioEngineProvider 的
+    // 延迟到帧结束后再暂停音频：返回上一页时，监听 audioEngineProvider 的
     // 页面（如全能播放器的进度条）正在重建，若在 dispose 同步阶段改 provider
     // 会触发 "Tried to modify a provider while the widget tree was building"。
-    // engine 是 keepAlive provider，晚一拍调用安全。
-    Future(() => _engine.stop());
+    // 这里只暂停并失效讲解页 session，不 stop；否则晚到的 stop 会在播放器返回后
+    // 重置 clip/position，造成句首短暂漏播和按钮状态误判。
+    Future(() => _engine.pause());
     super.dispose();
   }
 

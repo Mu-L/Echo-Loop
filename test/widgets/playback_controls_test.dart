@@ -73,6 +73,24 @@ void main() {
         expect(find.byIcon(Icons.skip_next), findsOneWidget);
       });
 
+      testWidgets('移动端主控制按钮间距与学习页一致', (tester) async {
+        tester.view.physicalSize = const Size(390, 840);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(buildControls());
+        await tester.pumpAndSettle();
+
+        final previousCenter = tester.getCenter(
+          find.byIcon(Icons.skip_previous),
+        );
+        final playCenter = tester.getCenter(find.byIcon(Icons.play_arrow));
+        final nextCenter = tester.getCenter(find.byIcon(Icons.skip_next));
+        expect(playCenter.dx - previousCenter.dx, closeTo(104, 0.1));
+        expect(nextCenter.dx - playCenter.dx, closeTo(104, 0.1));
+      });
+
       testWidgets('显示速度按钮', (tester) async {
         await tester.pumpWidget(buildControls());
         await tester.pumpAndSettle();

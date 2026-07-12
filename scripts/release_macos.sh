@@ -86,6 +86,7 @@ FLUTTER_ARGS=(
   --release
   "--flavor=prod"
   "--dart-define-from-file=$ENV_FILE"
+  "--dart-define=DISTRIBUTION_CHANNEL=direct"
   # --build-name 只传版本号，不含构建号
   "--build-name=$BUILD_NAME"
 )

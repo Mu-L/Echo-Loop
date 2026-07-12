@@ -756,14 +756,14 @@ List<pw.Widget> _appendixBlocks(
           ),
         ),
       );
-      if (sentence.grammar != null) {
-        blocks.add(_analysisField(labels.grammar, sentence.grammar!));
-      }
       if (sentence.vocabulary != null) {
         blocks.add(_analysisField(labels.vocabulary, sentence.vocabulary!));
       }
       if (sentence.listening != null) {
         blocks.add(_analysisField(labels.listening, sentence.listening!));
+      }
+      if (sentence.grammar != null) {
+        blocks.add(_analysisField(labels.grammar, sentence.grammar!));
       }
       blocks.add(pw.SizedBox(height: 12));
     }

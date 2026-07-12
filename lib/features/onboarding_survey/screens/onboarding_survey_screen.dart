@@ -33,14 +33,6 @@ enum _SurveyStep { goal, examType, dailyMinutes, referralSource, summary }
 /// 选完答案到自动跳下一步之间的延迟，留出选中高亮的视觉反馈。
 const _autoAdvanceDelay = Duration(milliseconds: 220);
 
-// ─────────────────────── 本地视觉常量 ───────────────────────
-// 仅 onboarding 模块内使用，避免污染全局 theme。
-
-const _kBgColor = Color(0xFFFAFBFD);
-const _kTitleColor = Color(0xFF1A2230);
-const _kMutedColor = Color(0xFF8A95A5);
-const _kBorderColor = Color(0xFFE2E8F0);
-
 /// 学习目标 emoji 映射。
 const _goalEmoji = <String, String>{
   OnboardingGoal.exam: '🎯',
@@ -154,16 +146,24 @@ Widget? _emojiLeading(String? emoji) {
 }
 
 /// 来源渠道 leading：品牌图标 + 品牌主色，方便用户快速识别熟悉的平台。
-Widget _referralLeading(String code) {
+Widget _referralLeading(BuildContext context, String code) {
+  final theme = Theme.of(context);
   final brand = _referralBrand[code];
   if (brand == null) {
-    return const FaIcon(
+    return FaIcon(
       FontAwesomeIcons.ellipsis,
       size: 18,
-      color: Color(0xFF4A5568),
+      color: theme.colorScheme.onSurfaceVariant,
     );
   }
-  return FaIcon(brand.icon, size: 18, color: brand.color);
+
+  // 黑色品牌标志在 AMOLED 背景上不可见，深色模式下改用主题前景色。
+  final color =
+      theme.brightness == Brightness.dark &&
+          brand.color.computeLuminance() < 0.08
+      ? theme.colorScheme.onSurface
+      : brand.color;
+  return FaIcon(brand.icon, size: 18, color: color);
 }
 
 class OnboardingSurveyScreen extends ConsumerStatefulWidget {
@@ -333,7 +333,6 @@ class _OnboardingSurveyScreenState
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: _kBgColor,
         body: SafeArea(
           child: Stack(
             children: [
@@ -795,7 +794,7 @@ class _OnboardingSurveyScreenState
         for (final code in codes)
           SurveyChoiceTile(
             label: _referralSourceLabel(l10n, code),
-            leading: _referralLeading(code),
+            leading: _referralLeading(context, code),
             selected: selected == code,
             onTap: () => _selectReferralSource(code),
           ),
@@ -925,7 +924,8 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 12, 28, 8),
       child: Row(
@@ -938,7 +938,7 @@ class _TopBar extends StatelessWidget {
                 : TextButton.icon(
                     onPressed: onBack,
                     style: TextButton.styleFrom(
-                      foregroundColor: _kMutedColor,
+                      foregroundColor: colorScheme.onSurfaceVariant,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: const Size(0, 36),
                       visualDensity: VisualDensity.compact,
@@ -980,6 +980,7 @@ class _SegmentedProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       children: List.generate(total, (i) {
         final reached = i <= currentIndex;
@@ -990,7 +991,7 @@ class _SegmentedProgress extends StatelessWidget {
               duration: const Duration(milliseconds: 220),
               height: 4,
               decoration: BoxDecoration(
-                color: reached ? activeColor : _kBorderColor,
+                color: reached ? activeColor : colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1009,7 +1010,9 @@ class _Prompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1017,7 +1020,7 @@ class _Prompt extends StatelessWidget {
           Text(
             eyebrow,
             style: textTheme.bodySmall?.copyWith(
-              color: _kMutedColor,
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
             ),
@@ -1031,7 +1034,7 @@ class _Prompt extends StatelessWidget {
             fontSize: 22,
             height: 1.35,
             fontWeight: FontWeight.w700,
-            color: _kTitleColor,
+            color: colorScheme.onSurface,
           ),
         ),
       ],

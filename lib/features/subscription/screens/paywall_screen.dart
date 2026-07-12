@@ -76,12 +76,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final isPremium = subState.isActive;
     // 网页支付渠道（侧载 APK / 桌面）：购买改为浏览器结账 + 回流对账，不展示商店套餐卡。
     final webMode = ref.watch(webCheckoutModeProvider);
+    final plansAsync = webMode || isPremium
+        ? null
+        : ref.watch(subscriptionPlansProvider);
+    final specialOfferLabel = webMode
+        ? null
+        : _specialOfferLabel(l10n, plansAsync?.valueOrNull ?? const []);
     AppLogger.log(
       'Subscription',
       'paywall build: isPremium=$isPremium webMode=$webMode '
           'status=${subState.status} waitingForWeb=$_waitingForWeb busy=$_busy',
     );
-
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.premiumTitle),
@@ -99,20 +104,47 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              children: isPremium
-                  ? _buildMemberBody(l10n)
-                  : [
-                      _Header(l10n: l10n),
-                      const SizedBox(height: 24),
-                      _BenefitCard(l10n: l10n),
-                      const SizedBox(height: 24),
-                      if (webMode)
-                        _buildWebPurchaseArea(l10n)
-                      else
-                        _buildPurchaseArea(l10n),
-                    ],
+            Positioned.fill(
+              child: isPremium
+                  ? ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      children: _buildMemberBody(l10n),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: ListView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  8,
+                                  20,
+                                  20,
+                                ),
+                                children: [
+                                  _Header(l10n: l10n),
+                                  const SizedBox(height: 16),
+                                  if (specialOfferLabel != null) ...[
+                                    _SpecialOfferStrip(
+                                      label: specialOfferLabel,
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                  _BenefitCard(l10n: l10n),
+                                ],
+                              ),
+                            ),
+                            _FixedPurchasePanel(
+                              maxHeight: constraints.maxHeight * 0.52,
+                              child: webMode
+                                  ? _buildWebPurchaseArea(l10n)
+                                  : _buildPurchaseArea(l10n),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
             ),
             if (_busy)
               const ColoredBox(
@@ -123,6 +155,35 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         ),
       ),
     );
+  }
+
+  String? _specialOfferLabel(
+    AppLocalizations l10n,
+    List<SubscriptionPlan> plans,
+  ) {
+    final plan = plans.where(_hasPaidIntroOffer).firstOrNull;
+    if (plan == null) return null;
+    final offer = plan.introOffer;
+    if (offer == null) return null;
+    final discounted = isIntroOfferDiscounted(plan);
+    if (discounted == false) return null;
+
+    final percent = computeIntroOfferDiscountPercent(plan);
+    if (percent != null && percent > 0) {
+      return l10n.premiumSpecialOfferPercent(
+        percent,
+        _offerPeriodName(l10n, offer),
+      );
+    }
+    return l10n.premiumSpecialOfferIntro(
+      _introLabelForOffer(l10n, offer),
+      _renewalLabelForPlan(l10n, plan, offer),
+    );
+  }
+
+  bool _hasPaidIntroOffer(SubscriptionPlan plan) {
+    final offer = plan.introOffer;
+    return offer != null && !offer.isFreeTrial;
   }
 
   /// 会员态页面主体：金色 hero + 到期信息卡 + 权益卡 + 管理订阅按钮。
@@ -188,17 +249,21 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         final yearlyValue = _yearlyValueOf(plans);
         return Column(
           children: [
-            for (final plan in plans)
+            for (var index = 0; index < plans.length; index++) ...[
+              if (index > 0) const SizedBox(height: 8),
               _PlanCard(
-                plan: plan,
+                plan: plans[index],
                 l10n: l10n,
-                selected: plan.planId == selectedId,
-                yearlyValue: plan.period == SubscriptionPeriod.yearly
+                selected: plans[index].planId == selectedId,
+                yearlyValue: plans[index].period == SubscriptionPeriod.yearly
                     ? yearlyValue
                     : null,
-                onTap: () => setState(() => _selectedPlanId = plan.planId),
+                onTap: () => setState(
+                  () => _selectedPlanId = plans[index].planId,
+                ),
               ),
-            const SizedBox(height: 24),
+            ],
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -214,21 +279,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 child: Text(_ctaLabel(l10n, selected)),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.premiumAutoRenewNotice,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant
-                    .withValues(
-                      alpha: Theme.of(context).brightness == Brightness.dark
-                          ? 0.72
-                          : 0.58,
-                    ),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            // 购买相关法律链接跟随订阅按钮一起滚动，避免小屏底部固定区挤压 CTA。
+            const SizedBox(height: 2),
             _LegalFooter(l10n: l10n),
           ],
         );
@@ -286,17 +337,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
             textAlign: TextAlign.center,
           ),
         ],
-        const SizedBox(height: 8),
-        Text(
-          l10n.premiumWebAutoRenewNotice,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withValues(
-              alpha: theme.brightness == Brightness.dark ? 0.72 : 0.58,
-            ),
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 2),
         _LegalFooter(l10n: l10n),
       ],
     );
@@ -316,7 +357,15 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       _showMessage(AppLocalizations.of(context)!.premiumWebOpenFailed);
       return;
     }
-    final opened = await launchUrl(uri);
+    bool opened;
+    try {
+      opened = await launchUrl(uri);
+    } catch (e) {
+      // 无可用浏览器 / 平台拒绝时 launchUrl 会抛异常，与「返回 false」同样处理，
+      // 不让异常冒泡为未捕获错误。
+      AppLogger.log('Subscription', 'web checkout launchUrl 异常: $e');
+      opened = false;
+    }
     AppLogger.log(
       'Subscription',
       'web checkout open result: opened=$opened host=${uri.host} path=${uri.path}',
@@ -483,27 +532,34 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final gold = AppTheme.premiumGold(theme.brightness);
     return Column(
       children: [
-        // 皇冠图标加金色圆形浅底衬，提升尊贵层次感。
+        // 顶部使用 Echo Loop 品牌 logo，较皇冠图标更贴近应用识别。
         Container(
-          width: 84,
-          height: 84,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                gold.withValues(alpha: 0.22),
-                gold.withValues(alpha: 0.10),
-              ],
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.18 : 0.06,
+                ),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Image.asset(
+              'assets/icon/app-icon-1024-alpha.png',
+              key: const ValueKey('paywall_header_logo'),
+              fit: BoxFit.cover,
             ),
           ),
-          child: Icon(Icons.workspace_premium, size: 48, color: gold),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         Text(
           l10n.premiumTitle,
           style: theme.textTheme.headlineSmall?.copyWith(
@@ -511,7 +567,7 @@ class _Header extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
           l10n.premiumTagline,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -532,16 +588,18 @@ class _BenefitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final benefits = [
-      l10n.premiumBenefitTranslation,
-      l10n.premiumBenefitAnalysis,
-      l10n.premiumBenefitWordAnalysis,
       l10n.premiumBenefitTranscription,
+      l10n.premiumBenefitTranslation,
+      l10n.premiumBenefitWordAnalysis,
+      l10n.premiumBenefitAnalysis,
+      l10n.premiumBenefitSenseGroups,
     ];
     final theme = Theme.of(context);
     final color = AppTheme.premiumAccent(theme.brightness);
     return Container(
+      key: const ValueKey('paywall_benefit_card'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.premiumSelectedFill(theme.brightness),
         borderRadius: BorderRadius.circular(16),
@@ -550,11 +608,11 @@ class _BenefitCard extends StatelessWidget {
         children: [
           for (final benefit in benefits)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, size: 22, color: color),
-                  const SizedBox(width: 14),
+                  Icon(Icons.check_circle, size: 20, color: color),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(benefit, style: theme.textTheme.bodyLarge),
                   ),
@@ -565,6 +623,122 @@ class _BenefitCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SpecialOfferStrip extends StatelessWidget {
+  const _SpecialOfferStrip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final backgroundColor = theme.brightness == Brightness.dark
+        ? const Color(0xFFD8B11E)
+        : const Color(0xFFFCE76B);
+    final textColor = const Color(0xFF111111);
+    return Container(
+      key: const ValueKey('paywall_special_offer'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w800,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+/// 固定购买区按内容取实际高度，小屏超过上限时仅在面板内部滚动。
+class _FixedPurchasePanel extends StatelessWidget {
+  const _FixedPurchasePanel({required this.child, required this.maxHeight});
+  final Widget child;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      key: const ValueKey('paywall_fixed_purchase_panel'),
+      width: double.infinity,
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(
+          top: BorderSide(
+            color: cs.outlineVariant.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.40 : 0.32,
+            ),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.10 : 0.03,
+            ),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+String _offerPeriodName(AppLocalizations l10n, SubscriptionIntroOffer offer) {
+  return switch (offer.period) {
+    SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
+      l10n.premiumOfferPeriodYear,
+    SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
+      l10n.premiumOfferPeriodMonth,
+    _ => l10n.premiumOfferPeriodGeneric,
+  };
+}
+
+String _introLabelForOffer(
+  AppLocalizations l10n,
+  SubscriptionIntroOffer offer,
+) {
+  return switch (offer.period) {
+    SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
+      l10n.premiumIntroFirstYear(offer.priceString),
+    SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
+      l10n.premiumIntroFirstMonth(offer.priceString),
+    _ => l10n.premiumIntroFirstPeriod(offer.priceString),
+  };
+}
+
+String _renewalLabelForPlan(
+  AppLocalizations l10n,
+  SubscriptionPlan plan,
+  SubscriptionIntroOffer offer,
+) {
+  return switch (plan.period) {
+    SubscriptionPeriod.yearly => l10n.premiumRenewalPricePerYear(
+      offer.renewalPriceString,
+    ),
+    SubscriptionPeriod.monthly => l10n.premiumRenewalPricePerMonth(
+      offer.renewalPriceString,
+    ),
+    SubscriptionPeriod.lifetime => l10n.premiumRenewalPricePerPeriod(
+      offer.renewalPriceString,
+    ),
+  };
 }
 
 /// 单个套餐选择卡片。
@@ -647,8 +821,10 @@ class _PlanCard extends StatelessWidget {
           'introOffer=${_introLog(offer)}',
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: _planName(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
@@ -668,7 +844,7 @@ class _PlanCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
                   Icon(
@@ -704,10 +880,16 @@ class _PlanCard extends StatelessWidget {
                         ),
                         if (subtitle != null) ...[
                           const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              subtitle,
+                              maxLines: 1,
+                              softWrap: false,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
@@ -742,35 +924,11 @@ class _PlanCard extends StatelessWidget {
   }
 
   String _offerSubtitle(AppLocalizations l10n, SubscriptionIntroOffer offer) {
-    final renewal = _renewalLabel(l10n, offer);
+    final renewal = _renewalLabelForPlan(l10n, plan, offer);
     if (offer.isFreeTrial && plan.trialDays > 0) {
       return l10n.premiumTryFreeThen(plan.trialDays, renewal);
     }
-    return l10n.premiumOfferThen(_introLabel(l10n, offer), renewal);
-  }
-
-  String _introLabel(AppLocalizations l10n, SubscriptionIntroOffer offer) {
-    return switch (offer.period) {
-      SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
-        l10n.premiumIntroFirstYear(offer.priceString),
-      SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
-        l10n.premiumIntroFirstMonth(offer.priceString),
-      _ => l10n.premiumIntroFirstPeriod(offer.priceString),
-    };
-  }
-
-  String _renewalLabel(AppLocalizations l10n, SubscriptionIntroOffer offer) {
-    return switch (plan.period) {
-      SubscriptionPeriod.yearly => l10n.premiumRenewalPricePerYear(
-        offer.renewalPriceString,
-      ),
-      SubscriptionPeriod.monthly => l10n.premiumRenewalPricePerMonth(
-        offer.renewalPriceString,
-      ),
-      SubscriptionPeriod.lifetime => l10n.premiumRenewalPricePerPeriod(
-        offer.renewalPriceString,
-      ),
-    };
+    return l10n.premiumOfferThen(_introLabelForOffer(l10n, offer), renewal);
   }
 
   String _introLog(SubscriptionIntroOffer? offer) {
@@ -789,16 +947,20 @@ class _RecommendedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final backgroundColor = theme.brightness == Brightness.dark
+        ? const Color(0xFFD8B11E)
+        : const Color(0xFFFCE76B);
+    final textColor = const Color(0xFF111111);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.premiumBadge,
-        borderRadius: BorderRadius.circular(6),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
         style: theme.textTheme.labelSmall?.copyWith(
-          color: Colors.white,
+          color: textColor,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1062,22 +1224,33 @@ class _LegalFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: Theme.of(context).colorScheme.primary,
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.56 : 0.62,
+      ),
+    );
+    final buttonStyle = TextButton.styleFrom(
+      minimumSize: const Size(0, 36),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
     );
     return Wrap(
       alignment: WrapAlignment.center,
-      spacing: 16,
+      spacing: 12,
       children: [
         TextButton(
+          style: buttonStyle,
           onPressed: () =>
               launchUrl(Uri.parse('https://www.echo-loop.top/terms')),
-          child: Text(l10n.termsOfService, style: style),
+          child: Text(l10n.premiumTermsShort, style: style),
         ),
         TextButton(
+          style: buttonStyle,
           onPressed: () =>
               launchUrl(Uri.parse('https://www.echo-loop.top/privacy')),
-          child: Text(l10n.privacyPolicy, style: style),
+          child: Text(l10n.premiumPrivacyShort, style: style),
         ),
       ],
     );

@@ -24,6 +24,28 @@ String hashText(String text) {
   return sha256.convert(utf8.encode(normalized)).toString();
 }
 
+/// 翻译缓存版本号（app 侧独立于后端 prompt version）。
+///
+/// 进入 [translationContextHash]：改译文展示契约 / 归一规则时 bump，即让旧缓存
+/// 全部自然 miss（无需删表）。与 `translation_v2:` 的 type 换代配合使用。
+const String translationCacheVersion = '1';
+
+/// 生成翻译的**上下文相关**缓存键（context hash）。
+///
+/// 由 前句 + 目标句 + 后句 + [translationCacheVersion] 组成（各段先 [normalizeForCache]
+/// 归一，`\n` 分隔），对齐后端「单句 + 上下文」缓存语义（CAT 的 ICE match）：不同上下文
+/// / 不同版本产生不同键、互不串缓存，同一 (音频, 句索引) 的前后句确定 → 键稳定、命中率不减。
+/// 目标语言不进 hash（已编码在缓存 type `translation_v2:$lang` 中）。缺前/后句传 null（首/末句）。
+String translationContextHash(String text, {String? previous, String? next}) {
+  final keyText = [
+    normalizeForCache(previous ?? ''),
+    normalizeForCache(text),
+    normalizeForCache(next ?? ''),
+    translationCacheVersion,
+  ].join('\n');
+  return sha256.convert(utf8.encode(keyText)).toString();
+}
+
 /// 各种弯/花撇号（U+2019 ’ / U+2018 ‘ / U+02BC ʼ / U+FF07 ＇ / 反引号 ` / U+00B4 ´）
 /// 统一为直撇号 `'`：排版文本（如 "I'd"）多用弯撇号，而词典库（ECDICT / 网页源）
 /// 用直撇号存储，不归一会查不中且粗体标题渲染异常。

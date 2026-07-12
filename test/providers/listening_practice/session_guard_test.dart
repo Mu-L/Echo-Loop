@@ -29,6 +29,7 @@ class _SessionAudioEngine extends TestAudioEngine {
 
   /// 记录最后一次 seek 的目标位置
   Duration? lastSeek;
+  int pauseCalls = 0;
 
   /// 记录最后一次 setClip 的起点
   Duration? lastClipStart;
@@ -42,6 +43,13 @@ class _SessionAudioEngine extends TestAudioEngine {
   Future<void> seek(Duration pos) async {
     position = pos;
     lastSeek = pos;
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCalls += 1;
+    isPlaying = false;
+    newSession();
   }
 
   @override
@@ -215,11 +223,35 @@ void main() {
     engine.newSession();
     engine.position = const Duration(seconds: 1);
     engine.lastSeek = null;
+    engine.pauseCalls = 0;
 
     // 返回后显式恢复：应 seek 回第 2 句起点（6s），不续播被污染的 1s
     await container.read(listeningPracticeProvider.notifier).restorePosition();
 
     expect(engine.lastSeek, const Duration(seconds: 6));
+    expect(engine.pauseCalls, 1);
+    expect(container.read(listeningPracticeProvider).isPlaying, false);
+  });
+
+  test('讲解页外来播放残留时 restorePosition 不会漏播句首', () async {
+    lp.seed(
+      sentences: sentences,
+      settings: continuousSettings,
+      currentFullIndex: 1,
+    );
+
+    // 模拟讲解页/意群试听旁路起播后，底层播放器仍保留 playing=true。
+    engine.newSession();
+    engine.isPlaying = true;
+    engine.position = const Duration(milliseconds: 1200);
+    engine.lastSeek = null;
+
+    await container.read(listeningPracticeProvider.notifier).restorePosition();
+
+    expect(engine.pauseCalls, 1);
+    expect(engine.isPlaying, false);
+    expect(engine.lastSeek, const Duration(seconds: 3));
+    expect(container.read(listeningPracticeProvider).isPlaying, false);
   });
 
   test('单句循环重复当前句，完成后不跳到第一句', () async {

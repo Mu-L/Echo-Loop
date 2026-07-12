@@ -27,7 +27,12 @@ void main() {
 
   group('AppUpdateChecker.check', () {
     test('成功解析有效 JSON', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(),
           data: {
@@ -47,7 +52,12 @@ void main() {
     });
 
     test('网络错误返回 null', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenThrow(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
         DioException(
           requestOptions: RequestOptions(),
           type: DioExceptionType.connectionTimeout,
@@ -59,7 +69,12 @@ void main() {
     });
 
     test('响应数据为 null 返回 null', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           data: null,
@@ -71,7 +86,12 @@ void main() {
     });
 
     test('JSON 格式错误返回 null', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(),
           data: <String, dynamic>{'invalid': true},
@@ -83,7 +103,12 @@ void main() {
     });
 
     test('DNS 解析失败返回 null', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenThrow(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
         DioException(
           requestOptions: RequestOptions(),
           type: DioExceptionType.unknown,
@@ -134,7 +159,12 @@ void main() {
           },
         ],
       });
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           data: {
@@ -229,7 +259,10 @@ void main() {
         ],
       });
       when(
-        () => mockDio.get<Map<String, dynamic>>(any()),
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(DioException(requestOptions: RequestOptions()));
 
       final result = await iosChecker.check();
@@ -244,7 +277,10 @@ void main() {
         ],
       });
       when(
-        () => mockDio.get<Map<String, dynamic>>(any()),
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(DioException(requestOptions: RequestOptions()));
 
       final result = await iosChecker.check();
@@ -363,7 +399,12 @@ void main() {
           {'version': '1.0.12', 'trackViewUrl': 'https://apps.apple.com/x'},
         ],
       });
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           data: {
@@ -389,7 +430,12 @@ void main() {
           {'version': '1.0.12', 'trackViewUrl': 'https://apps.apple.com/x'},
         ],
       });
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           // 只有顶层 minimumVersion，无 platforms.ios
@@ -418,7 +464,12 @@ void main() {
     });
 
     void stubManifest() {
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           data: {
@@ -481,7 +532,12 @@ void main() {
 
     test('仅顶层 minimumVersion 不波及 Android 各渠道（新版本忽略顶层）', () async {
       // 只有顶层 minimumVersion，无 platforms.android.*.minimumVersion
-      when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
           requestOptions: RequestOptions(),
           data: {

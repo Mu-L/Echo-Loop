@@ -27,6 +27,12 @@ class DictionaryPanelQuery {
   /// 查询文本（单词或多词词组，未归一化的原始点选文本）
   final String word;
 
+  /// 初始词典源 ID（可选）。
+  ///
+  /// 仅用于本次查询的初始选中源，不写入词典面板会话粘滞源。意群快捷 lookup
+  /// 用它强制走 AI 源；普通点词/选词组不传，仍走默认源与词组优先 AI 规则。
+  final String? preferredSourceId;
+
   /// 来源音频 ID（可选）
   final String? audioItemId;
 
@@ -44,6 +50,7 @@ class DictionaryPanelQuery {
 
   const DictionaryPanelQuery({
     required this.word,
+    this.preferredSourceId,
     this.audioItemId,
     this.sentenceIndex,
     this.sentenceText,
@@ -55,6 +62,7 @@ class DictionaryPanelQuery {
   bool operator ==(Object other) =>
       other is DictionaryPanelQuery &&
       other.word == word &&
+      other.preferredSourceId == preferredSourceId &&
       other.audioItemId == audioItemId &&
       other.sentenceIndex == sentenceIndex &&
       other.sentenceText == sentenceText &&
@@ -64,6 +72,7 @@ class DictionaryPanelQuery {
   @override
   int get hashCode => Object.hash(
     word,
+    preferredSourceId,
     audioItemId,
     sentenceIndex,
     sentenceText,
@@ -139,6 +148,11 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
   /// 屏障直达下层（点词切换查询、拖手柄扩选）；均未命中则关面板并吸收点击。
   final Set<bool Function(Offset globalPosition)> _tapThroughHitTests = {};
 
+  /// 面板开关状态监听器。
+  ///
+  /// 供页面内局部浮层（如意群快捷 lookup）在词典面板关闭时恢复交互。
+  final Set<VoidCallback> _openStateListeners = {};
+
   /// 注册屏障豁免命中谓词（可点词组件在挂载时调用，谓词在命中测试时求值）
   void registerTapThroughHitTest(bool Function(Offset globalPosition) hitTest) {
     _tapThroughHitTests.add(hitTest);
@@ -149,6 +163,22 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
     bool Function(Offset globalPosition) hitTest,
   ) {
     _tapThroughHitTests.remove(hitTest);
+  }
+
+  /// 注册词典面板开关状态监听器。
+  void addOpenStateListener(VoidCallback listener) {
+    _openStateListeners.add(listener);
+  }
+
+  /// 注销词典面板开关状态监听器。
+  void removeOpenStateListener(VoidCallback listener) {
+    _openStateListeners.remove(listener);
+  }
+
+  void _notifyOpenStateListeners() {
+    for (final listener in List<VoidCallback>.of(_openStateListeners)) {
+      listener();
+    }
   }
 
   /// 全局坐标是否命中任一豁免谓词
@@ -170,6 +200,7 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
           _owner = null;
           _closing = false;
         });
+        _notifyOpenStateListeners();
       }
     });
   }
@@ -194,6 +225,7 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
       _closing = false;
     });
     _slide.forward();
+    _notifyOpenStateListeners();
   }
 
   /// 关闭面板（播放滑出动画后移出树）
@@ -201,6 +233,7 @@ class DictionaryPanelHostState extends State<DictionaryPanelHost>
     if (_query == null || _closing) return;
     setState(() => _closing = true);
     _slide.reverse();
+    _notifyOpenStateListeners();
   }
 
   /// 面板开着则关闭并返回 true；否则返回 false。

@@ -6,6 +6,7 @@ library;
 
 import 'dart:io' show Platform;
 
+import 'package:echo_loop/config/client_distribution.dart';
 import 'package:echo_loop/services/client_info.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
@@ -28,13 +29,19 @@ void main() {
   });
 
   group('clientInfoHeaders', () {
-    test('支持的平台携带平台标识；给定版本时携带版本', () {
+    test('支持的平台携带平台标识；解析到渠道时携带正式渠道值', () {
       final headers = clientInfoHeaders(appVersion: '1.2.3');
       final platform = clientPlatformName();
       if (platform.isEmpty) {
         expect(headers.containsKey(kAppPlatformHeader), isFalse);
       } else {
         expect(headers[kAppPlatformHeader], platform);
+      }
+      final distribution = clientDistribution;
+      if (distribution == null) {
+        expect(headers.containsKey(kAppDistributionHeader), isFalse);
+      } else {
+        expect(headers[kAppDistributionHeader], distribution.headerValue);
       }
       expect(headers[kAppVersionHeader], '1.2.3');
     });
@@ -44,6 +51,69 @@ void main() {
       expect(
         clientInfoHeaders(appVersion: '').containsKey(kAppVersionHeader),
         isFalse,
+      );
+    });
+  });
+
+  group('parseClientDistribution', () {
+    test('正式协议值保持不变', () {
+      expect(parseClientDistribution('play'), ClientDistribution.play);
+      expect(parseClientDistribution('app_store'), ClientDistribution.appStore);
+      expect(parseClientDistribution('direct'), ClientDistribution.direct);
+    });
+
+    test('旧 apk / desktop 值兼容映射为 direct', () {
+      expect(parseClientDistribution('apk'), ClientDistribution.direct);
+      expect(parseClientDistribution('desktop'), ClientDistribution.direct);
+    });
+
+    test('空值和非法值返回 null', () {
+      expect(parseClientDistribution(''), isNull);
+      expect(parseClientDistribution('store'), isNull);
+    });
+  });
+
+  group('isValidClientIdentity', () {
+    test('只接受协议定义的平台渠道组合', () {
+      expect(isValidClientIdentity('android', ClientDistribution.play), isTrue);
+      expect(isValidClientIdentity('ios', ClientDistribution.appStore), isTrue);
+      expect(isValidClientIdentity('macos', ClientDistribution.direct), isTrue);
+      expect(
+        isValidClientIdentity('windows', ClientDistribution.direct),
+        isTrue,
+      );
+      expect(isValidClientIdentity('ios', ClientDistribution.direct), isFalse);
+      expect(
+        isValidClientIdentity('android', ClientDistribution.appStore),
+        isFalse,
+      );
+    });
+  });
+
+  group('paymentChannelForIdentity', () {
+    test('三类正式渠道映射到对应支付实现', () {
+      expect(
+        paymentChannelForIdentity('ios', ClientDistribution.appStore),
+        ClientPaymentChannel.appleStore,
+      );
+      expect(
+        paymentChannelForIdentity('android', ClientDistribution.play),
+        ClientPaymentChannel.googlePlay,
+      );
+      expect(
+        paymentChannelForIdentity('windows', ClientDistribution.direct),
+        ClientPaymentChannel.web,
+      );
+    });
+
+    test('缺失渠道或非法组合不可用', () {
+      expect(
+        paymentChannelForIdentity('android', null),
+        ClientPaymentChannel.unavailable,
+      );
+      expect(
+        paymentChannelForIdentity('ios', ClientDistribution.play),
+        ClientPaymentChannel.unavailable,
       );
     });
   });
@@ -59,6 +129,18 @@ void main() {
         expect(client.defaultHeaders.containsKey(kAppPlatformHeader), isFalse);
       } else {
         expect(client.defaultHeaders[kAppPlatformHeader], platform);
+      }
+      final distribution = clientDistribution;
+      if (distribution == null) {
+        expect(
+          client.defaultHeaders.containsKey(kAppDistributionHeader),
+          isFalse,
+        );
+      } else {
+        expect(
+          client.defaultHeaders[kAppDistributionHeader],
+          distribution.headerValue,
+        );
       }
       expect(client.defaultHeaders[kAppVersionHeader], '9.9.9');
       client.dispose();

@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,19 +21,23 @@ import '../../database/providers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/audio_item.dart' as app_model;
 import '../../models/sense_group_result.dart';
+import '../../models/sentence.dart';
 import '../../models/speech_practice_models.dart';
 import '../../models/word_timestamp.dart';
 import '../../providers/audio_engine/audio_engine_provider.dart';
+import '../../providers/audio_sentences_provider.dart';
 import '../../providers/learning_settings_provider.dart';
 import '../../providers/sentence_ai_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/saved_sense_group_provider.dart';
 import '../../services/app_logger.dart';
+import '../../services/dictionary/ai_dictionary_source.dart';
 import '../../services/transcription_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/sense_group_service.dart';
 import '../../utils/sense_group_timing_notice_store.dart';
 import '../../utils/sense_group_timing.dart';
+import '../dictionary/dictionary_panel_host.dart';
 import '../../providers/new_user_guide_provider.dart';
 import '../guide_flow.dart';
 import 'sentence_annotation_card.dart';
@@ -133,6 +138,11 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 意群播放 session（用于取消）
   int? _sgPlaybackSession;
 
+  /// 词典面板打开期间锁定意群快捷 lookup，避免同一快捷条重复触发查词。
+  bool _senseGroupLookupLocked = false;
+  DictionaryPanelHostState? _lookupLockHost;
+  VoidCallback? _lookupLockListener;
+
   /// 上传字幕推测时间提示是否正在展示，防止快速连点弹出多个对话框。
   bool _isShowingSyntheticTimingNotice = false;
 
@@ -143,6 +153,19 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
   /// 缓存预加载 generation counter（防竞态）
   int _preloadGeneration = 0;
 
+  // --- 意群流式状态 ---
+  /// 当前意群流订阅（逐帧渐显 medium）
+  StreamSubscription<(SenseGroupResult, List<SenseGroupTiming>)>? _sgSub;
+
+  /// 意群流 Dio 取消令牌（切句/dispose 时中断底层请求）
+  CancelToken? _sgCancel;
+
+  /// medium 就绪信号：medium 流完（fine 开始或流结束）即完成 → 早释放拆意群按钮
+  Completer<void>? _sgMediumReady;
+
+  /// 全部就绪信号：流结束（含 final）或出错完成 → fine 已完整，供 medium→fine 切换 await
+  Completer<void>? _sgAllDone;
+
   @override
   void initState() {
     super.initState();
@@ -152,6 +175,9 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
   @override
   void dispose() {
+    _sgSub?.cancel();
+    _sgCancel?.cancel();
+    _detachSenseGroupLookupLock(unlock: false);
     _dismissActionBar();
     _toolbarNotifier.dispose();
     super.dispose();
@@ -191,6 +217,18 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     }
   }
 
+  /// 从共享字幕投影取当前句的前/后句文本（做翻译上下文）。
+  ///
+  /// 无来源音频 / 无句索引 / 越界（首、末句）均返回 null。仅取不可变的
+  /// [Sentence.text]，前后句上下文进翻译缓存键（见 `getTranslationStream`）。
+  (String?, String?) _neighborTexts(List<Sentence>? sentences) {
+    final idx = widget.sentenceIndex;
+    if (sentences == null || idx == null) return (null, null);
+    String? at(int i) =>
+        (i >= 0 && i < sentences.length) ? sentences[i].text : null;
+    return (at(idx - 1), at(idx + 1));
+  }
+
   /// 从本地缓存预加载翻译/解析/意群数据
   ///
   /// 只查 L2 SQLite 并写入 L1 内存，不调用 L3 API。
@@ -205,10 +243,20 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
       appSettingsProvider.select((s) => s.nativeLanguage),
     );
 
+    // 取前后句上下文（翻译缓存键含上下文，须与 build/请求处一致）
+    final audioItemId = widget.audioItemId;
+    final sentences = (audioItemId != null && audioItemId.isNotEmpty)
+        ? await ref.read(audioSentencesProvider(audioItemId).future)
+        : null;
+    if (!mounted || generation != _preloadGeneration) return;
+    final (previousText, nextText) = _neighborTexts(sentences);
+
     // 预加载翻译和解析（结果通过 getCachedTranslation/getCachedAnalysis 透给 card）
     await ai.preloadTranslationFromDb(
       widget.text,
       targetLanguage: nativeLanguage,
+      previous: previousText,
+      next: nextText,
     );
     await ai.preloadAnalysisFromDb(widget.text, targetLanguage: nativeLanguage);
 
@@ -240,8 +288,18 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     setState(() {});
   }
 
-  /// 请求 AI 拆分意群（作为 onRequestSenseGroups 传给 card）
+  /// 请求 AI 拆分意群（流式，作为 onRequestSenseGroups 传给 card）
+  ///
+  /// 返回的 Future 在 **medium 就绪**（medium 流完）时 settle——供拆意群按钮尽早释放、
+  /// 让用户可交互 medium；fine 在后台继续流入 `_senseGroupResult`，medium→fine 切换由
+  /// [_awaitSenseGroupFine] 协调加载态。逐帧 setState 使 chunk 随 prop 变化自上而下渐显。
   Future<void> _requestSenseGroups() async {
+    // 已有活跃流：复用其 medium 就绪信号（去重，避免重复起流）
+    final activeReady = _sgMediumReady;
+    if (activeReady != null && _sgSub != null) {
+      return activeReady.future;
+    }
+
     final startMs = widget.sentenceStartMs ?? 0;
     final endMs = widget.sentenceEndMs ?? 0;
     final ai = widget.aiNotifier;
@@ -253,63 +311,90 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
     ref.read(usageTrackerProvider).record(UsageEvent.senseGroupTapped);
 
-    try {
-      final (result, timings) = await _sgService.requestSenseGroups(
-        text: widget.text,
-        ai: ai,
-        accessToken: accessToken,
-        sentenceStartMs: startMs,
-        sentenceEndMs: endMs,
-        wordTimestamps: _wordTimestamps,
-      );
+    final mediumReady = Completer<void>();
+    final allDone = Completer<void>();
+    final cancel = CancelToken();
+    _sgMediumReady = mediumReady;
+    _sgAllDone = allDone;
+    _sgCancel = cancel;
 
-      if (!mounted) return;
-
-      // API 返回空结果（极短句无法拆分）时，提示用户重试，不缓存结果
-      if (result.medium.isEmpty) {
-        AppLogger.log('SenseGroup', '意群列表为空，提示用户重试');
-        final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n?.senseGroupLoadFailed ??
-                  'Failed to split sense groups, please retry',
-            ),
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        _senseGroupResult = result;
-        _senseGroupTimings = timings;
-        _activeChunks = result.medium;
-      });
-      // 拿到非空可用结果才算一次成功（空结果分支已在上方 return）
-      ref.read(usageTrackerProvider).record(UsageEvent.senseGroupSucceeded);
-      widget.onTimingsChanged?.call(timings);
-    } on AiFeatureAuthRequiredException {
-      if (mounted) {
-        await _showAiFeatureSignInDialog();
-      }
-    } on AiFeatureQuotaExceededException {
-      if (mounted) {
-        await _openUpgradePaywall();
-      }
-    } catch (e) {
-      AppLogger.log('SenseGroup', '请求意群失败: $e');
-      if (mounted) {
-        final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n?.senseGroupLoadFailed ??
-                  'Failed to load sense groups, please retry',
-            ),
-          ),
-        );
-      }
+    void completeAll() {
+      if (!mediumReady.isCompleted) mediumReady.complete();
+      if (!allDone.isCompleted) allDone.complete();
     }
+
+    _sgSub = _sgService
+        .streamSenseGroups(
+          text: widget.text,
+          ai: ai,
+          accessToken: accessToken,
+          sentenceStartMs: startMs,
+          sentenceEndMs: endMs,
+          wordTimestamps: _wordTimestamps,
+          cancelToken: cancel,
+        )
+        .listen(
+          (frame) {
+            final (result, timings) = frame;
+            // 空快照跳过，留 shimmer（仿流式解析）
+            if (result.medium.isEmpty || !mounted) return;
+            setState(() {
+              _senseGroupResult = result;
+              _senseGroupTimings = timings;
+              _activeChunks = result.medium;
+            });
+            // fine 已开始 ⇒ medium 已流完（后端 medium→fine 顺序）→ 早释放按钮
+            if (!mediumReady.isCompleted && result.fine.isNotEmpty) {
+              mediumReady.complete();
+            }
+          },
+          onError: (Object e, StackTrace st) {
+            completeAll();
+            _sgSub = null;
+            if (!mounted) return;
+            if (e is AiFeatureAuthRequiredException) {
+              _showAiFeatureSignInDialog();
+            } else if (e is AiFeatureQuotaExceededException) {
+              _openUpgradePaywall();
+            } else {
+              AppLogger.log('SenseGroup', '请求意群失败: $e');
+              final l10n = AppLocalizations.of(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    l10n?.senseGroupLoadFailed ??
+                        'Failed to load sense groups, please retry',
+                  ),
+                ),
+              );
+            }
+          },
+          onDone: () {
+            // 流正常结束：medium/fine 均完整（缓存/校验/计费由 provider 负责）
+            final result = _senseGroupResult;
+            if (result != null && result.medium.isNotEmpty) {
+              ref
+                  .read(usageTrackerProvider)
+                  .record(UsageEvent.senseGroupSucceeded);
+              widget.onTimingsChanged?.call(_senseGroupTimings);
+            }
+            completeAll();
+            _sgSub = null;
+          },
+          cancelOnError: true,
+        );
+
+    return mediumReady.future;
+  }
+
+  /// 等待 fine 意群就绪（供 card 在 medium→fine 且 fine 未就绪时 await，按钮自动显示加载）。
+  ///
+  /// fine 完整 = 意群流结束（后端 fine 在 medium 之后、done 之前全部流出）。流已结束或无活跃流
+  /// （如缓存命中已含完整 fine）则立即返回。
+  Future<void> _awaitSenseGroupFine() async {
+    final done = _sgAllDone;
+    if (done == null || done.isCompleted) return;
+    await done.future;
   }
 
   /// 展示云端 AI 能力的登录引导弹窗。
@@ -470,13 +555,15 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
             return Positioned(
               left: badgeRect.left + badgeRect.width / 2 - 35,
-              top: badgeRect.top - 34,
+              top: badgeRect.top - 46,
               child: TapRegion(
                 onTapOutside: (_) => _dismissActionBar(),
                 child: SenseGroupActionBar(
                   isSaved: isSaved,
                   onToggleSave: () =>
                       _toggleSaveSenseGroup(index, chunk, normalized, isSaved),
+                  onLookup: () => _lookupSenseGroup(chunk),
+                  lookupEnabled: !_senseGroupLookupLocked,
                 ),
               ),
             );
@@ -498,6 +585,64 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     _actionBarTimer = null;
     _actionBarOverlay?.remove();
     _actionBarOverlay = null;
+  }
+
+  void _setSenseGroupLookupLocked(bool locked) {
+    if (_senseGroupLookupLocked == locked) return;
+    _senseGroupLookupLocked = locked;
+    _actionBarOverlay?.markNeedsBuild();
+  }
+
+  void _detachSenseGroupLookupLock({required bool unlock}) {
+    final host = _lookupLockHost;
+    final listener = _lookupLockListener;
+    if (host != null && listener != null) {
+      host.removeOpenStateListener(listener);
+    }
+    _lookupLockHost = null;
+    _lookupLockListener = null;
+    if (unlock) _setSenseGroupLookupLocked(false);
+  }
+
+  void _lockSenseGroupLookupUntilDictionaryClosed(
+    DictionaryPanelHostState host,
+  ) {
+    _detachSenseGroupLookupLock(unlock: false);
+    _setSenseGroupLookupLocked(true);
+
+    void listener() {
+      if (!host.isOpen) {
+        _detachSenseGroupLookupLock(unlock: true);
+      }
+    }
+
+    _lookupLockHost = host;
+    _lookupLockListener = listener;
+    host.addOpenStateListener(listener);
+  }
+
+  /// 用当前意群文本打开 AI 查词面板。
+  ///
+  /// 这里不关闭快捷条：保留既有 5 秒自然消失，用户查词后仍可继续收藏当前意群。
+  void _lookupSenseGroup(String chunk) {
+    if (_senseGroupLookupLocked) return;
+    final queryText = chunk.trim();
+    if (queryText.isEmpty) return;
+    widget.onToolbarButtonTapped?.call();
+    final host = DictionaryPanelHost.of(context);
+    host.show(
+      DictionaryPanelQuery(
+        word: queryText,
+        preferredSourceId: AiDictionarySource.sourceId,
+        audioItemId: widget.audioItemId,
+        sentenceIndex: widget.sentenceIndex,
+        sentenceText: widget.text,
+        sentenceStartMs: widget.sentenceStartMs,
+        sentenceEndMs: widget.sentenceEndMs,
+      ),
+      owner: this,
+    );
+    _lockSenseGroupLookupUntilDictionaryClosed(host);
   }
 
   /// 收藏/取消收藏意群
@@ -544,6 +689,15 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
 
   /// 重置意群数据
   void _resetSenseGroups() {
+    // 中断进行中的意群流并完成挂起的就绪信号（避免旧 card 的 await 悬挂）
+    _sgSub?.cancel();
+    _sgSub = null;
+    _sgCancel?.cancel();
+    _sgCancel = null;
+    if (_sgMediumReady?.isCompleted == false) _sgMediumReady!.complete();
+    if (_sgAllDone?.isCompleted == false) _sgAllDone!.complete();
+    _sgMediumReady = null;
+    _sgAllDone = null;
     _senseGroupResult = null;
     _senseGroupTimings = null;
     _activeChunks = null;
@@ -562,10 +716,18 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final autoExpand = ref
         .watch(learningSettingsProvider)
         .autoExpandCachedAnnotation;
+    // watch 共享字幕投影：撑起其 autoDispose 生命周期（视图在屏则常驻）+ 同步取前后句。
+    final audioItemId = widget.audioItemId;
+    final sentences = (audioItemId != null && audioItemId.isNotEmpty)
+        ? ref.watch(audioSentencesProvider(audioItemId)).valueOrNull
+        : null;
+    final (previousText, nextText) = _neighborTexts(sentences);
     final cachedTranslation = autoExpand
         ? ai
               ?.getCachedTranslation(
                 widget.text,
+                previous: previousText,
+                next: nextText,
                 targetLanguage: nativeLanguage,
               )
               ?.translation
@@ -573,7 +735,6 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
     final cachedAnalysis = autoExpand
         ? ai?.getCachedAnalysis(widget.text, targetLanguage: nativeLanguage)
         : null;
-    final cachedAnalysisText = cachedAnalysis?.toDisplayString();
     final accessToken = ref
         .watch(supabaseSessionProvider)
         .valueOrNull
@@ -666,63 +827,73 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                   showToolbar: false,
                   onToolbarStateChanged: _toolbarNotifier.notify,
                   onRequestTranslation: ai != null
-                      ? () async {
+                      ? (cancelToken) async* {
                           ref
                               .read(usageTrackerProvider)
                               .record(UsageEvent.translationTapped);
                           try {
-                            final result = await ai.getTranslation(
+                            // await for（非 yield*）确保流内 auth/quota 错误在本
+                            // try 内重抛，从而弹登录/订阅（与 onRequestAnalysis 语义一致）。
+                            await for (final t in ai.getTranslationStream(
                               widget.text,
+                              previous: previousText,
+                              next: nextText,
                               targetLanguage: nativeLanguage,
                               accessToken: accessToken,
-                            );
+                              cancelToken: cancelToken,
+                            )) {
+                              yield t.translation;
+                            }
                             ref
                                 .read(usageTrackerProvider)
                                 .record(UsageEvent.translationSucceeded);
-                            return result.translation;
                           } on AiFeatureAuthRequiredException {
                             if (mounted) {
-                              await _showAiFeatureSignInDialog();
+                              unawaited(_showAiFeatureSignInDialog());
                             }
                             rethrow;
                           } on AiFeatureQuotaExceededException {
                             if (mounted) {
-                              await _openUpgradePaywall();
+                              unawaited(_openUpgradePaywall());
                             }
                             rethrow;
                           }
                         }
                       : null,
                   onRequestAnalysis: ai != null
-                      ? () async {
+                      ? (cancelToken) async* {
                           ref
                               .read(usageTrackerProvider)
                               .record(UsageEvent.analysisTapped);
                           try {
-                            final result = await ai.getAnalysis(
+                            // await for 确保流内 auth/quota 错误进入本层 catch，
+                            // 从而触发登录或订阅导航，并由卡片恢复按钮状态。
+                            await for (final analysis in ai.getAnalysisStream(
                               widget.text,
                               targetLanguage: nativeLanguage,
                               accessToken: accessToken,
-                            );
+                              cancelToken: cancelToken,
+                            )) {
+                              yield analysis;
+                            }
                             ref
                                 .read(usageTrackerProvider)
                                 .record(UsageEvent.analysisSucceeded);
-                            return result.toDisplayString();
                           } on AiFeatureAuthRequiredException {
                             if (mounted) {
-                              await _showAiFeatureSignInDialog();
+                              unawaited(_showAiFeatureSignInDialog());
                             }
                             rethrow;
                           } on AiFeatureQuotaExceededException {
                             if (mounted) {
-                              await _openUpgradePaywall();
+                              unawaited(_openUpgradePaywall());
                             }
                             rethrow;
                           }
                         }
                       : null,
                   cachedTranslation: cachedTranslation,
-                  cachedAnalysis: cachedAnalysisText,
+                  cachedAnalysis: cachedAnalysis,
                   audioItemId: widget.audioItemId,
                   sentenceIndex: widget.sentenceIndex,
                   sentenceStartMs: widget.sentenceStartMs,
@@ -734,6 +905,7 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                   playedSenseGroupIndices: _playedSenseGroupIndices,
                   onTapSenseGroup: _handleTapSenseGroup,
                   onRequestSenseGroups: _requestSenseGroups,
+                  onAwaitSenseGroupFine: _awaitSenseGroupFine,
                   hasWordTimestamps: _wordTimestamps != null,
                   highlightedSegments: widget.highlightedSegments,
                   savedGroupTexts: savedTexts,

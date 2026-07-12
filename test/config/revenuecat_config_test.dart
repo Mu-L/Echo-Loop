@@ -5,6 +5,7 @@
 library;
 
 import 'package:echo_loop/config/revenuecat_config.dart';
+import 'package:echo_loop/config/client_distribution.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -60,6 +61,42 @@ void main() {
 
       expect(webKey, isEmpty);
       expect(unknownKey, isEmpty);
+    });
+  });
+
+  group('manageSubscriptionsUrlForChannel', () {
+    test('商店渠道返回对应商店管理页', () {
+      expect(
+        manageSubscriptionsUrlForChannel(
+          ClientPaymentChannel.appleStore,
+          webManageUrl: '',
+        ),
+        'https://apps.apple.com/account/subscriptions',
+      );
+      expect(
+        manageSubscriptionsUrlForChannel(
+          ClientPaymentChannel.googlePlay,
+          webManageUrl: '',
+        ),
+        'https://play.google.com/store/account/subscriptions',
+      );
+    });
+
+    test('direct 使用 web 管理页，未配置时隐藏', () {
+      expect(
+        manageSubscriptionsUrlForChannel(
+          ClientPaymentChannel.web,
+          webManageUrl: 'https://example.com/manage',
+        ),
+        'https://example.com/manage',
+      );
+      expect(
+        manageSubscriptionsUrlForChannel(
+          ClientPaymentChannel.web,
+          webManageUrl: '',
+        ),
+        isNull,
+      );
     });
   });
 }

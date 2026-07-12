@@ -3,7 +3,8 @@
 /// 使用 Riverpod 管理版本更新检查流程：
 /// - 冷启动 / 回到前台时后台静默检查（无时间节流）
 /// - 支持手动检查（绕过忽略逻辑，带 Checking UI 态）
-/// - 用户忽略后记录版本号，同版本不再自动弹窗
+/// - 仅当用户点击软更新弹窗的「稍后提醒」按钮时才记录忽略版本，之后同版本不再
+///   自动弹窗；点遮罩 / 返回手势关闭 **不** 记录（预期行为），下次冷启动会再弹
 ///
 /// iOS 路径的 Lookup 查询区域按用户真实 App Store storefront 判定（口径同订阅价格），
 /// 故本 core provider 依赖 subscription feature 的 [purchaseServiceProvider] 取 storefront。

@@ -1,7 +1,7 @@
 /// 问卷单选项卡片。
 ///
 /// 左对齐布局：可选 emoji + 标签 + 选中态尾部 ✓ 标记。
-/// 选中态用 #E8F1FB 柔和背景 + 2px primary 边框 + primary 色文字四重区分。
+/// 选中态使用主题容器色 + 2px primary 边框 + 对应前景色四重区分。
 library;
 
 import 'package:flutter/material.dart';
@@ -22,17 +22,20 @@ class SurveyChoiceTile extends StatelessWidget {
   /// 选项左侧的可选装饰 Widget（emoji / 品牌图标等）。为 null 时不渲染该 slot。
   final Widget? leading;
 
-  static const _borderColor = Color(0xFFE2E8F0);
-  static const _selectedBg = Color(0xFFE8F1FB);
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final bgColor = selected ? _selectedBg : colorScheme.surface;
-    final borderColor = selected ? colorScheme.primary : _borderColor;
-    final textColor = selected ? colorScheme.primary : colorScheme.onSurface;
+    final bgColor = selected
+        ? colorScheme.primaryContainer
+        : colorScheme.surface;
+    final borderColor = selected
+        ? colorScheme.primary
+        : colorScheme.outlineVariant;
+    final textColor = selected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurface;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
@@ -77,7 +80,7 @@ class SurveyChoiceTile extends StatelessWidget {
                     child: Icon(
                       Icons.check_rounded,
                       size: 18,
-                      color: colorScheme.primary,
+                      color: colorScheme.onPrimaryContainer,
                     ),
                   ),
               ],

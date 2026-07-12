@@ -665,6 +665,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return;
     }
 
+    await _selectSentenceForDetail(controller, playerState, sentence);
     await controller.pause();
     if (!mounted) {
       _isNavigatingToDetail = false;
@@ -691,6 +692,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     await controller.restorePosition();
     // 返回后刷新收藏状态（讲解页可能修改了收藏）
     await controller.syncBookmarks();
+  }
+
+  /// 正文点击进入讲解页时，先把播放器真相源同步到被点句。
+  ///
+  /// 左侧编号区仍负责“从这句播放”；正文区只切换焦点并保持暂停，避免返回列表时
+  /// 自动跟随旧播放句，同时不因为查看讲解而误启动播放。
+  Future<void> _selectSentenceForDetail(
+    ListeningPractice controller,
+    ListeningPracticeState playerState,
+    Sentence sentence,
+  ) async {
+    if (playerState.playlistMode == PlaylistMode.bookmarks) {
+      if (playerState.currentBookmarkIndex == sentence.index) return;
+      await controller.selectBookmarkedSentence(
+        sentence.index,
+        autoPlay: false,
+      );
+      return;
+    }
+
+    if (playerState.currentFullIndex == sentence.index) return;
+    await controller.selectFullSentence(sentence.index, autoPlay: false);
   }
 
   Widget _buildControlPanel(

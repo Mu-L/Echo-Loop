@@ -4,6 +4,9 @@
 /// 难句标记切换、三按钮工具栏（拆意群/翻译/解析）。
 library;
 
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/sentence_ai_provider.dart';
@@ -39,17 +42,18 @@ class SentenceAnnotationCard extends StatefulWidget {
   /// 句子文本
   final String text;
 
-  /// 请求翻译回调（返回翻译文本）
-  final Future<String> Function()? onRequestTranslation;
+  /// 请求翻译回调（返回译文的字段级增量流，逐帧渐显；与 [onRequestAnalysis] 同构）
+  final Stream<String> Function(CancelToken cancelToken)? onRequestTranslation;
 
-  /// 请求解析回调（返回解析 JSON 文本）
-  final Future<String> Function()? onRequestAnalysis;
+  /// 请求解析回调（返回结构化解析的字段级增量流，逐帧渐显）
+  final Stream<SentenceAnalysis> Function(CancelToken cancelToken)?
+  onRequestAnalysis;
 
   /// 已缓存的翻译文本
   final String? cachedTranslation;
 
-  /// 已缓存的解析文本（grammar\nvocabulary\nusage 格式）
-  final String? cachedAnalysis;
+  /// 已缓存的结构化解析（命中时自动展开）
+  final SentenceAnalysis? cachedAnalysis;
 
   /// 来源音频 ID（用于词典弹窗收藏单词时记录来源）
   final String? audioItemId;
@@ -89,6 +93,12 @@ class SentenceAnnotationCard extends StatefulWidget {
 
   /// 请求拆分意群回调
   final Future<void> Function()? onRequestSenseGroups;
+
+  /// 等待 fine 意群就绪回调（流式场景：medium 先返回、fine 后返回）。
+  ///
+  /// medium→fine 切换时若 fine 尚未就绪，await 此 Future，`AsyncToggleButton` 期间自动显示加载；
+  /// fine 已就绪（或缓存命中已含完整 fine）则立即返回。为空时不等待（向后兼容）。
+  final Future<void> Function()? onAwaitSenseGroupFine;
 
   /// 是否有词级时间戳（决定拆意群按钮是否可用）
   final bool hasWordTimestamps;
@@ -147,6 +157,7 @@ class SentenceAnnotationCard extends StatefulWidget {
     this.playedSenseGroupIndices = const {},
     this.onTapSenseGroup,
     this.onRequestSenseGroups,
+    this.onAwaitSenseGroupFine,
     this.hasWordTimestamps = false,
     this.showToolbar = true,
     this.onToolbarStateChanged,
@@ -176,9 +187,17 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
 
   /// 解析面板状态
   ContentLoadState _analysisState = ContentLoadState.idle;
-  String? _analysisContent;
+  SentenceAnalysis? _analysisContent;
   bool _analysisExpanded = false;
   bool _analysisActivated = false;
+
+  /// 进行中的解析流订阅（逐帧渐显）；dispose / 重新请求时取消。
+  StreamSubscription<SentenceAnalysis>? _analysisSub;
+  CancelToken? _analysisCancelToken;
+
+  /// 进行中的翻译流订阅（逐帧渐显）；dispose / 重新请求时取消。
+  StreamSubscription<String>? _translationSub;
+  CancelToken? _translationCancelToken;
 
   @override
   void initState() {
@@ -304,24 +323,41 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       if (_senseGroupMode == SenseGroupMode.off) {
         widget.onToolbarButtonTapped?.call();
       }
-      final bothEqual = result.areBothEqual;
       final prevMode = _senseGroupMode;
+
+      // medium→fine：fine 可能尚未流完（后端 medium 先返回、fine 后返回）。
+      // 先 await fine 就绪（流已结束则立即返回），await 期间 AsyncToggleButton 自动显示加载。
+      if (prevMode == SenseGroupMode.medium && !result.areBothEqual) {
+        if (widget.onAwaitSenseGroupFine != null) {
+          await widget.onAwaitSenseGroupFine!.call();
+        }
+        if (!mounted) return;
+        final ready = widget.senseGroupResult;
+        // await 后 fine 仍空（出错/无 fine）→ 放弃切换，保持 medium
+        if (ready == null || ready.fine.isEmpty) return;
+        // fine 完整后再判定是否与 medium 等同：等同则回 off，否则进 fine
+        final nextMode = ready.areBothEqual
+            ? SenseGroupMode.off
+            : SenseGroupMode.fine;
+        setState(() => _senseGroupMode = nextMode);
+        AppLogger.log('SenseGroup', '切换模式: $prevMode → $nextMode');
+        widget.onSenseGroupModeChanged?.call(_activeSenseGroups ?? []);
+        _notifyToolbar();
+        return;
+      }
+
+      // off→medium / fine→off / medium→off(两粒度等同)：同步切换
       setState(() {
         switch (_senseGroupMode) {
           case SenseGroupMode.off:
             _senseGroupMode = SenseGroupMode.medium;
           case SenseGroupMode.medium:
-            _senseGroupMode = bothEqual
-                ? SenseGroupMode.off
-                : SenseGroupMode.fine;
+            _senseGroupMode = SenseGroupMode.off;
           case SenseGroupMode.fine:
             _senseGroupMode = SenseGroupMode.off;
         }
       });
-      AppLogger.log(
-        'SenseGroup',
-        '切换模式: $prevMode → $_senseGroupMode (bothEqual=$bothEqual)',
-      );
+      AppLogger.log('SenseGroup', '切换模式: $prevMode → $_senseGroupMode');
       // 通知外部重新计算时间范围 + 停止播放（off 时传空列表）
       widget.onSenseGroupModeChanged?.call(_activeSenseGroups ?? []);
       _notifyToolbar();
@@ -344,7 +380,11 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     }
   }
 
-  /// 翻译按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
+  /// 翻译按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）。
+  ///
+  /// 未命中缓存时订阅译文流：首帧前显示 shimmer，随后逐帧 setState 渐显（逐词显示，
+  /// 与流式解析一致）。返回的 Future 在流结束（完成/出错）时 settle，供按钮收起
+  /// loading。auth/quota 异常向上抛出交由 glue 弹登录/订阅。
   Future<void> _onTapTranslation() async {
     widget.onToolbarButtonTapped?.call();
     if (!_translationActivated) {
@@ -359,23 +399,55 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       return;
     }
     if (widget.onRequestTranslation == null) return;
-    setState(() => _translationExpanded = true);
-    try {
-      final result = await widget.onRequestTranslation!();
-      if (mounted) {
+
+    setState(() {
+      _translationExpanded = true;
+      _translationState = ContentLoadState.loading;
+    });
+    _notifyToolbar();
+
+    final completer = Completer<void>();
+    await _translationSub?.cancel();
+    _translationCancelToken?.cancel('translation stream replaced');
+    final cancelToken = CancelToken();
+    _translationCancelToken = cancelToken;
+    _translationSub = widget.onRequestTranslation!(cancelToken).listen(
+      (translation) {
+        if (!mounted) return;
+        // 首帧起把 shimmer 换成内容，后续帧持续覆盖（渐显）。空快照仍留在 loading。
+        if (translation.isEmpty) return;
         setState(() {
-          _translationContent = result;
+          _translationContent = translation;
           _translationState = ContentLoadState.loaded;
         });
         _notifyToolbar();
-      }
+      },
+      onError: (Object error) {
+        _translationSub = null;
+        _translationCancelToken = null;
+        if (!completer.isCompleted) completer.completeError(error);
+      },
+      onDone: () {
+        _translationSub = null;
+        _translationCancelToken = null;
+        if (!completer.isCompleted) completer.complete();
+      },
+      cancelOnError: true,
+    );
+
+    try {
+      await completer.future;
     } catch (error) {
-      if (error is AiFeatureAuthRequiredException) rethrow;
-      if (error is AiFeatureQuotaExceededException) rethrow;
+      if (error is AiFeatureAuthRequiredException ||
+          error is AiFeatureQuotaExceededException) {
+        _resetTranslationAfterBlockedRequest();
+        rethrow;
+      }
       if (mounted) {
         setState(() {
           _translationExpanded = false;
           _translationState = ContentLoadState.idle;
+          _translationContent = null;
         });
         _notifyToolbar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -387,7 +459,23 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
     }
   }
 
-  /// 解析按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）
+  /// 登录或额度门槛阻断请求时，恢复翻译区域到可重新点击的初始状态。
+  void _resetTranslationAfterBlockedRequest() {
+    if (!mounted) return;
+    setState(() {
+      _translationExpanded = false;
+      _translationState = ContentLoadState.idle;
+      _translationContent = null;
+      _translationActivated = false;
+    });
+    _notifyToolbar();
+  }
+
+  /// 解析按钮点击（返回 Future 供 AsyncToggleButton 管理 loading）。
+  ///
+  /// 未命中缓存时订阅结构化解析流：首帧前显示 shimmer，随后逐帧 setState 自上而下
+  /// 渐显（与流式查词一致）。返回的 Future 在流结束（完成/出错）时 settle，供按钮
+  /// 收起 loading。auth/quota 异常向上抛出交由 glue 弹登录/订阅。
   Future<void> _onTapAnalysis() async {
     widget.onToolbarButtonTapped?.call();
     if (!_analysisActivated) {
@@ -402,23 +490,55 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       return;
     }
     if (widget.onRequestAnalysis == null) return;
-    try {
-      final result = await widget.onRequestAnalysis!();
-      if (mounted) {
+
+    setState(() {
+      _analysisExpanded = true;
+      _analysisState = ContentLoadState.loading;
+    });
+    _notifyToolbar();
+
+    final completer = Completer<void>();
+    await _analysisSub?.cancel();
+    _analysisCancelToken?.cancel('analysis stream replaced');
+    final cancelToken = CancelToken();
+    _analysisCancelToken = cancelToken;
+    _analysisSub = widget.onRequestAnalysis!(cancelToken).listen(
+      (analysis) {
+        if (!mounted) return;
+        // 首帧起把 shimmer 换成内容，后续帧持续覆盖（渐显）。空快照仍留在 loading。
+        if (analysis.isEmpty) return;
         setState(() {
-          _analysisContent = result;
-          _analysisExpanded = true;
+          _analysisContent = analysis;
           _analysisState = ContentLoadState.loaded;
         });
         _notifyToolbar();
-      }
+      },
+      onError: (Object error) {
+        _analysisSub = null;
+        _analysisCancelToken = null;
+        if (!completer.isCompleted) completer.completeError(error);
+      },
+      onDone: () {
+        _analysisSub = null;
+        _analysisCancelToken = null;
+        if (!completer.isCompleted) completer.complete();
+      },
+      cancelOnError: true,
+    );
+
+    try {
+      await completer.future;
     } catch (error) {
-      if (error is AiFeatureAuthRequiredException) rethrow;
-      if (error is AiFeatureQuotaExceededException) rethrow;
+      if (error is AiFeatureAuthRequiredException ||
+          error is AiFeatureQuotaExceededException) {
+        _resetAnalysisAfterBlockedRequest();
+        rethrow;
+      }
       if (mounted) {
         setState(() {
           _analysisExpanded = false;
           _analysisState = ContentLoadState.idle;
+          _analysisContent = null;
         });
         _notifyToolbar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -428,6 +548,27 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         );
       }
     }
+  }
+
+  /// 登录或额度门槛阻断请求时，恢复解析区域到可重新点击的初始状态。
+  void _resetAnalysisAfterBlockedRequest() {
+    if (!mounted) return;
+    setState(() {
+      _analysisExpanded = false;
+      _analysisState = ContentLoadState.idle;
+      _analysisContent = null;
+      _analysisActivated = false;
+    });
+    _notifyToolbar();
+  }
+
+  @override
+  void dispose() {
+    _analysisSub?.cancel();
+    _analysisCancelToken?.cancel('analysis card disposed');
+    _translationSub?.cancel();
+    _translationCancelToken?.cancel('translation card disposed');
+    super.dispose();
   }
 
   // -- 工具栏相关 --
@@ -654,20 +795,18 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
             l10n: l10n,
             state: _analysisState,
             content: _analysisContent,
-            contentBuilder: (content) => _AnalysisContent(content: content),
           ),
         ],
       ),
     );
   }
 
-  /// 构建单个内容面板（shimmer / 内容）
+  /// 构建解析内容面板（shimmer / 结构化内容）
   Widget _buildContentPanel({
     required ThemeData theme,
     required AppLocalizations l10n,
     required ContentLoadState state,
-    required String? content,
-    Widget Function(String)? contentBuilder,
+    required SentenceAnalysis? content,
   }) {
     // 纯黑深色主题下：半透明底色会显朦胧且边界不清，改用不透明实底 + 细描边。
     final isDark = theme.brightness == Brightness.dark;
@@ -685,43 +824,27 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       ),
       child: switch (state) {
         ContentLoadState.loading => const ShimmerPlaceholder(),
-        ContentLoadState.loaded => _buildLoadedContent(
-          theme,
-          content ?? '',
-          contentBuilder,
+        ContentLoadState.loaded when content != null => _AnalysisContent(
+          analysis: content,
         ),
+        ContentLoadState.loaded => const SizedBox.shrink(),
         ContentLoadState.error => const SizedBox.shrink(),
         ContentLoadState.idle => const SizedBox.shrink(),
       },
-    );
-  }
-
-  Widget _buildLoadedContent(
-    ThemeData theme,
-    String content,
-    Widget Function(String)? contentBuilder,
-  ) {
-    if (contentBuilder != null) return contentBuilder(content);
-    return Text(
-      content,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        height: 1.5,
-      ),
     );
   }
 }
 
 /// 解析内容结构化展示
 ///
-/// 使用 [SentenceAnalysis.parseDisplayString] 将内容按字段分隔符拆分为
-/// grammar / vocabulary / listening 三段。每段带 icon 标题与彩色 IconBox，
-/// 段间以极浅分割线区隔。词汇段采用"词条加粗 + 释义"的字典式排版，
-/// 听力段中的 IPA 音标（如 /tə/）以 monospace chip 形式高亮。
+/// 直接读取结构化 [SentenceAnalysis]（grammar / vocabulary / listening 三组要点
+/// 对象），无 `label: value` 文本解析。每段带 icon 标题与彩色 IconBox，段间以极浅
+/// 分割线区隔；每条要点为「标签加粗 + 详解」，详解中的反引号引用高亮、IPA 音标
+/// （如 /tə/）以 monospace chip 形式高亮。支持流式渐显：字段随帧到达逐条出现。
 class _AnalysisContent extends StatelessWidget {
-  final String content;
+  final SentenceAnalysis analysis;
 
-  const _AnalysisContent({required this.content});
+  const _AnalysisContent({required this.analysis});
 
   /// 匹配文本中的内联标记：反引号引用 `xxx` 或 IPA 音标 /tə/。
   ///
@@ -738,35 +861,28 @@ class _AnalysisContent extends StatelessWidget {
     r'`([^`\n]{1,80})`|(/(?=\S)(?=[^/\n]*[ɐ-˿])[^/\n]{1,60}(?<=\S)/)',
   );
 
-  /// "key：value" 拆分
-  ///
-  /// key 中允许英文标点（+ / ( )）和空格，但不允许中文句号/逗号/分号/感叹/问号，
-  /// 避免把长句子的内部冒号误判为 key/value 分隔；同时限制 key 长度 ≤ 80 字符。
-  static final _keyValueRegex = RegExp(
-    r'^\s*([^：:。，；！？]{1,80})[：:](.*)$',
-    dotAll: true,
-  );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final fields = SentenceAnalysis.parseDisplayString(content);
 
     // 展示顺序：重点词汇 → 听力提示 → 语法
-    // 字段索引固定为 [0=grammar, 1=vocabulary, 2=listening]，由 fieldIndex 关联
     final sections = <_Section>[
-      _Section(1, l10n.aiVocabulary, Icons.translate_outlined),
-      _Section(2, l10n.aiListening, Icons.hearing_outlined),
-      _Section(0, l10n.aiGrammar, Icons.menu_book_outlined),
+      _Section(l10n.aiVocabulary, Icons.translate_outlined, [
+        for (final v in analysis.vocabulary) (v.term, v.note),
+      ]),
+      _Section(l10n.aiListening, Icons.hearing_outlined, [
+        for (final p in analysis.listening) (p.phrase, p.note),
+      ]),
+      _Section(l10n.aiGrammar, Icons.menu_book_outlined, [
+        for (final g in analysis.grammar) (g.point, g.explanation),
+      ]),
     ];
 
-    // 仅渲染对应字段非空的段落
+    // 仅渲染有非空要点的段落（流式渐显：空段先不出现）
     final visible = [
       for (final s in sections)
-        if (s.fieldIndex < fields.length &&
-            fields[s.fieldIndex].trim().isNotEmpty)
-          s,
+        if (s.visibleItems.isNotEmpty) s,
     ];
 
     return Column(
@@ -776,7 +892,7 @@ class _AnalysisContent extends StatelessWidget {
           if (idx > 0) const SizedBox(height: 12),
           _buildSectionHeader(theme, visible[idx]),
           const SizedBox(height: 6),
-          _buildSectionBody(theme, fields[visible[idx].fieldIndex]),
+          _buildSectionBody(theme, visible[idx].visibleItems),
         ],
       ],
     );
@@ -812,48 +928,45 @@ class _AnalysisContent extends StatelessWidget {
     );
   }
 
-  /// 段落正文：拆分为多条 bullet（"key：value"），单条无 key 时降级为段落
-  Widget _buildSectionBody(ThemeData theme, String field) {
+  /// 段落正文：把结构化要点逐条渲染为 bullet（标签加粗 + 详解）。
+  Widget _buildSectionBody(ThemeData theme, List<(String, String)> items) {
     final cs = theme.colorScheme;
     final body = theme.textTheme.bodySmall?.copyWith(
       color: cs.onSurfaceVariant,
       height: 1.4,
     );
 
-    final items = field.split('\n').where((s) => s.trim().isNotEmpty).toList();
-    // 单条且无 key 时直接展示为段落
-    if (items.length == 1 && !_keyValueRegex.hasMatch(items.first)) {
-      return _richWithIpa(theme, items.first, body);
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (var i = 0; i < items.length; i++) ...[
           if (i > 0) const SizedBox(height: 5),
-          _buildBulletItem(theme, items[i], body),
+          _buildBulletItem(theme, items[i].$1, items[i].$2, body),
         ],
       ],
     );
   }
 
-  /// 删除 key 中的反引号并规范化空格。
+  /// 删除标签中的反引号并规范化空格。
   ///
-  /// 服务端已有相同清洗（[apps/app/app/api/v1/ai/analyze/cleanup.ts]），
-  /// 客户端再做一遍是出于防御：
-  /// - 老 API 版本或第三方接入未走清洗逻辑
-  /// - 本地缓存的旧解析数据来自更早版本的服务端
-  /// key 在 UI 中已通过加粗高亮，再加反引号既冗余、又不会被渲染成 chip。
+  /// 后端已约束标签为纯文本；客户端再清洗一次是防御旧缓存/异常数据。
+  /// 标签在 UI 中已通过加粗高亮，再加反引号既冗余、又不会被渲染成 chip。
   static String _cleanBulletKey(String key) {
     return key.replaceAll('`', '').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  /// 统一 bullet 条目：▸ + 可选加粗 key + ": " + value（value 含 IPA chip）
-  Widget _buildBulletItem(ThemeData theme, String raw, TextStyle? body) {
+  /// 统一 bullet 条目：▸ + 可选加粗标签 + "：" + 详解（详解含反引号高亮/IPA chip）。
+  /// 流式渐显时详解可能暂为空，此时只显示标签。
+  Widget _buildBulletItem(
+    ThemeData theme,
+    String rawKey,
+    String rawValue,
+    TextStyle? body,
+  ) {
     final cs = theme.colorScheme;
-    final m = _keyValueRegex.firstMatch(raw);
-    final rawKey = m?.group(1)?.trim();
-    final key = rawKey == null ? null : _cleanBulletKey(rawKey);
-    final value = m?.group(2)?.trim();
+    final trimmedKey = rawKey.trim();
+    final key = trimmedKey.isEmpty ? null : _cleanBulletKey(trimmedKey);
+    final value = rawValue.trim();
 
     final bullet = Padding(
       padding: const EdgeInsets.only(top: 1, right: 6),
@@ -869,9 +982,9 @@ class _AnalysisContent extends StatelessWidget {
     );
 
     final Widget content;
-    if (key == null || value == null || value.isEmpty) {
-      // 无 key:value 结构，整行作为 value
-      content = _richWithIpa(theme, raw, body);
+    if (key == null) {
+      // 无标签，整条作为详解
+      content = _richWithIpa(theme, value, body);
     } else {
       final keyStyle = body?.copyWith(
         color: cs.onSurface,
@@ -882,8 +995,11 @@ class _AnalysisContent extends StatelessWidget {
           style: body,
           children: [
             TextSpan(text: key, style: keyStyle),
-            const TextSpan(text: '：'),
-            ..._inlineSpans(theme, value, body),
+            // 详解暂未到达（流式中）时不加冒号，只显示标签
+            if (value.isNotEmpty) ...[
+              const TextSpan(text: '：'),
+              ..._inlineSpans(theme, value, body),
+            ],
           ],
         ),
       );
@@ -961,18 +1077,22 @@ class _AnalysisContent extends StatelessWidget {
   }
 }
 
-/// 解析卡片三段类型
-/// 解析卡片段落定义
+/// 解析卡片段落定义：标题 + icon + 要点列表（(标签, 详解) 对）。
 class _Section {
-  /// 对应 [SentenceAnalysis.parseDisplayString] 返回数组的索引
-  /// (0=grammar, 1=vocabulary, 2=listening)
-  final int fieldIndex;
-
   /// 段落标题（如"语法"）
   final String label;
 
   /// 段落 icon
   final IconData icon;
 
-  const _Section(this.fieldIndex, this.label, this.icon);
+  /// 该段全部要点（(标签, 详解)）；渐显时可能含尚未到齐的空条目。
+  final List<(String, String)> items;
+
+  const _Section(this.label, this.icon, this.items);
+
+  /// 至少有标签或详解非空的要点（过滤掉流式中尚全空的占位条目）。
+  List<(String, String)> get visibleItems => [
+    for (final it in items)
+      if (it.$1.trim().isNotEmpty || it.$2.trim().isNotEmpty) it,
+  ];
 }

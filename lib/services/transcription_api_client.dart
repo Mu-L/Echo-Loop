@@ -13,7 +13,7 @@ import '../config/api_config.dart';
 import '../models/word_timestamp.dart';
 import '../providers/package_info_provider.dart';
 import 'api_log_interceptor.dart';
-import 'client_info.dart';
+import 'backend_dio.dart';
 import '../utils/srt_generator.dart';
 
 part 'transcription_api_client.g.dart';
@@ -146,20 +146,18 @@ class TranscriptionApiClient {
   final Dio _dio;
 
   /// [appVersion] 随请求以 `x-app-version` 上报（版本灰度预留），可为 null。
-  /// 平台标识 `x-app-platform` 恒定携带——后端据此按平台决定是否限额。
+  /// 平台与渠道标识会随请求携带，后端据此按组合决定是否限额。
   TranscriptionApiClient({required String baseUrl, String? appVersion})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
-          headers: clientInfoHeaders(appVersion: appVersion),
-        ),
+    : _dio = createBackendDio(
+        baseUrl: baseUrl,
+        appVersion: appVersion,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        apiLogTag: 'DIO',
       ) {
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
     );
-    _dio.interceptors.add(ApiLogInterceptor(tag: 'DIO'));
   }
 
   /// 用于测试的构造函数，允许注入 Dio 实例
@@ -295,18 +293,8 @@ class TranscriptionApiClient {
 TranscriptionApiClient transcriptionApiClient(Ref ref) {
   final client = TranscriptionApiClient(
     baseUrl: apiBaseUrl,
-    appVersion: _readAppVersion(ref),
+    appVersion: readAppVersion(ref),
   );
   ref.onDispose(client.dispose);
   return client;
-}
-
-/// 读取 app 版本号；packageInfoProvider 未 override（如部分测试环境）时降级为
-/// null（省略版本 header），不让辅助信息阻断客户端构建（同 §7.18 惰性降级原则）。
-String? _readAppVersion(Ref ref) {
-  try {
-    return ref.read(packageInfoProvider).version;
-  } catch (_) {
-    return null;
-  }
 }

@@ -4,6 +4,7 @@
 /// 支持并发请求去重，避免同一句子重复发起 API 调用。
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -19,6 +20,7 @@ import '../features/subscription/providers/subscription_controller.dart';
 import '../models/sense_group_result.dart';
 import '../models/sentence_ai_result.dart';
 import '../services/sentence_ai_api_client.dart';
+import '../utils/sense_group_validate.dart';
 import '../utils/text_normalize.dart';
 
 /// 请求云端 AI 功能但当前用户未登录。
@@ -38,6 +40,156 @@ class AiFeatureQuotaExceededException implements Exception {
 
   @override
   String toString() => 'AiFeatureQuotaExceededException';
+}
+
+/// 单个句子解析 L3 请求的共享流。
+///
+/// Provider 用它把同一句、同语言的多个消费者挂到同一条后端流上。最后一个
+/// 消费者取消订阅时取消底层 Dio 请求；只有生产端正常收到 final 帧时才落缓存。
+class _PendingAnalysisStream {
+  final _controller = StreamController<SentenceAnalysis>.broadcast();
+  final cancelToken = CancelToken();
+
+  SentenceAnalysis? _latest;
+  var _listeners = 0;
+  var _closed = false;
+
+  Stream<SentenceAnalysis> subscribe() async* {
+    _listeners += 1;
+    final latest = _latest;
+    if (latest != null) {
+      yield latest;
+    }
+    try {
+      await for (final analysis in _controller.stream) {
+        yield analysis;
+      }
+    } finally {
+      _listeners -= 1;
+      if (_listeners <= 0 && !_closed && !cancelToken.isCancelled) {
+        cancelToken.cancel('analysis stream has no active listeners');
+      }
+    }
+  }
+
+  void add(SentenceAnalysis analysis) {
+    if (_closed) return;
+    _latest = analysis;
+    _controller.add(analysis);
+  }
+
+  Future<void> close() {
+    if (_closed) return Future.value();
+    _closed = true;
+    return _controller.close();
+  }
+
+  Future<void> addError(Object error, StackTrace stackTrace) {
+    if (_closed) return Future.value();
+    _closed = true;
+    _controller.addError(error, stackTrace);
+    return _controller.close();
+  }
+}
+
+/// 单个句子翻译 L3 请求的共享流（与 [_PendingAnalysisStream] 同构）。
+///
+/// 把同一句、同上下文、同语言的多个消费者挂到同一条后端流上；最后一个消费者
+/// 取消订阅时取消底层 Dio 请求；只有生产端正常收到 final 帧时才落缓存。
+class _PendingTranslationStream {
+  final _controller = StreamController<SentenceTranslation>.broadcast();
+  final cancelToken = CancelToken();
+
+  SentenceTranslation? _latest;
+  var _listeners = 0;
+  var _closed = false;
+
+  Stream<SentenceTranslation> subscribe() async* {
+    _listeners += 1;
+    final latest = _latest;
+    if (latest != null) {
+      yield latest;
+    }
+    try {
+      await for (final translation in _controller.stream) {
+        yield translation;
+      }
+    } finally {
+      _listeners -= 1;
+      if (_listeners <= 0 && !_closed && !cancelToken.isCancelled) {
+        cancelToken.cancel('translation stream has no active listeners');
+      }
+    }
+  }
+
+  void add(SentenceTranslation translation) {
+    if (_closed) return;
+    _latest = translation;
+    _controller.add(translation);
+  }
+
+  Future<void> close() {
+    if (_closed) return Future.value();
+    _closed = true;
+    return _controller.close();
+  }
+
+  Future<void> addError(Object error, StackTrace stackTrace) {
+    if (_closed) return Future.value();
+    _closed = true;
+    _controller.addError(error, stackTrace);
+    return _controller.close();
+  }
+}
+
+/// 单个句子意群拆分 L3 请求的共享流（与 [_PendingAnalysisStream] 同构）。
+///
+/// 把同一句的多个消费者挂到同一条后端流上；最后一个消费者取消订阅时取消底层 Dio 请求；
+/// 只有生产端正常收到 final 帧且 concat 校验通过时才落缓存。
+class _PendingSenseGroupStream {
+  final _controller = StreamController<SenseGroupResult>.broadcast();
+  final cancelToken = CancelToken();
+
+  SenseGroupResult? _latest;
+  var _listeners = 0;
+  var _closed = false;
+
+  Stream<SenseGroupResult> subscribe() async* {
+    _listeners += 1;
+    final latest = _latest;
+    if (latest != null) {
+      yield latest;
+    }
+    try {
+      await for (final result in _controller.stream) {
+        yield result;
+      }
+    } finally {
+      _listeners -= 1;
+      if (_listeners <= 0 && !_closed && !cancelToken.isCancelled) {
+        cancelToken.cancel('sense group stream has no active listeners');
+      }
+    }
+  }
+
+  void add(SenseGroupResult result) {
+    if (_closed) return;
+    _latest = result;
+    _controller.add(result);
+  }
+
+  Future<void> close() {
+    if (_closed) return Future.value();
+    _closed = true;
+    return _controller.close();
+  }
+
+  Future<void> addError(Object error, StackTrace stackTrace) {
+    if (_closed) return Future.value();
+    _closed = true;
+    _controller.addError(error, stackTrace);
+    return _controller.close();
+  }
 }
 
 /// AI 句子翻译/解析服务
@@ -62,9 +214,9 @@ class SentenceAiNotifier {
   final Map<String, SenseGroupResult> _senseGroupCache = {};
 
   /// 正在进行的请求（用于去重）
-  final Map<String, Future<SentenceTranslation>> _pendingTranslations = {};
-  final Map<String, Future<SentenceAnalysis>> _pendingAnalyses = {};
-  final Map<String, Future<SenseGroupResult>> _pendingSenseGroups = {};
+  final Map<String, _PendingTranslationStream> _pendingTranslations = {};
+  final Map<String, _PendingAnalysisStream> _pendingAnalyses = {};
+  final Map<String, _PendingSenseGroupStream> _pendingSenseGroups = {};
 
   SentenceAiNotifier({
     required SentenceAiCacheDao cacheDao,
@@ -76,133 +228,392 @@ class SentenceAiNotifier {
        _guardFeature = guardFeature,
        _onConsumeTrial = onConsumeTrial;
 
-  /// 执行一次 AI API 调用，把后端「本月免费额度用尽」的 402 统一映射为
-  /// [AiFeatureQuotaExceededException]，交由上层弹订阅。其余异常原样抛出。
+  /// 获取翻译（流式，三级缓存查找，带前后句上下文）
   ///
-  /// 额度裁决在后端（按用户+功能+自然月计数），客户端只负责把 402 翻成领域异常，
-  /// 不做本地预判（见 free_allowance_policy 的 AlwaysAllow）。
-  Future<T> _callWithQuotaMapping<T>(Future<T> Function() call) async {
-    try {
-      return await call();
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 402) {
-        throw const AiFeatureQuotaExceededException();
-      }
-      rethrow;
-    }
-  }
-
-  /// 获取翻译（三级缓存查找）
+  /// L1 内存 / L2 SQLite 命中：一次性 yield 完整译文后结束。
+  /// 未命中走 L3 流式：`translation` 逐帧 yield 渐显（供 UI 逐词显示），**仅收到完整
+  /// 末帧才**写 L1+L2 并消耗一次试用；中途取消（客户端关流）不落缓存、不计费。
   ///
-  /// L1 内存 → L2 SQLite → L3 API。
-  /// 并发请求同一句子会复用同一个 Future。
-  /// [targetLanguage] 为 BCP 47 代码，用于缓存隔离和 API 调用。
-  Future<SentenceTranslation> getTranslation(
+  /// 只译目标句 [text]，[previous]/[next] 仅作上下文（缺失即首/末句，可为 null），
+  /// 且**进入缓存键**（[translationContextHash]）：不同上下文互不串缓存。
+  /// 鉴权/额度：未登录抛 [AiFeatureAuthRequiredException]；后端 402 由内部映射为
+  /// [AiFeatureQuotaExceededException]。[targetLanguage] 为 BCP 47 代码。
+  Stream<SentenceTranslation> getTranslationStream(
     String text, {
     required String targetLanguage,
+    String? previous,
+    String? next,
     String? accessToken,
     CancelToken? cancelToken,
-  }) async {
-    final hash = hashText(text);
+  }) async* {
+    final hash = translationContextHash(text, previous: previous, next: next);
     final cacheKey = '$hash:$targetLanguage';
+    final l2Type = 'translation_v2:$targetLanguage';
 
     // L1: 内存缓存
-    final cached = _translationCache[cacheKey];
-    if (cached != null) return cached;
-
-    // 去重：复用正在进行的请求
-    if (_pendingTranslations.containsKey(cacheKey)) {
-      return _pendingTranslations[cacheKey]!;
+    final l1 = _translationCache[cacheKey];
+    if (l1 != null) {
+      yield l1;
+      return;
     }
 
-    final future = _fetchTranslation(
-      hash,
-      text,
-      targetLanguage: targetLanguage,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    // L2: SQLite 缓存（JSON 损坏/空译文时跳过，fallthrough 到 L3）
+    final dbResult = await _cacheDao.getByHash(hash, l2Type);
+    if (dbResult != null) {
+      try {
+        final translation = SentenceTranslation.fromJson(
+          jsonDecode(dbResult) as Map<String, dynamic>,
+        );
+        if (translation.translation.isNotEmpty) {
+          _translationCache[cacheKey] = translation;
+          yield translation;
+          return;
+        }
+      } catch (_) {
+        // L2 数据损坏或结构变更，继续到 L3 流式调用
+      }
+    }
+
+    // L3: 流式 API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SentenceAI', '翻译 L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
+    _guardFeature?.call(PremiumFeature.aiTranslation);
+
+    final existing = _pendingTranslations[cacheKey];
+    if (existing != null) {
+      yield* existing.subscribe();
+      return;
+    }
+
+    final pending = _PendingTranslationStream();
+    _pendingTranslations[cacheKey] = pending;
+    unawaited(
+      _pumpTranslationStream(
+        pending,
+        cacheKey: cacheKey,
+        hash: hash,
+        l2Type: l2Type,
+        text: text,
+        previous: previous,
+        next: next,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+      ),
     );
-    _pendingTranslations[cacheKey] = future;
+    yield* pending.subscribe();
+  }
+
+  /// 生产共享翻译流，并在完整完成后写 L1/L2 缓存。
+  Future<void> _pumpTranslationStream(
+    _PendingTranslationStream pending, {
+    required String cacheKey,
+    required String hash,
+    required String l2Type,
+    required String text,
+    required String? previous,
+    required String? next,
+    required String targetLanguage,
+    required String accessToken,
+  }) async {
+    SentenceTranslation? finalTranslation;
     try {
-      return await future;
+      await for (final frame in _apiClient.translateStream(
+        text,
+        previousText: previous,
+        nextText: next,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+        cancelToken: pending.cancelToken,
+      )) {
+        pending.add(frame.translation);
+        if (frame.isFinal) finalTranslation = frame.translation;
+      }
+
+      // 仅「完整完成」且译文非空才落缓存并计一次试用；未收到 final（取消/EOF）不写。
+      if (finalTranslation != null && finalTranslation.translation.isNotEmpty) {
+        _translationCache[cacheKey] = finalTranslation;
+        await _cacheDao.upsert(
+          hash,
+          l2Type,
+          jsonEncode({'translation': finalTranslation.translation}),
+        );
+        _onConsumeTrial?.call(PremiumFeature.aiTranslation);
+      }
+      await pending.close();
+    } on DioException catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else if (e.response?.statusCode == 402) {
+        await pending.addError(
+          const AiFeatureQuotaExceededException(),
+          stackTrace,
+        );
+      } else {
+        await pending.addError(e, stackTrace);
+      }
+    } catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else {
+        await pending.addError(e, stackTrace);
+      }
     } finally {
       _pendingTranslations.remove(cacheKey);
     }
   }
 
-  /// 获取解析（三级缓存查找）
+  /// 获取解析（流式，三级缓存查找）
   ///
-  /// [targetLanguage] 为 BCP 47 代码，用于缓存隔离和 API 调用。
-  Future<SentenceAnalysis> getAnalysis(
+  /// L1 内存 / L2 SQLite 命中：一次性 yield 完整结果后结束。
+  /// 未命中走 L3 流式：逐帧 yield 部分结果（供 UI 渐显），**仅收到完整末帧才**
+  /// 写 L1+L2 并消耗一次试用；中途取消（客户端关流）不落缓存、不计费。
+  ///
+  /// 鉴权/额度：未登录抛 [AiFeatureAuthRequiredException]；后端 402 由内部映射为
+  /// [AiFeatureQuotaExceededException]。[targetLanguage] 为 BCP 47 代码。
+  Stream<SentenceAnalysis> getAnalysisStream(
     String text, {
     required String targetLanguage,
     String? accessToken,
     CancelToken? cancelToken,
-  }) async {
+  }) async* {
     final hash = hashText(text);
     final cacheKey = '$hash:$targetLanguage';
+    final l2Type = 'analysis_v2:$targetLanguage';
 
     // L1: 内存缓存
-    final cached = _analysisCache[cacheKey];
-    if (cached != null) return cached;
-
-    // 去重：复用正在进行的请求
-    if (_pendingAnalyses.containsKey(cacheKey)) {
-      return _pendingAnalyses[cacheKey]!;
+    final l1 = _analysisCache[cacheKey];
+    if (l1 != null) {
+      yield l1;
+      return;
     }
 
-    final future = _fetchAnalysis(
-      hash,
-      text,
-      targetLanguage: targetLanguage,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    // L2: SQLite 缓存（JSON 损坏/空结果时跳过，fallthrough 到 L3）
+    final dbResult = await _cacheDao.getByHash(hash, l2Type);
+    if (dbResult != null) {
+      try {
+        final analysis = SentenceAnalysis.fromJson(
+          jsonDecode(dbResult) as Map<String, dynamic>,
+        );
+        if (analysis.isNotEmpty) {
+          _analysisCache[cacheKey] = analysis;
+          yield analysis;
+          return;
+        }
+      } catch (_) {
+        // L2 数据损坏或结构变更，继续到 L3 流式调用
+      }
+    }
+
+    // L3: 流式 API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SentenceAI', '解析 L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
+    _guardFeature?.call(PremiumFeature.aiAnalysis);
+
+    final existing = _pendingAnalyses[cacheKey];
+    if (existing != null) {
+      yield* existing.subscribe();
+      return;
+    }
+
+    final pending = _PendingAnalysisStream();
+    _pendingAnalyses[cacheKey] = pending;
+    unawaited(
+      _pumpAnalysisStream(
+        pending,
+        cacheKey: cacheKey,
+        hash: hash,
+        l2Type: l2Type,
+        text: text,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+      ),
     );
-    _pendingAnalyses[cacheKey] = future;
+    yield* pending.subscribe();
+  }
+
+  /// 生产共享解析流，并在完整完成后写 L1/L2 缓存。
+  Future<void> _pumpAnalysisStream(
+    _PendingAnalysisStream pending, {
+    required String cacheKey,
+    required String hash,
+    required String l2Type,
+    required String text,
+    required String targetLanguage,
+    required String accessToken,
+  }) async {
+    SentenceAnalysis? finalAnalysis;
     try {
-      return await future;
+      await for (final frame in _apiClient.analyzeStream(
+        text,
+        targetLanguage: targetLanguage,
+        accessToken: accessToken,
+        cancelToken: pending.cancelToken,
+      )) {
+        pending.add(frame.analysis);
+        if (frame.isFinal) finalAnalysis = frame.analysis;
+      }
+
+      // 仅「完整完成」才落缓存并计一次试用；未收到 final（取消/EOF）一律不写。
+      if (finalAnalysis != null) {
+        _analysisCache[cacheKey] = finalAnalysis;
+        await _cacheDao.upsert(
+          hash,
+          l2Type,
+          jsonEncode(finalAnalysis.toJson()),
+        );
+        _onConsumeTrial?.call(PremiumFeature.aiAnalysis);
+      }
+      await pending.close();
+    } on DioException catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else if (e.response?.statusCode == 402) {
+        await pending.addError(
+          const AiFeatureQuotaExceededException(),
+          stackTrace,
+        );
+      } else {
+        await pending.addError(e, stackTrace);
+      }
+    } catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else {
+        await pending.addError(e, stackTrace);
+      }
     } finally {
       _pendingAnalyses.remove(cacheKey);
     }
   }
 
-  /// 获取意群拆分（三级缓存查找）
-  Future<SenseGroupResult> getSenseGroups(
+  /// 获取意群拆分（流式，三级缓存查找）
+  ///
+  /// L1 内存 / L2 SQLite 命中：一次性 yield 完整结果后结束。
+  /// 未命中走 L3 流式：medium 意群逐帧渐显（fine 随后），**仅收到完整末帧且 concat 校验通过才**
+  /// 写 L1+L2 并消耗一次试用；中途取消（客户端关流）或校验失败一律不落缓存、不计费。
+  ///
+  /// 意群与目标语言无关（chunk 是原句子串的切分），缓存 key 仅 [hashText]，无语言维度。
+  /// 鉴权/额度：未登录抛 [AiFeatureAuthRequiredException]；后端 402 由内部映射为
+  /// [AiFeatureQuotaExceededException]。
+  Stream<SenseGroupResult> getSenseGroupsStream(
     String text, {
     String? accessToken,
     CancelToken? cancelToken,
-  }) async {
+  }) async* {
     final hash = hashText(text);
 
     // L1: 内存缓存（空结果不视为有效缓存）
-    final cached = _senseGroupCache[hash];
-    if (cached != null && cached.medium.isNotEmpty) {
-      AppLogger.log(
-        'SenseGroup',
-        'L1 命中 | medium=${cached.medium.length}组 fine=${cached.fine.length}组 | "${text.length > 40 ? '${text.substring(0, 40)}...' : text}"',
-      );
-      return cached;
+    final l1 = _senseGroupCache[hash];
+    if (l1 != null && l1.medium.isNotEmpty) {
+      yield l1;
+      return;
     }
-    if (cached != null) {
+    if (l1 != null) {
       _senseGroupCache.remove(hash);
     }
 
-    // 去重：复用正在进行的请求
-    if (_pendingSenseGroups.containsKey(hash)) {
-      AppLogger.log('SenseGroup', '复用进行中请求 | "$text"');
-      return _pendingSenseGroups[hash]!;
+    // L2: SQLite 缓存（JSON 损坏/空结果时跳过，fallthrough 到 L3）
+    final dbResult = await _cacheDao.getByHash(hash, 'sense_groups');
+    if (dbResult != null) {
+      try {
+        final result = SenseGroupResult.fromJson(
+          jsonDecode(dbResult) as Map<String, dynamic>,
+        );
+        if (result.medium.isNotEmpty) {
+          _senseGroupCache[hash] = result;
+          yield result;
+          return;
+        }
+        // 空结果视为旧格式缓存，删除并 fallthrough 到 L3
+        await _cacheDao.deleteByHash(hash, 'sense_groups');
+      } catch (_) {
+        // L2 数据损坏或结构变更，删除后继续到 L3 流式调用
+        await _cacheDao.deleteByHash(hash, 'sense_groups');
+      }
     }
 
-    AppLogger.log('SenseGroup', 'L1 未命中，开始查找 | "$text"');
-    final future = _fetchSenseGroups(
-      hash,
-      text,
-      accessToken: accessToken,
-      cancelToken: cancelToken,
+    // L3: 流式 API 调用
+    if (accessToken == null || accessToken.isEmpty) {
+      AppLogger.log('SenseGroup', 'L3 需要登录，未发现 Supabase access token');
+      throw const AiFeatureAuthRequiredException();
+    }
+    _guardFeature?.call(PremiumFeature.aiSenseGroup);
+
+    final existing = _pendingSenseGroups[hash];
+    if (existing != null) {
+      yield* existing.subscribe();
+      return;
+    }
+
+    final pending = _PendingSenseGroupStream();
+    _pendingSenseGroups[hash] = pending;
+    unawaited(
+      _pumpSenseGroupStream(
+        pending,
+        hash: hash,
+        text: text,
+        accessToken: accessToken,
+      ),
     );
-    _pendingSenseGroups[hash] = future;
+    yield* pending.subscribe();
+  }
+
+  /// 生产共享意群流，并在完整完成且 concat 校验通过后写 L1/L2 缓存。
+  Future<void> _pumpSenseGroupStream(
+    _PendingSenseGroupStream pending, {
+    required String hash,
+    required String text,
+    required String accessToken,
+  }) async {
+    SenseGroupResult? finalResult;
     try {
-      return await future;
+      await for (final frame in _apiClient.senseGroupsStream(
+        text,
+        accessToken: accessToken,
+        cancelToken: pending.cancelToken,
+      )) {
+        pending.add(frame.result);
+        if (frame.isFinal) finalResult = frame.result;
+      }
+
+      // 仅「完整完成」且 medium 非空、concat 校验通过（两级粒度拼接均能还原原句）才落缓存并计一次试用。
+      // 校验失败/空/未收到 final（取消/EOF）一律不写——允许重试重生成，镜像后端 onComplete「不合法不入库」。
+      if (finalResult != null &&
+          finalResult.medium.isNotEmpty &&
+          validateSenseGroupChunks(finalResult.medium, text) &&
+          validateSenseGroupChunks(finalResult.fine, text)) {
+        _senseGroupCache[hash] = finalResult;
+        await _cacheDao.upsert(
+          hash,
+          'sense_groups',
+          jsonEncode(finalResult.toJson()),
+        );
+        _onConsumeTrial?.call(PremiumFeature.aiSenseGroup);
+      } else if (finalResult != null) {
+        AppLogger.log('SenseGroup', '最终结果空或 concat 校验失败，不落缓存（可重试）');
+      }
+      await pending.close();
+    } on DioException catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else if (e.response?.statusCode == 402) {
+        await pending.addError(
+          const AiFeatureQuotaExceededException(),
+          stackTrace,
+        );
+      } else {
+        await pending.addError(e, stackTrace);
+      }
+    } catch (e, stackTrace) {
+      if (pending.cancelToken.isCancelled) {
+        await pending.close();
+      } else {
+        await pending.addError(e, stackTrace);
+      }
     } finally {
       _pendingSenseGroups.remove(hash);
     }
@@ -210,12 +621,15 @@ class SentenceAiNotifier {
 
   /// 同步查找 L1 翻译缓存（仅内存）
   ///
-  /// [targetLanguage] 不传时遍历所有语言版本（向后兼容），传入时精确匹配。
+  /// [previous]/[next] 为前后句上下文（进缓存键）；[targetLanguage] 不传时遍历所有
+  /// 语言版本（向后兼容），传入时精确匹配。
   SentenceTranslation? getCachedTranslation(
     String text, {
+    String? previous,
+    String? next,
     String? targetLanguage,
   }) {
-    final hash = hashText(text);
+    final hash = translationContextHash(text, previous: previous, next: next);
     if (targetLanguage != null) {
       return _translationCache['$hash:$targetLanguage'];
     }
@@ -247,23 +661,26 @@ class SentenceAiNotifier {
 
   /// 从 L2 SQLite 预加载翻译到 L1 内存（不调用 L3 API）
   ///
-  /// 返回 true 表示 L1 或 L2 命中，false 表示无缓存。
+  /// [previous]/[next] 为前后句上下文（进缓存键）。返回 true 表示 L1 或 L2 命中。
   Future<bool> preloadTranslationFromDb(
     String text, {
     required String targetLanguage,
+    String? previous,
+    String? next,
   }) async {
-    final hash = hashText(text);
+    final hash = translationContextHash(text, previous: previous, next: next);
     final cacheKey = '$hash:$targetLanguage';
     if (_translationCache.containsKey(cacheKey)) return true;
     final dbResult = await _cacheDao.getByHash(
       hash,
-      'translation:$targetLanguage',
+      'translation_v2:$targetLanguage',
     );
     if (dbResult != null) {
       try {
         final translation = SentenceTranslation.fromJson(
           jsonDecode(dbResult) as Map<String, dynamic>,
         );
+        if (translation.translation.isEmpty) return false;
         _translationCache[cacheKey] = translation;
         return true;
       } catch (_) {
@@ -285,15 +702,17 @@ class SentenceAiNotifier {
     if (_analysisCache.containsKey(cacheKey)) return true;
     final dbResult = await _cacheDao.getByHash(
       hash,
-      'analysis:$targetLanguage',
+      'analysis_v2:$targetLanguage',
     );
     if (dbResult != null) {
       try {
         final analysis = SentenceAnalysis.fromJson(
           jsonDecode(dbResult) as Map<String, dynamic>,
         );
-        _analysisCache[cacheKey] = analysis;
-        return true;
+        if (analysis.isNotEmpty) {
+          _analysisCache[cacheKey] = analysis;
+          return true;
+        }
       } catch (_) {
         // JSON 损坏，跳过
       }
@@ -331,184 +750,6 @@ class SentenceAiNotifier {
     _senseGroupCache.clear();
   }
 
-  /// L2 + L3 翻译查找
-  Future<SentenceTranslation> _fetchTranslation(
-    String hash,
-    String text, {
-    required String targetLanguage,
-    String? accessToken,
-    CancelToken? cancelToken,
-  }) async {
-    final cacheKey = '$hash:$targetLanguage';
-    final l2Type = 'translation:$targetLanguage';
-
-    // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
-    final dbResult = await _cacheDao.getByHash(hash, l2Type);
-    if (dbResult != null) {
-      try {
-        final translation = SentenceTranslation.fromJson(
-          jsonDecode(dbResult) as Map<String, dynamic>,
-        );
-        _translationCache[cacheKey] = translation;
-        return translation;
-      } catch (_) {
-        // L2 数据损坏或结构变更，继续到 L3 API 调用
-      }
-    }
-
-    // L3: API 调用
-    if (accessToken == null || accessToken.isEmpty) {
-      AppLogger.log('SentenceAI', '翻译 L3 需要登录，未发现 Supabase access token');
-      throw const AiFeatureAuthRequiredException();
-    }
-    // 已登录前提下做额度闸：未解锁则抛配额超限，引导升级。
-    _guardFeature?.call(PremiumFeature.aiTranslation);
-    final translation = await _callWithQuotaMapping(
-      () => _apiClient.translate(
-        text,
-        targetLanguage: targetLanguage,
-        accessToken: accessToken,
-        cancelToken: cancelToken,
-      ),
-    );
-    // 写入 L1 + L2
-    _translationCache[cacheKey] = translation;
-    await _cacheDao.upsert(
-      hash,
-      l2Type,
-      jsonEncode({'translation': translation.translation}),
-    );
-    _onConsumeTrial?.call(PremiumFeature.aiTranslation);
-    return translation;
-  }
-
-  /// L2 + L3 解析查找
-  Future<SentenceAnalysis> _fetchAnalysis(
-    String hash,
-    String text, {
-    required String targetLanguage,
-    String? accessToken,
-    CancelToken? cancelToken,
-  }) async {
-    final cacheKey = '$hash:$targetLanguage';
-    final l2Type = 'analysis:$targetLanguage';
-
-    // L2: SQLite 缓存（JSON 损坏时跳过，fallthrough 到 L3）
-    final dbResult = await _cacheDao.getByHash(hash, l2Type);
-    if (dbResult != null) {
-      try {
-        final analysis = SentenceAnalysis.fromJson(
-          jsonDecode(dbResult) as Map<String, dynamic>,
-        );
-        _analysisCache[cacheKey] = analysis;
-        return analysis;
-      } catch (_) {
-        // L2 数据损坏或结构变更，继续到 L3 API 调用
-      }
-    }
-
-    // L3: API 调用
-    if (accessToken == null || accessToken.isEmpty) {
-      AppLogger.log('SentenceAI', '解析 L3 需要登录，未发现 Supabase access token');
-      throw const AiFeatureAuthRequiredException();
-    }
-    _guardFeature?.call(PremiumFeature.aiAnalysis);
-    final analysis = await _callWithQuotaMapping(
-      () => _apiClient.analyze(
-        text,
-        targetLanguage: targetLanguage,
-        accessToken: accessToken,
-        cancelToken: cancelToken,
-      ),
-    );
-    // 写入 L1 + L2
-    _analysisCache[cacheKey] = analysis;
-    await _cacheDao.upsert(
-      hash,
-      l2Type,
-      jsonEncode({
-        'analysis': {
-          'grammar': analysis.grammar,
-          'vocabulary': analysis.vocabulary,
-          'listening': analysis.listening,
-        },
-      }),
-    );
-    _onConsumeTrial?.call(PremiumFeature.aiAnalysis);
-    return analysis;
-  }
-
-  /// L2 + L3 意群查找
-  Future<SenseGroupResult> _fetchSenseGroups(
-    String hash,
-    String text, {
-    String? accessToken,
-    CancelToken? cancelToken,
-  }) async {
-    // L2: SQLite 缓存（JSON 损坏或字段不一致时跳过，fallthrough 到 L3）
-    final dbResult = await _cacheDao.getByHash(hash, 'sense_groups');
-    if (dbResult != null) {
-      try {
-        final result = SenseGroupResult.fromJson(
-          jsonDecode(dbResult) as Map<String, dynamic>,
-        );
-        // 检查结果是否有效（旧格式数据 fromJson 不会报错但会返回空列表）
-        if (result.medium.isNotEmpty) {
-          _senseGroupCache[hash] = result;
-          AppLogger.log(
-            'SenseGroup',
-            'L2 SQLite 命中 | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}',
-          );
-          return result;
-        }
-        // 空结果视为旧格式缓存，删除并 fallthrough 到 L3
-        AppLogger.log('SenseGroup', 'L2 SQLite 缓存为空（可能是旧格式），删除并重新请求');
-        await _cacheDao.deleteByHash(hash, 'sense_groups');
-      } catch (e) {
-        // 缓存格式不兼容，删除旧数据后 fallthrough 到 L3
-        AppLogger.log('SenseGroup', 'L2 SQLite 格式不兼容，删除旧缓存 | error=$e');
-        await _cacheDao.deleteByHash(hash, 'sense_groups');
-      }
-    }
-
-    // L3: API 调用
-    if (accessToken == null || accessToken.isEmpty) {
-      AppLogger.log('SenseGroup', 'L3 需要登录，未发现 Supabase access token');
-      throw const AiFeatureAuthRequiredException();
-    }
-    _guardFeature?.call(PremiumFeature.aiSenseGroup);
-    AppLogger.log('SenseGroup', 'L3 调用 API...');
-    final sw = Stopwatch()..start();
-    final result = await _callWithQuotaMapping(
-      () => _apiClient.splitSenseGroups(
-        text,
-        accessToken: accessToken,
-        cancelToken: cancelToken,
-      ),
-    );
-    sw.stop();
-    AppLogger.log(
-      'SenseGroup',
-      'L3 API 返回 | ${sw.elapsedMilliseconds}ms | medium=${result.medium.length}组 fine=${result.fine.length}组 equal=${result.areBothEqual}',
-    );
-
-    // 打印具体分组内容
-    for (var i = 0; i < result.medium.length; i++) {
-      AppLogger.log('SenseGroup', '  中等[$i]: "${result.medium[i]}"');
-    }
-    for (var i = 0; i < result.fine.length; i++) {
-      AppLogger.log('SenseGroup', '  细粒[$i]: "${result.fine[i]}"');
-    }
-
-    // 空结果不缓存（允许用户重试）
-    if (result.medium.isEmpty) return result;
-
-    // 写入 L1 + L2
-    _senseGroupCache[hash] = result;
-    await _cacheDao.upsert(hash, 'sense_groups', jsonEncode(result.toJson()));
-    _onConsumeTrial?.call(PremiumFeature.aiSenseGroup);
-    return result;
-  }
 }
 
 /// SentenceAiNotifier Provider

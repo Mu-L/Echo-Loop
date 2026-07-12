@@ -102,9 +102,11 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   void initState() {
     super.initState();
     // 查询文本在面板打开时即已知，立即后台预热，不必等 AI 查询返回。
-    // 标题行 SpeakButton 加载前发的就是 _normalizedWord；AI 返回后
-    // prewarmTexts 的完整批次会把 headword 排首位，命中缓存/在途去重不重复合成。
-    ref.read(ttsControllerProvider.notifier).prewarmTexts([_normalizedWord]);
+    // 标题行 SpeakButton 加载前发的就是 _normalizedWord；AI 流式帧到达后
+    // 增量预热把 headword 与例句共用同一 seen-set，命中即跳过不重复合成。
+    ref.read(ttsControllerProvider.notifier).prewarmTextsIncremental([
+      _normalizedWord,
+    ]);
     _watchEntryAnimation();
   }
 
@@ -134,7 +136,9 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
       // 用户调整过的面板高度保留（连续查词不跳动）。
       _ttsController?.cancelTextsPrewarm();
       _ttsController?.stop();
-      ref.read(ttsControllerProvider.notifier).prewarmTexts([_normalizedWord]);
+      ref.read(ttsControllerProvider.notifier).prewarmTextsIncremental([
+        _normalizedWord,
+      ]);
     }
   }
 
@@ -223,7 +227,7 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
       message: l10n.senseGroupSignInRequiredMessage,
     );
     if (ok) {
-      ref.read(dictionaryLookupControllerProvider(word).notifier).retry();
+      ref.read(_controllerProvider(word).notifier).retry();
     }
   }
 
@@ -231,15 +235,21 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
   Future<void> _handleUpgrade(String word) async {
     await openPaywall(context, ref);
     if (!mounted) return;
-    ref.read(dictionaryLookupControllerProvider(word).notifier).retry();
+    ref.read(_controllerProvider(word).notifier).retry();
   }
+
+  DictionaryLookupControllerProvider _controllerProvider(String word) =>
+      dictionaryLookupControllerProvider(
+        word,
+        preferredSourceId: widget.query.preferredSourceId,
+      );
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final word = _normalizedWord;
     final lookupQuery = _lookupQuery;
-    final controllerProvider = dictionaryLookupControllerProvider(lookupQuery);
+    final controllerProvider = _controllerProvider(lookupQuery);
     final state = ref.watch(controllerProvider);
     final notifier = ref.read(controllerProvider.notifier);
 
@@ -255,14 +265,18 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
       }
     });
 
-    // 查词结果到达（或切换数据源后命中已加载结果）即后台预热「单词 + 例句」，
-    // 用户点击发音时命中缓存秒播。仅在选中源的状态变为新的 LookupLoaded 时触发；
-    // 重复文本由协调器缓存/在途去重兜底，开销极小。
+    // 例句边流边预热：流式帧与完成态都取当前部分结果，增量预热「单词 + 已到达例句」，
+    // 用户点击发音时命中缓存秒播。每帧传完整可发音列表，增量入口靠 seen-set 只对
+    // 新出现的例句发起合成，已提交的自动跳过（不重发整份、不打断已在推进的批次）。
     ref.listen(controllerProvider, (prev, next) {
       final cur = next.current;
-      if (cur is LookupLoaded && !identical(prev?.current, cur)) {
-        _ttsController?.prewarmTexts(dictionarySpeakableTexts(cur.result));
-      }
+      final result = switch (cur) {
+        LookupStreaming(:final result) => result,
+        LookupLoaded(:final result) => result,
+        _ => null,
+      };
+      if (result == null) return;
+      _ttsController?.prewarmTextsIncremental(dictionarySpeakableTexts(result));
     });
 
     final isWeb = _isWebSource(state.selectedSourceId);

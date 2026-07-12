@@ -2,7 +2,7 @@
   "@@locale": "en",
   "appTitle": "Echo Loop",
   "premiumTitle": "Echo Loop Membership",
-  "premiumTagline": "Unlock unlimited AI-powered learning",
+  "premiumTagline": "Get more AI-powered learning",
   "aiQuotaExceededTitle": "You've used up this month's free credits",
   "aiQuotaExceededMessage": "Upgrade to Premium for unlimited AI dictionary, translation, and analysis.",
   "aiQuotaExceededCta": "Upgrade to Premium",
@@ -11,10 +11,11 @@
   "premiumEntryBadgeActive": "Member",
   "premiumEntryBadgeUpgrade": "Upgrade",
   "premiumActive": "You're a member",
-  "premiumBenefitTranslation": "Unlimited AI translation",
-  "premiumBenefitAnalysis": "Unlimited AI sentence analysis",
-  "premiumBenefitWordAnalysis": "Unlimited AI word analysis",
+  "premiumBenefitTranslation": "More AI translation",
+  "premiumBenefitAnalysis": "More AI sentence breakdown",
+  "premiumBenefitWordAnalysis": "More AI word explanation",
   "premiumBenefitTranscription": "More AI subtitle transcription",
+  "premiumBenefitSenseGroups": "More AI sentence chunking",
   "premiumSubscribe": "Subscribe",
   "premiumStartTrial": "Start {days}-day free trial",
   "@premiumStartTrial": {
@@ -45,7 +46,6 @@
     }
   },
   "premiumLifetimeAccessNote": "Lifetime access, no renewal needed",
-  "premiumAutoRenewNotice": "Auto-renews. Manage or cancel in your App Store account.",
   "premiumNoPlans": "No plans available right now. Please try again later.",
   "premiumLoginRequired": "Please sign in before subscribing.",
   "premiumPurchaseFailed": "Purchase failed. Please try again.",
@@ -56,7 +56,6 @@
   "premiumWebVerifying": "Waiting for payment to be confirmed…",
   "premiumWebCheckDone": "I've completed payment",
   "premiumWebOpenFailed": "Couldn't open the checkout page. Please try again.",
-  "premiumWebAutoRenewNotice": "Auto-renews. Manage or cancel from your account page or the confirmation email.",
   "premiumRefresh": "Refresh",
   "premiumPeriodMonthly": "Monthly",
   "premiumPeriodYearly": "Yearly",
@@ -127,6 +126,25 @@
       "renewal": { "type": "String" }
     }
   },
+  "premiumSpecialOfferPercent": "Special offer: {percent}% off your first {period}",
+  "@premiumSpecialOfferPercent": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "premiumSpecialOfferIntro": "Special offer: {intro}, then {renewal}",
+  "@premiumSpecialOfferIntro": {
+    "placeholders": {
+      "intro": { "type": "String" },
+      "renewal": { "type": "String" }
+    }
+  },
+  "premiumOfferPeriodYear": "year",
+  "premiumOfferPeriodMonth": "month",
+  "premiumOfferPeriodGeneric": "period",
+  "premiumTermsShort": "Terms",
+  "premiumPrivacyShort": "Privacy",
   "practiceControlModeAuto": "Auto",
   "practiceControlModeManual": "Manual",
   "player": "Player",

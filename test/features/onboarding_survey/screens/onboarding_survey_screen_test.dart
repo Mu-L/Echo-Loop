@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:echo_loop/analytics/analytics_channel.dart';
 import 'package:echo_loop/analytics/analytics_providers.dart';
@@ -15,6 +16,8 @@ import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey
 import 'package:echo_loop/features/onboarding_survey/screens/onboarding_survey_screen.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/router/app_router.dart';
+import 'package:echo_loop/theme/app_theme.dart';
+import 'package:echo_loop/features/onboarding_survey/widgets/survey_choice_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/mock_providers.dart';
@@ -51,6 +54,7 @@ Widget _wrap({
   required SharedPreferences prefs,
   bool initialOnboardingCompleted = false,
   _RecordingAnalyticsChannel? analyticsChannel,
+  ThemeMode themeMode = ThemeMode.light,
 }) {
   final router = GoRouter(
     initialLocation: AppRoutes.onboardingSurvey,
@@ -84,6 +88,9 @@ Widget _wrap({
     ],
     child: MaterialApp.router(
       routerConfig: router,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       supportedLocales: const [Locale('zh', 'CN'), Locale('en')],
       locale: const Locale('zh', 'CN'),
       localizationsDelegates: const [
@@ -160,6 +167,62 @@ void main() {
     expect(
       answers?.referralSource,
       equals(OnboardingReferralSource.xiaohongshu),
+    );
+  });
+
+  testWidgets('深色模式下题目、选项、品牌图标和 summary 使用深色主题颜色', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    final darkTheme = AppTheme.dark();
+    final colors = darkTheme.colorScheme;
+    await tester.pumpWidget(_wrap(prefs: prefs, themeMode: ThemeMode.dark));
+    await tester.pumpAndSettle();
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(scaffold.backgroundColor, isNull);
+    expect(
+      tester.widget<Text>(find.text('你练习英语听说的主要目标是什么？')).style?.color,
+      colors.onSurface,
+    );
+
+    final dailyTile = find.ancestor(
+      of: find.text('日常交流'),
+      matching: find.byType(SurveyChoiceTile),
+    );
+    final unselectedMaterial = find.descendant(
+      of: dailyTile,
+      matching: find.byType(Material),
+    );
+    expect(tester.widget<Material>(unselectedMaterial).color, colors.surface);
+
+    await tester.tap(find.text('日常交流'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<Material>(unselectedMaterial).color,
+      colors.primaryContainer,
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text('约 10 分钟'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    final githubTile = find.ancestor(
+      of: find.text('GitHub'),
+      matching: find.byType(SurveyChoiceTile),
+    );
+    final githubIcon = find.descendant(
+      of: githubTile,
+      matching: find.byType(FaIcon),
+    );
+    expect(tester.widget<FaIcon>(githubIcon).color, colors.onSurface);
+
+    await tester.tap(find.text('朋友推荐'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    expect(
+      tester.widget<Text>(find.textContaining('提升英语听说')).style?.color,
+      colors.onSurface,
+    );
+    expect(
+      tester.widget<Text>(find.text('为了保证体验我们将请求以下权限')).style?.color,
+      colors.onSurfaceVariant,
     );
   });
 

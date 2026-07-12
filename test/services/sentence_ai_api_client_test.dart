@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:dio_http2_adapter/dio_http2_adapter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:echo_loop/models/dictionary/dictionary_entry.dart';
+import 'package:echo_loop/services/ai_http_client_adapter.dart';
 import 'package:echo_loop/services/dictionary/dictionary_source.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
 
@@ -16,105 +18,212 @@ void main() {
 
   late MockDio mockDio;
   late SentenceAiApiClient client;
+  late List<String> streamLogs;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     mockDio = MockDio();
-    client = SentenceAiApiClient.withDio(mockDio);
+    streamLogs = <String>[];
+    client = SentenceAiApiClient.withDio(
+      mockDio,
+      streamLogPrint: streamLogs.add,
+    );
   });
 
-  group('translate', () {
-    test('正常响应返回 SentenceTranslation', () async {
-      when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/translate',
-          data: {'text': 'Hello world'},
-          options: any(
-            named: 'options',
-            that: isA<Options>().having(
-              (o) => o.headers?['Authorization'],
-              'Authorization',
-              'Bearer access-token',
+  group('translateStream', () {
+    Response<ResponseBody> ndjsonResponse(String ndjson, {int status = 200}) {
+      final bytes = Uint8List.fromList(utf8.encode(ndjson));
+      return Response(
+        data: ResponseBody(Stream<Uint8List>.fromIterable([bytes]), status),
+        statusCode: status,
+        requestOptions: RequestOptions(
+          path: '/api/v1/stream/translate',
+          method: 'POST',
+        ),
+      );
+    }
+
+    String opsLine(List<Map<String, dynamic>> ops) =>
+        '${jsonEncode({'ops': ops})}\n';
+
+    test(
+      '打到 /api/v1/stream/translate，带 text + 前后句 + Bearer，逐帧渐显 + done',
+      () async {
+        when(
+          () => mockDio.post<ResponseBody>(
+            '/api/v1/stream/translate',
+            data: {
+              'text': 'This is a test.',
+              'previousText': 'Hello world.',
+              'nextText': 'Goodbye now.',
+            },
+            options: any(
+              named: 'options',
+              that: isA<Options>().having(
+                (o) => o.headers?['Authorization'],
+                'Authorization',
+                'Bearer access-token',
+              ),
             ),
+            cancelToken: any(named: 'cancelToken'),
           ),
+        ).thenAnswer(
+          (_) async => ndjsonResponse(
+            '${opsLine([
+              {
+                'p': ['translation'],
+                'v': '这是',
+              },
+            ])}'
+            '${opsLine([
+              {
+                'p': ['translation'],
+                'v': '这是一个测试。',
+              },
+            ])}'
+            '${jsonEncode({'done': true})}\n',
+          ),
+        );
+
+        final frames = await client
+            .translateStream(
+              'This is a test.',
+              previousText: 'Hello world.',
+              nextText: 'Goodbye now.',
+              accessToken: 'access-token',
+            )
+            .toList();
+
+        // 两个 ops 批帧（isFinal=false）+ done 帧（isFinal=true），译文替换式渐显
+        expect(frames.length, 3);
+        expect(frames.first.isFinal, isFalse);
+        expect(frames.first.translation.translation, '这是');
+        expect(frames.last.isFinal, isTrue);
+        expect(frames.last.translation.translation, '这是一个测试。');
+      },
+    );
+
+    test('无前后句时请求体不含 previousText/nextText', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/translate',
+          data: {'text': 'Hi.'},
+          options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
-        (_) async => Response(
-          data: {'translation': '你好世界'},
-          statusCode: 200,
-          requestOptions: RequestOptions(),
-        ),
+        (_) async => ndjsonResponse('${jsonEncode({'done': true})}\n'),
       );
 
-      final result = await client.translate(
-        'Hello world',
-        accessToken: 'access-token',
-      );
-      expect(result.translation, '你好世界');
-    });
+      await client.translateStream('Hi.', accessToken: 'access-token').toList();
 
-    test('服务器错误抛出 DioException', () async {
-      when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/translate',
-          data: {'text': 'test'},
+      verify(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/translate',
+          data: {'text': 'Hi.'},
           options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
-      ).thenThrow(
-        DioException(
-          type: DioExceptionType.badResponse,
-          requestOptions: RequestOptions(),
-          response: Response(statusCode: 500, requestOptions: RequestOptions()),
-        ),
-      );
-
-      expect(
-        () => client.translate('test', accessToken: 'access-token'),
-        throwsA(isA<DioException>()),
-      );
+      ).called(1);
     });
 
-    test('支持 CancelToken', () async {
-      final cancelToken = CancelToken();
-
+    test('非 200（如 402）抛出带状态码的 DioException', () async {
       when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/translate',
-          data: {'text': 'test'},
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/translate',
+          data: any(named: 'data'),
           options: any(named: 'options'),
-          cancelToken: cancelToken,
+          cancelToken: any(named: 'cancelToken'),
         ),
-      ).thenThrow(
-        DioException(
-          type: DioExceptionType.cancel,
-          requestOptions: RequestOptions(),
-        ),
+      ).thenAnswer(
+        (_) async =>
+            ndjsonResponse(jsonEncode({'code': 'quota_exceeded'}), status: 402),
       );
 
-      expect(
-        () => client.translate(
-          'test',
-          accessToken: 'access-token',
-          cancelToken: cancelToken,
-        ),
+      await expectLater(
+        client.translateStream('test', accessToken: 'access-token').toList(),
         throwsA(
           isA<DioException>().having(
-            (e) => e.type,
-            'type',
-            DioExceptionType.cancel,
+            (e) => e.response?.statusCode,
+            'statusCode',
+            402,
           ),
         ),
       );
+      final log = streamLogs.join('\n');
+      expect(log, contains('/api/v1/stream/translate'));
+      expect(log, contains('402'));
+      expect(log, contains('quota_exceeded'));
+      expect(log, isNot(contains('access-token')));
+    });
+
+    test('流内 __error 帧抛出 SentenceTranslationStreamException', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/translate',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            ndjsonResponse('${jsonEncode({'__error': 'unavailable'})}\n'),
+      );
+
+      await expectLater(
+        client.translateStream('test', accessToken: 'access-token').toList(),
+        throwsA(isA<SentenceTranslationStreamException>()),
+      );
+    });
+
+    test('打印每条原始流式响应帧，便于调试', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/translate',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async => ndjsonResponse(
+          '${opsLine([
+            {
+              'p': ['translation'],
+              'v': '你好',
+            },
+          ])}'
+          '${jsonEncode({'done': true})}\n',
+        ),
+      );
+
+      await client.translateStream('Hi.', accessToken: 'access-token').toList();
+
+      expect(streamLogs.length, 2);
+      expect(streamLogs.first, contains('流式响应帧'));
+      expect(streamLogs.first, contains('"ops"'));
+      expect(streamLogs.first, contains('你好'));
+      expect(streamLogs.last, contains('"done":true'));
     });
   });
 
-  group('analyze', () {
-    test('正常响应返回 SentenceAnalysis', () async {
+  group('analyzeStream', () {
+    /// 构造一个 NDJSON 字节流响应
+    Response<ResponseBody> ndjsonResponse(String ndjson, {int status = 200}) {
+      final bytes = Uint8List.fromList(utf8.encode(ndjson));
+      return Response(
+        data: ResponseBody(Stream<Uint8List>.fromIterable([bytes]), status),
+        statusCode: status,
+        requestOptions: RequestOptions(),
+      );
+    }
+
+    String opsLine(List<Map<String, dynamic>> ops) =>
+        '${jsonEncode({'ops': ops})}\n';
+
+    test('打到 /api/v1/stream/analyze，带 text + Bearer，逐帧渐显 + done', () async {
       when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/analyze',
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/analyze',
           data: {'text': 'She has been studying.'},
           options: any(
             named: 'options',
@@ -127,84 +236,202 @@ void main() {
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
-        (_) async => Response(
-          data: {
-            'analysis': {
-              'grammar': '现在完成进行时',
-              'vocabulary': 'study: 学习',
-              'listening': '表示持续进行的动作',
+        (_) async => ndjsonResponse(
+          '${opsLine([
+            {
+              'p': ['grammar', 0, 'point'],
+              'v': '现在完成进行时',
             },
-          },
-          statusCode: 200,
-          requestOptions: RequestOptions(),
+          ])}'
+          '${opsLine([
+            {
+              'p': ['grammar', 0, 'explanation'],
+              'v': '表持续动作',
+            },
+          ])}'
+          '${jsonEncode({'done': true})}\n',
         ),
       );
 
-      final result = await client.analyze(
-        'She has been studying.',
-        accessToken: 'access-token',
-      );
-      expect(result.grammar, '现在完成进行时');
-      expect(result.vocabulary, 'study: 学习');
-      expect(result.listening, '表示持续进行的动作');
+      final frames = await client
+          .analyzeStream('She has been studying.', accessToken: 'access-token')
+          .toList();
+
+      // 两个 ops 批帧（isFinal=false）+ done 帧（isFinal=true）
+      expect(frames.length, 3);
+      expect(frames.first.isFinal, isFalse);
+      expect(frames.first.analysis.grammar.single.point, '现在完成进行时');
+      expect(frames.last.isFinal, isTrue);
+      expect(frames.last.analysis.grammar.single.explanation, '表持续动作');
     });
 
-    test('服务器错误抛出 DioException', () async {
+    test('非 200（如 402）抛出带状态码的 DioException', () async {
       when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/analyze',
-          data: {'text': 'test'},
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/analyze',
+          data: any(named: 'data'),
           options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
-      ).thenThrow(
-        DioException(
-          type: DioExceptionType.connectionTimeout,
-          requestOptions: RequestOptions(),
-        ),
+      ).thenAnswer(
+        (_) async =>
+            ndjsonResponse(jsonEncode({'code': 'quota_exceeded'}), status: 402),
       );
 
       expect(
-        () => client.analyze('test', accessToken: 'access-token'),
-        throwsA(isA<DioException>()),
+        () =>
+            client.analyzeStream('test', accessToken: 'access-token').toList(),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            402,
+          ),
+        ),
+      );
+    });
+
+    test('流内 __error 帧抛出 SentenceAnalysisStreamException', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/analyze',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            ndjsonResponse('${jsonEncode({'__error': 'unavailable'})}\n'),
+      );
+
+      expect(
+        () =>
+            client.analyzeStream('test', accessToken: 'access-token').toList(),
+        throwsA(isA<SentenceAnalysisStreamException>()),
       );
     });
   });
 
-  group('splitSenseGroups', () {
-    test('调用 v2 认证接口并发送 Bearer token', () async {
-      when(
-        () => mockDio.post<Map<String, dynamic>>(
-          '/api/v2/ai/sense-groups',
-          data: {'text': 'Hello world'},
-          options: any(
-            named: 'options',
-            that: isA<Options>().having(
-              (o) => o.headers?['Authorization'],
-              'Authorization',
-              'Bearer access-token',
+  group('senseGroupsStream', () {
+    /// 构造一个 NDJSON 字节流响应
+    Response<ResponseBody> ndjsonResponse(String ndjson, {int status = 200}) {
+      final bytes = Uint8List.fromList(utf8.encode(ndjson));
+      return Response(
+        data: ResponseBody(Stream<Uint8List>.fromIterable([bytes]), status),
+        statusCode: status,
+        requestOptions: RequestOptions(),
+      );
+    }
+
+    String opsLine(List<Map<String, dynamic>> ops) =>
+        '${jsonEncode({'ops': ops})}\n';
+
+    test(
+      '打到 /api/v1/stream/sense-groups，带 text + Bearer，medium 逐个渐显 + done',
+      () async {
+        when(
+          () => mockDio.post<ResponseBody>(
+            '/api/v1/stream/sense-groups',
+            data: {'text': 'Hello world'},
+            options: any(
+              named: 'options',
+              that: isA<Options>().having(
+                (o) => o.headers?['Authorization'],
+                'Authorization',
+                'Bearer access-token',
+              ),
             ),
+            cancelToken: any(named: 'cancelToken'),
           ),
+        ).thenAnswer(
+          (_) async => ndjsonResponse(
+            // medium[0] → medium[1] 逐个到达，随后 fine，最后 done
+            '${opsLine([
+              {
+                'p': ['medium', 0],
+                'v': 'Hello',
+              },
+            ])}'
+            '${opsLine([
+              {
+                'p': ['medium', 1],
+                'v': ' world',
+              },
+            ])}'
+            '${opsLine([
+              {
+                'p': ['fine', 0],
+                'v': 'Hello',
+              },
+              {
+                'p': ['fine', 1],
+                'v': ' world',
+              },
+            ])}'
+            '${jsonEncode({'done': true})}\n',
+          ),
+        );
+
+        final frames = await client
+            .senseGroupsStream('Hello world', accessToken: 'access-token')
+            .toList();
+
+        // 三个 ops 批帧（isFinal=false）+ done 帧（isFinal=true）
+        expect(frames.length, 4);
+        expect(frames.first.isFinal, isFalse);
+        expect(frames.first.result.medium, ['Hello']);
+        expect(frames.last.isFinal, isTrue);
+        expect(frames.last.result.medium, ['Hello', ' world']);
+        expect(frames.last.result.fine, ['Hello', ' world']);
+      },
+    );
+
+    test('非 200（如 402）抛出带状态码的 DioException', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/sense-groups',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
-        (_) async => Response(
-          data: {
-            'medium': ['Hello world'],
-            'fine': ['Hello', 'world'],
-          },
-          statusCode: 200,
-          requestOptions: RequestOptions(),
+        (_) async =>
+            ndjsonResponse(jsonEncode({'code': 'quota_exceeded'}), status: 402),
+      );
+
+      expect(
+        () => client
+            .senseGroupsStream('test', accessToken: 'access-token')
+            .toList(),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            402,
+          ),
         ),
       );
+    });
 
-      final result = await client.splitSenseGroups(
-        'Hello world',
-        accessToken: 'access-token',
+    test('流内 __error 帧抛出 SenseGroupsStreamException', () async {
+      when(
+        () => mockDio.post<ResponseBody>(
+          '/api/v1/stream/sense-groups',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            ndjsonResponse('${jsonEncode({'__error': 'unavailable'})}\n'),
       );
 
-      expect(result.medium, ['Hello world']);
-      expect(result.fine, ['Hello', 'world']);
+      expect(
+        () => client
+            .senseGroupsStream('test', accessToken: 'access-token')
+            .toList(),
+        throwsA(isA<SenseGroupsStreamException>()),
+      );
     });
   });
 
@@ -235,7 +462,6 @@ void main() {
           ),
         ).thenAnswer(
           (_) async => ndjsonResponse(
-            '${jsonEncode({'q': 'single_word'})}\n'
             '${opsLine([
               {
                 'p': ['headword'],
@@ -255,7 +481,7 @@ void main() {
             .lookupWordStream('run', accessToken: 'tok')
             .toList();
 
-        // 元信息帧不 yield；两个 ops 批各 yield 一帧
+        // 两个 ops 批各 yield 一帧
         expect(frames.length, 2);
         expect(frames.first.headword, 'run');
         expect(frames.last.headword, 'run');
@@ -272,7 +498,6 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => ndjsonResponse(
-          '${jsonEncode({'q': 'single_word'})}\n'
           '${opsLine([
             {
               'p': ['headword'],
@@ -308,7 +533,6 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => ndjsonResponse(
-          '${jsonEncode({'q': 'single_word'})}\n'
           '${opsLine([
             {
               'p': ['headword'],
@@ -350,13 +574,12 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => ndjsonResponse(
-          '${jsonEncode({'q': 'multi_word'})}\n'
-          '${opsLine([
+          opsLine([
             {
               'p': ['originalExpression'],
               'v': 'break a leg',
             },
-          ])}',
+          ]),
         ),
       );
 
@@ -378,7 +601,6 @@ void main() {
         ),
       ).thenAnswer(
         (_) async => ndjsonResponse(
-          '${jsonEncode({'q': 'single_word'})}\n'
           '${opsLine([
             {
               'p': ['headword'],
@@ -423,10 +645,8 @@ void main() {
           cancelToken: any(named: 'cancelToken'),
         ),
       ).thenAnswer(
-        (_) async => ndjsonResponse(
-          '${jsonEncode({'headword': 'run', 'queryType': 'single_word'})}\n'
-          '${jsonEncode({'__error': 'unavailable'})}\n',
-        ),
+        (_) async =>
+            ndjsonResponse('${jsonEncode({'__error': 'unavailable'})}\n'),
       );
 
       await expectLater(
@@ -526,6 +746,7 @@ void main() {
     test('普通构造函数创建实例', () {
       final c = SentenceAiApiClient(baseUrl: 'https://test.com');
       expect(c, isNotNull);
+      expect(c.debugHttpClientAdapter, isA<Http2Adapter>());
       c.dispose();
     });
 
@@ -541,6 +762,42 @@ void main() {
       ).thenAnswer((_) async {});
       client.dispose();
       verify(() => mockDio.close(force: false)).called(1);
+    });
+  });
+
+  group('AI HTTP adapter', () {
+    test('HTTPS API 默认启用 HTTP/2 adapter', () {
+      final dio = Dio();
+
+      configureAiHttpClientAdapter(dio, baseUrl: 'https://api.test');
+
+      expect(shouldUseAiHttp2Adapter('https://api.test'), isTrue);
+      expect(dio.httpClientAdapter, isA<Http2Adapter>());
+    });
+
+    test('HTTP 本地开发地址保持 Dio 默认 adapter', () {
+      final dio = Dio();
+
+      configureAiHttpClientAdapter(dio, baseUrl: 'http://localhost:3000');
+
+      expect(shouldUseAiHttp2Adapter('http://localhost:3000'), isFalse);
+      expect(dio.httpClientAdapter, isNot(isA<Http2Adapter>()));
+    });
+
+    test('显式关闭开关时保持 Dio 默认 adapter', () {
+      final dio = Dio();
+
+      configureAiHttpClientAdapter(
+        dio,
+        baseUrl: 'https://api.test',
+        http2Enabled: false,
+      );
+
+      expect(
+        shouldUseAiHttp2Adapter('https://api.test', http2Enabled: false),
+        isFalse,
+      );
+      expect(dio.httpClientAdapter, isNot(isA<Http2Adapter>()));
     });
   });
 }

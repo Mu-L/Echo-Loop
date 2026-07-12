@@ -195,4 +195,76 @@ void main() {
       expect(engine.synthTexts, ['a', 'b']);
     });
   });
+
+  group('prewarmTextsIncremental（流式逐帧预热）', () {
+    test('同一文本多帧重复 → 只合成一次', () async {
+      final c = makeContainer(
+        const TtsSettings(engine: TtsEngineKind.echoLoop),
+      );
+      addTearDown(c.dispose);
+      final notifier = c.read(ttsControllerProvider.notifier);
+      await Future<void>(() {}); // 等首次 configure 落定
+
+      // 模拟连续三帧携带同一份可发音列表（后续帧未新增例句）。
+      await notifier.prewarmTextsIncremental(['run', 'I run.']);
+      await notifier.prewarmTextsIncremental(['run', 'I run.']);
+      await notifier.prewarmTextsIncremental(['run', 'I run.']);
+
+      expect(engine.synthTexts, ['run', 'I run.'], reason: '已提交文本不重复合成');
+    });
+
+    test('逐帧递增列表 → 只对新出现的例句合成', () async {
+      final c = makeContainer(
+        const TtsSettings(engine: TtsEngineKind.echoLoop),
+      );
+      addTearDown(c.dispose);
+      final notifier = c.read(ttsControllerProvider.notifier);
+      await Future<void>(() {}); // 等首次 configure 落定
+
+      // 帧1：仅单词；帧2：+例句1；帧3：+例句2（模拟流式例句渐显）。
+      await notifier.prewarmTextsIncremental(['run']);
+      await notifier.prewarmTextsIncremental(['run', 'I run.']);
+      await notifier.prewarmTextsIncremental(['run', 'I run.', 'She runs.']);
+
+      expect(engine.synthTexts, ['run', 'I run.', 'She runs.']);
+    });
+
+    test('cancelTextsPrewarm 清空 seen-set → 切词后同一文本可再次预热', () async {
+      final c = makeContainer(
+        const TtsSettings(engine: TtsEngineKind.echoLoop),
+      );
+      addTearDown(c.dispose);
+      final notifier = c.read(ttsControllerProvider.notifier);
+      await Future<void>(() {}); // 等首次 configure 落定
+
+      await notifier.prewarmTextsIncremental(['run']);
+      notifier.cancelTextsPrewarm(); // 切词/关闭：清空去重集合
+      await notifier.prewarmTextsIncremental(['run']);
+
+      expect(engine.synthTexts, [
+        'run',
+        'run',
+      ], reason: '取消后 seen-set 清空，可重新预热');
+    });
+
+    test('cancelTextsPrewarm 中途取消 → 已在途例句结束后剩余不再合成', () async {
+      final c = makeContainer(
+        const TtsSettings(engine: TtsEngineKind.echoLoop),
+      );
+      addTearDown(c.dispose);
+      final notifier = c.read(ttsControllerProvider.notifier);
+      await Future<void>(() {}); // 等首次 configure 落定
+
+      engine.gate('a');
+      final batch = notifier.prewarmTextsIncremental(['a', 'b', 'c']);
+      await pumpEventQueue();
+      expect(engine.synthTexts, ['a'], reason: '第一条已进入合成、阻塞在闸门');
+
+      notifier.cancelTextsPrewarm();
+      engine.release('a');
+      await batch;
+
+      expect(engine.synthTexts, ['a'], reason: '取消后 b、c 不再合成');
+    });
+  });
 }

@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../analytics/geo_interceptor.dart';
 import '../../../config/api_config.dart';
+import '../../../providers/package_info_provider.dart';
+import '../../../services/backend_dio.dart';
 import '../models/audio_content_dto.dart';
 
 part 'official_collection_api.g.dart';
@@ -28,23 +30,16 @@ class AudioTranscriptUnavailable implements Exception {
 class OfficialCollectionApi {
   final Dio _dio;
 
-  OfficialCollectionApi({required String baseUrl})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
+  OfficialCollectionApi({required String baseUrl, String? appVersion})
+    : _dio = createBackendDio(
+        baseUrl: baseUrl,
+        appVersion: appVersion,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        apiLogTag: 'OFFICIAL-COLLECTION',
       ) {
     SharedPreferences.getInstance().then(
       (prefs) => _dio.interceptors.add(GeoInterceptor(prefs)),
-    );
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        logPrint: (obj) => print('[OfficialCollection] $obj'),
-      ),
     );
   }
 
@@ -77,5 +72,8 @@ class OfficialCollectionApi {
 
 @Riverpod(keepAlive: true)
 OfficialCollectionApi officialCollectionApi(Ref ref) {
-  return OfficialCollectionApi(baseUrl: apiBaseUrl);
+  return OfficialCollectionApi(
+    baseUrl: apiBaseUrl,
+    appVersion: readAppVersion(ref),
+  );
 }

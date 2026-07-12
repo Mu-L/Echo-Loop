@@ -155,8 +155,15 @@ void main() {
   }
 
   /// 启动 controller 并保持订阅（autoDispose 在测试中无监听会被立即销毁）
-  DictionaryLookupController start(ProviderContainer c, String word) {
-    final p = dictionaryLookupControllerProvider(word);
+  DictionaryLookupController start(
+    ProviderContainer c,
+    String word, {
+    String? preferredSourceId,
+  }) {
+    final p = dictionaryLookupControllerProvider(
+      word,
+      preferredSourceId: preferredSourceId,
+    );
     final sub = c.listen(p, (_, _) {});
     addTearDown(sub.close);
     return c.read(p.notifier);
@@ -491,6 +498,55 @@ void main() {
     expect(
       c.read(dictionaryLookupControllerProvider('run')).selectedSourceId,
       'a',
+    );
+  });
+
+  test('显式 preferredSourceId 优先于会话粘滞源，且只影响本次查询', () async {
+    final a = ControllableSource('a');
+    final b = ControllableSource('b');
+    final ai = ControllableSource('ai');
+    final c = ProviderContainer(
+      overrides: [
+        dictionarySourcesByIdProvider.overrideWithValue({
+          'a': a,
+          'b': b,
+          'ai': ai,
+        }),
+        resolvedDefaultSourceIdProvider.overrideWithValue('a'),
+        visibleDictionarySourcesProvider.overrideWithValue([a, b, ai]),
+        dictionaryLookupContextProvider.overrideWithValue(
+          const DictionaryLookupContext(
+            accessToken: 'tok',
+            targetLanguage: 'zh-CN',
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.read(dictionarySessionSourceProvider.notifier).remember('b');
+
+    start(c, 'small prompts', preferredSourceId: 'ai');
+    await pump();
+    expect(
+      c
+          .read(
+            dictionaryLookupControllerProvider(
+              'small prompts',
+              preferredSourceId: 'ai',
+            ),
+          )
+          .selectedSourceId,
+      'ai',
+    );
+    expect(ai.calls, hasLength(1));
+    expect(b.calls, isEmpty);
+
+    // 普通后续查询未传 preferredSourceId，仍沿用用户手动选择的会话源。
+    start(c, 'ordinary');
+    await pump();
+    expect(
+      c.read(dictionaryLookupControllerProvider('ordinary')).selectedSourceId,
+      'b',
     );
   });
 

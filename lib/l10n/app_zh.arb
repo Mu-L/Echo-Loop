@@ -2,7 +2,7 @@
   "@@locale": "zh",
   "appTitle": "Echo Loop",
   "premiumTitle": "Echo Loop 会员",
-  "premiumTagline": "解锁无限 AI 学习能力",
+  "premiumTagline": "使用更多 AI，学习更高效。",
   "aiQuotaExceededTitle": "本月免费额度已用完",
   "aiQuotaExceededMessage": "升级会员，畅享无限 AI 查词、翻译与句子解析。",
   "aiQuotaExceededCta": "升级会员",
@@ -11,10 +11,11 @@
   "premiumEntryBadgeActive": "会员",
   "premiumEntryBadgeUpgrade": "升级",
   "premiumActive": "你已是会员",
-  "premiumBenefitTranslation": "无限 AI 翻译",
-  "premiumBenefitAnalysis": "无限 AI 句子解析",
-  "premiumBenefitWordAnalysis": "无限 AI 单词解析",
-  "premiumBenefitTranscription": "更多 AI 字幕转录额度",
+  "premiumBenefitTranslation": "更多 AI 翻译",
+  "premiumBenefitAnalysis": "更多 AI 句子拆解",
+  "premiumBenefitWordAnalysis": "更多 AI 单词讲解",
+  "premiumBenefitTranscription": "更多 AI 字幕转录",
+  "premiumBenefitSenseGroups": "更多 AI 句子意群拆分",
   "premiumSubscribe": "订阅",
   "premiumStartTrial": "开始 {days} 天免费试用",
   "@premiumStartTrial": {
@@ -45,7 +46,6 @@
     }
   },
   "premiumLifetimeAccessNote": "永久有效，无需续订",
-  "premiumAutoRenewNotice": "自动续费，可在 App Store 账户中管理或取消。",
   "premiumNoPlans": "暂无可用套餐，请稍后再试。",
   "premiumLoginRequired": "订阅前请先登录。",
   "premiumPurchaseFailed": "购买失败，请重试。",
@@ -56,7 +56,6 @@
   "premiumWebVerifying": "正在等待支付结果确认…",
   "premiumWebCheckDone": "我已完成支付",
   "premiumWebOpenFailed": "无法打开结账页面，请重试。",
-  "premiumWebAutoRenewNotice": "自动续费。可在账户页或结账确认邮件中管理或取消。",
   "premiumRefresh": "刷新",
   "premiumPeriodMonthly": "月付",
   "premiumPeriodYearly": "年付",
@@ -127,6 +126,25 @@
       "renewal": { "type": "String" }
     }
   },
+  "premiumSpecialOfferPercent": "特别优惠：首{period}立减 {percent}%",
+  "@premiumSpecialOfferPercent": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "premiumSpecialOfferIntro": "特别优惠：{intro}，之后 {renewal}",
+  "@premiumSpecialOfferIntro": {
+    "placeholders": {
+      "intro": { "type": "String" },
+      "renewal": { "type": "String" }
+    }
+  },
+  "premiumOfferPeriodYear": "年",
+  "premiumOfferPeriodMonth": "月",
+  "premiumOfferPeriodGeneric": "期",
+  "premiumTermsShort": "服务条款",
+  "premiumPrivacyShort": "隐私政策",
   "practiceControlModeAuto": "自动",
   "practiceControlModeManual": "手动",
   "player": "播放器",

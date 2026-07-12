@@ -18,6 +18,7 @@ import '../models/app_update_info.dart';
 import '../utils/version_compare.dart';
 import 'android_update_bridge.dart';
 import 'app_logger.dart';
+import 'client_info.dart';
 
 /// App Store Lookup API endpoint。
 const _iosLookupBase = 'https://itunes.apple.com/lookup';
@@ -252,7 +253,12 @@ class AppUpdateChecker {
   Future<AppUpdateInfo?> _checkVersionJson() async {
     AppLogger.log(_logTag, 'version.json start: url=$_url');
     try {
-      final response = await _dio.get<Map<String, dynamic>>(_url);
+      // 仅本请求打自家后端，per-request 携带平台/渠道标识（同一 _dio 还用于打
+      // 外部 App Store Lookup，故不在 BaseOptions 全局注入，避免把标识泄漏给苹果）。
+      final response = await _dio.get<Map<String, dynamic>>(
+        _url,
+        options: Options(headers: clientInfoHeaders()),
+      );
       final data = response.data;
       if (data == null) {
         AppLogger.log(_logTag, 'version.json empty body');

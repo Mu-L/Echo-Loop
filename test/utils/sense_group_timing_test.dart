@@ -203,6 +203,111 @@ void main() {
       expect(timings[1].end, const Duration(milliseconds: 600));
     });
 
+    test('个别意群匹配不上：静默跳过（零长度占位），其余仍映射真实时间、下标对齐', () {
+      // 句子: "I really like it"，但中间插入一个音频里不存在的意群 "and stuff"
+      final words = [
+        _word('I', 0, 100),
+        _word('really', 100, 300),
+        _word('like', 300, 400),
+        _word('it', 400, 600),
+      ];
+      final chunks = ['I really', 'and stuff', 'like it'];
+
+      final timings = mapSenseGroupTimings(
+        chunks: chunks,
+        words: words,
+        sentenceStart: Duration.zero,
+        sentenceEnd: const Duration(milliseconds: 600),
+        sentenceStartWordIndex: 0,
+        sentenceEndWordIndex: 3,
+      );
+
+      // 下标与 chunks 对齐（3 个）
+      expect(timings.length, 3);
+      // 匹配上的用真实时间
+      expect(timings[0].start, const Duration(milliseconds: 0));
+      expect(timings[0].end, const Duration(milliseconds: 300)); // I ~ really
+      // 匹配不上的 "and stuff" → 零长度占位（塌缩到前一意群结束点，非播放）
+      expect(timings[1].start, timings[1].end);
+      expect(timings[1].start, const Duration(milliseconds: 300));
+      // 后续意群不受影响，cursor 未被占位意群推进，仍从 like 起
+      expect(timings[2].start, const Duration(milliseconds: 300)); // like
+      expect(timings[2].end, const Duration(milliseconds: 600)); // it
+    });
+
+    test('缩写/撇号差异下匹配不上的意群零长度占位、不抛', () {
+      final words = [
+        _word("don't", 0, 200),
+        _word('know', 200, 400),
+      ];
+      // "dont" 归一化后不含撇号，与 "don't" 归一化后一致 → 可匹配；"maybe" 不存在 → 占位
+      final chunks = ['dont know', 'maybe'];
+
+      final timings = mapSenseGroupTimings(
+        chunks: chunks,
+        words: words,
+        sentenceStart: Duration.zero,
+        sentenceEnd: const Duration(milliseconds: 400),
+        sentenceStartWordIndex: 0,
+        sentenceEndWordIndex: 1,
+      );
+
+      expect(timings.length, 2);
+      expect(timings[0].start, const Duration(milliseconds: 0));
+      expect(timings[0].end, const Duration(milliseconds: 400));
+      expect(timings[1].start, timings[1].end); // maybe 占位
+    });
+
+    test('重复词：cursor 前移避免回头误匹配', () {
+      // "the cat the dog"，两个 "the"
+      final words = [
+        _word('the', 0, 100),
+        _word('cat', 100, 200),
+        _word('the', 200, 300),
+        _word('dog', 300, 400),
+      ];
+      final chunks = ['the cat', 'the dog'];
+
+      final timings = mapSenseGroupTimings(
+        chunks: chunks,
+        words: words,
+        sentenceStart: Duration.zero,
+        sentenceEnd: const Duration(milliseconds: 400),
+        sentenceStartWordIndex: 0,
+        sentenceEndWordIndex: 3,
+      );
+
+      expect(timings.length, 2);
+      // 第二个 "the cat" 从第二个 the(200) 起，而非回头匹配第一个 the
+      expect(timings[1].start, const Duration(milliseconds: 200));
+      expect(timings[1].end, const Duration(milliseconds: 400));
+    });
+
+    test('流式部分帧：末意群为前缀，仍映射不抛', () {
+      final words = [
+        _word('I', 0, 100),
+        _word('run', 100, 300),
+        _word('fast', 300, 500),
+      ];
+      // 流式中间帧：medium 尚在生成，末 chunk "fa" 是 "fast" 的前缀（首 token 无法精确匹配）
+      final chunks = ['I run', 'fa'];
+
+      final timings = mapSenseGroupTimings(
+        chunks: chunks,
+        words: words,
+        sentenceStart: Duration.zero,
+        sentenceEnd: const Duration(milliseconds: 500),
+        sentenceStartWordIndex: 0,
+        sentenceEndWordIndex: 2,
+      );
+
+      // 不崩；"I run" 精确映射，"fa" 匹配不上 → 零长度占位
+      expect(timings.length, 2);
+      expect(timings[0].start, const Duration(milliseconds: 0));
+      expect(timings[0].end, const Duration(milliseconds: 300));
+      expect(timings[1].start, timings[1].end);
+    });
+
     test('fallback 按词数比例分配时间', () {
       // 构造一个无法匹配的场景
       final words = [_word('xyz', 0, 100)];

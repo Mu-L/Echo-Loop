@@ -65,6 +65,7 @@ dependencies:
   flutter_timezone: ^4.1.1
   crypto: ^3.0.7
   dio: ^5.9.0
+  dio_http2_adapter: ^2.7.1
   # 网络图片磁盘缓存：官方合集封面冷启动后无需重下，离线浏览有图。
   # 用 JsonCacheInfoRepository 替代默认 sqflite 仓库，避免 sqflite 全局 factory 警告
   cached_network_image: ^3.4.1
@@ -148,8 +149,9 @@ flutter:
     - assets/demo/
     # 只打包运行时真正用到的图标（封面图/登录页经 rootBundle 读取）。
     # 目录内其余文件（app-icon-1024-rounded 仅构建期生成 launcher icon、
-    # ic_stat_logo 仅作 Android 通知图标源文件）不进包，避免 iOS 等平台白带。
+    # ic_stat_logo 仅作 Android 通知图标源文件）不进包；订阅页透明底品牌图单独显式打包。
     - assets/icon/app-icon-1024.png
+    - assets/icon/app-icon-1024-alpha.png
     # PDF 导出品牌角标（96px 小图，1024 原图 190KB 直接嵌会撑大每份 PDF）
     - assets/icon/app-icon-96.png
     # 后台静音保活轨：停顿期间循环播放以保持 iOS 音频会话活跃（见 background_audio_handler）
