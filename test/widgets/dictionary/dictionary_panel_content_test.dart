@@ -22,7 +22,7 @@ import '../../helpers/mock_providers.dart';
 /// 词典设置读取的 SharedPreferences（在 setUp 注入），供 [_buildTestPage] override
 late SharedPreferences _prefs;
 
-/// 记录桩控制器每次 [TtsController.prewarmTexts] 的入参（在 setUp 清空），
+/// 记录桩控制器每次 TTS 文本预热的入参（在 setUp 清空），
 /// 供断言「打开弹窗即以单词本身预热」。
 final List<List<String>> _prewarmCalls = [];
 
@@ -37,6 +37,11 @@ class _StubTtsController extends TtsController {
   Future<void> speak(String text, {String? key}) async {}
   @override
   Future<void> prewarmTexts(List<String> texts) async {
+    _prewarmCalls.add(texts);
+  }
+
+  @override
+  Future<void> prewarmTextsIncremental(List<String> texts) async {
     _prewarmCalls.add(texts);
   }
 
