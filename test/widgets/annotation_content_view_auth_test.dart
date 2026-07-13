@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:echo_loop/database/daos/audio_item_dao.dart';
 import 'package:echo_loop/database/daos/sentence_ai_cache_dao.dart';
 import 'package:echo_loop/database/daos/saved_sense_group_dao.dart';
 import 'package:echo_loop/database/providers.dart';
@@ -14,7 +17,9 @@ import 'package:echo_loop/features/auth/providers/auth_providers.dart';
 import 'package:echo_loop/features/subscription/providers/subscription_availability.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/models/sense_group_result.dart';
+import 'package:echo_loop/models/sentence.dart';
 import 'package:echo_loop/models/sentence_ai_result.dart';
+import 'package:echo_loop/providers/audio_sentences_provider.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/router/app_router.dart';
 import 'package:echo_loop/services/sentence_ai_api_client.dart';
@@ -69,11 +74,49 @@ class _QuotaSentenceAiNotifier extends SentenceAiNotifier {
   }
 }
 
+class _RecordingSentenceAiNotifier extends SentenceAiNotifier {
+  _RecordingSentenceAiNotifier({
+    required super.cacheDao,
+    required super.apiClient,
+  });
+
+  final translationRequests = <({String? previous, String? next})>[];
+
+  @override
+  Stream<SentenceTranslation> getTranslationStream(
+    String text, {
+    required String targetLanguage,
+    String? previous,
+    String? next,
+    String? accessToken,
+    CancelToken? cancelToken,
+    bool respectLocalQuotaReset = false,
+  }) async* {
+    translationRequests.add((previous: previous, next: next));
+    yield const SentenceTranslation(translation: 'cached-chain translation');
+  }
+
+  @override
+  Stream<SentenceAnalysis> getAnalysisStream(
+    String text, {
+    required String targetLanguage,
+    String? accessToken,
+    CancelToken? cancelToken,
+    bool respectLocalQuotaReset = false,
+  }) async* {
+    yield const SentenceAnalysis(
+      grammar: [GrammarPoint(point: 'g', note: 'n')],
+    );
+  }
+}
+
 class _UnusedDio extends MockDio {}
 
 class _MockCacheDao extends Mock implements SentenceAiCacheDao {}
 
 class _MockSavedSenseGroupDao extends Mock implements SavedSenseGroupDao {}
+
+class _MockAudioItemDao extends Mock implements AudioItemDao {}
 
 class MockDio extends Mock implements Dio {}
 
@@ -99,6 +142,9 @@ void main() {
     SentenceAiNotifier? aiNotifier,
     bool signedIn = false,
     bool autoLoadSentenceAi = false,
+    String? audioItemId,
+    int? sentenceIndex,
+    List<Override> extraOverrides = const [],
   }) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
@@ -112,6 +158,8 @@ void main() {
               text: 'Hello world.',
               enableGuide: false,
               autoLoadSentenceAi: autoLoadSentenceAi,
+              audioItemId: audioItemId,
+              sentenceIndex: sentenceIndex,
               aiNotifier:
                   aiNotifier ??
                   SentenceAiNotifier(
@@ -144,6 +192,7 @@ void main() {
           ),
           savedSenseGroupDaoProvider.overrideWithValue(savedSenseGroupDao),
           subscriptionAvailabilityProvider.overrideWithValue(true),
+          ...extraOverrides,
         ],
         child: MaterialApp.router(
           locale: const Locale('en'),
@@ -366,5 +415,72 @@ void main() {
     expect(find.text('Upgrade Now'), findsOneWidget);
     expect(aiNotifier.translationRespectLocalQuotaResetValues, [true]);
     expect(aiNotifier.analysisRespectLocalQuotaResetValues, [true]);
+  });
+
+  testWidgets('自动翻译等待前后句上下文就绪后再请求', (tester) async {
+    final cacheDao = _MockCacheDao();
+    final savedSenseGroupDao = _MockSavedSenseGroupDao();
+    final audioItemDao = _MockAudioItemDao();
+    final aiNotifier = _RecordingSentenceAiNotifier(
+      cacheDao: cacheDao,
+      apiClient: _NoopSentenceAiApiClient(),
+    );
+    final sentencesCompleter = Completer<List<Sentence>>();
+
+    when(() => cacheDao.getByHash(any(), any())).thenAnswer((_) async => null);
+    when(
+      savedSenseGroupDao.watchSavedPhraseTexts,
+    ).thenAnswer((_) => Stream<Set<String>>.value(const {}));
+    when(() => audioItemDao.getById('audio-1')).thenAnswer((_) async => null);
+
+    await pumpAuthTestApp(
+      tester,
+      cacheDao: cacheDao,
+      savedSenseGroupDao: savedSenseGroupDao,
+      aiNotifier: aiNotifier,
+      signedIn: true,
+      autoLoadSentenceAi: true,
+      audioItemId: 'audio-1',
+      sentenceIndex: 1,
+      extraOverrides: [
+        audioItemDaoProvider.overrideWithValue(audioItemDao),
+        audioSentencesProvider(
+          'audio-1',
+        ).overrideWith((_) => sentencesCompleter.future),
+      ],
+    );
+
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(aiNotifier.translationRequests, isEmpty);
+
+    sentencesCompleter.complete([
+      Sentence(
+        index: 0,
+        text: 'Previous sentence.',
+        startTime: Duration.zero,
+        endTime: const Duration(seconds: 1),
+      ),
+      Sentence(
+        index: 1,
+        text: 'Hello world.',
+        startTime: const Duration(seconds: 1),
+        endTime: const Duration(seconds: 2),
+      ),
+      Sentence(
+        index: 2,
+        text: 'Next sentence.',
+        startTime: const Duration(seconds: 2),
+        endTime: const Duration(seconds: 3),
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(aiNotifier.translationRequests, hasLength(1));
+    expect(
+      aiNotifier.translationRequests.single.previous,
+      'Previous sentence.',
+    );
+    expect(aiNotifier.translationRequests.single.next, 'Next sentence.');
+    expect(find.text('cached-chain translation'), findsOneWidget);
   });
 }

@@ -34,6 +34,7 @@ const kPlayerSingleSentenceSwipeAreaKey = ValueKey(
 const kPlayerBookmarkSingleSentenceSwipeAreaKey = ValueKey(
   'player-bookmark-single-sentence-swipe-area',
 );
+const kPlayerInfoBarStatusRowKey = ValueKey('player-info-bar-status-row');
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -735,6 +736,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             ),
           ),
           child: SafeArea(
+            bottom: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -822,6 +824,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final iconColor = mutedColor;
 
     final statusRow = Row(
+      key: kPlayerInfoBarStatusRowKey,
       mainAxisSize: MainAxisSize.min,
       children: [
         // 模式标签（列表/精听）依赖字幕分句，无字幕时隐藏。
@@ -878,10 +881,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       ],
     );
 
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final bottomPadding = centered
+        ? (mediaPadding.bottom * 0.35).clamp(4.0, AppSpacing.s).toDouble()
+        : AppSpacing.s;
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.m,
-        vertical: AppSpacing.s,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.m,
+        AppSpacing.s,
+        AppSpacing.m,
+        bottomPadding,
       ),
       child: centered
           ? Center(child: statusRow)

@@ -8,6 +8,7 @@ import 'package:echo_loop/models/sentence_ai_result.dart';
 import 'package:echo_loop/providers/sentence_ai_provider.dart';
 import 'package:echo_loop/utils/sense_group_timing.dart';
 import 'package:echo_loop/widgets/common/shimmer_placeholder.dart';
+import 'package:echo_loop/widgets/practice/selectable_sentence_text.dart';
 import 'package:echo_loop/widgets/practice/sense_group_text.dart';
 import 'package:echo_loop/widgets/practice/sentence_annotation_card.dart';
 
@@ -212,6 +213,26 @@ void main() {
       // 初始自动展开缓存
       expect(find.text('已缓存的翻译'), findsOneWidget);
       expect(requested, isFalse);
+    });
+
+    testWidgets('内联翻译紧跟在原句下方', (tester) async {
+      await tester.pumpWidget(
+        createTestApp(
+          const SentenceAnnotationCard(
+            text: 'Test sentence',
+            cachedTranslation: '已缓存的翻译',
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final sentenceBottom = tester
+          .getBottomLeft(find.byType(SelectableSentenceText))
+          .dy;
+      final translationTop = tester.getTopLeft(find.text('已缓存的翻译')).dy;
+
+      expect(translationTop - sentenceBottom, lessThanOrEqualTo(6));
     });
 
     testWidgets('翻译请求失败显示 SnackBar', (tester) async {

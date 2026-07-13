@@ -9,7 +9,6 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../theme/app_theme.dart';
 
 /// 格式化练习页的遍数文案。
 ///
@@ -55,10 +54,7 @@ class PracticePlayCountLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.m),
-      child: isManualMode ? _buildManualLabel() : _buildAutoLabel(),
-    );
+    return isManualMode ? _buildManualLabel() : _buildAutoLabel();
   }
 
   /// 手动模式：高亮 "手动"

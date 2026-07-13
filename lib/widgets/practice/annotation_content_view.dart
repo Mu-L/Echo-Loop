@@ -772,11 +772,33 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
         .watch(learningSettingsProvider)
         .autoExpandCachedAnnotation;
     // watch 共享字幕投影：撑起其 autoDispose 生命周期（视图在屏则常驻）+ 同步取前后句。
+    // 翻译缓存 key 包含前后句，必须等字幕投影就绪后才允许自动翻译；
+    // 否则首帧会用 null/null 写入无上下文 key，返回页面时再用带上下文 key 读取就会 miss。
     final audioItemId = widget.audioItemId;
-    final sentences = (audioItemId != null && audioItemId.isNotEmpty)
-        ? ref.watch(audioSentencesProvider(audioItemId)).valueOrNull
+    final hasSentenceContextSource =
+        audioItemId != null &&
+        audioItemId.isNotEmpty &&
+        widget.sentenceIndex != null;
+    final sentencesAsync = (audioItemId != null && audioItemId.isNotEmpty)
+        ? ref.watch(audioSentencesProvider(audioItemId))
         : null;
-    final (previousText, nextText) = _neighborTexts(sentences);
+    final translationContextReady =
+        !hasSentenceContextSource || (sentencesAsync?.hasValue ?? false);
+    final sentences = translationContextReady
+        ? sentencesAsync?.valueOrNull
+        : null;
+    final (previousText, nextText) = translationContextReady
+        ? _neighborTexts(sentences)
+        : (null, null);
+
+    Future<(String?, String?)> resolveTranslationContext() async {
+      if (!hasSentenceContextSource) return (null, null);
+      final loadedSentences =
+          sentencesAsync?.valueOrNull ??
+          await ref.read(audioSentencesProvider(audioItemId).future);
+      return _neighborTexts(loadedSentences);
+    }
+
     final cachedTranslation = autoExpand
         ? ai
               ?.getCachedTranslation(
@@ -889,12 +911,14 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                       ? (cancelToken, source) async* {
                           var hasContent = false;
                           try {
+                            final (requestPreviousText, requestNextText) =
+                                await resolveTranslationContext();
                             // await for（非 yield*）确保流内 auth/quota 错误在本
                             // try 内重抛，从而弹登录/订阅（与 onRequestAnalysis 语义一致）。
                             await for (final t in ai.getTranslationStream(
                               widget.text,
-                              previous: previousText,
-                              next: nextText,
+                              previous: requestPreviousText,
+                              next: requestNextText,
                               targetLanguage: nativeLanguage,
                               accessToken: accessToken,
                               cancelToken: cancelToken,
@@ -975,7 +999,8 @@ class _AnnotationContentViewState extends ConsumerState<AnnotationContentView> {
                       : null,
                   cachedTranslation: cachedTranslation,
                   cachedAnalysis: cachedAnalysis,
-                  autoLoadTranslation: shouldAutoLoadSentenceAi,
+                  autoLoadTranslation:
+                      shouldAutoLoadSentenceAi && translationContextReady,
                   autoLoadAnalysis: shouldAutoLoadSentenceAi,
                   onTranslationUserIntent: () {
                     ref

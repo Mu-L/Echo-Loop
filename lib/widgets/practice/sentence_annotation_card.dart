@@ -32,6 +32,12 @@ enum ContentLoadState { idle, loading, loaded, error }
 /// 意群显示模式
 enum SenseGroupMode { off, medium, fine }
 
+/// 句子顶部留白，给词组选区手柄圆点让位。
+const double _sentenceTopPadding = AppSpacing.m - 4;
+
+/// 句子与内联翻译之间的留白，保持译文贴近原句。
+const double _sentenceBottomPadding = AppSpacing.xs;
+
 /// 标注模式句子卡片
 ///
 /// 句子文本经 [SelectableSentenceText] 渲染（点词查词 + 词组选区手柄），
@@ -909,12 +915,14 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 句子文本 — 意群色块模式或纯 RichText（带长按/右键复制整句）。
-        // 上下留白给选区手柄圆点（悬在首行上方/末行下方各约 12dp）让位，
-        // 避免遮挡；上方留白由外部工具栏缩小间距补偿（annotation_content_view）。
+        // 顶部留白给选区手柄圆点让位；底部收紧，让译文紧跟原句。
         _wrapGuide(
           widget.sentenceGuideStep,
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.m - 4),
+            padding: const EdgeInsets.only(
+              top: _sentenceTopPadding,
+              bottom: _sentenceBottomPadding,
+            ),
             child: sentenceBody,
           ),
         ),
@@ -953,7 +961,7 @@ class SentenceAnnotationCardState extends State<SentenceAnnotationCard> {
         );
       case ContentLoadState.loaded:
         content = Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.xs),
+          padding: EdgeInsets.zero,
           child: Text(
             _translationContent ?? '',
             style: theme.textTheme.bodyMedium?.copyWith(

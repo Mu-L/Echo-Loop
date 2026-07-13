@@ -11,6 +11,10 @@ import '../guide_flow.dart';
 import '../practice/practice_play_count_label.dart';
 import 'playback_controls.dart';
 
+const kPracticePlaybackFooterLabelKey = ValueKey(
+  'practice-playback-footer-label',
+);
+
 /// 练习页面共享底部控制区
 class PracticePlaybackFooter extends StatelessWidget {
   /// 是否可以返回上一句
@@ -67,11 +71,19 @@ class PracticePlaybackFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final bottomPadding = isMobile
+        ? (mediaPadding.bottom * 0.35)
+              .clamp(AppSpacing.xs, AppSpacing.s)
+              .toDouble()
+        : AppSpacing.m;
+
     return Padding(
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         left: AppSpacing.l,
         right: AppSpacing.l,
-        bottom: AppSpacing.m,
+        bottom: bottomPadding,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -87,6 +99,7 @@ class PracticePlaybackFooter extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s),
           PracticePlayCountLabel(
+            key: kPracticePlaybackFooterLabelKey,
             isManualMode: isManualMode,
             playCountText: playCountText,
             statusSuffixText: statusSuffixText,

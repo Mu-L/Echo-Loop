@@ -329,6 +329,44 @@ void main() {
         await _disposeTree(tester);
       });
 
+      testWidgets('移动端状态 label 不再占用完整底部安全区', (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        tester.view.padding = const FakeViewPadding(bottom: 34);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPadding);
+
+        final item = createTestAudioItem();
+        final sentences = createTestSentences(count: 3);
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const PlayerScreen(),
+            locale: const Locale('zh'),
+            overrides: _audioOverrides(
+              practiceState: ListeningPracticeState(
+                currentAudioItem: item,
+                sentences: sentences,
+                currentFullIndex: 0,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final statusRowBottom = tester
+            .getRect(find.byKey(kPlayerInfoBarStatusRowKey))
+            .bottom;
+        final screenBottom =
+            tester.view.physicalSize.height / tester.view.devicePixelRatio;
+
+        // 底部状态行只保留压缩后的 8px 间距，避免 Home indicator 的 34px
+        // 全量安全区把播放器控制面板顶高，给上方正文留出更多空间。
+        expect(screenBottom - statusRowBottom, closeTo(8, 0.1));
+        await _disposeTree(tester);
+      });
+
       testWidgets('恢复断点后进度条首帧显示当前绝对位置，不回到 0:00', (tester) async {
         final item = createTestAudioItem();
         final sentences = createTestSentences(count: 6);
