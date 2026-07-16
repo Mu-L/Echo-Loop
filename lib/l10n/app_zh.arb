@@ -56,7 +56,6 @@
   "premiumRestored": "已恢复购买。",
   "premiumWebCheckoutCta": "查看订阅方案",
   "premiumWebVerifying": "正在等待支付结果确认…",
-  "premiumWebCheckDone": "我已完成支付",
   "premiumWebOpenFailed": "无法打开结账页面，请重试。",
   "premiumRefresh": "刷新",
   "premiumPeriodMonthly": "月付",
@@ -65,6 +64,7 @@
   "premiumPriceSuffixMonth": "/月",
   "premiumPriceSuffixYear": "/年",
   "premiumPriceSuffixFirstYear": "/首年",
+  "premiumPriceSuffixFirstMonth": "/首月",
   "premiumPriceSuffixLifetime": "一次性",
   "premiumSavePercent": "立省 {percent}%",
   "@premiumSavePercent": {
@@ -86,12 +86,6 @@
   },
   "premiumIntroFirstMonth": "首月 {price}",
   "@premiumIntroFirstMonth": {
-    "placeholders": {
-      "price": { "type": "String" }
-    }
-  },
-  "premiumIntroFirstPeriod": "首期 {price}",
-  "@premiumIntroFirstPeriod": {
     "placeholders": {
       "price": { "type": "String" }
     }
@@ -144,7 +138,6 @@
   },
   "premiumOfferPeriodYear": "年",
   "premiumOfferPeriodMonth": "月",
-  "premiumOfferPeriodGeneric": "期",
   "premiumTermsShort": "服务条款",
   "premiumPrivacyShort": "隐私政策",
   "practiceControlModeAuto": "自动",

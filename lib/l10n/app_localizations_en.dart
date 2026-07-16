@@ -142,9 +142,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumWebVerifying => 'Waiting for payment to be confirmed…';
 
   @override
-  String get premiumWebCheckDone => 'I\'ve completed payment';
-
-  @override
   String get premiumWebOpenFailed =>
       'Couldn\'t open the checkout page. Please try again.';
 
@@ -170,6 +167,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumPriceSuffixFirstYear => '/first yr';
 
   @override
+  String get premiumPriceSuffixFirstMonth => '/first mo';
+
+  @override
   String get premiumPriceSuffixLifetime => 'One-time';
 
   @override
@@ -190,11 +190,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String premiumIntroFirstMonth(String price) {
     return 'First month $price';
-  }
-
-  @override
-  String premiumIntroFirstPeriod(String price) {
-    return 'First period $price';
   }
 
   @override
@@ -237,9 +232,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumOfferPeriodMonth => 'month';
-
-  @override
-  String get premiumOfferPeriodGeneric => 'period';
 
   @override
   String get premiumTermsShort => 'Terms';

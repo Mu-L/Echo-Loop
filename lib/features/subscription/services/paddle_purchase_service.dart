@@ -3,6 +3,7 @@ library;
 
 import '../models/entitlement.dart';
 import '../models/subscription_plan.dart';
+import '../../../services/app_logger.dart';
 import 'paddle_billing_repository.dart';
 import 'purchase_service.dart';
 
@@ -24,10 +25,24 @@ class PaddlePurchaseService implements PurchaseService {
   }) async {
     final cached = _latestPlans;
     if (includeIntroEligibility && cached != null) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle plans 命中会话缓存: count=${cached.length} '
+            'ids=${cached.map((p) => p.planId).toList()}',
+      );
       return cached;
     }
+    AppLogger.log(
+      'Subscription',
+      'Paddle plans 拉取入口: includeIntroEligibility=$includeIntroEligibility',
+    );
     final plans = await _repository.fetchPlans();
     _latestPlans = plans;
+    AppLogger.log(
+      'Subscription',
+      'Paddle plans 拉取完成: count=${plans.length} '
+          'ids=${plans.map((p) => p.planId).toList()}',
+    );
     return plans;
   }
 
@@ -57,7 +72,14 @@ class PaddlePurchaseService implements PurchaseService {
   @override
   Future<bool> ensureIdentified(String userId) async {
     final token = _accessToken();
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle 身份检查失败: userId=$userId accessToken=empty',
+      );
+      return false;
+    }
+    AppLogger.log('Subscription', 'Paddle 身份检查通过: userId=$userId');
     return true;
   }
 

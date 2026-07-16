@@ -312,6 +312,28 @@ void main() {
     });
   });
 
+  test('direct 匿名对账 → free，不穿透到 Paddle currentEntitlement', () async {
+    await withClock(Clock.fixed(now), () async {
+      final purchases = FakePurchaseService()
+        ..currentError = StateError('Paddle has no anonymous entitlement');
+      final container = makeContainer(
+        identity: SubscriptionIdentity.anonymous,
+        repo: FakeEntitlementRepository((_) async => null),
+        cache: FakeEntitlementCache(),
+        purchases: purchases,
+        paymentChannel: ClientPaymentChannel.web,
+      );
+      container.read(subscriptionControllerProvider);
+      await pumpEventQueue();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.status, EntitlementStatus.free);
+      expect(state.isStale, isFalse);
+      expect(state.error, isNull);
+      expect(purchases.currentCalls, 0);
+    });
+  });
+
   test('登录冷启动 + 远端 active → pro，并落盘缓存', () async {
     await withClock(Clock.fixed(now), () async {
       final cache = FakeEntitlementCache();

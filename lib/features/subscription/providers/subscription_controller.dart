@@ -122,6 +122,11 @@ class SubscriptionController extends _$SubscriptionController {
     final identity = _identity;
     final userId = identity.userId;
     final accessToken = identity.accessToken;
+    AppLogger.log(
+      'Subscription',
+      '权益刷新开始: generation=$generation channel=${_paymentChannel.name} '
+          'userId=${userId ?? "匿名"} hasToken=${accessToken != null}',
+    );
 
     final cached = await _readValidCache(userId);
     Entitlement? remote;
@@ -132,16 +137,34 @@ class SubscriptionController extends _$SubscriptionController {
       if (_paymentChannel == ClientPaymentChannel.web &&
           userId != null &&
           accessToken != null) {
+        AppLogger.log('Subscription', 'Web/direct 权益刷新读取后端: userId=$userId');
         remote = await _repository.fetchRemote(
           userId: userId,
           accessToken: accessToken,
         );
       }
+      if (_paymentChannel == ClientPaymentChannel.web &&
+          remote == null &&
+          (userId == null || accessToken == null)) {
+        // Direct/Paddle 权益只能通过已登录账号从后端读取。匿名或 token 未就绪时
+        // 与 native 匿名无购买保持同一上层语义：明确 free，而不是把无 token 当错误态。
+        remote = Entitlement.free;
+      }
       // Native 渠道或后端不可达时，用平台购买服务的当前权益快照兜底。
-      remote ??= await _purchases.currentEntitlement();
+      if (remote == null) {
+        AppLogger.log(
+          'Subscription',
+          '权益刷新读取购买服务快照: channel=${_paymentChannel.name}',
+        );
+        remote = await _purchases.currentEntitlement();
+      }
     } catch (e) {
       // 失败不静默吞：记录错误、保留兜底，不误判为无权益。
       error = e.toString();
+      AppLogger.log(
+        'Subscription',
+        '权益刷新在线源失败: generation=$generation error=$error',
+      );
     }
 
     if (generation != _generation) return; // 已被更新的对账 / 登录切换作废。
@@ -204,32 +227,77 @@ class SubscriptionController extends _$SubscriptionController {
   /// 只有 webhook 更新后端权益并由 [refresh] 读回才算购买完成。
   Future<Uri> startPaddleCheckout(String planId) async {
     if (_paymentChannel != ClientPaymentChannel.web) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 中止: channel=${_paymentChannel.name} planId=$planId',
+      );
       throw PurchaseException('当前渠道不支持 Paddle checkout');
     }
+    AppLogger.log(
+      'Subscription',
+      'Paddle checkout 创建入口: planId=$planId '
+          'userId=${_identity.userId ?? "匿名"}',
+    );
     await _ensurePurchaseIdentity();
     final token = _identity.accessToken;
     if (token == null || token.isEmpty) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 中止: planId=$planId reason=tokenEmpty',
+      );
       throw PurchaseException('订阅身份未就绪，请稍后重试');
     }
-    final session = await ref
-        .read(paddleBillingRepositoryProvider)
-        .createCheckout(accessToken: token, planId: planId);
-    return session.checkoutUrl;
+    try {
+      final session = await ref
+          .read(paddleBillingRepositoryProvider)
+          .createCheckout(accessToken: token, planId: planId);
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 创建完成: planId=$planId '
+            'attemptId=${session.attemptId} host=${session.checkoutUrl.host}',
+      );
+      return session.checkoutUrl;
+    } catch (error) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 创建失败: planId=$planId error=$error',
+      );
+      rethrow;
+    }
   }
 
   /// 创建 Paddle Customer Portal session，供 direct 用户取消订阅或更新支付方式。
   Future<Uri> createPaddlePortal() async {
     if (_paymentChannel != ClientPaymentChannel.web) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle Portal 中止: channel=${_paymentChannel.name}',
+      );
       throw PurchaseException('当前渠道不支持 Paddle Portal');
     }
+    AppLogger.log(
+      'Subscription',
+      'Paddle Portal 创建入口: userId=${_identity.userId ?? "匿名"}',
+    );
     await _ensurePurchaseIdentity();
     final token = _identity.accessToken;
     if (token == null || token.isEmpty) {
+      AppLogger.log('Subscription', 'Paddle Portal 中止: reason=tokenEmpty');
       throw PurchaseException('订阅身份未就绪，请稍后重试');
     }
-    return ref
-        .read(paddleBillingRepositoryProvider)
-        .createPortal(accessToken: token);
+    try {
+      final uri = await ref
+          .read(paddleBillingRepositoryProvider)
+          .createPortal(accessToken: token);
+      AppLogger.log(
+        'Subscription',
+        'Paddle Portal 创建完成: host=${uri.host} path=${uri.path}',
+      );
+      return uri;
+    } catch (error) {
+      AppLogger.log('Subscription', 'Paddle Portal 创建失败: error=$error');
+      rethrow;
+    }
   }
 
   /// 恢复购买。

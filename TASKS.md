@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-15（direct 渠道切换为 Paddle 自建支付）
+> 最后更新：2026-07-16（收口顶部优惠条展示优先级）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -60,6 +60,14 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-16 15:04：降低 direct/Paddle checkout 后权益确认轮询频次：`/api/entitlements` 轮询间隔由 3 秒改为 5 秒，保持总等待约 2 分钟，并补充轮询间隔 widget 断言。
+- [x] 2026-07-16 14:39：修复 direct/Paddle 支付等待态深色主题加载圈可见性：等待按钮禁用时保留 Premium 蓝底，spinner 使用蓝底对比色，并补充深色主题 widget 断言。
+- [x] 2026-07-16 14:26：简化 direct/Paddle 支付等待态：打开 checkout 后主订阅按钮切换为禁用加载态，移除额外等待 label 与“我已完成支付”按钮，并补充 widget 回归断言。
+- [x] 2026-07-16 11:15：收口订阅页顶部优惠高亮条：monthly/yearly 都有 paid intro offer 时只展示 yearly；yearly 不存在但 monthly 存在时展示 monthly；两者都没有可展示优惠时隐藏高亮条，并补充三类 widget 回归。
+- [x] 2026-07-16 10:55：统一 monthly/yearly paid intro offer 展示逻辑：套餐卡优惠价后缀改为只按月/年显示 `/first mo` / `/first yr`，补充中英文文案、monthly offer 显示回归与 Paddle monthly intro DTO 映射断言。
+- [x] 2026-07-16 10:45：适配后端 Paddle plans 新 DTO：App 请求不再发送 locale；direct 套餐解析移除 title / 旧 intro price 依赖，按 percentage intro offer 推导优惠展示价，并补充 repository 与价格工具回归测试。
+- [x] 2026-07-16 09:16：统一 direct/Paddle 与 native 订阅的上层行为：Paddle plans 返回 `introOffer` 时复用 native 同一套 Special offer 展示逻辑；direct 匿名权益对账直接进入 free，不再把无 token 当作 Paddle 在线源错误；补充 paywall 与 controller 回归断言。
+- [x] 2026-07-16 08:23：补强 direct/Paddle 订阅全流程关键日志，覆盖套餐加载/重试、checkout 创建与浏览器打开、权益轮询/手动检查、后端权益刷新、Customer Portal 与异常路径，便于定位未登录打开订阅页价格不显示等问题。
 - [x] 2026-07-15 23:32：修复原生订阅的“管理订阅”入口，iOS 优先调用 StoreKit 系统订阅管理页，Android 优先打开 Play Store 订阅管理页，并保留平台不可用时的外部链接兜底。
 - [x] 2026-07-15 23:04：修复原生恢复购买归属校验，RevenueCat restore 返回的订阅若已绑定其他 Echo Loop 账号则拒绝写入当前账号，并在订阅页提示登录原账号后重试。
 - [x] 2026-07-15：direct 渠道由 RevenueCat Web Purchase Link 切换为后端 Paddle 集成；App 展示 Paddle 月付/年付套餐，登录后创建 checkout、等待统一权益生效，并通过 Paddle Customer Portal 管理订阅；App Store / Google Play 的 RevenueCat 购买与恢复路径保持隔离。

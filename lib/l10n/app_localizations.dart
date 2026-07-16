@@ -344,12 +344,6 @@ abstract class AppLocalizations {
   /// **'Waiting for payment to be confirmed…'**
   String get premiumWebVerifying;
 
-  /// No description provided for @premiumWebCheckDone.
-  ///
-  /// In en, this message translates to:
-  /// **'I\'ve completed payment'**
-  String get premiumWebCheckDone;
-
   /// No description provided for @premiumWebOpenFailed.
   ///
   /// In en, this message translates to:
@@ -398,6 +392,12 @@ abstract class AppLocalizations {
   /// **'/first yr'**
   String get premiumPriceSuffixFirstYear;
 
+  /// No description provided for @premiumPriceSuffixFirstMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'/first mo'**
+  String get premiumPriceSuffixFirstMonth;
+
   /// No description provided for @premiumPriceSuffixLifetime.
   ///
   /// In en, this message translates to:
@@ -427,12 +427,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'First month {price}'**
   String premiumIntroFirstMonth(String price);
-
-  /// No description provided for @premiumIntroFirstPeriod.
-  ///
-  /// In en, this message translates to:
-  /// **'First period {price}'**
-  String premiumIntroFirstPeriod(String price);
 
   /// No description provided for @premiumRenewalPricePerYear.
   ///
@@ -487,12 +481,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'month'**
   String get premiumOfferPeriodMonth;
-
-  /// No description provided for @premiumOfferPeriodGeneric.
-  ///
-  /// In en, this message translates to:
-  /// **'period'**
-  String get premiumOfferPeriodGeneric;
 
   /// No description provided for @premiumTermsShort.
   ///

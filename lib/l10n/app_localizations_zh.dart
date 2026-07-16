@@ -139,9 +139,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumWebVerifying => '正在等待支付结果确认…';
 
   @override
-  String get premiumWebCheckDone => '我已完成支付';
-
-  @override
   String get premiumWebOpenFailed => '无法打开结账页面，请重试。';
 
   @override
@@ -166,6 +163,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumPriceSuffixFirstYear => '/首年';
 
   @override
+  String get premiumPriceSuffixFirstMonth => '/首月';
+
+  @override
   String get premiumPriceSuffixLifetime => '一次性';
 
   @override
@@ -186,11 +186,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String premiumIntroFirstMonth(String price) {
     return '首月 $price';
-  }
-
-  @override
-  String premiumIntroFirstPeriod(String price) {
-    return '首期 $price';
   }
 
   @override
@@ -233,9 +228,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get premiumOfferPeriodMonth => '月';
-
-  @override
-  String get premiumOfferPeriodGeneric => '期';
 
   @override
   String get premiumTermsShort => '服务条款';

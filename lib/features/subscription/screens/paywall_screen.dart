@@ -59,6 +59,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     // 页面首帧优先消费会话缓存，再让 SDK 在后台校验当前 offering/storefront。
     Future.microtask(() {
       if (!mounted) return;
+      final webMode = ref.read(webCheckoutModeProvider);
+      AppLogger.log(
+        'Subscription',
+        'paywall init refresh plans: webMode=$webMode',
+      );
       unawaited(
         ref.read(subscriptionPlansProvider.notifier).refresh(force: true),
       );
@@ -92,9 +97,10 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     // direct 渠道复用统一套餐 UI，购买动作改为 Paddle 浏览器结账 + 回流对账。
     final webMode = ref.watch(webCheckoutModeProvider);
     final plansAsync = isPremium ? null : ref.watch(subscriptionPlansProvider);
-    final specialOfferLabel = webMode
-        ? null
-        : _specialOfferLabel(l10n, plansAsync?.valueOrNull ?? const []);
+    final specialOfferLabel = _specialOfferLabel(
+      l10n,
+      plansAsync?.valueOrNull ?? const [],
+    );
     AppLogger.log(
       'Subscription',
       'paywall build: isPremium=$isPremium webMode=$webMode '
@@ -173,24 +179,38 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     AppLocalizations l10n,
     List<SubscriptionPlan> plans,
   ) {
-    final plan = plans.where(_hasPaidIntroOffer).firstOrNull;
+    final plan = _specialOfferPlan(plans);
     if (plan == null) return null;
     final offer = plan.introOffer;
     if (offer == null) return null;
-    final discounted = isIntroOfferDiscounted(plan);
-    if (discounted == false) return null;
 
     final percent = computeIntroOfferDiscountPercent(plan);
-    if (percent != null && percent > 0) {
-      return l10n.premiumSpecialOfferPercent(
-        percent,
-        _offerPeriodName(l10n, offer),
-      );
+    final offerPeriodName = _offerPeriodName(l10n, plan);
+    if (percent != null && percent > 0 && offerPeriodName.isNotEmpty) {
+      return l10n.premiumSpecialOfferPercent(percent, offerPeriodName);
     }
     return l10n.premiumSpecialOfferIntro(
-      _introLabelForOffer(l10n, offer),
+      _introLabelForOffer(l10n, plan, offer),
       _renewalLabelForPlan(l10n, plan, offer),
     );
+  }
+
+  SubscriptionPlan? _specialOfferPlan(List<SubscriptionPlan> plans) {
+    final yearly = plans.where(
+      (plan) => plan.period == SubscriptionPeriod.yearly,
+    );
+    final yearlyOffer = yearly.where(_hasDisplayablePaidIntroOffer).firstOrNull;
+    if (yearlyOffer != null) return yearlyOffer;
+
+    final monthly = plans.where(
+      (plan) => plan.period == SubscriptionPeriod.monthly,
+    );
+    return monthly.where(_hasDisplayablePaidIntroOffer).firstOrNull;
+  }
+
+  bool _hasDisplayablePaidIntroOffer(SubscriptionPlan plan) {
+    if (!_hasPaidIntroOffer(plan)) return false;
+    return isIntroOfferDiscounted(plan) != false;
   }
 
   bool _hasPaidIntroOffer(SubscriptionPlan plan) {
@@ -244,20 +264,33 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => _NoPlans(
-        l10n: l10n,
-        onRetry: () => ref.invalidate(subscriptionPlansProvider),
-      ),
+      error: (error, _) {
+        AppLogger.log('Subscription', 'paywall 套餐区错误态: error=$error');
+        return _NoPlans(
+          l10n: l10n,
+          onRetry: () {
+            AppLogger.log('Subscription', 'paywall 套餐重试点击');
+            ref.invalidate(subscriptionPlansProvider);
+          },
+        );
+      },
       data: (plans) {
         if (plans.isEmpty) {
+          AppLogger.log('Subscription', 'paywall 套餐为空，展示重试');
           return _NoPlans(
             l10n: l10n,
-            onRetry: () => ref.invalidate(subscriptionPlansProvider),
+            onRetry: () {
+              AppLogger.log('Subscription', 'paywall 空套餐重试点击');
+              ref.invalidate(subscriptionPlansProvider);
+            },
           );
         }
         final selectedId = _effectiveSelection(plans);
         final selected = plans.firstWhere((p) => p.planId == selectedId);
         final yearlyValue = _yearlyValueOf(plans);
+        final brightness = Theme.of(context).brightness;
+        final accent = AppTheme.premiumAccent(brightness);
+        final onAccent = AppTheme.onPremiumAccent(brightness);
         return Column(
           children: [
             for (var index = 0; index < plans.length; index++) ...[
@@ -273,44 +306,22 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     setState(() => _selectedPlanId = plans[index].planId),
               ),
             ],
-            if (webMode && _waitingForWeb) ...[
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(child: Text(l10n.premiumWebVerifying)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: _busy ? null : _manualCheckEntitlement,
-                child: Text(l10n.premiumWebCheckDone),
-              ),
-            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.premiumAccent(
-                    Theme.of(context).brightness,
-                  ),
-                  foregroundColor: AppTheme.onPremiumAccent(
-                    Theme.of(context).brightness,
-                  ),
+                  backgroundColor: accent,
+                  foregroundColor: onAccent,
+                  disabledBackgroundColor: _waitingForWeb ? accent : null,
+                  disabledForegroundColor: _waitingForWeb ? onAccent : null,
                 ),
-                onPressed: _busy
+                onPressed: _busy || _waitingForWeb
                     ? null
                     : () => webMode
                           ? _startPaddleCheckout(selected)
                           : _purchase(selected),
-                child: Text(_ctaLabel(l10n, selected)),
+                child: _ctaChild(l10n, selected),
               ),
             ),
             const SizedBox(height: 2),
@@ -324,7 +335,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   /// 发起 Paddle 结账：登录 → 服务端创建 transaction → 系统浏览器打开 →
   /// 等待 webhook 后刷新统一权益。打开 URL 本身永远不视为购买成功。
   Future<void> _startPaddleCheckout(SubscriptionPlan plan) async {
-    if (!await _ensureSignedIn() || !mounted) return;
+    AppLogger.log('Subscription', 'Paddle checkout 点击: planId=${plan.planId}');
+    if (!await _ensureSignedIn() || !mounted) {
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 点击中止: planId=${plan.planId} reason=notSignedIn',
+      );
+      return;
+    }
     setState(() => _busy = true);
     bool opened;
     Uri? uri;
@@ -332,6 +350,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       uri = await ref
           .read(subscriptionControllerProvider.notifier)
           .startPaddleCheckout(plan.planId);
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout URL 已获取: planId=${plan.planId} '
+            'host=${uri.host} path=${uri.path}',
+      );
       opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     } catch (e) {
       AppLogger.log('Subscription', 'Paddle checkout 异常: $e');
@@ -360,46 +383,68 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   /// 权益真相在后端（RC webhook 落库），浏览器结账成功回跳不作数——必须回源确认。
   /// 用户从浏览器返回 App 时 resume 也会触发 refresh（main.dart），双保险。
   Future<void> _pollEntitlement() async {
-    const interval = Duration(seconds: 3);
-    const maxAttempts = 40; // ~2 分钟
+    const interval = Duration(seconds: 5);
+    const maxAttempts = 24; // ~2 分钟
+    AppLogger.log(
+      'Subscription',
+      'Paddle checkout 权益轮询开始: maxAttempts=$maxAttempts',
+    );
     for (var i = 0; i < maxAttempts; i++) {
-      if (!mounted || !_waitingForWeb) return;
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
+      if (!mounted || !_waitingForWeb) {
+        AppLogger.log(
+          'Subscription',
+          'Paddle checkout 权益轮询停止: attempt=${i + 1} '
+              'mounted=$mounted waiting=$_waitingForWeb',
+        );
+        return;
+      }
+      try {
+        await ref.read(subscriptionControllerProvider.notifier).refresh();
+      } catch (error) {
+        AppLogger.log(
+          'Subscription',
+          'Paddle checkout 权益轮询刷新异常: attempt=${i + 1} error=$error',
+        );
+      }
       if (!mounted) return;
-      if (ref.read(subscriptionControllerProvider).isActive) {
+      final state = ref.read(subscriptionControllerProvider);
+      AppLogger.log(
+        'Subscription',
+        'Paddle checkout 权益轮询结果: attempt=${i + 1} '
+            'status=${state.status.name} isActive=${state.isActive} '
+            'isStale=${state.isStale} error=${state.error ?? "none"}',
+      );
+      if (state.isActive) {
         setState(() => _waitingForWeb = false);
         if (mounted) context.pop();
         return;
       }
       await Future<void>.delayed(interval);
     }
+    AppLogger.log('Subscription', 'Paddle checkout 权益轮询超时');
     if (mounted) setState(() => _waitingForWeb = false);
-  }
-
-  /// 「我已完成支付」：立即回源对账一次（不必等轮询间隔）。
-  Future<void> _manualCheckEntitlement() async {
-    setState(() => _busy = true);
-    try {
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
-      if (!mounted) return;
-      if (ref.read(subscriptionControllerProvider).isActive) {
-        setState(() => _waitingForWeb = false);
-        context.pop();
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   /// Web 渠道恢复购买：直接触发后端对账并提示当前账号的权益状态。
   Future<void> _refreshEntitlement() async {
+    AppLogger.log('Subscription', 'Web/direct 恢复购买点击：刷新后端权益');
     setState(() => _busy = true);
     try {
       await ref.read(subscriptionControllerProvider.notifier).refresh();
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      final active = ref.read(subscriptionControllerProvider).isActive;
+      final state = ref.read(subscriptionControllerProvider);
+      final active = state.isActive;
+      AppLogger.log(
+        'Subscription',
+        'Web/direct 恢复购买结果: status=${state.status.name} '
+            'isActive=$active isStale=${state.isStale} '
+            'error=${state.error ?? "none"}',
+      );
       _showMessage(active ? l10n.premiumRestored : l10n.premiumRestoreNone);
+    } catch (error) {
+      AppLogger.log('Subscription', 'Web/direct 恢复购买异常: $error');
+      rethrow;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -433,17 +478,39 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     return l10n.premiumSubscribe;
   }
 
+  Widget _ctaChild(AppLocalizations l10n, SubscriptionPlan plan) {
+    if (!_waitingForWeb) {
+      return Text(_ctaLabel(l10n, plan));
+    }
+    final onAccent = AppTheme.onPremiumAccent(Theme.of(context).brightness);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: onAccent),
+        ),
+        const SizedBox(width: 10),
+        Flexible(child: Text(l10n.premiumWebVerifying)),
+      ],
+    );
+  }
+
   /// 购买 / 恢复前的统一登录门：权益需绑定 Supabase user_id（跨设备 / 可恢复），
   /// 复用全 App 通用的 [ensureSignedInForAction]（弹登录引导 → 跳登录页），
   /// 未登录返回 false，调用方据此中止本次动作。
   Future<bool> _ensureSignedIn() async {
     final l10n = AppLocalizations.of(context)!;
-    return ensureSignedInForAction(
+    final signedIn = await ensureSignedInForAction(
       context: context,
       ref: ref,
       title: l10n.authSignInTitle,
       message: l10n.premiumLoginRequired,
     );
+    AppLogger.log('Subscription', '订阅动作登录门结果: signedIn=$signedIn');
+    return signedIn;
   }
 
   Future<void> _purchase(SubscriptionPlan plan) async {
@@ -509,13 +576,25 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   }
 
   Future<void> _openPaddlePortal() async {
-    if (!await _ensureSignedIn() || !mounted) return;
+    AppLogger.log('Subscription', 'Paddle Portal 点击');
+    if (!await _ensureSignedIn() || !mounted) {
+      AppLogger.log('Subscription', 'Paddle Portal 点击中止: reason=notSignedIn');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final uri = await ref
           .read(subscriptionControllerProvider.notifier)
           .createPaddlePortal();
+      AppLogger.log(
+        'Subscription',
+        'Paddle Portal URL 已获取: host=${uri.host} path=${uri.path}',
+      );
       final opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      AppLogger.log(
+        'Subscription',
+        'Paddle Portal open result: opened=$opened host=${uri.host}',
+      );
       if (!opened && mounted) {
         _showMessage(AppLocalizations.of(context)!.premiumWebOpenFailed);
       }
@@ -711,26 +790,25 @@ class _FixedPurchasePanel extends StatelessWidget {
   }
 }
 
-String _offerPeriodName(AppLocalizations l10n, SubscriptionIntroOffer offer) {
-  return switch (offer.period) {
-    SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
-      l10n.premiumOfferPeriodYear,
-    SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
-      l10n.premiumOfferPeriodMonth,
-    _ => l10n.premiumOfferPeriodGeneric,
+String _offerPeriodName(AppLocalizations l10n, SubscriptionPlan plan) {
+  return switch (plan.period) {
+    SubscriptionPeriod.yearly => l10n.premiumOfferPeriodYear,
+    SubscriptionPeriod.monthly => l10n.premiumOfferPeriodMonth,
+    _ => '',
   };
 }
 
 String _introLabelForOffer(
   AppLocalizations l10n,
+  SubscriptionPlan plan,
   SubscriptionIntroOffer offer,
 ) {
-  return switch (offer.period) {
-    SubscriptionOfferPeriod.year when offer.periodNumberOfUnits == 1 =>
-      l10n.premiumIntroFirstYear(offer.priceString),
-    SubscriptionOfferPeriod.month when offer.periodNumberOfUnits == 1 =>
-      l10n.premiumIntroFirstMonth(offer.priceString),
-    _ => l10n.premiumIntroFirstPeriod(offer.priceString),
+  return switch (plan.period) {
+    SubscriptionPeriod.yearly => l10n.premiumIntroFirstYear(offer.priceString),
+    SubscriptionPeriod.monthly => l10n.premiumIntroFirstMonth(
+      offer.priceString,
+    ),
+    _ => offer.priceString,
   };
 }
 
@@ -788,20 +866,22 @@ class _PlanCard extends StatelessWidget {
     SubscriptionPeriod.lifetime => l10n.premiumPriceSuffixLifetime,
   };
 
-  /// 卡片右侧主价格：付费首期优惠展示用户首年实际支付价；免费试用仍展示续费价。
+  /// 卡片右侧主价格：付费 intro offer 展示用户优惠价；免费试用仍展示续费价。
   String _displayPrice() {
     final offer = plan.introOffer;
     if (offer != null && !offer.isFreeTrial) return offer.priceString;
     return plan.priceString;
   }
 
-  /// 卡片右侧价格后缀：付费首年优惠需要明确这是首年价格。
+  /// 卡片右侧价格后缀：付费 intro offer 只区分首月/首年，未知周期回退原周期。
   String _displayPriceSuffix() {
     final offer = plan.introOffer;
-    if (offer != null &&
-        !offer.isFreeTrial &&
-        plan.period == SubscriptionPeriod.yearly) {
-      return l10n.premiumPriceSuffixFirstYear;
+    if (offer != null && !offer.isFreeTrial) {
+      return switch (offer.period) {
+        SubscriptionOfferPeriod.year => l10n.premiumPriceSuffixFirstYear,
+        SubscriptionOfferPeriod.month => l10n.premiumPriceSuffixFirstMonth,
+        _ => _priceSuffix(),
+      };
     }
     return _priceSuffix();
   }
@@ -815,7 +895,7 @@ class _PlanCard extends StatelessWidget {
     final savePercent = yearlyValue?.savePercent;
     final perMonth = offer == null ? yearlyValue?.perMonth : null;
 
-    // 副标题优先级：平台首期促销 > 每月折合价 > 试用提示。
+    // 副标题优先级：平台 intro offer > 每月折合价 > 试用提示。
     final String? subtitle = offer != null
         ? _offerSubtitle(l10n, offer)
         : (perMonth != null
@@ -939,7 +1019,10 @@ class _PlanCard extends StatelessWidget {
     if (offer.isFreeTrial && plan.trialDays > 0) {
       return l10n.premiumTryFreeThen(plan.trialDays, renewal);
     }
-    return l10n.premiumOfferThen(_introLabelForOffer(l10n, offer), renewal);
+    return l10n.premiumOfferThen(
+      _introLabelForOffer(l10n, plan, offer),
+      renewal,
+    );
   }
 
   String _introLog(SubscriptionIntroOffer? offer) {

@@ -56,7 +56,6 @@
   "premiumRestored": "Purchases restored.",
   "premiumWebCheckoutCta": "Continue to secure checkout",
   "premiumWebVerifying": "Waiting for payment to be confirmed…",
-  "premiumWebCheckDone": "I've completed payment",
   "premiumWebOpenFailed": "Couldn't open the checkout page. Please try again.",
   "premiumRefresh": "Refresh",
   "premiumPeriodMonthly": "Monthly",
@@ -65,6 +64,7 @@
   "premiumPriceSuffixMonth": "/mo",
   "premiumPriceSuffixYear": "/yr",
   "premiumPriceSuffixFirstYear": "/first yr",
+  "premiumPriceSuffixFirstMonth": "/first mo",
   "premiumPriceSuffixLifetime": "One-time",
   "premiumSavePercent": "Save {percent}%",
   "@premiumSavePercent": {
@@ -86,12 +86,6 @@
   },
   "premiumIntroFirstMonth": "First month {price}",
   "@premiumIntroFirstMonth": {
-    "placeholders": {
-      "price": { "type": "String" }
-    }
-  },
-  "premiumIntroFirstPeriod": "First period {price}",
-  "@premiumIntroFirstPeriod": {
     "placeholders": {
       "price": { "type": "String" }
     }
@@ -144,7 +138,6 @@
   },
   "premiumOfferPeriodYear": "year",
   "premiumOfferPeriodMonth": "month",
-  "premiumOfferPeriodGeneric": "period",
   "premiumTermsShort": "Terms",
   "premiumPrivacyShort": "Privacy",
   "practiceControlModeAuto": "Auto",

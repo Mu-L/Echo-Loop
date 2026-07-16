@@ -11,6 +11,7 @@ import 'package:echo_loop/features/subscription/screens/paywall_screen.dart';
 import 'package:echo_loop/features/subscription/services/purchase_service.dart';
 import 'package:echo_loop/features/subscription/state/entitlement_state.dart';
 import 'package:echo_loop/l10n/app_localizations.dart';
+import 'package:echo_loop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -164,6 +165,7 @@ Widget _harness({
   // 网页支付渠道（侧载 APK / 桌面）：切换到浏览器结账购买态。
   bool webCheckout = false,
   SubscriptionIdentity? identity,
+  ThemeMode themeMode = ThemeMode.light,
 }) {
   return ProviderScope(
     overrides: [
@@ -180,7 +182,10 @@ Widget _harness({
       if (identity != null)
         subscriptionIdentityProvider.overrideWithValue(identity),
     ],
-    child: const MaterialApp(
+    child: MaterialApp(
+      themeMode: themeMode,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       localizationsDelegates: [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -188,7 +193,7 @@ Widget _harness({
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: [Locale('en'), Locale('zh')],
-      home: PaywallScreen(),
+      home: const PaywallScreen(),
     ),
   );
 }
@@ -237,7 +242,7 @@ void main() {
 
     // 权益列表仍展示
     expect(find.text('More AI subtitle transcription'), findsOneWidget);
-    expect(find.text('Special offer:'), findsNothing);
+    expect(find.text('Special offer: 50% off your first year'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
     expect(find.textContaining('RevenueCat'), findsNothing);
     expect(find.textContaining('Paddle'), findsNothing);
@@ -285,6 +290,7 @@ void main() {
           accessToken: 'token',
         ),
         controller: () => spy,
+        themeMode: ThemeMode.dark,
       ),
     );
     await tester.pumpAndSettle();
@@ -299,12 +305,36 @@ void main() {
       urlLauncher.options.single.mode,
       PreferredLaunchMode.inAppBrowserView,
     );
-    expect(find.text('Waiting for payment to be confirmed…'), findsOneWidget);
+    final waitingButton = find.widgetWithText(
+      FilledButton,
+      'Waiting for payment to be confirmed…',
+    );
+    expect(waitingButton, findsOneWidget);
+    final button = tester.widget<FilledButton>(waitingButton);
+    expect(button.onPressed, isNull);
+    expect(
+      button.style?.backgroundColor?.resolve({WidgetState.disabled}),
+      AppTheme.premiumAccent(Brightness.dark),
+    );
+    final progress = tester.widget<CircularProgressIndicator>(
+      find.descendant(
+        of: waitingButton,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+    );
+    expect(progress.color, AppTheme.onPremiumAccent(Brightness.dark));
     expect(
       find.widgetWithText(OutlinedButton, 'I\'ve completed payment'),
-      findsOneWidget,
+      findsNothing,
     );
+    await tester.tap(waitingButton);
+    await tester.pump();
+    expect(spy.checkoutCalls, 1);
     expect(spy.refreshCalls, 1);
+    await tester.pump(const Duration(seconds: 4));
+    expect(spy.refreshCalls, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(spy.refreshCalls, 2);
 
     await tester.pump(const Duration(seconds: 121));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -481,7 +511,7 @@ void main() {
     expect(find.text('Restore Purchases'), findsOneWidget);
   });
 
-  testWidgets('年付首期促销：展示首年价、续费价与相对月付折扣', (tester) async {
+  testWidgets('年付 intro offer：展示首年价、续费价与相对月付折扣', (tester) async {
     const promoPlans = [
       SubscriptionPlan(
         planId: 'monthly',
@@ -541,7 +571,48 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
   });
 
-  testWidgets('非 50% 首期促销：顶部优惠条动态显示真实折扣', (tester) async {
+  testWidgets('顶部优惠条：monthly/yearly 都有优惠时只展示 yearly', (tester) async {
+    const promoPlans = [
+      SubscriptionPlan(
+        planId: 'monthly',
+        title: 'Monthly',
+        priceString: r'$12.00',
+        period: SubscriptionPeriod.monthly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$3.00',
+          period: SubscriptionOfferPeriod.month,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$12.00',
+        ),
+      ),
+      SubscriptionPlan(
+        planId: 'yearly',
+        title: 'Yearly',
+        priceString: r'$60.00',
+        period: SubscriptionPeriod.yearly,
+        introOffer: SubscriptionIntroOffer(
+          priceString: r'$30.00',
+          period: SubscriptionOfferPeriod.year,
+          periodNumberOfUnits: 1,
+          cycles: 1,
+          isFreeTrial: false,
+          renewalPriceString: r'$60.00',
+        ),
+      ),
+    ];
+    await tester.pumpWidget(
+      _harness(state: const EntitlementState.free(), plans: promoPlans),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Special offer: 50% off your first year'), findsOneWidget);
+    expect(find.text('Special offer: 75% off your first month'), findsNothing);
+    expect(find.byKey(const ValueKey('paywall_special_offer')), findsOneWidget);
+  });
+
+  testWidgets('顶部优惠条：yearly 没有优惠时展示 monthly', (tester) async {
     const promoPlans = [
       SubscriptionPlan(
         planId: 'monthly',
@@ -567,9 +638,22 @@ void main() {
       find.text('Special offer: 75% off your first month'),
       findsOneWidget,
     );
+    expect(find.text(r'$3.00'), findsOneWidget);
+    expect(find.text('/first mo'), findsOneWidget);
+    expect(find.text(r'First month $3.00, then $12.00/mo'), findsOneWidget);
   });
 
-  testWidgets('首期价不低于续费价：不显示顶部优惠条', (tester) async {
+  testWidgets('顶部优惠条：monthly/yearly 都没有优惠时不显示', (tester) async {
+    await tester.pumpWidget(
+      _harness(state: const EntitlementState.free(), plans: _plans),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('paywall_special_offer')), findsNothing);
+    expect(find.textContaining('Special offer:'), findsNothing);
+  });
+
+  testWidgets('顶部优惠条：intro offer 价格不低于续费价时不显示', (tester) async {
     const promoPlans = [
       SubscriptionPlan(
         planId: 'yearly',

@@ -16,12 +16,7 @@ void main() {
   });
 
   test('fetchPlans 映射月付、年付和首年优惠', () async {
-    when(
-      () => dio.get<Map<String, dynamic>>(
-        '/api/paddle/plans',
-        queryParameters: any(named: 'queryParameters'),
-      ),
-    ).thenAnswer(
+    when(() => dio.get<Map<String, dynamic>>('/api/paddle/plans')).thenAnswer(
       (_) async => Response(
         requestOptions: RequestOptions(path: '/api/paddle/plans'),
         statusCode: 200,
@@ -29,27 +24,34 @@ void main() {
           'plans': [
             {
               'planId': 'plus_monthly',
-              'title': 'Monthly',
-              'priceString': r'$4.99',
+              'priceString': r'US$8.99',
               'period': 'monthly',
               'hasFreeTrial': false,
               'trialDays': 0,
-              'introOffer': null,
+              'introOffer': {
+                'discountType': 'percentage',
+                'discountPercent': 20,
+                'period': 'month',
+                'periodNumberOfUnits': 1,
+                'cycles': 1,
+                'isFreeTrial': false,
+                'renewalPriceString': r'US$8.99',
+              },
             },
             {
               'planId': 'plus_yearly',
-              'title': 'Yearly',
-              'priceString': r'$49.99',
+              'priceString': r'US$50.00',
               'period': 'yearly',
               'hasFreeTrial': false,
               'trialDays': 0,
               'introOffer': {
-                'priceString': r'$24.99',
+                'discountType': 'percentage',
+                'discountPercent': 50,
                 'period': 'year',
                 'periodNumberOfUnits': 1,
                 'cycles': 1,
                 'isFreeTrial': false,
-                'renewalPriceString': r'$49.99',
+                'renewalPriceString': r'US$50.00',
               },
             },
           ],
@@ -61,9 +63,42 @@ void main() {
 
     expect(plans, hasLength(2));
     expect(plans.first.period, SubscriptionPeriod.monthly);
+    expect(plans.first.title, 'Monthly');
+    expect(plans.first.introOffer?.priceString, r'US$7.19');
+    expect(plans.first.introOffer?.period, SubscriptionOfferPeriod.month);
+    expect(plans.first.introOffer?.renewalPriceString, r'US$8.99');
     expect(plans.last.period, SubscriptionPeriod.yearly);
-    expect(plans.last.introOffer?.priceString, r'$24.99');
-    expect(plans.last.introOffer?.renewalPriceString, r'$49.99');
+    expect(plans.last.title, 'Yearly');
+    expect(plans.last.introOffer?.priceString, r'US$25.00');
+    expect(plans.last.introOffer?.renewalPriceString, r'US$50.00');
+    verify(() => dio.get<Map<String, dynamic>>('/api/paddle/plans')).called(1);
+  });
+
+  test('fetchPlans 映射 Paddle price 自带免费试用', () async {
+    when(() => dio.get<Map<String, dynamic>>('/api/paddle/plans')).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/api/paddle/plans'),
+        statusCode: 200,
+        data: {
+          'plans': [
+            {
+              'planId': 'plus_yearly',
+              'priceString': r'£47.99',
+              'period': 'yearly',
+              'hasFreeTrial': true,
+              'trialDays': 7,
+              'introOffer': null,
+            },
+          ],
+        },
+      ),
+    );
+
+    final plans = await repository.fetchPlans();
+
+    expect(plans.single.hasFreeTrial, isTrue);
+    expect(plans.single.trialDays, 7);
+    expect(plans.single.introOffer, isNull);
   });
 
   test('createCheckout 只提交 plan/locale，并携带 Bearer 与 UUID 幂等键', () async {
