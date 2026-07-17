@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
@@ -13,7 +16,9 @@ import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/transcription_task_provider.dart';
 import 'package:echo_loop/providers/local_transcription_task_provider.dart';
 import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
+import 'package:echo_loop/services/app_logger.dart';
 import 'package:echo_loop/services/transcription_api_client.dart';
+import 'package:echo_loop/utils/transcript_picker.dart';
 import 'package:echo_loop/widgets/manage_subtitles_sheet.dart';
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,6 +55,7 @@ void main() {
       AppSettingsState appSettingsState = const AppSettingsState(
         locale: Locale('en'),
       ),
+      Future<TranscriptDecodeResult?> Function()? transcriptContentPicker,
       List<Override> extraOverrides = const [],
     }) {
       final libraryState = AudioLibraryState(audioItems: [audioItem]);
@@ -60,7 +66,10 @@ void main() {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                builder: (_) => ManageSubtitlesSheet(audioItem: audioItem),
+                builder: (_) => ManageSubtitlesSheet(
+                  audioItem: audioItem,
+                  transcriptContentPicker: transcriptContentPicker,
+                ),
               );
             },
             child: const Text('Open'),
@@ -100,6 +109,10 @@ void main() {
         ],
       );
     }
+
+    setUp(() {
+      AppLogger.instance.clear();
+    });
 
     group('初始状态', () {
       testWidgets('无字幕音频：显示两个 Radio 选项，无删除按钮', (tester) async {
@@ -295,7 +308,7 @@ void main() {
         expect(find.text('Sign in to use AI transcription'), findsNothing);
       });
 
-      testWidgets('AI 转录音频过长时在弹窗内显示 5 秒错误提示', (tester) async {
+      testWidgets('AI 转录音频过长时在弹窗内显示 12 秒错误提示', (tester) async {
         final item = createTestAudioItem(
           totalDuration: 31 * 60,
         ).copyWith(transcriptSource: TranscriptSource.local);
@@ -317,10 +330,96 @@ void main() {
         expect(find.textContaining('Audio too long'), findsOneWidget);
         expect(find.byType(SnackBar), findsNothing);
 
-        await tester.pump(const Duration(seconds: 5));
+        await tester.pump(const Duration(seconds: 12));
         await tester.pumpAndSettle();
 
         expect(find.textContaining('Audio too long'), findsNothing);
+      });
+
+      testWidgets('本地上传失败时完整显示错误并写入日志', (tester) async {
+        const failurePath =
+            '/private/var/mobile/Containers/Shared/AppGroup/subtitle.srt';
+        final item = createTestAudioItem(transcriptPath: null);
+        await tester.pumpWidget(
+          buildSheet(
+            item,
+            transcriptContentPicker: () async =>
+                throw const FileSystemException(
+                  'Operation not permitted',
+                  failurePath,
+                  OSError('Permission denied', 1),
+                ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Local Upload'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Upload Transcript'),
+        );
+        await tester.pump();
+
+        expect(find.textContaining(failurePath), findsOneWidget);
+        expect(find.textContaining('Operation not permitted'), findsOneWidget);
+
+        final logLines = AppLogger.instance.entries.map((e) => e.toString());
+        expect(
+          logLines,
+          contains(
+            allOf(
+              contains('[SubtitleUpload] failed local upload'),
+              contains('errorType=FileSystemException'),
+              contains(failurePath),
+            ),
+          ),
+        );
+
+        await tester.pump(const Duration(seconds: 12));
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('本地上传成功时日志记录解码字符集', (tester) async {
+        final item = createTestAudioItem(transcriptPath: null);
+        await tester.pumpWidget(
+          buildSheet(
+            item,
+            transcriptContentPicker: () async => const TranscriptDecodeResult(
+              text: '1\n00:00:00,000 --> 00:00:01,000\n你好\n',
+              charset: 'gb18030',
+            ),
+            extraOverrides: [
+              audioItemDaoProvider.overrideWithValue(TestAudioItemDao()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Local Upload'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Upload Transcript'),
+        );
+        await tester.pumpAndSettle();
+
+        final logLines = AppLogger.instance.entries.map((e) => e.toString());
+        expect(
+          logLines,
+          contains(
+            allOf(
+              contains('[SubtitleUpload] picked transcript'),
+              contains('charset=gb18030'),
+            ),
+          ),
+        );
       });
     });
 

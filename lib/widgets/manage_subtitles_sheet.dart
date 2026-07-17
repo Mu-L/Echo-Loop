@@ -32,6 +32,7 @@ import '../providers/local_transcription_model_provider.dart';
 import '../providers/offline_asr_settings_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../router/app_router.dart';
+import '../services/app_logger.dart';
 import '../services/asr/asr_model_manager.dart';
 import '../services/asr/offline_asr_engine.dart';
 import '../services/subtitle_parser.dart';
@@ -77,7 +78,16 @@ class ManageSubtitlesSheet extends ConsumerStatefulWidget {
   /// 要管理字幕的音频项
   final AudioItem audioItem;
 
-  const ManageSubtitlesSheet({super.key, required this.audioItem});
+  /// 字幕内容选择器。
+  ///
+  /// 生产环境使用系统文件选择器；测试可注入失败或固定内容，避免依赖平台 channel。
+  final Future<TranscriptDecodeResult?> Function()? transcriptContentPicker;
+
+  const ManageSubtitlesSheet({
+    super.key,
+    required this.audioItem,
+    this.transcriptContentPicker,
+  });
 
   @override
   ConsumerState<ManageSubtitlesSheet> createState() =>
@@ -158,11 +168,14 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     super.dispose();
   }
 
-  /// 显示内联错误条，5 秒后自动消失。重复触发会重置倒计时。
+  /// 显示内联错误条，12 秒后自动消失。重复触发会重置倒计时。
+  ///
+  /// 文件系统异常通常包含路径、errno 和平台返回信息，保留更长时间方便用户截图
+  /// 或打开日志页导出。
   void _showInlineError(_InlineError err) {
     _errorClearTimer?.cancel();
     setState(() => _error = err);
-    _errorClearTimer = Timer(const Duration(seconds: 5), () {
+    _errorClearTimer = Timer(const Duration(seconds: 12), () {
       if (!mounted) return;
       setState(() => _error = null);
     });
@@ -629,8 +642,12 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
           ),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 17, color: accent),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon, size: 17, color: accent),
+            ),
             const SizedBox(width: AppSpacing.s),
             Expanded(
               child: Text.rich(
@@ -643,22 +660,26 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
                     TextSpan(text: ' · ${err.message}'),
                   ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.error,
                   height: 1.25,
                 ),
               ),
             ),
-            IconButton(
-              onPressed: _dismissInlineError,
-              icon: const Icon(Icons.close, size: 18),
-              color: colorScheme.error,
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: IconButton(
+                onPressed: _dismissInlineError,
+                icon: const Icon(Icons.close, size: 18),
+                color: colorScheme.error,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 28,
+                ),
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              ),
             ),
           ],
         ),
@@ -1673,14 +1694,42 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     }
 
     try {
-      final content = await pickTranscriptContent();
-      if (content == null) return;
+      AppLogger.log(
+        'SubtitleUpload',
+        'start local upload audioId=${audioItem.id} name=${audioItem.name}',
+      );
+      final contentPicker =
+          widget.transcriptContentPicker ?? pickTranscriptContentWithMetadata;
+      final transcript = await contentPicker();
+      if (transcript == null) {
+        AppLogger.log(
+          'SubtitleUpload',
+          'canceled local upload audioId=${audioItem.id}',
+        );
+        return;
+      }
+      final content = transcript.text;
+      AppLogger.log(
+        'SubtitleUpload',
+        'picked transcript audioId=${audioItem.id} '
+            'charset=${transcript.charset} chars=${content.length}',
+      );
 
       final stats = await getTranscriptStatsFromSrt(content);
+      AppLogger.log(
+        'SubtitleUpload',
+        'parsed transcript audioId=${audioItem.id} '
+            'sentences=${stats.$1} words=${stats.$2}',
+      );
 
       // 本地字幕没有真实词级时间戳，保存时按字符长度生成近似词级时间戳。
       final wordTimestampsJson = encodeWordTimestamps(
         await generateSyntheticWordTimestampsFromSrt(content),
+      );
+      AppLogger.log(
+        'SubtitleUpload',
+        'generated word timestamps audioId=${audioItem.id} '
+            'jsonChars=${wordTimestampsJson.length}',
       );
 
       // 字幕内容 + 近似词级时间戳原子写入 DB；transcriptPath 置 null。
@@ -1691,6 +1740,10 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             srt: content,
             wordTimestampsJson: wordTimestampsJson,
           );
+      AppLogger.log(
+        'SubtitleUpload',
+        'saved transcript content audioId=${audioItem.id}',
+      );
 
       if (!context.mounted) return;
       ref
@@ -1704,6 +1757,10 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
               transcriptLanguage: null,
             ),
           );
+      AppLogger.log(
+        'SubtitleUpload',
+        'updated audio item audioId=${audioItem.id}',
+      );
 
       ref
           .read(usageTrackerProvider)
@@ -1714,8 +1771,16 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
               EventParams.audioName: audioItem.name,
             },
           );
+      AppLogger.log(
+        'SubtitleUpload',
+        'completed local upload audioId=${audioItem.id}',
+      );
       if (context.mounted) Navigator.pop(context);
     } on SubtitleParseException catch (e) {
+      AppLogger.log(
+        'SubtitleUpload',
+        'parse failed audioId=${audioItem.id} kind=${e.kind} detail=${e.detail}',
+      );
       if (!mounted) return;
       final kind = switch (e.kind) {
         SubtitleParseErrorKind.unsupportedFormat =>
@@ -1724,7 +1789,13 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         SubtitleParseErrorKind.empty => _UploadErrorKind.empty,
       };
       _showInlineError(_InlineError(kind, subtitleParseErrorMessage(l10n, e)));
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.log(
+        'SubtitleUpload',
+        'failed local upload audioId=${audioItem.id} '
+            'errorType=${e.runtimeType} error=$e',
+      );
+      AppLogger.log('SubtitleUpload', st.toString());
       if (!mounted) return;
       _showInlineError(
         _InlineError(
