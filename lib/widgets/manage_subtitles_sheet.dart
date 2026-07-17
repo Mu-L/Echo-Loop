@@ -38,12 +38,9 @@ import '../services/asr/offline_asr_engine.dart';
 import '../services/subtitle_parser.dart';
 import 'asr_download_prompt_dialog.dart';
 import '../theme/app_theme.dart';
-import '../models/word_timestamp.dart';
-import '../utils/synthetic_word_timestamps.dart';
 import '../utils/audio_duration.dart';
 import '../utils/file_size.dart';
 import '../utils/transcript_picker.dart';
-import '../utils/transcript_stats.dart';
 import 'common/anchored_bubble.dart';
 import 'guide_flow.dart';
 
@@ -1708,59 +1705,27 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
         );
         return;
       }
-      final content = transcript.text;
       AppLogger.log(
         'SubtitleUpload',
         'picked transcript audioId=${audioItem.id} '
-            'charset=${transcript.charset} chars=${content.length}',
+            'charset=${transcript.charset} ext=${transcript.ext} '
+            'chars=${transcript.text.length}',
       );
 
-      final stats = await getTranscriptStatsFromSrt(content);
-      AppLogger.log(
-        'SubtitleUpload',
-        'parsed transcript audioId=${audioItem.id} '
-            'sentences=${stats.$1} words=${stats.$2}',
-      );
-
-      // 本地字幕没有真实词级时间戳，保存时按字符长度生成近似词级时间戳。
-      final wordTimestampsJson = encodeWordTimestamps(
-        await generateSyntheticWordTimestampsFromSrt(content),
+      // 按音频时长把字幕（srt/vtt/lrc）规范化为 SRT 并原子入库
+      // （含统计与近似词级时间戳、来源标记）。
+      await importLocalSubtitle(
+        ref,
+        audioItem,
+        text: transcript.text,
+        ext: transcript.ext,
       );
       AppLogger.log(
         'SubtitleUpload',
-        'generated word timestamps audioId=${audioItem.id} '
-            'jsonChars=${wordTimestampsJson.length}',
-      );
-
-      // 字幕内容 + 近似词级时间戳原子写入 DB；transcriptPath 置 null。
-      await ref
-          .read(audioItemDaoProvider)
-          .saveTranscriptContent(
-            audioItem.id,
-            srt: content,
-            wordTimestampsJson: wordTimestampsJson,
-          );
-      AppLogger.log(
-        'SubtitleUpload',
-        'saved transcript content audioId=${audioItem.id}',
+        'saved & updated transcript audioId=${audioItem.id}',
       );
 
       if (!context.mounted) return;
-      ref
-          .read(audioLibraryProvider.notifier)
-          .updateAudioItem(
-            audioItem.copyWith(
-              transcriptPath: null,
-              sentenceCount: stats.$1,
-              wordCount: stats.$2,
-              transcriptSource: TranscriptSource.local,
-              transcriptLanguage: null,
-            ),
-          );
-      AppLogger.log(
-        'SubtitleUpload',
-        'updated audio item audioId=${audioItem.id}',
-      );
 
       ref
           .read(usageTrackerProvider)

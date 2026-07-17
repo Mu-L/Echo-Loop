@@ -60,6 +60,11 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-18：优化音频导入——多选批量导入 + 同名字幕自动配对 + 字幕统一 SRT 入库（含 LRC）。选择器放行「音频+字幕」并集（Android 用 FileType.any 自过滤，避开多扩展名灰选 bug），用户一次多选音频和同名字幕，App 按去扩展名同名（大小写不敏感、优先级 srt>vtt>lrc）自动配对；配对字幕在有音频时长的入库处统一转 SRT（新增 `parseSupportedSubtitle`/`normalizeSubtitleToSrt`/`importLocalSubtitle`），修掉 VTT 原文直存的隐患。新增 LRC 解析器（`lib/services/lrc_parser.dart`，支持厘秒/毫秒/hh:mm:ss/多标签/offset/元数据跳过，末句结束时间取音频总时长）。新增纯配对逻辑 `subtitle_pairing.dart`（`matchSubtitlesForAudios`/`classifyImportFiles`）。手动上传路径（`uploadTranscriptForAudio`/`ManageSubtitlesSheet`）复用同一入库主干。已选文件行显示「含字幕」徽章，全程 `AudioImport` 诊断日志。
+  - **性能**：把「复制到沙盒 + 全文件 SHA256 指纹」从选择阶段延后到点「添加」时（进度条覆盖），选完文件预览秒出。
+  - **去重展示**：`AudioRegistrationDuplicate` 增加 `attemptedName`/`existingName`，重复弹窗重设计为限高滚动列表（图标+名称，导入名与已有名不同时标注「与「X」内容相同」），弹窗抽为独立 `DuplicatesSkippedDialog` 便于测试。
+  - **测试**：LRC 解析、同名配对/分类、VTT/LRC→SRT 规范化、去重名字段、重复弹窗（大量项不溢出/配对次行）等边界单测与 widget 测试。
+  - 因 iOS/Android 沙盒隔离拿不到原文件夹，不支持「选目录自动扫描」，改由同一次多选实现。
 - [x] 2026-07-17 19:25：修复多语言字幕导入乱码：新增平台 charset 转换依赖，字幕读取按 BOM / UTF-16 / UTF-8 优先，再尝试 GB18030、Big5、Shift-JIS、EUC-KR、Windows-125x 等常见编码，并结合字幕结构与乱码评分选择结果；上传日志记录实际 charset，保留完整错误展示和 stack trace；补充 UTF-8/BOM/UTF-16/中文/繁中/日文/韩文/Windows-1252 解码与上传日志回归测试。
 - [x] 2026-07-17 18:05：客户端落盘日志不再重启后表现为清空：启动时从落盘日志恢复最近 500 条到内存日志页，落盘文件上限由 512KB 提升到 5MB，超过上限时保留尾部；日志页清空同步清空落盘文件，并补充 5MB 截断、重启恢复和清空落盘回归测试。
 - [x] 2026-07-17 16:49：开发者选项日志页复制改为分享 `.log` 文件，进入日志页自动写入设备诊断信息（App 版本、平台、屏幕、系统版本、机型等），并在 Android / iOS / macOS 增加轻量设备信息 channel；临时日志分享目录纳入缓存清理白名单，补充日志页分享、设备诊断和临时目录清理回归测试。

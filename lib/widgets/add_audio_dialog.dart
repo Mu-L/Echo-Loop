@@ -8,6 +8,7 @@
 // 单文件添加成功后返回 [AudioItem] 供调用方弹出字幕确认；
 // 多文件直接添加，不弹字幕确认。
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -18,21 +19,28 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import '../features/audio_import/audio_finalization_service.dart';
 import '../features/audio_import/audio_registration_service.dart';
+import '../features/audio_import/subtitle_pairing.dart';
 import '../models/audio_item.dart';
 import '../providers/collection_provider.dart';
 import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../services/app_logger.dart';
+import '../utils/transcript_picker.dart';
 import 'common/secondary_action_button.dart';
 
 /// 已选中的音频文件信息
+///
+/// [file] 为原始选中文件（含缓存路径/字节）；复制到沙盒、算指纹等重活延后到点击
+/// 「添加」时做，保证选择后预览秒出。[subtitleText]/[subtitleExt] 为同一次多选里
+/// 配对到的同名字幕（已解码原始文本与扩展名 srt/vtt/lrc），无匹配或解码失败为 null；
+/// 转 SRT 延后到入库时（需音频时长）。
 typedef _PickedAudio = ({
-  String path,
+  PlatformFile file,
   String name,
   String displayName,
-  String audioSha256,
-  String originalAudioSha256,
-  bool created,
   int fileSize,
+  String? subtitleText,
+  String? subtitleExt,
 });
 
 typedef _SavedPickedAudio = ({
@@ -390,6 +398,18 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          // 已配对同名字幕：显示徽章，让用户明确会一并导入。
+          if (file.subtitleText != null) ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: AppLocalizations.of(context)!.subtitlePairedBadge,
+              child: Icon(
+                Icons.closed_caption_outlined,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
           Text(
             _formatFileSize(file.fileSize),
@@ -533,85 +553,95 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
   }
 
-  /// 选择音频文件（支持多选）
+  /// 选择音频文件（支持多选，可同时选中同名字幕自动配对）
+  ///
+  /// 选择器放行「音频 + 字幕」并集，用户一次把成对的音频和字幕都选上；App 在选中集合内
+  /// 按去扩展名同名把字幕配对到音频，导入时一并入库，免去逐个手动上传字幕。
   Future<void> _pickAudioFiles() async {
     try {
-      final FilePickerResult? result;
-      const extensions = ['mp3', 'wav', 'm4a', 'aac', 'flac'];
+      final result = await _showAudioFilePicker();
+      if (result == null || result.files.isEmpty) return;
 
-      if (!kIsWeb && Platform.isAndroid) {
-        // Android SAF 在 FileType.custom + EXTRA_MIME_TYPES 多扩展名场景下
-        // 会按精确 MIME 匹配，导致 m4a/flac 等被设备索引成非标 MIME 的文件被灰掉、无法选中。
-        // 改用 FileType.audio（audio/*），picker 端不过滤具体类型，我们自己按扩展名白名单过滤。
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.audio,
-          allowMultiple: true,
-        );
-      } else if (!kIsWeb && Platform.isIOS) {
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: extensions,
-          allowMultiple: true,
-        );
-      } else {
-        final initialDir =
-            widget.preferDownloadsDirectory && !kIsWeb && Platform.isMacOS
-            ? await _getDownloadsDirectory()
-            : null;
-        result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: extensions,
-          allowMultiple: true,
-          initialDirectory: initialDir,
-        );
+      // 1. 建立文件名 → 文件映射，并按扩展名分类（音频 / 字幕 / 不支持）。
+      final byName = <String, PlatformFile>{
+        for (final f in result.files) f.name: f,
+      };
+      final classification = classifyImportFiles(byName.keys);
+      final audioFiles = [
+        for (final n in classification.audioNames) byName[n]!,
+      ];
+      final subtitleFiles = <String, PlatformFile>{
+        for (final n in classification.subtitleNames) n: byName[n]!,
+      };
+      final rejectedExts = classification.rejectedExtensions;
+
+      // 2. 同名配对（音频文件名 → 字幕文件名）。
+      final pairing = matchSubtitlesForAudios(byName.keys);
+
+      // 3. 配对到的字幕就地解码（文本很小，文本+扩展名留到入库时转 SRT）。
+      //    音频不在此复制/算指纹——那些重活延后到点击「添加」时做，保证预览秒出。
+      final List<_PickedAudio> picked = [];
+      var matchedCount = 0;
+      for (final file in audioFiles) {
+        final sourcePath = file.path;
+        final sourceName = file.name.isNotEmpty
+            ? file.name
+            : sourcePath == null
+            ? 'file'
+            : path.basename(sourcePath);
+
+        String? subtitleText;
+        String? subtitleExt;
+        final matchedName = pairing[file.name];
+        final subtitleFile = matchedName == null
+            ? null
+            : subtitleFiles[matchedName];
+        if (matchedName != null && subtitleFile != null) {
+          try {
+            final bytes = await _readPlatformFileBytes(subtitleFile);
+            // 仅解码取文本；具体格式（srt/vtt/lrc）解析交给入库时按扩展名处理。
+            final decoded = await decodeTranscriptBytes(bytes);
+            subtitleText = decoded.text;
+            subtitleExt = _extOf(matchedName);
+            matchedCount++;
+          } catch (e) {
+            // 字幕解码失败不影响音频导入，仅记录。
+            AppLogger.log(
+              'AudioImport',
+              'decode subtitle "$matchedName" for "${file.name}" failed: $e',
+            );
+          }
+        }
+
+        picked.add((
+          file: file,
+          name: path.basenameWithoutExtension(sourceName),
+          displayName: sourceName,
+          fileSize: file.size,
+          subtitleText: subtitleText,
+          subtitleExt: subtitleExt,
+        ));
       }
 
-      if (result != null && result.files.isNotEmpty) {
-        final supportedSet = extensions.toSet();
-        final List<_PickedAudio> picked = [];
-        final List<String> rejectedExts = [];
+      AppLogger.log(
+        'AudioImport',
+        'picked audios=${audioFiles.length} subtitles=${subtitleFiles.length} '
+            'matched=$matchedCount rejected=${rejectedExts.length}',
+      );
 
-        for (final file in result.files) {
-          final ext = path
-              .extension(file.name)
-              .replaceFirst('.', '')
-              .toLowerCase();
-          if (!supportedSet.contains(ext)) {
-            rejectedExts.add(ext.isNotEmpty ? ext : '?');
-            continue;
-          }
-          final saved = await _savePickedFileToSandbox(file, 'audios');
-          final sourcePath = file.path;
-          final sourceName = file.name.isNotEmpty
-              ? file.name
-              : sourcePath == null
-              ? saved.fileName
-              : path.basename(sourcePath);
-          picked.add((
-            path: saved.path,
-            name: path.basenameWithoutExtension(sourceName),
-            displayName: sourceName,
-            audioSha256: saved.audioSha256,
-            originalAudioSha256: saved.originalAudioSha256,
-            created: saved.created,
-            fileSize: file.size,
-          ));
-        }
-
-        if (!mounted) return;
-        if (rejectedExts.isNotEmpty) {
-          final l10n = AppLocalizations.of(context)!;
-          final extList = rejectedExts.toSet().map((e) => '.$e').join(', ');
-          _showInlineError(
-            _InlineError(
-              _AudioErrorKind.unsupportedFormat,
-              l10n.audioUnsupportedFormat(extList),
-            ),
-          );
-        }
-        if (picked.isNotEmpty) {
-          setState(() => _pickedFiles = picked);
-        }
+      if (!mounted) return;
+      if (rejectedExts.isNotEmpty) {
+        final l10n = AppLocalizations.of(context)!;
+        final extList = rejectedExts.toSet().map((e) => '.$e').join(', ');
+        _showInlineError(
+          _InlineError(
+            _AudioErrorKind.unsupportedFormat,
+            l10n.audioUnsupportedFormat(extList),
+          ),
+        );
+      }
+      if (picked.isNotEmpty) {
+        setState(() => _pickedFiles = picked);
       }
     } catch (e) {
       if (mounted) {
@@ -625,6 +655,59 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       }
     }
   }
+
+  /// 弹出系统文件选择器，放行「音频 + 字幕」扩展名并集。
+  Future<FilePickerResult?> _showAudioFilePicker() {
+    final allowed = [...audioImportExtensions, ...subtitleImportExtensions];
+    if (!kIsWeb && Platform.isAndroid) {
+      // Android SAF 在 FileType.custom + 多扩展名场景会按精确 MIME 匹配，
+      // 导致 m4a/flac 等被设备索引成非标 MIME 的文件被灰掉、无法选中；且 FileType.audio
+      // 会隐藏字幕文件。改用 FileType.any（不过滤），选中后我们自己按白名单过滤。
+      return FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+      );
+    }
+    if (!kIsWeb && Platform.isIOS) {
+      return FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowed,
+        allowMultiple: true,
+      );
+    }
+    return _getDownloadsDirectory().then((initialDir) {
+      return FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowed,
+        allowMultiple: true,
+        initialDirectory:
+            widget.preferDownloadsDirectory && !kIsWeb && Platform.isMacOS
+            ? initialDir
+            : null,
+      );
+    });
+  }
+
+  /// 读取选中文件的字节（路径 / bytes / 流三种来源）。
+  Future<Uint8List> _readPlatformFileBytes(PlatformFile file) async {
+    final sourcePath = file.path;
+    if (sourcePath != null) return File(sourcePath).readAsBytes();
+    final bytes = file.bytes;
+    if (bytes != null) return bytes;
+    final readStream = file.readStream;
+    if (readStream != null) {
+      final chunks = <int>[];
+      await for (final chunk in readStream) {
+        chunks.addAll(chunk);
+      }
+      return Uint8List.fromList(chunks);
+    }
+    throw Exception('Unable to access picked subtitle file');
+  }
+
+  /// 提取文件扩展名（小写、不含点）。
+  static String _extOf(String name) =>
+      path.extension(name).replaceFirst('.', '').toLowerCase();
 
   Future<String?> _getDownloadsDirectory() async {
     try {
@@ -686,6 +769,39 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
   }
 
+  /// 若该音频配对到了字幕且尚无字幕，则按音频时长转 SRT 并入库。
+  ///
+  /// 字幕入库失败不影响音频本身（音频已注册）；返回值反映最终字幕状态，供完成页判断。
+  Future<AudioItem> _attachPairedSubtitle(
+    AudioItem item,
+    _PickedAudio file,
+  ) async {
+    final subtitleText = file.subtitleText;
+    final subtitleExt = file.subtitleExt;
+    if (subtitleText == null || subtitleExt == null || item.hasTranscript) {
+      return item;
+    }
+    try {
+      await importLocalSubtitle(
+        ref,
+        item,
+        text: subtitleText,
+        ext: subtitleExt,
+      );
+      AppLogger.log(
+        'AudioImport',
+        'attached subtitle to "${item.name}" (ext=$subtitleExt)',
+      );
+      return item.copyWith(transcriptSource: TranscriptSource.local);
+    } catch (e) {
+      AppLogger.log(
+        'AudioImport',
+        'attach subtitle to "${item.name}" failed: $e',
+      );
+      return item;
+    }
+  }
+
   Future<void> _deleteIfExists(File file) async {
     if (!await file.exists()) return;
     try {
@@ -710,7 +826,8 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     });
 
     final List<AudioItem> results = [];
-    final List<String> skippedDuplicates = [];
+    // 跳过的重复项：本次导入名 + 与之重复的库中已有条目名。
+    final List<({String attempted, String existing})> skippedDuplicates = [];
 
     // 全程包裹 try/catch/finally：任一文件入库（读时长/写库）抛异常都不能让面板
     // 卡在 loading（按钮全禁用、只能杀进程），finally 统一恢复可交互。
@@ -720,13 +837,16 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       for (var i = 0; i < _pickedFiles.length; i++) {
         final file = _pickedFiles[i];
 
+        // 落沙盒 + 算内容指纹（重活）在此进行，受下方进度条覆盖。
+        final saved = await _savePickedFileToSandbox(file.file, 'audios');
+
         final result = await registrationService.registerSandboxedAudio(
           input: SandboxedAudioRegistrationInput(
             name: file.name,
-            relativePath: file.path,
+            relativePath: saved.path,
             importSourceType: widget.importSourceType,
-            audioSha256: file.audioSha256,
-            originalAudioSha256: file.originalAudioSha256,
+            audioSha256: saved.audioSha256,
+            originalAudioSha256: saved.originalAudioSha256,
           ),
           audioLibrary: library,
           audioLibraryState: ref.read(audioLibraryProvider),
@@ -737,15 +857,21 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
 
         switch (result) {
           case AudioRegistrationAdded(:final item):
-            if (file.created && item.audioPath != file.path) {
-              await _deleteIfExists(File(path.join(dataDir.path, file.path)));
+            if (saved.created && item.audioPath != saved.path) {
+              await _deleteIfExists(File(path.join(dataDir.path, saved.path)));
             }
-            results.add(item);
-          case AudioRegistrationDuplicate(:final name):
-            if (file.created) {
-              await _deleteIfExists(File(path.join(dataDir.path, file.path)));
+            results.add(await _attachPairedSubtitle(item, file));
+          case AudioRegistrationDuplicate(
+            :final attemptedName,
+            :final existingName,
+          ):
+            if (saved.created) {
+              await _deleteIfExists(File(path.join(dataDir.path, saved.path)));
             }
-            skippedDuplicates.add(name);
+            skippedDuplicates.add((
+              attempted: attemptedName,
+              existing: existingName,
+            ));
         }
 
         if (!mounted) return;
@@ -768,61 +894,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     if (skippedDuplicates.isNotEmpty) {
       await showDialog(
         context: context,
-        builder: (ctx) {
-          final theme = Theme.of(ctx);
-          final colorScheme = theme.colorScheme;
-          return AlertDialog(
-            icon: Icon(
-              Icons.info_outline,
-              size: 32,
-              color: colorScheme.primary,
-            ),
-            title: Text(l10n.duplicatesSkipped(skippedDuplicates.length)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.duplicatesSkippedDetail,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...skippedDuplicates.map(
-                  (name) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6, right: 8),
-                          child: Container(
-                            width: 4,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: colorScheme.onSurfaceVariant,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(name, style: theme.textTheme.bodyMedium),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(l10n.ok),
-              ),
-            ],
-          );
-        },
+        builder: (_) => DuplicatesSkippedDialog(duplicates: skippedDuplicates),
       );
     }
 
@@ -836,5 +908,162 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     if (mounted) {
       Navigator.pop(context, results);
     }
+  }
+}
+
+/// 重复音频跳过提示弹窗。
+///
+/// 批量导入时，内容与库中已有音频完全相同（按 SHA256 去重）的文件会被跳过。
+/// 弹窗以限高滚动卡片列出被跳过项，避免大量重复时撑破弹窗，并在导入名与已有名
+/// 不同时标注与哪个已有音频内容相同。
+class DuplicatesSkippedDialog extends StatelessWidget {
+  const DuplicatesSkippedDialog({super.key, required this.duplicates});
+
+  /// 被跳过的重复项：本次导入名 + 与之内容相同的库中已有条目名。
+  final List<({String attempted, String existing})> duplicates;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+      // 标题行：图标 + 计数，左对齐更紧凑直观。
+      title: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.copy_all_outlined,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              l10n.duplicatesSkipped(duplicates.length),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.duplicatesSkippedDetail,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 重复项可能很多：装进限高、带滚动条的卡片，避免撑破弹窗。
+            Flexible(
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 280),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Scrollbar(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: duplicates.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 44,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                    itemBuilder: (_, i) =>
+                        _buildRow(theme, l10n, duplicates[i]),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l10n.ok),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 单条重复项行：音频图标 + 导入名（+ 与哪个已有音频内容相同的次行）。
+  Widget _buildRow(
+    ThemeData theme,
+    AppLocalizations l10n,
+    ({String attempted, String existing}) dup,
+  ) {
+    final colorScheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.music_note_outlined,
+            size: 18,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dup.attempted,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                // 仅当导入名与已有名不同时，标注与哪个已有音频内容相同。
+                if (dup.existing != dup.attempted)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      l10n.duplicateOfExisting(dup.existing),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.75,
+                        ),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
