@@ -289,6 +289,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectAudioFile => '选择音频文件';
 
   @override
+  String get subtitlePairedBadge => '已匹配字幕，将一并导入';
+
+  @override
   String get audioFilePickerCloudDriveHint =>
       '从网盘选择前，请先安装并登录对应网盘。少部分网盘可能不支持从文件选择器中直接选择。';
 
@@ -3066,7 +3069,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get duplicatesSkippedDetail => '以下音频已在本合集中，已跳过：';
+  String get duplicatesSkippedDetail => '以下音频与本合集中已有音频内容完全相同，已跳过：';
+
+  @override
+  String duplicateOfExisting(String name) {
+    return '与「$name」内容相同';
+  }
 
   @override
   String get removeFile => '移除';

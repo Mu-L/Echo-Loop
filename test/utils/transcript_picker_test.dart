@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:echo_loop/services/subtitle_parser.dart';
 import 'package:echo_loop/utils/transcript_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -115,6 +116,68 @@ void main() {
 
       expect(result.text, '1\n00:00:00,000 --> 00:00:01,000\n안녕\n');
       expect(result.charset, 'euc-kr');
+    });
+  });
+
+  group('normalizeSubtitleToSrt', () {
+    test('SRT 原样规范化并可往返解析', () async {
+      const srt = '1\n00:00:01,000 --> 00:00:02,000\nHello\n';
+      final normalized = await normalizeSubtitleToSrt(srt, ext: 'srt');
+
+      final sentences = await SubtitleParser.parseSubtitleStrictString(
+        normalized,
+      );
+      expect(sentences.length, 1);
+      expect(sentences.first.text, 'Hello');
+    });
+
+    test('VTT 转成合法 SRT', () async {
+      const vtt =
+          'WEBVTT\n\n'
+          '00:00:01.000 --> 00:00:02.000\nHello\n\n'
+          '00:00:02.000 --> 00:00:03.000\nWorld\n';
+      final srt = await normalizeSubtitleToSrt(vtt, ext: 'vtt');
+
+      // 产物是标准 SRT（逗号毫秒分隔），且能被 SRT 解析器读回。
+      expect(srt.contains('00:00:01,000 --> 00:00:02,000'), isTrue);
+      final sentences = await SubtitleParser.parseSubtitleStrictString(srt);
+      expect(sentences.map((s) => s.text).toList(), ['Hello', 'World']);
+    });
+
+    test('LRC 转成合法 SRT，末句取音频时长', () async {
+      const lrc = '[00:01.00]Hello\n[00:03.00]World';
+      final srt = await normalizeSubtitleToSrt(
+        lrc,
+        ext: 'lrc',
+        audioDuration: const Duration(seconds: 10),
+      );
+
+      final sentences = await SubtitleParser.parseSubtitleStrictString(srt);
+      expect(sentences.map((s) => s.text).toList(), ['Hello', 'World']);
+      expect(sentences[0].startTime, const Duration(seconds: 1));
+      expect(sentences[1].endTime, const Duration(seconds: 10));
+    });
+
+    test('非法内容抛 SubtitleParseException', () async {
+      expect(
+        () => normalizeSubtitleToSrt('not a subtitle', ext: 'lrc'),
+        throwsA(isA<SubtitleParseException>()),
+      );
+    });
+
+    test('空扩展名按 SRT 处理（兼容注入型 picker 默认 ext）', () async {
+      const srt = '1\n00:00:01,000 --> 00:00:02,000\nHi\n';
+      final normalized = await normalizeSubtitleToSrt(srt, ext: '');
+      final sentences = await SubtitleParser.parseSubtitleStrictString(
+        normalized,
+      );
+      expect(sentences.single.text, 'Hi');
+    });
+
+    test('大写扩展名不区分大小写', () async {
+      const srt = '1\n00:00:01,000 --> 00:00:02,000\nHi\n';
+      final normalized = await normalizeSubtitleToSrt(srt, ext: 'SRT');
+      expect(normalized.contains('00:00:01,000 --> 00:00:02,000'), isTrue);
     });
   });
 }

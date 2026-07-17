@@ -293,6 +293,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectAudioFile => 'Select Audio File';
 
   @override
+  String get subtitlePairedBadge => 'Subtitle matched, imported together';
+
+  @override
   String get audioFilePickerCloudDriveHint =>
       'Before choosing from a cloud drive, install and sign in to that cloud drive app first. A few cloud drive apps may not support direct selection from the file picker.';
 
@@ -3193,7 +3196,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get duplicatesSkippedDetail =>
-      'The following audio files are already in this collection and were skipped:';
+      'The following audio files have identical content to audio already in this collection and were skipped:';
+
+  @override
+  String duplicateOfExisting(String name) {
+    return 'Same content as \"$name\"';
+  }
 
   @override
   String get removeFile => 'Remove';

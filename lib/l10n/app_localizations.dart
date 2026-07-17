@@ -596,6 +596,12 @@ abstract class AppLocalizations {
   /// **'Select Audio File'**
   String get selectAudioFile;
 
+  /// No description provided for @subtitlePairedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle matched, imported together'**
+  String get subtitlePairedBadge;
+
   /// No description provided for @audioFilePickerCloudDriveHint.
   ///
   /// In en, this message translates to:
@@ -5603,8 +5609,14 @@ abstract class AppLocalizations {
   /// No description provided for @duplicatesSkippedDetail.
   ///
   /// In en, this message translates to:
-  /// **'The following audio files are already in this collection and were skipped:'**
+  /// **'The following audio files have identical content to audio already in this collection and were skipped:'**
   String get duplicatesSkippedDetail;
+
+  /// No description provided for @duplicateOfExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Same content as \"{name}\"'**
+  String duplicateOfExisting(String name);
 
   /// No description provided for @removeFile.
   ///

@@ -164,6 +164,7 @@
   "cancel": "Cancel",
   "add": "Add",
   "selectAudioFile": "Select Audio File",
+  "subtitlePairedBadge": "Subtitle matched, imported together",
   "audioFilePickerCloudDriveHint": "Before choosing from a cloud drive, install and sign in to that cloud drive app first. A few cloud drive apps may not support direct selection from the file picker.",
   "selectTranscript": "Select Transcript (Optional)",
   "noTranscript": "No transcript available",
@@ -1737,7 +1738,13 @@
       "count": {"type": "int"}
     }
   },
-  "duplicatesSkippedDetail": "The following audio files are already in this collection and were skipped:",
+  "duplicatesSkippedDetail": "The following audio files have identical content to audio already in this collection and were skipped:",
+  "duplicateOfExisting": "Same content as \"{name}\"",
+  "@duplicateOfExisting": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "removeFile": "Remove",
   "goToSettings": "Go to Settings",
   "dictionaryDownloading": "Downloading dictionary...",

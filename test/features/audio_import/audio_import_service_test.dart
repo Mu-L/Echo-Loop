@@ -416,6 +416,91 @@ void main() {
       expect(result, isA<AudioRegistrationDuplicate>());
       expect(container.read(audioLibraryProvider).audioItems, [existing]);
     });
+
+    test('重复项同时携带本次导入名与已有条目名（内容同、名不同）', () async {
+      final existing = AudioItem(
+        id: 'a1',
+        name: 'TPO-32-L4',
+        audioPath: 'audios/sha.m4a',
+        audioSha256: 'sha',
+        originalAudioSha256: 'orig-sha',
+        addedDate: DateTime(2026, 1, 1),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => _FakeAudioLibrary(AudioLibraryState(audioItems: [existing])),
+          ),
+          collectionListProvider.overrideWith(
+            () => _FakeCollectionList(
+              const CollectionState(
+                audioIdsMap: {
+                  'c1': ['a1'],
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final service = AudioRegistrationService(
+        readDurationSeconds: (_) async => 5,
+      );
+
+      final result = await service.registerSandboxedAudio(
+        input: const SandboxedAudioRegistrationInput(
+          name: 'TPO-32-L4 copy copy',
+          relativePath: 'audios/sha.m4a',
+          importSourceType: AudioImportSourceType.local,
+          audioSha256: 'orig-sha',
+          originalAudioSha256: 'orig-sha',
+        ),
+        audioLibrary: container.read(audioLibraryProvider.notifier),
+        audioLibraryState: container.read(audioLibraryProvider),
+        collectionList: container.read(collectionListProvider.notifier),
+        collectionState: container.read(collectionListProvider),
+        collectionId: 'c1',
+      );
+
+      final dup = result as AudioRegistrationDuplicate;
+      expect(dup.attemptedName, 'TPO-32-L4 copy copy');
+      expect(dup.existingName, 'TPO-32-L4');
+      expect(dup.name, 'TPO-32-L4'); // 兼容 getter
+    });
+
+    test('按名去重（无原始 hash）重复项 attemptedName 与 existingName 一致', () async {
+      final existing = AudioItem(
+        id: 'a1',
+        name: 'lesson',
+        audioPath: 'audios/old.m4a',
+        addedDate: DateTime(2026, 1, 1),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          audioLibraryProvider.overrideWith(
+            () => _FakeAudioLibrary(AudioLibraryState(audioItems: [existing])),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final service = AudioRegistrationService(
+        readDurationSeconds: (_) async => 5,
+      );
+
+      final result = await service.registerSandboxedAudio(
+        input: const SandboxedAudioRegistrationInput(
+          name: 'lesson',
+          relativePath: 'audios/lesson.mp3',
+          importSourceType: AudioImportSourceType.local,
+        ),
+        audioLibrary: container.read(audioLibraryProvider.notifier),
+        audioLibraryState: container.read(audioLibraryProvider),
+      );
+
+      final dup = result as AudioRegistrationDuplicate;
+      expect(dup.attemptedName, 'lesson');
+      expect(dup.existingName, 'lesson');
+    });
   });
 
   group('AudioImportService.importFromUrl', () {
