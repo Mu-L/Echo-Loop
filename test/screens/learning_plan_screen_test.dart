@@ -296,17 +296,32 @@ void main() {
       expect(find.text('Not started'), findsOneWidget);
     });
 
-    testWidgets('疑似空音频时进度卡片显示内容警告徽章', (tester) async {
-      final suspectEmptyItem = testAudioItem.copyWith(
-        contentStatus: AudioContentStatus.suspectEmpty,
+    testWidgets('音频损坏时进度卡片显示内容警告徽章', (tester) async {
+      final damagedItem = testAudioItem.copyWith(
+        contentStatus: AudioContentStatus.damaged,
       );
-      await tester.pumpWidget(createTestWidget(audioItem: suspectEmptyItem));
+      await tester.pumpWidget(createTestWidget(audioItem: damagedItem));
       await tester.pumpAndSettle();
 
       expect(
         find.byKey(const Key('learning_plan_content_warning_badge')),
         findsOneWidget,
       );
+      expect(find.text('Audio issue'), findsOneWidget);
+    });
+
+    testWidgets('静音音频时进度卡片显示静音警告徽章', (tester) async {
+      final silentItem = testAudioItem.copyWith(
+        contentStatus: AudioContentStatus.silent,
+      );
+      await tester.pumpWidget(createTestWidget(audioItem: silentItem));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('learning_plan_content_warning_badge')),
+        findsOneWidget,
+      );
+      expect(find.text('Possibly silent'), findsOneWidget);
     });
 
     testWidgets('内容正常时进度卡片不显示内容警告徽章', (tester) async {

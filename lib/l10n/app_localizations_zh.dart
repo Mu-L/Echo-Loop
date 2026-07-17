@@ -1962,6 +1962,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioContentEmptyWarning => '疑似空音频';
 
   @override
+  String get audioContentDamagedWarning => '音频异常';
+
+  @override
+  String get audioContentSilentWarning => '疑似静音音频';
+
+  @override
+  String get transcriptionDamagedConfirmTitle => '音频可能损坏';
+
+  @override
+  String get transcriptionDamagedConfirmMessage => '该音频可能已损坏或格式不兼容，仍要转录吗？';
+
+  @override
   String get transcriptionSilentConfirmTitle => '音频疑似为空';
 
   @override
@@ -1969,6 +1981,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get transcriptionSilentConfirmProceed => '仍要转录';
+
+  @override
+  String transcriptionAudioFileSize(Object size) {
+    return '文件大小：$size';
+  }
+
+  @override
+  String transcriptionAudioDuration(Object duration) {
+    return '时长：$duration';
+  }
+
+  @override
+  String get transcriptionAudioUnknown => '未检测到';
 
   @override
   String get currentSubtitleExists => '当前：已有字幕';

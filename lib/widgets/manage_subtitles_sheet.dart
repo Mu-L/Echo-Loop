@@ -39,6 +39,8 @@ import 'asr_download_prompt_dialog.dart';
 import '../theme/app_theme.dart';
 import '../models/word_timestamp.dart';
 import '../utils/synthetic_word_timestamps.dart';
+import '../utils/audio_duration.dart';
+import '../utils/file_size.dart';
 import '../utils/transcript_picker.dart';
 import '../utils/transcript_stats.dart';
 import 'common/anchored_bubble.dart';
@@ -55,6 +57,16 @@ class _InlineError {
   final _UploadErrorKind kind;
   final String message;
   const _InlineError(this.kind, this.message);
+}
+
+class _AudioDiagnosticInfo {
+  const _AudioDiagnosticInfo({
+    required this.fileSizeText,
+    required this.durationText,
+  });
+
+  final String fileSizeText;
+  final String durationText;
 }
 
 /// 管理字幕底部弹窗
@@ -1568,7 +1580,7 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     }
   }
 
-  /// 处理本地（离线）转录：确认覆盖/疑似空音频 → 门控下载模型 → 启动后台任务。
+  /// 处理本地（离线）转录：确认覆盖/异常音频 → 门控下载模型 → 启动后台任务。
   ///
   /// 无需登录、无云端大小/时长限制。
   Future<void> _handleOfflineTranscription(
@@ -1577,26 +1589,15 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
   ) async {
     final l10n = AppLocalizations.of(context)!;
 
-    // 疑似空音频确认（与 AI 转录一致，用确认而非硬拦截）。
-    if (audioItem.contentStatus == AudioContentStatus.suspectEmpty) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.transcriptionSilentConfirmTitle),
-          content: Text(l10n.transcriptionSilentConfirmMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l10n.transcriptionSilentConfirmProceed),
-            ),
-          ],
-        ),
+    // 内容异常确认（与 AI 转录一致，用确认而非硬拦截）。
+    if (audioItem.contentStatus case final status?
+        when status != AudioContentStatus.ok) {
+      final proceed = await _showContentStatusConfirmDialog(
+        context,
+        audioItem,
+        status,
       );
-      if (proceed != true || !context.mounted) return;
+      if (!proceed || !context.mounted) return;
     }
 
     // 已有字幕时弹出覆盖确认。
@@ -1792,27 +1793,16 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       return;
     }
 
-    // 疑似空音频（解码失败 / 全程静音）拦截：用确认而非硬拦截，规避检测误判
-    if (audioItem.contentStatus == AudioContentStatus.suspectEmpty) {
+    // 内容异常（损坏 / 静音）确认：用确认而非硬拦截，给用户保留继续转录入口。
+    if (audioItem.contentStatus case final status?
+        when status != AudioContentStatus.ok) {
       if (!context.mounted) return;
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.transcriptionSilentConfirmTitle),
-          content: Text(l10n.transcriptionSilentConfirmMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l10n.transcriptionSilentConfirmProceed),
-            ),
-          ],
-        ),
+      final proceed = await _showContentStatusConfirmDialog(
+        context,
+        audioItem,
+        status,
       );
-      if (proceed != true) return;
+      if (!proceed) return;
     }
 
     // 已有字幕时弹出覆盖确认
@@ -1863,6 +1853,89 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
             EventParams.audioName: audioItem.name,
           },
         );
+  }
+
+  Future<bool> _showContentStatusConfirmDialog(
+    BuildContext context,
+    AudioItem audioItem,
+    AudioContentStatus status,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final info = await _loadAudioDiagnosticInfo(audioItem);
+    if (!context.mounted) return false;
+    final title = switch (status) {
+      AudioContentStatus.damaged => l10n.transcriptionDamagedConfirmTitle,
+      AudioContentStatus.silent => l10n.transcriptionSilentConfirmTitle,
+      AudioContentStatus.ok => l10n.transcriptionSilentConfirmTitle,
+    };
+    final message = switch (status) {
+      AudioContentStatus.damaged => l10n.transcriptionDamagedConfirmMessage,
+      AudioContentStatus.silent => l10n.transcriptionSilentConfirmMessage,
+      AudioContentStatus.ok => l10n.transcriptionSilentConfirmMessage,
+    };
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 12),
+            Text(l10n.transcriptionAudioFileSize(info.fileSizeText)),
+            Text(l10n.transcriptionAudioDuration(info.durationText)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.transcriptionSilentConfirmProceed),
+          ),
+        ],
+      ),
+    );
+    return proceed == true;
+  }
+
+  Future<_AudioDiagnosticInfo> _loadAudioDiagnosticInfo(
+    AudioItem audioItem,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final fullPath = await audioItem.getFullAudioPath();
+    final fileSizeText = fullPath == null
+        ? l10n.transcriptionAudioUnknown
+        : await _formatExistingFileSize(fullPath, l10n);
+    final durationSeconds = audioItem.totalDuration > 0
+        ? audioItem.totalDuration
+        : audioItem.audioPath == null
+        ? 0
+        : await getAudioDurationSeconds(audioItem.audioPath!);
+    final durationText = durationSeconds > 0
+        ? SubtitleParser.formatDuration(Duration(seconds: durationSeconds))
+        : l10n.transcriptionAudioUnknown;
+    return _AudioDiagnosticInfo(
+      fileSizeText: fileSizeText,
+      durationText: durationText,
+    );
+  }
+
+  Future<String> _formatExistingFileSize(
+    String fullPath,
+    AppLocalizations l10n,
+  ) async {
+    try {
+      final file = File(fullPath);
+      if (!await file.exists()) return l10n.transcriptionAudioUnknown;
+      return formatBytes(await file.length());
+    } catch (_) {
+      return l10n.transcriptionAudioUnknown;
+    }
   }
 
   /// 展示 AI 转录登录引导弹窗。

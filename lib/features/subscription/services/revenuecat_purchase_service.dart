@@ -21,6 +21,7 @@ import '../../../config/paddle_config.dart';
 import '../../../config/revenuecat_config.dart';
 import '../../../services/app_logger.dart';
 import '../models/entitlement.dart';
+import '../models/entitlement_source.dart';
 import '../models/subscription_plan.dart';
 import '../providers/subscription_identity.dart';
 import 'local_storekit_purchase_service.dart';
@@ -517,7 +518,27 @@ class RevenueCatPurchaseService implements PurchaseService {
           subscriptionPeriodFromProductId(productId),
       expiresAt: expiry != null ? DateTime.tryParse(expiry) : null,
       willRenew: premium.willRenew,
+      source: sourceFromRevenueCatStore(premium.store),
     );
+  }
+}
+
+/// 将 RevenueCat 的 [Store] 映射为订阅来源渠道。
+///
+/// App Store / Mac App Store → apple；Play Store → google；Paddle → paddle；
+/// 其余（Stripe / Amazon / 促销 / 未知等）→ unknown，让管理入口回退到按平台渠道。
+@visibleForTesting
+EntitlementSource sourceFromRevenueCatStore(Store store) {
+  switch (store) {
+    case Store.appStore:
+    case Store.macAppStore:
+      return EntitlementSource.apple;
+    case Store.playStore:
+      return EntitlementSource.google;
+    case Store.paddle:
+      return EntitlementSource.paddle;
+    default:
+      return EntitlementSource.unknown;
   }
 }
 

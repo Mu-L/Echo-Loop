@@ -332,12 +332,12 @@ void main() {
       );
     }
 
-    testWidgets('suspectEmpty 时显示警告徽章', (tester) async {
+    testWidgets('damaged 时显示损坏警告徽章', (tester) async {
       final item = createTestAudioItem(
-        name: 'Empty Audio',
+        name: 'Damaged Audio',
         transcriptPath: null,
         transcriptSource: null,
-      ).copyWith(contentStatus: AudioContentStatus.suspectEmpty);
+      ).copyWith(contentStatus: AudioContentStatus.damaged);
 
       await tester.pumpWidget(buildTile(item));
       await tester.pumpAndSettle();
@@ -347,16 +347,33 @@ void main() {
         findsOneWidget,
       );
       expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-      expect(find.text('Possibly empty'), findsOneWidget);
+      expect(find.text('Audio issue'), findsOneWidget);
     });
 
-    testWidgets('suspectEmpty 且 totalDuration=0 时不渲染时长行', (tester) async {
+    testWidgets('silent 时显示静音警告徽章', (tester) async {
       final item = createTestAudioItem(
-        name: 'Empty Audio',
+        name: 'Silent Audio',
+        transcriptPath: null,
+        transcriptSource: null,
+      ).copyWith(contentStatus: AudioContentStatus.silent);
+
+      await tester.pumpWidget(buildTile(item));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('audio_list_tile_content_warning_badge')),
+        findsOneWidget,
+      );
+      expect(find.text('Possibly silent'), findsOneWidget);
+    });
+
+    testWidgets('非 ok 且 totalDuration=0 时不渲染时长行', (tester) async {
+      final item = createTestAudioItem(
+        name: 'Damaged Audio',
         totalDuration: 0,
         transcriptPath: null,
         transcriptSource: null,
-      ).copyWith(contentStatus: AudioContentStatus.suspectEmpty);
+      ).copyWith(contentStatus: AudioContentStatus.damaged);
 
       await tester.pumpWidget(buildTile(item));
       await tester.pumpAndSettle();

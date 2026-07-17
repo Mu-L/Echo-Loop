@@ -36,6 +36,7 @@ void main() {
         'entitlementIds': ['Echo Loop Plus'],
         'productId': 'echo_loop_plus_annual',
         'expiresAtMs': 1750000000000,
+        'willRenew': true,
       }),
     );
 
@@ -49,6 +50,48 @@ void main() {
       e.expiresAt,
       DateTime.fromMillisecondsSinceEpoch(1750000000000, isUtc: true),
     );
+    expect(e.willRenew, isTrue);
+  });
+
+  test('willRenew=false：premium 有效但不再自动续订', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => resp({
+        'isPremium': true,
+        'entitlementIds': ['Echo Loop Plus'],
+        'productId': 'echo_loop_plus_monthly',
+        'expiresAtMs': 1750000000000,
+        'willRenew': false,
+      }),
+    );
+
+    final e = await repo.fetchRemote(userId: 'u1', accessToken: 't');
+    expect(e!.isPremium, isTrue);
+    expect(e.willRenew, isFalse);
+  });
+
+  test('willRenew 字段缺失：兼容旧后端，保守映射为 false', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => resp({
+        'isPremium': true,
+        'entitlementIds': ['Echo Loop Plus'],
+        'productId': 'echo_loop_plus_monthly',
+        'expiresAtMs': 1750000000000,
+      }),
+    );
+
+    final e = await repo.fetchRemote(userId: 'u1', accessToken: 't');
+    expect(e!.isPremium, isTrue);
+    expect(e.willRenew, isFalse);
   });
 
   test('isPremium=false：返回权威的 Entitlement.free（非 null，可据此降级）', () async {

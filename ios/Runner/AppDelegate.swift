@@ -1,4 +1,5 @@
 import AVFoundation
+import Darwin
 import Flutter
 import NaturalLanguage
 import PostHog
@@ -1207,12 +1208,55 @@ private final class IOSAudioDecodeHandler: NSObject {
       }
     }
 
+    let deviceInfoChannel = FlutterMethodChannel(
+      name: "top.echo-loop/device_info",
+      binaryMessenger: controller.binaryMessenger
+    )
+    deviceInfoChannel.setMethodCallHandler { (call, result) in
+      if call.method == "getDeviceInfo" {
+        result(self.deviceInfo())
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     speechPracticeHandler = IOSSpeechPracticeHandler(binaryMessenger: controller.binaryMessenger)
     textEmbeddingHandler = IOSTextEmbeddingHandler(binaryMessenger: controller.binaryMessenger)
     audioDecodeHandler = IOSAudioDecodeHandler(binaryMessenger: controller.binaryMessenger)
     notificationPermissionHandler = NotificationPermissionHandler(binaryMessenger: controller.binaryMessenger)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func deviceInfo() -> [String: Any] {
+    let device = UIDevice.current
+    return [
+      "deviceName": device.name,
+      "deviceModel": device.model,
+      "modelIdentifier": modelIdentifier(),
+      "systemName": device.systemName,
+      "systemVersion": device.systemVersion,
+      "isPhysicalDevice": !isSimulator()
+    ]
+  }
+
+  private func modelIdentifier() -> String {
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    let mirror = Mirror(reflecting: systemInfo.machine)
+    let identifier = mirror.children.reduce(into: "") { result, element in
+      guard let value = element.value as? Int8, value != 0 else { return }
+      result.append(String(UnicodeScalar(UInt8(value))))
+    }
+    return identifier
+  }
+
+  private func isSimulator() -> Bool {
+    #if targetEnvironment(simulator)
+    return true
+    #else
+    return false
+    #endif
   }
 
   /// 打开 iOS 系统订阅管理页。

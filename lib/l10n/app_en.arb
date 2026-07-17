@@ -1102,9 +1102,26 @@
   "overwriteExistingSubtitleMessage": "This will replace the current subtitle. Continue?",
   "overwrite": "Overwrite",
   "audioContentEmptyWarning": "Possibly empty",
+  "audioContentDamagedWarning": "Audio issue",
+  "audioContentSilentWarning": "Possibly silent",
+  "transcriptionDamagedConfirmTitle": "Audio may be damaged",
+  "transcriptionDamagedConfirmMessage": "This audio may be damaged or use an incompatible format. Transcribe anyway?",
   "transcriptionSilentConfirmTitle": "Audio may be empty",
   "transcriptionSilentConfirmMessage": "This audio appears to be silent with no speech. Transcribe anyway?",
   "transcriptionSilentConfirmProceed": "Transcribe anyway",
+  "transcriptionAudioFileSize": "File size: {size}",
+  "@transcriptionAudioFileSize": {
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "transcriptionAudioDuration": "Duration: {duration}",
+  "@transcriptionAudioDuration": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "transcriptionAudioUnknown": "Not detected",
   "currentSubtitleExists": "Current: Has Subtitle",
   "currentSubtitleLocal": "Current: Local Upload",
   "currentSubtitleAi": "Current: AI ({language})",

@@ -17,12 +17,12 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/revenuecat_config.dart';
-import '../../../config/client_distribution.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/app_logger.dart';
 import '../../auth/sign_in_required_dialog.dart';
 import '../../../theme/app_theme.dart';
 import '../models/entitlement.dart';
+import '../models/entitlement_source.dart';
 import '../models/subscription_plan.dart';
 import '../providers/subscription_availability.dart';
 import '../providers/subscription_controller.dart';
@@ -230,13 +230,29 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       now: DateTime.now(),
       plans: plans,
     );
+    // 「管理订阅」按钮的显示与行为按订阅**实际来源**决定，与当前运行平台解耦：
+    // - Paddle 来源（或来源未知且当前为 web 渠道）→ 打开 Paddle Customer Portal；
+    // - Apple / Google 来源 → 交给 launcher 按来源打开对应平台管理页；
+    // - 来源未知且非 web → 回退旧逻辑（有平台管理 URL 才展示，launcher 按当前渠道）。
+    final source = entitlement.source;
+    final isPaddle = source == EntitlementSource.paddle;
+    final isKnownStore =
+        source == EntitlementSource.apple ||
+        source == EntitlementSource.google;
+    final usePortal =
+        isPaddle || (source == EntitlementSource.unknown && webMode);
+    final showManage =
+        isPaddle ||
+        isKnownStore ||
+        (source == EntitlementSource.unknown &&
+            (webMode || manageSubscriptionsUrl != null));
     return [
       _MemberHeroCard(l10n: l10n, summary: summary),
       const SizedBox(height: 16),
       _MembershipInfoTile(l10n: l10n, summary: summary),
       const SizedBox(height: 20),
       _BenefitCard(l10n: l10n),
-      if (webMode || manageSubscriptionsUrl != null) ...[
+      if (showManage) ...[
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
@@ -249,7 +265,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 Theme.of(context).brightness,
               ),
             ),
-            onPressed: webMode ? _openPaddlePortal : _openManageSubscription,
+            onPressed: usePortal ? _openPaddlePortal : _openManageSubscription,
             child: Text(l10n.premiumManage),
           ),
         ),
@@ -566,8 +582,10 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
   Future<void> _openManageSubscription() async {
     final entitlement = ref.read(subscriptionControllerProvider).entitlement;
+    // 按订阅**实际来源**打开管理页（Apple 订阅在 Android 上也能打开苹果网页管理页）。
+    // 来源未知（老缓存 / 后端未返回）时 launcher 内部回退到按当前平台渠道。
     final opened = await _subscriptionManagementLauncher.open(
-      channel: clientPaymentChannel,
+      source: entitlement?.source ?? EntitlementSource.unknown,
       productId: entitlement?.productId,
     );
     if (!opened && mounted) {

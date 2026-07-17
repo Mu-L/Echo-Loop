@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:echo_loop/features/subscription/models/entitlement.dart';
+import 'package:echo_loop/features/subscription/models/entitlement_source.dart';
 import 'package:echo_loop/features/subscription/models/subscription_plan.dart';
 import 'package:echo_loop/features/subscription/providers/subscription_controller.dart';
 import 'package:echo_loop/features/subscription/providers/subscription_identity.dart';
@@ -844,6 +845,9 @@ void main() {
       );
       container.read(subscriptionControllerProvider);
       await pumpEventQueue();
+      // 需求1：native RC 非会员时 build 阶段会补查后端；此处清零，
+      // 使本用例聚焦「restore 动作本身不经后端」。
+      repo.calls.clear();
 
       await container.read(subscriptionControllerProvider.notifier).restore();
       await pumpEventQueue();

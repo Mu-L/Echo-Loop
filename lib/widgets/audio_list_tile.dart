@@ -311,12 +311,14 @@ class AudioListTile extends ConsumerWidget {
     final metaStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    final isSuspectEmpty =
-        audioItem.contentStatus == AudioContentStatus.suspectEmpty;
+    final contentWarningLabel = _contentWarningLabel(
+      l10n,
+      audioItem.contentStatus,
+    );
     final hasBadgeRow =
         audioItem.hasTranscript ||
         isTranscribing ||
-        isSuspectEmpty ||
+        contentWarningLabel != null ||
         (progress?.isStarted ?? false) ||
         collectionNames.isNotEmpty ||
         tagData.isNotEmpty ||
@@ -338,9 +340,9 @@ class AudioListTile extends ConsumerWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // 内容异常警告（解码失败 / 全程静音）
-              if (isSuspectEmpty)
-                _buildContentWarningBadge(theme, l10n.audioContentEmptyWarning),
+              // 内容异常警告（损坏 / 静音）
+              if (contentWarningLabel != null)
+                _buildContentWarningBadge(theme, contentWarningLabel),
               if (audioItem.hasTranscript && !isTranscribing)
                 _buildTranscriptBadge(theme, l10n.transcript),
               // 后台转录进度指示（带 spinner，需独立显示）
@@ -525,6 +527,17 @@ class AudioListTile extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String? _contentWarningLabel(
+    AppLocalizations l10n,
+    AudioContentStatus? status,
+  ) {
+    return switch (status) {
+      AudioContentStatus.damaged => l10n.audioContentDamagedWarning,
+      AudioContentStatus.silent => l10n.audioContentSilentWarning,
+      AudioContentStatus.ok || null => null,
+    };
   }
 
   Widget _buildTranscriptBadge(ThemeData theme, String label) {
@@ -773,7 +786,11 @@ class AudioListTile extends ConsumerWidget {
           } else if (value == 'export') {
             exportAudioItem(context, ref, audioItem);
           } else if (value == 'exportPdf') {
-            context.push(AppRoutes.pdfPreview, extra: _latestAudioItem(ref));
+            AppRoutes.pushNested(
+              context,
+              AppRoutes.pdfPreviewSegment,
+              extra: _latestAudioItem(ref),
+            );
           } else if (value == 'togglePause') {
             _handleTogglePause(context, ref, isPausedForMenu);
           } else if (value == 'resetProgress') {

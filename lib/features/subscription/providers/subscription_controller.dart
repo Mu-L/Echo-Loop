@@ -157,6 +157,31 @@ class SubscriptionController extends _$SubscriptionController {
           '权益刷新读取购买服务快照: channel=${_paymentChannel.name}',
         );
         remote = await _purchases.currentEntitlement();
+        // 需求1：native 商店渠道在 RC 判定为「非会员」时，回退查后端补充识别。
+        // RevenueCat CustomerInfo 不含 Paddle 订阅——用户若在 Web/direct 用 Paddle
+        // 订阅后换到商店版 App 登录同一账号，仅凭 RC 会被漏判为免费。此处补一次
+        // /api/entitlements（后端已合并 RC + Paddle），命中会员则以后端结果为准。
+        if (_paymentChannel != ClientPaymentChannel.web &&
+            !remote.isPremium &&
+            userId != null &&
+            accessToken != null) {
+          AppLogger.log(
+            'Subscription',
+            'native RC 非会员，回退查后端补充: userId=$userId',
+          );
+          final backend = await _repository.fetchRemote(
+            userId: userId,
+            accessToken: accessToken,
+          );
+          if (backend != null && backend.isPremium) {
+            AppLogger.log(
+              'Subscription',
+              'native 后端补查命中会员: source=${backend.source.name} '
+                  'productId=${backend.productId}',
+            );
+            remote = backend;
+          }
+        }
       }
     } catch (e) {
       // 失败不静默吞：记录错误、保留兜底，不误判为无权益。

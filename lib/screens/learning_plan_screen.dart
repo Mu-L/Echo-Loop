@@ -522,7 +522,11 @@ class _LearningPlanScreenState extends ConsumerState<LearningPlanScreen> {
           case 'export':
             exportAudioItem(context, ref, audioItem);
           case 'exportPdf':
-            context.push(AppRoutes.pdfPreview, extra: audioItem);
+            AppRoutes.pushNested(
+              context,
+              AppRoutes.pdfPreviewSegment,
+              extra: audioItem,
+            );
         }
       },
     );
@@ -1713,9 +1717,10 @@ class _ProgressCard extends ConsumerWidget {
     final item = audioItem!;
     final chips = <Widget>[];
 
-    // 内容异常警告（疑似空音频：解码失败 / 全程静音）放在首位，最醒目。
-    if (item.contentStatus == AudioContentStatus.suspectEmpty) {
-      chips.add(_buildContentWarningChip(theme));
+    // 内容异常警告（损坏 / 静音）放在首位，最醒目。
+    final contentWarningLabel = _contentWarningLabel(item.contentStatus);
+    if (contentWarningLabel != null) {
+      chips.add(_buildContentWarningChip(theme, contentWarningLabel));
     }
     if (item.totalDuration > 0) {
       chips.add(
@@ -1757,8 +1762,8 @@ class _ProgressCard extends ConsumerWidget {
     );
   }
 
-  /// 内容异常警告徽章（疑似空音频），与音频列表项的警告徽章风格一致。
-  Widget _buildContentWarningChip(ThemeData theme) {
+  /// 内容异常警告徽章，与音频列表项的警告徽章风格一致。
+  Widget _buildContentWarningChip(ThemeData theme, String label) {
     final color = theme.colorScheme.error;
     return Container(
       key: const Key('learning_plan_content_warning_badge'),
@@ -1774,7 +1779,7 @@ class _ProgressCard extends ConsumerWidget {
           Icon(Icons.warning_amber_rounded, size: 12, color: color),
           const SizedBox(width: 3),
           Text(
-            l10n.audioContentEmptyWarning,
+            label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: color,
               fontSize: 10,
@@ -1785,6 +1790,14 @@ class _ProgressCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String? _contentWarningLabel(AudioContentStatus? status) {
+    return switch (status) {
+      AudioContentStatus.damaged => l10n.audioContentDamagedWarning,
+      AudioContentStatus.silent => l10n.audioContentSilentWarning,
+      AudioContentStatus.ok || null => null,
+    };
   }
 
   /// 第一行：大阶段文字

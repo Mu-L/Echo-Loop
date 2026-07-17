@@ -3620,6 +3620,30 @@ abstract class AppLocalizations {
   /// **'Possibly empty'**
   String get audioContentEmptyWarning;
 
+  /// No description provided for @audioContentDamagedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio issue'**
+  String get audioContentDamagedWarning;
+
+  /// No description provided for @audioContentSilentWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Possibly silent'**
+  String get audioContentSilentWarning;
+
+  /// No description provided for @transcriptionDamagedConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio may be damaged'**
+  String get transcriptionDamagedConfirmTitle;
+
+  /// No description provided for @transcriptionDamagedConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This audio may be damaged or use an incompatible format. Transcribe anyway?'**
+  String get transcriptionDamagedConfirmMessage;
+
   /// No description provided for @transcriptionSilentConfirmTitle.
   ///
   /// In en, this message translates to:
@@ -3637,6 +3661,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Transcribe anyway'**
   String get transcriptionSilentConfirmProceed;
+
+  /// No description provided for @transcriptionAudioFileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'File size: {size}'**
+  String transcriptionAudioFileSize(Object size);
+
+  /// No description provided for @transcriptionAudioDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration: {duration}'**
+  String transcriptionAudioDuration(Object duration);
+
+  /// No description provided for @transcriptionAudioUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not detected'**
+  String get transcriptionAudioUnknown;
 
   /// No description provided for @currentSubtitleExists.
   ///

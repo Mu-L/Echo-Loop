@@ -2043,6 +2043,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioContentEmptyWarning => 'Possibly empty';
 
   @override
+  String get audioContentDamagedWarning => 'Audio issue';
+
+  @override
+  String get audioContentSilentWarning => 'Possibly silent';
+
+  @override
+  String get transcriptionDamagedConfirmTitle => 'Audio may be damaged';
+
+  @override
+  String get transcriptionDamagedConfirmMessage =>
+      'This audio may be damaged or use an incompatible format. Transcribe anyway?';
+
+  @override
   String get transcriptionSilentConfirmTitle => 'Audio may be empty';
 
   @override
@@ -2051,6 +2064,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get transcriptionSilentConfirmProceed => 'Transcribe anyway';
+
+  @override
+  String transcriptionAudioFileSize(Object size) {
+    return 'File size: $size';
+  }
+
+  @override
+  String transcriptionAudioDuration(Object duration) {
+    return 'Duration: $duration';
+  }
+
+  @override
+  String get transcriptionAudioUnknown => 'Not detected';
 
   @override
   String get currentSubtitleExists => 'Current: Has Subtitle';

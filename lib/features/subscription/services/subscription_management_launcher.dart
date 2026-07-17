@@ -1,7 +1,8 @@
 /// 平台订阅管理入口。
 ///
-/// 原生商店订阅不应当像普通网页一样打开：Apple 优先请求系统订阅管理页，
-/// Google Play 优先打开 Play Store 订阅页；只有平台入口不可用时才回退 HTTPS。
+/// 按订阅**实际来源**（Apple / Google / Paddle）决定管理页，与 App 当前运行平台解耦：
+/// 当前平台恰为来源平台时优先系统原生入口（iOS 系统订阅管理页 / Android Play 深链），
+/// 跨平台则回退对应商店的网页管理页。Paddle 走动态 Customer Portal，由上层处理。
 library;
 
 import 'dart:io' show Platform;
@@ -14,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../config/client_distribution.dart';
 import '../../../config/revenuecat_config.dart';
 import '../../../services/app_logger.dart';
+import '../models/entitlement_source.dart';
 
 /// URL 打开函数，供测试注入。
 typedef SubscriptionUrlLauncher =
@@ -37,13 +39,33 @@ class SubscriptionManagementLauncher {
   final MethodChannel _channel;
   final Future<PackageInfo> Function() _packageInfoLoader;
 
-  /// 打开当前渠道的订阅管理页。
+  /// 按订阅**实际来源**打开对应平台的管理页，与 App 当前运行平台解耦。
+  ///
+  /// - [EntitlementSource.apple]：当前 iOS 优先系统原生管理页，其它平台（含 Android /
+  ///   桌面）回退 Apple 网页订阅管理页；
+  /// - [EntitlementSource.google]：当前 Android 优先 Play 深链，其它平台回退 Play 网页；
+  /// - [EntitlementSource.paddle]：Paddle 走动态 Customer Portal，URL 由上层经
+  ///   controller 获取，本入口不处理，返回 false 让上层改走 Portal；
+  /// - [EntitlementSource.unknown]：来源未知（老缓存 / 后端未返回），回退到按当前平台渠道。
   ///
   /// 返回 false 表示没有可用入口或全部打开失败；调用方负责显示失败提示。
   Future<bool> open({
-    required ClientPaymentChannel channel,
+    required EntitlementSource source,
     String? productId,
   }) async {
+    return switch (source) {
+      EntitlementSource.apple => _openApple(),
+      EntitlementSource.google => _openGooglePlay(productId),
+      EntitlementSource.paddle => Future<bool>.value(false),
+      EntitlementSource.unknown => _openByChannel(
+        clientPaymentChannel,
+        productId,
+      ),
+    };
+  }
+
+  /// 按当前平台渠道打开管理页（来源未知时的回退路径，保持旧行为）。
+  Future<bool> _openByChannel(ClientPaymentChannel channel, String? productId) {
     return switch (channel) {
       ClientPaymentChannel.appleStore => _openApple(),
       ClientPaymentChannel.googlePlay => _openGooglePlay(productId),
@@ -71,7 +93,13 @@ class SubscriptionManagementLauncher {
   }
 
   Future<bool> _openGooglePlay(String? productId) async {
-    if (kIsWeb || !Platform.isAndroid) return false;
+    // 非 Android（iOS / macOS / 桌面）无法用 market:// 深链，直接打开 Play 网页管理页。
+    // 这是「Google 订阅在非 Android 平台登录同账号」的管理入口。
+    if (kIsWeb || !Platform.isAndroid) {
+      return _openUri(
+        Uri.parse('https://play.google.com/store/account/subscriptions'),
+      );
+    }
     final packageName = (await _packageInfoLoader()).packageName;
     final uris = googlePlaySubscriptionManagementUris(
       packageName: packageName,

@@ -795,8 +795,8 @@ class AudioItem extends DataClass implements Insertable<AudioItem> {
   /// AI 转录使用的语言（'en' / 'multi'）
   final String? transcriptLanguage;
 
-  /// 音频内容有效性状态：0=ok, 1=suspectEmpty, null=未检测。
-  /// 新下载时检测一次（解码失败或全程静音判 suspectEmpty）。
+  /// 音频内容有效性状态：0=ok, 1=damaged, 2=silent, null=未检测。
+  /// 新下载时检测一次（短解码失败判 damaged，可解码但静音判 silent）。
   final int? audioContentStatus;
 
   /// 最后修改时间

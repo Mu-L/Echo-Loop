@@ -47,7 +47,7 @@ class StubEntitlementRepository implements EntitlementRepository {
 
 /// 后端权益仓库实现（`GET /api/entitlements`）。
 ///
-/// 响应体：`{ isPremium, entitlementIds, productId, expiresAtMs }`（见后端
+/// 响应体：`{ isPremium, entitlementIds, productId, expiresAtMs, willRenew }`（见后端
 /// `apps/app/app/api/entitlements/route.ts`）。带 `Authorization: Bearer <token>`，
 /// 参照 [TranscriptionApiClient] 的既有鉴权模式。
 ///
@@ -85,6 +85,7 @@ class BackendEntitlementRepository implements EntitlementRepository {
         AppLogger.log('Subscription', '后端权益：响应体为空，走兜底');
         return null;
       }
+      _logEntitlementResponse(data, response.statusCode);
       return _entitlementFrom(data);
     } on DioException catch (e) {
       // 网络 / 超时 / 非 2xx：不可误判为无权益，返回 null 由上层走缓存兜底。
@@ -121,8 +122,27 @@ class BackendEntitlementRepository implements EntitlementRepository {
       // 后端无周期字段：用 productId 字符串启发式推断，供会员 UI 显示套餐名。
       period: subscriptionPeriodFromProductId(productId),
       expiresAt: expiresAt,
-      // 后端当前不投影自动续费标志，保守置 false（不影响 isActive 门禁判定）。
-      willRenew: false,
+      willRenew: json['willRenew'] == true,
+    );
+  }
+
+  /// 打印 App 实际收到的权益响应，避免排查时只看后端预期。
+  ///
+  /// 只记录业务摘要与字段存在性，不打印 access token / Authorization header。
+  void _logEntitlementResponse(Map<String, dynamic> json, int? statusCode) {
+    final rawIds = json['entitlementIds'];
+    final entitlementIds = rawIds is List
+        ? rawIds.whereType<String>().toList()
+        : const <String>[];
+    AppLogger.log(
+      'Subscription',
+      '后端权益响应: http=${statusCode ?? "unknown"} '
+          'isPremium=${json['isPremium'] == true} '
+          'entitlementIds=$entitlementIds '
+          'productId=${json['productId'] is String ? json['productId'] : "null"} '
+          'expiresAtMs=${json['expiresAtMs'] is int ? json['expiresAtMs'] : "null"} '
+          'willRenew=${json['willRenew'] == true} '
+          'hasWillRenew=${json.containsKey('willRenew')}',
     );
   }
 }
