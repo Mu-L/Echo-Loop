@@ -315,8 +315,9 @@ class AudioListTile extends ConsumerWidget {
       l10n,
       audioItem.contentStatus,
     );
+    // CC 徽章已下沉到元信息行（与时长/日期同排），不再触发标签行。
+    final hasCc = audioItem.hasTranscript && !isTranscribing;
     final hasBadgeRow =
-        audioItem.hasTranscript ||
         isTranscribing ||
         contentWarningLabel != null ||
         (progress?.isStarted ?? false) ||
@@ -327,10 +328,22 @@ class AudioListTile extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          metaParts.join(' · '),
-          key: const Key('audio_list_tile_metadata_row'),
-          style: metaStyle,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (hasCc) ...[
+              _buildTranscriptBadge(theme, l10n.transcript),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                metaParts.join(' · '),
+                key: const Key('audio_list_tile_metadata_row'),
+                style: metaStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         if (hasBadgeRow) ...[
           const SizedBox(height: 4),
@@ -343,8 +356,6 @@ class AudioListTile extends ConsumerWidget {
               // 内容异常警告（损坏 / 静音）
               if (contentWarningLabel != null)
                 _buildContentWarningBadge(theme, contentWarningLabel),
-              if (audioItem.hasTranscript && !isTranscribing)
-                _buildTranscriptBadge(theme, l10n.transcript),
               // 后台转录进度指示（带 spinner，需独立显示）
               if (isTranscribing)
                 Row(
@@ -540,31 +551,35 @@ class AudioListTile extends ConsumerWidget {
     };
   }
 
+  /// 字幕状态标签 —— 采用国际通用的 CC（Closed Caption）徽章。
+  ///
+  /// [label] 保留作为语义标签（无障碍朗读），视觉上只呈现「CC」，
+  /// 更紧凑、辨识度更高。
+  ///
+  /// 采用中性灰：CC 是「有无字幕」的静态属性标记，与状态/标签 chip 的
+  /// 彩色区分，避免与相邻的学习进度 badge 争夺注意力。
   Widget _buildTranscriptBadge(ThemeData theme, String label) {
-    final color = theme.colorScheme.primary;
-    return Container(
-      key: const Key('audio_list_tile_transcript_badge'),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        border: Border.all(color: color.withValues(alpha: 0.55)),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.subtitles_outlined, size: 12, color: color),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              height: 1.1,
-            ),
+    final color = theme.colorScheme.onSurfaceVariant;
+    return Tooltip(
+      message: label,
+      child: Container(
+        key: const Key('audio_list_tile_transcript_badge'),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'CC',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            height: 1.0,
           ),
-        ],
+        ),
       ),
     );
   }
