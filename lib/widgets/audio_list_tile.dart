@@ -68,6 +68,18 @@ class AudioListTile extends ConsumerWidget {
   /// 当前音频菜单作为引导 target 时的 step（由外层注入）。
   final GuideStep? menuStep;
 
+  /// 是否处于多选模式（合集详情页批量删除）。
+  final bool selectionMode;
+
+  /// 多选模式下本项是否被选中。
+  final bool selected;
+
+  /// 长按回调 —— 进入多选并选中本项（由外层注入）。
+  final VoidCallback? onLongPress;
+
+  /// 多选模式下点击本项切换选中态（由外层注入）。
+  final VoidCallback? onSelectToggle;
+
   const AudioListTile({
     super.key,
     required this.audioItem,
@@ -77,6 +89,10 @@ class AudioListTile extends ConsumerWidget {
     this.onDelete,
     this.itemStep,
     this.menuStep,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onLongPress,
+    this.onSelectToggle,
   });
 
   /// 是否在合集上下文中
@@ -131,24 +147,50 @@ class AudioListTile extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 600;
+        // 多选态：选中项高亮（沿用置顶高亮的柔和主色底），未选中保持普通色。
+        final selectionHighlightColor = theme.colorScheme.primary.withValues(
+          alpha: 0.12,
+        );
+        final Color? cardColor = selectionMode && selected
+            ? selectionHighlightColor
+            : (audioItem.isPinned ? pinnedHighlightColor : null);
         final card = Card(
           margin: EdgeInsets.zero,
-          color: audioItem.isPinned ? pinnedHighlightColor : null,
+          color: cardColor,
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _handleTap(context, ref, l10n),
+            onTap: selectionMode
+                ? onSelectToggle
+                : () => _handleTap(context, ref, l10n),
+            onLongPress: onLongPress,
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: Padding(
-                      padding: isDesktop
-                          ? const EdgeInsets.fromLTRB(20, 8, 0, 8)
-                          : const EdgeInsets.fromLTRB(16, 8, 0, 8),
+                      // 右侧留白通常由 trailing 菜单（宽 60）撑起，故默认为 0；
+                      // 多选态隐藏了菜单，需补回右内边距以保持左右对称。
+                      padding: EdgeInsets.fromLTRB(
+                        isDesktop ? 20 : 16,
+                        8,
+                        selectionMode ? (isDesktop ? 20 : 16) : 0,
+                        8,
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          // 多选态：最左侧放选中框，紧凑不占过多横向空间。
+                          if (selectionMode) ...[
+                            Checkbox(
+                              value: selected,
+                              onChanged: (_) => onSelectToggle?.call(),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
                           // 左侧进度图标，垂直居中
                           _buildLeading(progress, downloadProgress),
                           const SizedBox(width: 16),
@@ -183,7 +225,8 @@ class AudioListTile extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  _buildTrailing(context, ref, l10n, theme),
+                  // 多选态隐藏右侧菜单按钮，避免与选中交互冲突。
+                  if (!selectionMode) _buildTrailing(context, ref, l10n, theme),
                 ],
               ),
             ),
