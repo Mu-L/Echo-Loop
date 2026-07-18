@@ -134,6 +134,7 @@ class _CollectionDetailScreenState
                           ),
                         ),
                       ),
+                    const SizedBox(width: 8),
                   ],
                 ),
           body: collection.isPodcast
