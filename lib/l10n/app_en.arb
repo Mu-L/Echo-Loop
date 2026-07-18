@@ -396,6 +396,34 @@
     }
   },
   "audioNotInOtherCollections": "Not used by any other collection — safe to delete.",
+  "selectedCount": "{count} selected",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "Select All",
+  "deselectAll": "Deselect All",
+  "removeFromCollectionBatch": "Remove {count} from collection",
+  "@removeFromCollectionBatch": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentlyDeleteBatch": "Permanently delete {count} audio",
+  "@permanentlyDeleteBatch": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentlyDeleteBatchHint": "Removes the files and the audio from all collections.",
+  "removeFromCollectionBatchHint": "Only removes them from this collection; the audio files are kept.",
   "emptyCollection": "No audio in this collection",
   "tapToAddAudio": "Tap + to add audio files",
   "renameAudio": "Rename",

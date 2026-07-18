@@ -750,6 +750,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioNotInOtherCollections => '未被其它合集引用，可放心删除。';
 
   @override
+  String selectedCount(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get selectAll => '全选';
+
+  @override
+  String get deselectAll => '取消全选';
+
+  @override
+  String removeFromCollectionBatch(int count) {
+    return '从合集移除 $count 项';
+  }
+
+  @override
+  String permanentlyDeleteBatch(int count) {
+    return '彻底删除 $count 项音频';
+  }
+
+  @override
+  String get permanentlyDeleteBatchHint => '将删除音频文件，并从所有合集移除。';
+
+  @override
+  String get removeFromCollectionBatchHint => '仅从当前合集移除，音频文件保留。';
+
+  @override
   String get emptyCollection => '合集中还没有音频';
 
   @override

@@ -1460,6 +1460,48 @@ abstract class AppLocalizations {
   /// **'Not used by any other collection — safe to delete.'**
   String get audioNotInOtherCollections;
 
+  /// No description provided for @selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String selectedCount(int count);
+
+  /// No description provided for @selectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get selectAll;
+
+  /// No description provided for @deselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect All'**
+  String get deselectAll;
+
+  /// No description provided for @removeFromCollectionBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {count} from collection'**
+  String removeFromCollectionBatch(int count);
+
+  /// No description provided for @permanentlyDeleteBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete {count} audio'**
+  String permanentlyDeleteBatch(int count);
+
+  /// No description provided for @permanentlyDeleteBatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Removes the files and the audio from all collections.'**
+  String get permanentlyDeleteBatchHint;
+
+  /// No description provided for @removeFromCollectionBatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only removes them from this collection; the audio files are kept.'**
+  String get removeFromCollectionBatchHint;
+
   /// No description provided for @emptyCollection.
   ///
   /// In en, this message translates to:

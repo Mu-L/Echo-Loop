@@ -320,6 +320,34 @@
   "permanentlyDeleteAudioHint": "将删除音频文件，并从所有合集中移除。",
   "audioBelongsToCollections": "此音频还在以下合集：{names}",
   "audioNotInOtherCollections": "未被其它合集引用，可放心删除。",
+  "selectedCount": "已选 {count} 项",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "全选",
+  "deselectAll": "取消全选",
+  "removeFromCollectionBatch": "从合集移除 {count} 项",
+  "@removeFromCollectionBatch": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentlyDeleteBatch": "彻底删除 {count} 项音频",
+  "@permanentlyDeleteBatch": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentlyDeleteBatchHint": "将删除音频文件，并从所有合集移除。",
+  "removeFromCollectionBatchHint": "仅从当前合集移除，音频文件保留。",
   "emptyCollection": "合集中还没有音频",
   "tapToAddAudio": "点击 + 添加音频文件",
   "renameAudio": "重命名",

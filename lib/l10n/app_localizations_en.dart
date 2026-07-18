@@ -765,6 +765,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not used by any other collection — safe to delete.';
 
   @override
+  String selectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get selectAll => 'Select All';
+
+  @override
+  String get deselectAll => 'Deselect All';
+
+  @override
+  String removeFromCollectionBatch(int count) {
+    return 'Remove $count from collection';
+  }
+
+  @override
+  String permanentlyDeleteBatch(int count) {
+    return 'Permanently delete $count audio';
+  }
+
+  @override
+  String get permanentlyDeleteBatchHint =>
+      'Removes the files and the audio from all collections.';
+
+  @override
+  String get removeFromCollectionBatchHint =>
+      'Only removes them from this collection; the audio files are kept.';
+
+  @override
   String get emptyCollection => 'No audio in this collection';
 
   @override
