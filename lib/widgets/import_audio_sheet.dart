@@ -249,7 +249,6 @@ class _ChooseSourcePanel extends StatelessWidget {
           key: const ValueKey('import-option-local-file'),
           icon: Icons.audio_file_outlined,
           title: l10n.importAudioFromFile,
-          description: l10n.importAudioFromFileDescription,
           onTap: onLocalFile,
         ),
         const SizedBox(height: 12),
@@ -270,13 +269,15 @@ class _ImportOptionTile extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
-    required this.description,
+    this.description,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String description;
+
+  /// 可选说明文案，为 null 时不显示说明行。
+  final String? description;
   final VoidCallback onTap;
 
   @override
@@ -313,13 +314,15 @@ class _ImportOptionTile extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                    if (description != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        description!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

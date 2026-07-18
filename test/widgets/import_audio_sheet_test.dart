@@ -137,15 +137,16 @@ void main() {
     expect(linkTop - localBottom, 12);
   });
 
-  testWidgets('本地文件入口说明提示可选择手机或网盘音频', (tester) async {
+  testWidgets('本地文件入口不显示说明提示', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.tap(find.text('Open Import'));
     await tester.pumpAndSettle();
 
     expect(find.text('Import from Cloud Drive'), findsNothing);
+    // 本地文件入口已移除说明文案。
     expect(
       find.text('Choose audio files from your phone or cloud drive'),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.text('Import from File'), findsOneWidget);
     expect(find.text('Import from Link'), findsOneWidget);
