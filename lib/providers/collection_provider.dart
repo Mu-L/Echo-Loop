@@ -228,6 +228,19 @@ class CollectionList extends _$CollectionList {
     await dao.hardDelete(id);
   }
 
+  /// 删除合集并彻底删除其中的音频（DB 记录 + 文件 + 关联数据）。
+  ///
+  /// 用于「我的合集」列表删除时用户勾选「同时删除音频文件」的分支。音频可能被多个
+  /// 合集共享，故通过 [AudioLibrary.removeAudioItems] 逐条按引用检查删文件，避免误删
+  /// 仍被其它条目使用的资源；最后调用 [deleteCollection] 删合集行。
+  Future<void> deleteCollectionWithAudios(String id) async {
+    final audioIds = state.getAudioIds(id).toSet();
+    if (audioIds.isNotEmpty) {
+      await ref.read(audioLibraryProvider.notifier).removeAudioItems(audioIds);
+    }
+    await deleteCollection(id);
+  }
+
   Future<void> renameCollection(String id, String newName) async {
     final collections = [...state.rawCollections];
     final index = collections.indexWhere((c) => c.id == id);

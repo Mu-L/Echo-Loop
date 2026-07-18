@@ -333,11 +333,28 @@
   "noCollectionsYet": "No collections yet",
   "tapToCreateCollection": "Tap + to create your first collection",
   "deleteCollection": "Delete Collection",
-  "deleteCollectionConfirm": "Are you sure you want to delete \"{name}\"? Audio files in this collection will not be deleted.",
+  "deleteCollectionConfirm": "Are you sure you want to delete \"{name}\"?",
   "@deleteCollectionConfirm": {
     "placeholders": {
       "name": {
         "type": "String"
+      }
+    }
+  },
+  "deleteCollectionAlsoDeleteAudio": "Also delete audio files",
+  "deleteCollectionKeepAudioHint": "{count} audio file(s) in this collection will be kept.",
+  "@deleteCollectionKeepAudioHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteCollectionDeleteAudioHint": "{count} audio file(s) in this collection will also be deleted.",
+  "@deleteCollectionDeleteAudioHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
       }
     }
   },

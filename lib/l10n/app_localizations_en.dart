@@ -662,7 +662,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String deleteCollectionConfirm(String name) {
-    return 'Are you sure you want to delete \"$name\"? Audio files in this collection will not be deleted.';
+    return 'Are you sure you want to delete \"$name\"?';
+  }
+
+  @override
+  String get deleteCollectionAlsoDeleteAudio => 'Also delete audio files';
+
+  @override
+  String deleteCollectionKeepAudioHint(int count) {
+    return '$count audio file(s) in this collection will be kept.';
+  }
+
+  @override
+  String deleteCollectionDeleteAudioHint(int count) {
+    return '$count audio file(s) in this collection will also be deleted.';
   }
 
   @override

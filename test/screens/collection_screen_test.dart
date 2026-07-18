@@ -360,6 +360,113 @@ void main() {
         expect(card.color, isNotNull);
       });
 
+      testWidgets('删除合集弹窗默认勾选删音频并显示文件数，取消勾选则保留', (tester) async {
+        final c = createTestCollection(id: '1', name: 'test');
+        final audio = createTestAudioItem(id: 'a1');
+        final collectionList = TestCollectionList(
+          CollectionState(
+            rawCollections: [c],
+            audioIdsMap: {
+              '1': ['a1'],
+            },
+          ),
+        );
+        final audioLib = TestAudioLibrary(
+          AudioLibraryState(audioItems: [audio]),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const LibraryScreen(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              audioLibraryProvider.overrideWith(() => audioLib),
+              collectionListProvider.overrideWith(() => collectionList),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const Key('collection_list_menu_hit_area')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        // 默认勾选：提示一并删除并带文件数，选项文案为纯文本。
+        expect(
+          find.text('1 audio file(s) in this collection will also be deleted.'),
+          findsOneWidget,
+        );
+        expect(find.text('Also delete audio files'), findsOneWidget);
+
+        // 取消勾选 → 提示切换为保留。
+        await tester.tap(find.text('Also delete audio files'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('1 audio file(s) in this collection will be kept.'),
+          findsOneWidget,
+        );
+
+        // 删除 → 合集删除，音频保留。
+        await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+        await tester.pumpAndSettle();
+
+        expect(collectionList.state.rawCollections, isEmpty);
+        expect(audioLib.state.audioItems, hasLength(1));
+      });
+
+      testWidgets('删除合集默认勾选时一并删除音频文件', (tester) async {
+        final c = createTestCollection(id: '1', name: 'test');
+        final audio = createTestAudioItem(id: 'a1');
+        final collectionList = TestCollectionList(
+          CollectionState(
+            rawCollections: [c],
+            audioIdsMap: {
+              '1': ['a1'],
+            },
+          ),
+        );
+        final audioLib = TestAudioLibrary(
+          AudioLibraryState(audioItems: [audio]),
+        );
+
+        await tester.pumpWidget(
+          createTestScreen(
+            const LibraryScreen(),
+            overrides: [
+              appSettingsProvider.overrideWith(() => TestAppSettings()),
+              audioLibraryProvider.overrideWith(() => audioLib),
+              collectionListProvider.overrideWith(() => collectionList),
+              listeningPracticeProvider.overrideWith(
+                () => TestListeningPractice(),
+              ),
+              audioEngineProvider.overrideWith(() => TestAudioEngine()),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const Key('collection_list_menu_hit_area')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+
+        // 默认已勾选，直接删除 → 合集与音频均被删除。
+        await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+        await tester.pumpAndSettle();
+
+        expect(collectionList.state.rawCollections, isEmpty);
+        expect(audioLib.state.audioItems, isEmpty);
+      });
+
       testWidgets('Podcast 合集菜单显示重命名和详情，不显示刷新', (tester) async {
         final c =
             createTestCollection(

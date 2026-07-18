@@ -651,7 +651,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String deleteCollectionConfirm(String name) {
-    return '确定要删除「$name」吗？合集中的音频文件不会被删除。';
+    return '确定要删除「$name」吗？';
+  }
+
+  @override
+  String get deleteCollectionAlsoDeleteAudio => '同时删除音频文件';
+
+  @override
+  String deleteCollectionKeepAudioHint(int count) {
+    return '合集中共 $count 个音频文件，将保留。';
+  }
+
+  @override
+  String deleteCollectionDeleteAudioHint(int count) {
+    return '合集中共 $count 个音频文件，将一并删除。';
   }
 
   @override

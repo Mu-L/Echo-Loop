@@ -19,6 +19,7 @@ import '../services/app_network_image_cache.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/app_popup_menu.dart';
 import '../widgets/common/form_input_style.dart';
+import '../widgets/audio_list_view.dart';
 import '../widgets/common/secondary_action_button.dart';
 import '../widgets/dialogs/confirm_dialog.dart';
 import '../widgets/dialogs/text_input_dialog.dart';
@@ -1070,25 +1071,102 @@ void _showRenameCollectionDialog(
 }
 
 /// 删除确认对话框（local 合集专用）
+///
+/// 提供「同时删除音频文件」复选框（默认不勾）：勾选则彻底删除合集内音频（含文件），
+/// 否则仅删合集、保留音频。默认不勾以避免误删共享音频。
 void _showDeleteConfirmDialog(
   BuildContext context,
   WidgetRef ref,
   Collection collection,
 ) async {
-  final l10n = AppLocalizations.of(context)!;
-
-  final confirmed = await showConfirmDialog(
+  final audioCount = ref
+      .read(collectionListProvider)
+      .getAudioIds(collection.id)
+      .length;
+  final alsoDeleteAudio = await showDialog<bool>(
     context: context,
-    title: l10n.deleteCollection,
-    message: l10n.deleteCollectionConfirm(collection.name),
-    icon: Icons.warning_amber_rounded,
-    isDestructive: true,
-    confirmLabel: l10n.delete,
-    cancelLabel: l10n.cancel,
+    builder: (_) =>
+        _DeleteCollectionDialog(name: collection.name, audioCount: audioCount),
   );
 
-  if (confirmed == true) {
-    ref.read(collectionListProvider.notifier).deleteCollection(collection.id);
+  if (alsoDeleteAudio == null) return;
+  final notifier = ref.read(collectionListProvider.notifier);
+  if (alsoDeleteAudio) {
+    notifier.deleteCollectionWithAudios(collection.id);
+  } else {
+    notifier.deleteCollection(collection.id);
+  }
+}
+
+/// 合集删除确认弹窗：默认仅删合集，勾选「同时删除音频文件」后主按钮切换为破坏色。
+///
+/// 返回值：`true` 表示同时删除音频，`false` 表示仅删合集，`null` 表示取消。
+/// 风格与合集详情页批量删除弹窗（[_BatchDeleteDialog]）保持一致。
+class _DeleteCollectionDialog extends StatefulWidget {
+  const _DeleteCollectionDialog({required this.name, required this.audioCount});
+
+  final String name;
+
+  /// 合集内音频数量，展示在选项文案里。
+  final int audioCount;
+
+  @override
+  State<_DeleteCollectionDialog> createState() =>
+      _DeleteCollectionDialogState();
+}
+
+class _DeleteCollectionDialogState extends State<_DeleteCollectionDialog> {
+  // 默认勾选：删合集通常意在清理音频，勾掉才退化为仅删合集。
+  bool _alsoDeleteAudio = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AlertDialog(
+      icon: Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+      title: Text(l10n.deleteCollection),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.deleteCollectionConfirm(widget.name)),
+          const SizedBox(height: 10),
+          // 弱化提示：随选择切换，说明音频文件的去留。
+          Text(
+            _alsoDeleteAudio
+                ? l10n.deleteCollectionDeleteAudioHint(widget.audioCount)
+                : l10n.deleteCollectionKeepAudioHint(widget.audioCount),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 同时删除音频文件选项：复用删除弹窗的紧凑可点整行。
+          PermanentlyDeleteOption(
+            value: _alsoDeleteAudio,
+            label: l10n.deleteCollectionAlsoDeleteAudio,
+            onChanged: (v) => setState(() => _alsoDeleteAudio = v),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _alsoDeleteAudio),
+          style: FilledButton.styleFrom(
+            backgroundColor: colorScheme.error,
+            foregroundColor: colorScheme.onError,
+          ),
+          child: Text(l10n.delete),
+        ),
+      ],
+    );
   }
 }
 
