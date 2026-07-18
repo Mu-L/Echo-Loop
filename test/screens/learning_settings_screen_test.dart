@@ -8,6 +8,7 @@ library;
 
 import 'package:echo_loop/l10n/app_localizations.dart';
 import 'package:echo_loop/providers/learning_settings_provider.dart';
+import 'package:echo_loop/providers/new_user_guide_provider.dart';
 import 'package:echo_loop/screens/learning_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -25,6 +26,8 @@ void main() {
     bool autoPlayRetellRecording = false,
     bool listenAndRepeatRatingEnabled = true,
     bool retellRatingEnabled = true,
+    bool? guideEnabled,
+    bool seedGuideSeen = false,
   }) async {
     SharedPreferences.setMockInitialValues({
       if (autoSkipRetell) LearningSettingsKeys.autoSkipRetell: true,
@@ -33,6 +36,8 @@ void main() {
       if (!listenAndRepeatRatingEnabled)
         LearningSettingsKeys.listenAndRepeatRatingEnabled: false,
       if (!retellRatingEnabled) LearningSettingsKeys.retellRatingEnabled: false,
+      if (guideEnabled != null) GuideRegistry.enabledKey: guideEnabled,
+      if (seedGuideSeen) 'guide_v1_${GuideFlowIds.active.first}_seen': true,
     });
     final prefs = await SharedPreferences.getInstance();
     return ProviderScope(
@@ -262,5 +267,59 @@ void main() {
     );
     final ratingTile = tester.widget<SwitchListTile>(ratingFinder);
     expect(ratingTile.value, isFalse);
+  });
+
+  // 新手引导项为自定义 Row（非 SwitchListTile），按所在 Card 内的 Switch 定位。
+  Finder guideSwitchFinder() => find.descendant(
+    of: find.widgetWithText(Card, 'New User Guide'),
+    matching: find.byType(Switch),
+  );
+
+  testWidgets('新手引导默认开启，且显示「重置」按钮', (tester) async {
+    await tester.pumpWidget(await buildApp());
+    await tester.pumpAndSettle();
+
+    final guideSwitch = tester.widget<Switch>(guideSwitchFinder());
+    expect(guideSwitch.value, isTrue);
+    // 开启时「重置」按钮可见。
+    expect(find.widgetWithText(TextButton, 'Reset'), findsOneWidget);
+  });
+
+  testWidgets('关闭新手引导后「重置」按钮消失', (tester) async {
+    await tester.pumpWidget(await buildApp(guideEnabled: false));
+    await tester.pumpAndSettle();
+
+    final guideSwitch = tester.widget<Switch>(guideSwitchFinder());
+    expect(guideSwitch.value, isFalse);
+    expect(find.widgetWithText(TextButton, 'Reset'), findsNothing);
+  });
+
+  testWidgets('切换新手引导开关 → 翻转 state + 写 SP', (tester) async {
+    await tester.pumpWidget(await buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(guideSwitchFinder());
+    await tester.pumpAndSettle();
+
+    final guideSwitch = tester.widget<Switch>(guideSwitchFinder());
+    expect(guideSwitch.value, isFalse);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(GuideRegistry.enabledKey), isFalse);
+  });
+
+  testWidgets('点击「重置」→ 清空 seen 状态并弹 snackbar', (tester) async {
+    await tester.pumpWidget(await buildApp(seedGuideSeen: true));
+    await tester.pumpAndSettle();
+
+    final seenKey = 'guide_v1_${GuideFlowIds.active.first}_seen';
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(seenKey), isTrue);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Reset'));
+    await tester.pumpAndSettle();
+
+    expect(prefs.getBool(seenKey), isNull);
+    expect(find.text('New user guide has been reset'), findsOneWidget);
   });
 }
