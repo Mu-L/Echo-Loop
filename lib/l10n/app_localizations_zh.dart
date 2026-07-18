@@ -3318,6 +3318,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetNewUserGuideDone => '新手引导已重置';
 
   @override
+  String get newUserGuideToggle => '新手引导';
+
+  @override
+  String get newUserGuideSubtitle => '开启后在各页面首次使用时显示操作引导';
+
+  @override
+  String get newUserGuideResetAction => '重置';
+
+  @override
   String get resetOnboarding => '重置 Onboarding 问卷';
 
   @override
