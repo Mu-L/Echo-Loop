@@ -156,6 +156,8 @@ class _GuideFlowSequenceHostState extends ConsumerState<GuideFlowSequenceHost> {
     if (!TickerMode.valuesOf(context).enabled) return;
     final showcase = _tryGetShowcase();
     if (showcase == null) return;
+    // 新手引导总开关关闭时，直接不启动任何 flow。
+    if (!ref.read(guideEnabledProvider)) return;
     if (ref.read(guideControllerProvider).isActive) return;
 
     final registry = ref.read(guideRegistryProvider);

@@ -15,6 +15,7 @@ import '../analytics/models/event_names.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/learning_progress_provider.dart';
 import '../providers/learning_settings_provider.dart';
+import '../providers/new_user_guide_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 学习设置页面
@@ -25,6 +26,7 @@ class LearningSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(learningSettingsProvider);
+    final guideEnabled = ref.watch(guideEnabledProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -200,8 +202,88 @@ class LearningSettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+          const SizedBox(height: AppSpacing.m),
+          // 新手引导：总开关（默认开启）；开启时在开关左侧内联「重置」入口，
+          // 关闭时不显示「重置」（关闭后不再弹任何引导气泡）。
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.m,
+                AppSpacing.s,
+                AppSpacing.s,
+                AppSpacing.s,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.school_outlined,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.m),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.newUserGuideToggle,
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.newUserGuideSubtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 仅在开启时显示「重置」：清空所有 flow 的 seen，重新体验引导。
+                  if (guideEnabled)
+                    TextButton(
+                      onPressed: () => _resetGuide(context, ref, l10n),
+                      child: Text(l10n.newUserGuideResetAction),
+                    ),
+                  Switch(
+                    value: guideEnabled,
+                    onChanged: (value) async {
+                      await ref
+                          .read(guideEnabledProvider.notifier)
+                          .setEnabled(value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// 重置新手引导：清空所有 flow 的 seen 状态，用户可重新体验引导气泡。
+  Future<void> _resetGuide(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) async {
+    await ref
+        .read(guideControllerProvider.notifier)
+        .resetFlows(GuideFlowIds.all);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.resetNewUserGuideDone)));
   }
 }
