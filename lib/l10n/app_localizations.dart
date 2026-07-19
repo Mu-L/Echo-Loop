@@ -5648,6 +5648,12 @@ abstract class AppLocalizations {
   /// **'{count} items'**
   String recycleBinItemCount(int count);
 
+  /// No description provided for @importList.
+  ///
+  /// In en, this message translates to:
+  /// **'Import List'**
+  String get importList;
+
   /// No description provided for @filesSelected.
   ///
   /// In en, this message translates to:
@@ -5659,6 +5665,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Processing {current} of {total}...'**
   String processingFileOf(int current, int total);
+
+  /// No description provided for @importingFileProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing {current}/{total}: {name}'**
+  String importingFileProgress(int current, int total, String name);
 
   /// No description provided for @multipleAudioAdded.
   ///
@@ -5689,6 +5701,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The following audio files have identical content to audio already in this collection and were skipped:'**
   String get duplicatesSkippedDetail;
+
+  /// No description provided for @duplicateExistingFileName.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate file name: {name}'**
+  String duplicateExistingFileName(String name);
 
   /// No description provided for @duplicateOfExisting.
   ///
@@ -7459,6 +7477,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paste a direct audio link and download it'**
   String get importAudioFromUrlDescription;
+
+  /// No description provided for @importAudioFromCloudDrive.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Cloud Drive'**
+  String get importAudioFromCloudDrive;
+
+  /// No description provided for @importAudioFromBaiduNetdisk.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Baidu Netdisk'**
+  String get importAudioFromBaiduNetdisk;
+
+  /// No description provided for @cloudDriveSourceShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Drive'**
+  String get cloudDriveSourceShort;
+
+  /// No description provided for @baiduNetdisk.
+  ///
+  /// In en, this message translates to:
+  /// **'Baidu Netdisk'**
+  String get baiduNetdisk;
+
+  /// No description provided for @baiduNetdiskAllFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Files'**
+  String get baiduNetdiskAllFiles;
+
+  /// No description provided for @baiduNetdiskWaitingAuthorization.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for Baidu authorization...'**
+  String get baiduNetdiskWaitingAuthorization;
+
+  /// No description provided for @baiduNetdiskLoadingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading Baidu Netdisk files...'**
+  String get baiduNetdiskLoadingFiles;
+
+  /// No description provided for @baiduNetdiskImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Baidu Netdisk import failed.'**
+  String get baiduNetdiskImportFailed;
+
+  /// No description provided for @baiduNetdiskConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Baidu Netdisk'**
+  String get baiduNetdiskConnectTitle;
+
+  /// No description provided for @baiduNetdiskConnectDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorize Echo Loop to browse your Baidu Netdisk and import selected audio files.'**
+  String get baiduNetdiskConnectDescription;
+
+  /// No description provided for @baiduNetdiskConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Baidu Netdisk'**
+  String get baiduNetdiskConnectAction;
+
+  /// No description provided for @baiduNetdiskLogoutTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of Baidu Netdisk'**
+  String get baiduNetdiskLogoutTooltip;
+
+  /// No description provided for @baiduNetdiskSelectAllAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get baiduNetdiskSelectAllAction;
+
+  /// No description provided for @baiduNetdiskClearSelectionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get baiduNetdiskClearSelectionAction;
+
+  /// No description provided for @baiduNetdiskLogoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of Baidu Netdisk?'**
+  String get baiduNetdiskLogoutTitle;
+
+  /// No description provided for @baiduNetdiskLogoutMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Echo Loop will clear the saved Baidu Netdisk authorization on this device.'**
+  String get baiduNetdiskLogoutMessage;
+
+  /// No description provided for @baiduNetdiskLogoutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Out'**
+  String get baiduNetdiskLogoutConfirm;
+
+  /// No description provided for @baiduNetdiskNoSupportedAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'No supported audio files found in this folder.'**
+  String get baiduNetdiskNoSupportedAudio;
+
+  /// No description provided for @importAudioShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importAudioShort;
+
+  /// No description provided for @importAudioSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Import {count}'**
+  String importAudioSelectedCount(int count);
+
+  /// No description provided for @importAudioAndSubtitleCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Import ({audioCount, plural, =0{} =1{1 audio} other{{audioCount} audio files}}{subtitleCount, plural, =0{} =1{, 1 subtitle} other{, {subtitleCount} subtitles}})'**
+  String importAudioAndSubtitleCount(int audioCount, int subtitleCount);
+
+  /// No description provided for @baiduNetdiskImporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing...'**
+  String get baiduNetdiskImporting;
+
+  /// No description provided for @baiduNetdiskImportingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing {name}...'**
+  String baiduNetdiskImportingFile(String name);
+
+  /// No description provided for @baiduNetdiskImportedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} from Baidu Netdisk'**
+  String baiduNetdiskImportedCount(int count);
+
+  /// No description provided for @baiduNetdiskSkippedSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped duplicates: {duplicates} · Failed: {failures}'**
+  String baiduNetdiskSkippedSummary(int duplicates, int failures);
 
   /// No description provided for @audioUrlLabel.
   ///

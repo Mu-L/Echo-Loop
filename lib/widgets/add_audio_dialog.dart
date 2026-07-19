@@ -4,20 +4,20 @@
 // - 有 collectionId：添加音频后自动关联到指定合集
 // - 无 collectionId：显示合集下拉框，可选择归入合集
 //
-// 支持一次选择多个音频文件批量添加。
-// 单文件添加成功后返回 [AudioItem] 供调用方弹出字幕确认；
-// 多文件直接添加，不弹字幕确认。
+// 支持选择一个音频文件添加。
+// 添加成功后返回导入结果供调用方继续处理。
 import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_io/io.dart';
 import '../utils/app_data_dir.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import '../features/audio_import/audio_finalization_service.dart';
+import '../features/audio_import/audio_import_models.dart';
 import '../features/audio_import/audio_registration_service.dart';
 import '../features/audio_import/subtitle_pairing.dart';
 import '../models/audio_item.dart';
@@ -26,12 +26,12 @@ import '../providers/audio_library_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_logger.dart';
 import '../utils/transcript_picker.dart';
-import 'common/secondary_action_button.dart';
+import 'import_audio_selection_list.dart';
 
 /// 已选中的音频文件信息
 ///
 /// [file] 为原始选中文件（含缓存路径/字节）；复制到沙盒、算指纹等重活延后到点击
-/// 「添加」时做，保证选择后预览秒出。[subtitleText]/[subtitleExt] 为同一次多选里
+/// 「添加」时做，保证选择后预览秒出。[subtitleText]/[subtitleExt] 为同一次选择里
 /// 配对到的同名字幕（已解码原始文本与扩展名 srt/vtt/lrc），无匹配或解码失败为 null；
 /// 转 SRT 延后到入库时（需音频时长）。
 typedef _PickedAudio = ({
@@ -51,17 +51,6 @@ typedef _SavedPickedAudio = ({
   bool created,
 });
 
-/// 被跳过的重复项：本次导入名 + 与之内容相同的库中已有条目名。
-typedef AudioImportDuplicate = ({String attempted, String existing});
-
-/// 批量导入结果：成功入库的音频 + 因内容重复被跳过的项。
-///
-/// 供完成页统一展示成功与跳过结果，避免额外的重复项提示弹窗。
-typedef AudioImportOutcome = ({
-  List<AudioItem> added,
-  List<AudioImportDuplicate> duplicates,
-});
-
 /// 内联错误提示种类
 enum _AudioErrorKind { unsupportedFormat, generic }
 
@@ -72,10 +61,10 @@ class _InlineError {
   const _InlineError(this.kind, this.message);
 }
 
-/// 添加音频对话框 — 支持批量选择
+/// 添加音频对话框
 ///
 /// 返回值：
-/// - `List<AudioItem>` — 成功添加的音频列表
+/// - `AudioImportOutcome` — 导入结果
 /// - `null` — 用户取消
 class AddAudioDialog extends ConsumerStatefulWidget {
   /// 合集 ID（为 null 时显示合集下拉框）
@@ -112,8 +101,23 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
 
   bool _isLoading = false;
 
-  /// 批量添加时的进度
+  /// 添加时的进度
   int _processedCount = 0;
+
+  /// 导入列表单行状态，key 使用 [_pickedAudioId]，让本地导入与网盘导入共用同一套 UI。
+  final Map<String, AudioImportSelectionStatus> _importStatuses = {};
+
+  /// 重复跳过项对应的库中已有音频名。
+  final Map<String, String> _duplicateExistingNames = {};
+
+  /// 成功导入项最终是否带字幕；完成态优先读这里，避免和选择阶段配对状态不一致。
+  final Map<String, bool> _addedSubtitleStates = {};
+
+  /// 当前选择列表的完成汇总；不为空时底部主按钮切换为「完成」。
+  AudioImportSelectionSummary? _importSummary;
+
+  /// 已完成导入的原始结果，供非 embedded 调用方在点击「完成」后继续接收。
+  AudioImportOutcome? _completedOutcome;
 
   /// 用户选择的合集 ID（仅 collectionId == null 时使用）
   String? _selectedCollectionId;
@@ -181,33 +185,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         child: _buildContent(l10n, colorScheme),
       ),
       actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-      actions: [
-        Row(
-          children: [
-            Expanded(
-              child: TextButton(
-                onPressed: _isLoading ? null : () => Navigator.pop(context),
-                child: Text(l10n.cancel),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton(
-                onPressed: _pickedFiles.isEmpty || _isLoading
-                    ? null
-                    : _addAudio,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.importAction),
-              ),
-            ),
-          ],
-        ),
-      ],
+      actions: [_buildActionsRow(l10n)],
     );
   }
 
@@ -218,33 +196,43 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
       children: [
         _buildContent(l10n, colorScheme, maxFileListHeight: 220),
         const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: SecondaryActionButton(
-                // 取消：直接关闭整个导入流程；返回来源选择页由顶部返回箭头处理。
-                onPressed: _isLoading ? null : () => Navigator.pop(context),
-                label: l10n.cancel,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton(
-                onPressed: _pickedFiles.isEmpty || _isLoading
-                    ? null
-                    : _addAudio,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.importAction),
-              ),
-            ),
-          ],
-        ),
+        _buildActionsRow(l10n),
       ],
+    );
+  }
+
+  Widget _buildActionsRow(AppLocalizations l10n) {
+    if (_importSummary != null) {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: () => Navigator.pop(context, _completedOutcome),
+          child: Text(l10n.done),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: _pickedFiles.isEmpty || _isLoading ? null : _addAudio,
+        child: _isLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                _pickedFiles.isEmpty
+                    ? l10n.importAudioShort
+                    : l10n.importAudioAndSubtitleCount(
+                        _pickedFiles.length,
+                        _pickedFiles
+                            .where((file) => file.subtitleText != null)
+                            .length,
+                      ),
+              ),
+      ),
     );
   }
 
@@ -304,58 +292,17 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         // 已选文件列表
         if (_pickedFiles.isNotEmpty) ...[
           const SizedBox(height: 12),
-          // 多文件时显示文件数量 + 总大小
-          if (_pickedFiles.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                '${l10n.filesSelected(_pickedFiles.length)}'
-                '  ·  ${_formatFileSize(_pickedFiles.fold<int>(0, (sum, f) => sum + f.fileSize))}',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxFileListHeight),
-            child: Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Scrollbar(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: _pickedFiles.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 44,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                  itemBuilder: (context, index) {
-                    final file = _pickedFiles[index];
-                    return _buildFileRow(file, index, colorScheme);
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-        // 加载进度
-        if (_isLoading && _pickedFiles.length > 1) ...[
-          const SizedBox(height: 8),
-          LinearProgressIndicator(value: _processedCount / _pickedFiles.length),
-          const SizedBox(height: 4),
-          Text(
-            AppLocalizations.of(
-              context,
-            )!.processingFileOf(_processedCount + 1, _pickedFiles.length),
-            style: Theme.of(context).textTheme.bodySmall,
+          ImportAudioSelectionList(
+            items: [
+              for (var i = 0; i < _pickedFiles.length; i++)
+                _selectionItemFor(_pickedFiles[i], i),
+            ],
+            progress: _selectionProgress(l10n),
+            summary: _importSummary,
+            onRemove: _isLoading || _importSummary != null
+                ? null
+                : _removePickedAudio,
+            maxHeight: maxFileListHeight,
           ),
         ],
         // 无 collectionId 时显示合集下拉框
@@ -365,6 +312,56 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         ],
       ],
     );
+  }
+
+  AudioImportSelectionProgress? _selectionProgress(AppLocalizations l10n) {
+    if (!_isLoading || _pickedFiles.length <= 1) return null;
+    final currentIndex = _processedCount.clamp(0, _pickedFiles.length - 1);
+    final file = _pickedFiles[currentIndex];
+    return AudioImportSelectionProgress(
+      value: _processedCount / _pickedFiles.length,
+      label: l10n.importingFileProgress(
+        _processedCount + 1,
+        _pickedFiles.length,
+        file.displayName,
+      ),
+    );
+  }
+
+  AudioImportSelectionItem _selectionItemFor(_PickedAudio file, int index) {
+    final id = _pickedAudioId(file, index);
+    return AudioImportSelectionItem(
+      id: id,
+      displayName: file.displayName,
+      fileSize: file.fileSize,
+      hasSubtitle: _addedSubtitleStates[id] ?? file.subtitleText != null,
+      status: _importStatuses[id] ?? AudioImportSelectionStatus.pending,
+      duplicateExistingName: _duplicateExistingNames[id],
+    );
+  }
+
+  String _pickedAudioId(_PickedAudio file, int index) {
+    return file.file.identifier ??
+        file.file.path ??
+        '${file.displayName}-$index';
+  }
+
+  void _removePickedAudio(String id) {
+    if (_isLoading || _importSummary != null) return;
+    final next = <_PickedAudio>[];
+    for (var i = 0; i < _pickedFiles.length; i++) {
+      final file = _pickedFiles[i];
+      if (_pickedAudioId(file, i) != id) next.add(file);
+    }
+    setState(() {
+      _pickedFiles = next;
+      _processedCount = 0;
+      _importStatuses.clear();
+      _duplicateExistingNames.clear();
+      _addedSubtitleStates.clear();
+      _completedOutcome = null;
+      _importSummary = null;
+    });
   }
 
   /// 构建本地音频选择入口，保留明确按钮语义并弱化相对底部主操作的层级。
@@ -396,135 +393,6 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         ),
       ),
     );
-  }
-
-  /// 是否为移动端（Android / iOS）。移动端用左滑删除，桌面/Web 用删除按钮。
-  bool get _isMobilePlatform =>
-      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
-
-  /// 从已选列表移除指定索引的文件。
-  void _removeFileAt(int index) {
-    setState(() {
-      _pickedFiles = List.of(_pickedFiles)..removeAt(index);
-    });
-  }
-
-  /// 构建单个文件行。
-  ///
-  /// 桌面/Web：行尾显示删除按钮；移动端：去掉删除按钮，改为整行左滑删除
-  /// （删除按钮太小不便点击）。两端均展示字幕徽章与文件大小列。
-  Widget _buildFileRow(_PickedAudio file, int index, ColorScheme colorScheme) {
-    final row = _buildFileRowContent(file, index, colorScheme);
-    if (!_isMobilePlatform) return row;
-    // 移动端：左滑删除，加载中禁用滑动。
-    return Dismissible(
-      key: ValueKey(file.file),
-      direction: _isLoading
-          ? DismissDirection.none
-          : DismissDirection.endToStart,
-      onDismissed: (_) => _removeFileAt(index),
-      background: Container(
-        alignment: Alignment.centerRight,
-        color: colorScheme.errorContainer,
-        padding: const EdgeInsets.only(right: 20),
-        child: Icon(
-          Icons.delete_outline,
-          size: 20,
-          color: colorScheme.onErrorContainer,
-        ),
-      ),
-      child: row,
-    );
-  }
-
-  /// 文件行内容：波形图标 + 文件名 + 字幕徽章 + 大小（+ 桌面端删除按钮）。
-  Widget _buildFileRowContent(
-    _PickedAudio file,
-    int index,
-    ColorScheme colorScheme,
-  ) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      child: Row(
-        children: [
-          // 音频图标统一用波形（graphic_eq），避免音乐音符观感。
-          Icon(Icons.graphic_eq, size: 18, color: colorScheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              file.displayName,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // 已配对同名字幕徽章：固定槽位（无论有无都占位），保证后续大小列对齐。
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 16,
-            child: file.subtitleText != null
-                ? Tooltip(
-                    message: AppLocalizations.of(context)!.subtitlePairedBadge,
-                    child: Icon(
-                      Icons.closed_caption_outlined,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 8),
-          // 大小列固定宽度右对齐，长标题不挤占此列，各行大小竖直对齐。
-          SizedBox(
-            width: 64,
-            child: Text(
-              _formatFileSize(file.fileSize),
-              textAlign: TextAlign.right,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          // 桌面/Web：圆形删除按钮；移动端不显示（改用左滑）。
-          if (!_isMobilePlatform) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              icon: Icon(
-                Icons.close,
-                size: 16,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              // 圆形按钮：默认透明，仅悬停/按下时显示灰色圆底。
-              style: ButtonStyle(
-                shape: const WidgetStatePropertyAll(CircleBorder()),
-                minimumSize: const WidgetStatePropertyAll(Size(28, 28)),
-                backgroundColor: WidgetStateProperty.resolveWith(
-                  (states) =>
-                      states.contains(WidgetState.hovered) ||
-                          states.contains(WidgetState.pressed)
-                      ? colorScheme.surfaceContainerHighest
-                      : Colors.transparent,
-                ),
-              ),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(),
-              onPressed: _isLoading ? null : () => _removeFileAt(index),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// 格式化文件大小
-  static String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   /// 内联错误提示卡片（与 ManageSubtitlesSheet 视觉一致：浅灰描边 + 橙色图标徽章）
@@ -636,7 +504,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     );
   }
 
-  /// 选择音频文件（支持多选，可同时选中同名字幕自动配对）
+  /// 选择音频文件（可同时选中同名字幕自动配对）
   ///
   /// 选择器放行「音频 + 字幕」并集，用户一次把成对的音频和字幕都选上；App 在选中集合内
   /// 按去扩展名同名把字幕配对到音频，导入时一并入库，免去逐个手动上传字幕。
@@ -729,7 +597,15 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
         );
       }
       if (picked.isNotEmpty) {
-        setState(() => _pickedFiles = picked);
+        setState(() {
+          _pickedFiles = picked;
+          _processedCount = 0;
+          _importStatuses.clear();
+          _duplicateExistingNames.clear();
+          _addedSubtitleStates.clear();
+          _importSummary = null;
+          _completedOutcome = null;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -899,7 +775,7 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     } catch (_) {}
   }
 
-  /// 批量添加音频
+  /// 添加音频
   Future<void> _addAudio() async {
     // 重入守卫：_isLoading 同步置位前的窗口内若重复点击会重复入库，这里直接拦截。
     if (_pickedFiles.isEmpty || _isLoading) return;
@@ -913,19 +789,38 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
     setState(() {
       _isLoading = true;
       _processedCount = 0;
+      _importSummary = null;
+      _completedOutcome = null;
+      _importStatuses
+        ..clear()
+        ..addEntries([
+          for (var i = 0; i < _pickedFiles.length; i++)
+            MapEntry(
+              _pickedAudioId(_pickedFiles[i], i),
+              AudioImportSelectionStatus.pending,
+            ),
+        ]);
+      _duplicateExistingNames.clear();
+      _addedSubtitleStates.clear();
     });
 
     final List<AudioItem> results = [];
     // 跳过的重复项：本次导入名 + 与之重复的库中已有条目名。
     final List<AudioImportDuplicate> skippedDuplicates = [];
+    final selectedFiles = List<_PickedAudio>.of(_pickedFiles);
 
     // 全程包裹 try/catch/finally：任一文件入库（读时长/写库）抛异常都不能让面板
     // 卡在 loading（按钮全禁用、只能杀进程），finally 统一恢复可交互。
     try {
       final dataDir = await getAppDataDirectory();
 
-      for (var i = 0; i < _pickedFiles.length; i++) {
-        final file = _pickedFiles[i];
+      for (var i = 0; i < selectedFiles.length; i++) {
+        final file = selectedFiles[i];
+        final itemId = _pickedAudioId(file, i);
+        if (!mounted) return;
+        setState(() {
+          _importStatuses[itemId] = AudioImportSelectionStatus.importing;
+        });
 
         // 落沙盒 + 算内容指纹（重活）在此进行，受下方进度条覆盖。
         final saved = await _savePickedFileToSandbox(file.file, 'audios');
@@ -950,7 +845,14 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
             if (saved.created && item.audioPath != saved.path) {
               await _deleteIfExists(File(path.join(dataDir.path, saved.path)));
             }
-            results.add(await _attachPairedSubtitle(item, file));
+            final importedItem = await _attachPairedSubtitle(item, file);
+            results.add(importedItem);
+            if (!mounted) return;
+            setState(() {
+              _importStatuses[itemId] = AudioImportSelectionStatus.added;
+              _addedSubtitleStates[itemId] =
+                  importedItem.transcriptSource == TranscriptSource.local;
+            });
           case AudioRegistrationDuplicate(
             :final attemptedName,
             :final existingName,
@@ -962,6 +864,11 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
               attempted: attemptedName,
               existing: existingName,
             ));
+            if (!mounted) return;
+            setState(() {
+              _importStatuses[itemId] = AudioImportSelectionStatus.skipped;
+              _duplicateExistingNames[itemId] = existingName;
+            });
         }
 
         if (!mounted) return;
@@ -980,14 +887,17 @@ class _AddAudioDialogState extends ConsumerState<AddAudioDialog> {
 
     if (!mounted) return;
 
-    // 成功与跳过结果统一交给完成页展示，不再弹独立的重复项提示弹窗。
+    // 成功与跳过结果保留在当前选择列表内展示，便于用户返回继续选择其它文件导入。
     final outcome = (added: results, duplicates: skippedDuplicates);
-
-    if (widget.embedded) {
-      widget.onComplete?.call(outcome);
-      return;
-    }
-
-    Navigator.pop(context, outcome);
+    setState(() {
+      _completedOutcome = outcome;
+      _importSummary = AudioImportSelectionSummary(
+        addedCount: results.length,
+        subtitleCount: _addedSubtitleStates.values
+            .where((hasSubtitle) => hasSubtitle)
+            .length,
+        skippedCount: skippedDuplicates.length,
+      );
+    });
   }
 }

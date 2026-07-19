@@ -159,6 +159,28 @@ Future<void> importLocalSubtitle(
   required String text,
   required String ext,
 }) async {
+  await _importLocalSubtitleWithRead(ref.read, item, text: text, ext: ext);
+}
+
+/// Provider / service 编排层使用的本地字幕入库入口。
+///
+/// 与 [importLocalSubtitle] 共用同一条主干，只把读取 provider 的入口从
+/// [WidgetRef] 换成普通 [Ref]，便于非 Widget 层复用。
+Future<void> importLocalSubtitleWithRef(
+  Ref ref,
+  AudioItem item, {
+  required String text,
+  required String ext,
+}) async {
+  await _importLocalSubtitleWithRead(ref.read, item, text: text, ext: ext);
+}
+
+Future<void> _importLocalSubtitleWithRead(
+  T Function<T>(ProviderListenable<T> provider) read,
+  AudioItem item, {
+  required String text,
+  required String ext,
+}) async {
   final srt = await normalizeSubtitleToSrt(
     text,
     ext: ext,
@@ -168,24 +190,20 @@ Future<void> importLocalSubtitle(
   final wordTimestampsJson = encodeWordTimestamps(
     await generateSyntheticWordTimestampsFromSrt(srt),
   );
-  await ref
-      .read(audioItemDaoProvider)
-      .saveTranscriptContent(
-        item.id,
-        srt: srt,
-        wordTimestampsJson: wordTimestampsJson,
-      );
-  ref
-      .read(audioLibraryProvider.notifier)
-      .updateAudioItem(
-        item.copyWith(
-          transcriptPath: null,
-          sentenceCount: stats.$1,
-          wordCount: stats.$2,
-          transcriptSource: TranscriptSource.local,
-          transcriptLanguage: null,
-        ),
-      );
+  await read(audioItemDaoProvider).saveTranscriptContent(
+    item.id,
+    srt: srt,
+    wordTimestampsJson: wordTimestampsJson,
+  );
+  read(audioLibraryProvider.notifier).updateAudioItem(
+    item.copyWith(
+      transcriptPath: null,
+      sentenceCount: stats.$1,
+      wordCount: stats.$2,
+      transcriptSource: TranscriptSource.local,
+      transcriptLanguage: null,
+    ),
+  );
 }
 
 /// 解码字幕文件字节。

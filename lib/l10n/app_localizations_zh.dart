@@ -3092,6 +3092,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get importList => '导入列表';
+
+  @override
   String filesSelected(int count) {
     return '已选择 $count 个文件';
   }
@@ -3099,6 +3102,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String processingFileOf(int current, int total) {
     return '正在处理 $current/$total...';
+  }
+
+  @override
+  String importingFileProgress(int current, int total, String name) {
+    return '正在导入 $current/$total：$name';
   }
 
   @override
@@ -3123,6 +3131,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get duplicatesSkippedDetail => '以下音频与本合集中已有音频内容完全相同，已跳过：';
+
+  @override
+  String duplicateExistingFileName(String name) {
+    return '重复文件名: $name';
+  }
 
   @override
   String duplicateOfExisting(String name) {
@@ -4055,6 +4068,104 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importAudioFromUrlDescription => '粘贴音频直链，下载后加入资源库';
+
+  @override
+  String get importAudioFromCloudDrive => '从网盘导入';
+
+  @override
+  String get importAudioFromBaiduNetdisk => '从百度网盘导入';
+
+  @override
+  String get cloudDriveSourceShort => '网盘';
+
+  @override
+  String get baiduNetdisk => '百度网盘';
+
+  @override
+  String get baiduNetdiskAllFiles => '全部文件';
+
+  @override
+  String get baiduNetdiskWaitingAuthorization => '等待百度授权...';
+
+  @override
+  String get baiduNetdiskLoadingFiles => '正在加载百度网盘文件...';
+
+  @override
+  String get baiduNetdiskImportFailed => '百度网盘导入失败。';
+
+  @override
+  String get baiduNetdiskConnectTitle => '连接百度网盘';
+
+  @override
+  String get baiduNetdiskConnectDescription =>
+      '授权 Echo Loop 浏览你的百度网盘，并导入选中的音频文件。';
+
+  @override
+  String get baiduNetdiskConnectAction => '连接百度网盘';
+
+  @override
+  String get baiduNetdiskLogoutTooltip => '退出百度网盘登录';
+
+  @override
+  String get baiduNetdiskSelectAllAction => '全选';
+
+  @override
+  String get baiduNetdiskClearSelectionAction => '取消';
+
+  @override
+  String get baiduNetdiskLogoutTitle => '退出百度网盘登录？';
+
+  @override
+  String get baiduNetdiskLogoutMessage => 'Echo Loop 会清除当前设备上保存的百度网盘授权。';
+
+  @override
+  String get baiduNetdiskLogoutConfirm => '退出登录';
+
+  @override
+  String get baiduNetdiskNoSupportedAudio => '此文件夹中没有支持的音频文件。';
+
+  @override
+  String get importAudioShort => '导入';
+
+  @override
+  String importAudioSelectedCount(int count) {
+    return '导入 $count 个';
+  }
+
+  @override
+  String importAudioAndSubtitleCount(int audioCount, int subtitleCount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      audioCount,
+      locale: localeName,
+      other: '$audioCount 个音频',
+      zero: '',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      subtitleCount,
+      locale: localeName,
+      other: '，$subtitleCount 个字幕',
+      zero: '',
+    );
+    return '导入（$_temp0$_temp1）';
+  }
+
+  @override
+  String get baiduNetdiskImporting => '正在导入...';
+
+  @override
+  String baiduNetdiskImportingFile(String name) {
+    return '正在导入 $name...';
+  }
+
+  @override
+  String baiduNetdiskImportedCount(int count) {
+    return '已从百度网盘导入 $count 个';
+  }
+
+  @override
+  String baiduNetdiskSkippedSummary(int duplicates, int failures) {
+    return '跳过重复项：$duplicates · 失败：$failures';
+  }
 
   @override
   String get audioUrlLabel => '音频链接';

@@ -3220,6 +3220,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get importList => 'Import List';
+
+  @override
   String filesSelected(int count) {
     return '$count files selected';
   }
@@ -3227,6 +3230,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String processingFileOf(int current, int total) {
     return 'Processing $current of $total...';
+  }
+
+  @override
+  String importingFileProgress(int current, int total, String name) {
+    return 'Importing $current/$total: $name';
   }
 
   @override
@@ -3252,6 +3260,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get duplicatesSkippedDetail =>
       'The following audio files have identical content to audio already in this collection and were skipped:';
+
+  @override
+  String duplicateExistingFileName(String name) {
+    return 'Duplicate file name: $name';
+  }
 
   @override
   String duplicateOfExisting(String name) {
@@ -4248,6 +4261,109 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importAudioFromUrlDescription =>
       'Paste a direct audio link and download it';
+
+  @override
+  String get importAudioFromCloudDrive => 'Import from Cloud Drive';
+
+  @override
+  String get importAudioFromBaiduNetdisk => 'Import from Baidu Netdisk';
+
+  @override
+  String get cloudDriveSourceShort => 'Cloud Drive';
+
+  @override
+  String get baiduNetdisk => 'Baidu Netdisk';
+
+  @override
+  String get baiduNetdiskAllFiles => 'All Files';
+
+  @override
+  String get baiduNetdiskWaitingAuthorization =>
+      'Waiting for Baidu authorization...';
+
+  @override
+  String get baiduNetdiskLoadingFiles => 'Loading Baidu Netdisk files...';
+
+  @override
+  String get baiduNetdiskImportFailed => 'Baidu Netdisk import failed.';
+
+  @override
+  String get baiduNetdiskConnectTitle => 'Connect Baidu Netdisk';
+
+  @override
+  String get baiduNetdiskConnectDescription =>
+      'Authorize Echo Loop to browse your Baidu Netdisk and import selected audio files.';
+
+  @override
+  String get baiduNetdiskConnectAction => 'Connect Baidu Netdisk';
+
+  @override
+  String get baiduNetdiskLogoutTooltip => 'Sign out of Baidu Netdisk';
+
+  @override
+  String get baiduNetdiskSelectAllAction => 'Select';
+
+  @override
+  String get baiduNetdiskClearSelectionAction => 'Clear';
+
+  @override
+  String get baiduNetdiskLogoutTitle => 'Sign out of Baidu Netdisk?';
+
+  @override
+  String get baiduNetdiskLogoutMessage =>
+      'Echo Loop will clear the saved Baidu Netdisk authorization on this device.';
+
+  @override
+  String get baiduNetdiskLogoutConfirm => 'Sign Out';
+
+  @override
+  String get baiduNetdiskNoSupportedAudio =>
+      'No supported audio files found in this folder.';
+
+  @override
+  String get importAudioShort => 'Import';
+
+  @override
+  String importAudioSelectedCount(int count) {
+    return 'Import $count';
+  }
+
+  @override
+  String importAudioAndSubtitleCount(int audioCount, int subtitleCount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      audioCount,
+      locale: localeName,
+      other: '$audioCount audio files',
+      one: '1 audio',
+      zero: '',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      subtitleCount,
+      locale: localeName,
+      other: ', $subtitleCount subtitles',
+      one: ', 1 subtitle',
+      zero: '',
+    );
+    return 'Import ($_temp0$_temp1)';
+  }
+
+  @override
+  String get baiduNetdiskImporting => 'Importing...';
+
+  @override
+  String baiduNetdiskImportingFile(String name) {
+    return 'Importing $name...';
+  }
+
+  @override
+  String baiduNetdiskImportedCount(int count) {
+    return 'Imported $count from Baidu Netdisk';
+  }
+
+  @override
+  String baiduNetdiskSkippedSummary(int duplicates, int failures) {
+    return 'Skipped duplicates: $duplicates · Failed: $failures';
+  }
 
   @override
   String get audioUrlLabel => 'Audio link';

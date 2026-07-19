@@ -1323,13 +1323,28 @@
   "recycleBinSortTimeDesc": "最近移除",
   "recycleBinSortTimeAsc": "最早移除",
   "recycleBinItemCount": "{count} 条",
+  "importList": "导入列表",
   "filesSelected": "已选择 {count} 个文件",
   "processingFileOf": "正在处理 {current}/{total}...",
+  "importingFileProgress": "正在导入 {current}/{total}：{name}",
+  "@importingFileProgress": {
+    "placeholders": {
+      "current": {"type": "int"},
+      "total": {"type": "int"},
+      "name": {"type": "String"}
+    }
+  },
   "multipleAudioAdded": "已添加 {count} 个音频",
   "audioImportedCount": "成功导入 {count} 个音频",
   "audioImportedWithSubtitleCount": "其中 {count} 个包含字幕",
   "duplicatesSkipped": "跳过 {count} 个重复项",
   "duplicatesSkippedDetail": "以下音频与本合集中已有音频内容完全相同，已跳过：",
+  "duplicateExistingFileName": "重复文件名: {name}",
+  "@duplicateExistingFileName": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "duplicateOfExisting": "与「{name}」内容相同",
   "@duplicateOfExisting": {
     "placeholders": {
@@ -1695,6 +1710,58 @@
   "importAudioFromFileDescription": "选择手机或网盘中的音频文件",
   "importAudioFromUrl": "从链接导入",
   "importAudioFromUrlDescription": "粘贴音频直链，下载后加入资源库",
+  "importAudioFromCloudDrive": "从网盘导入",
+  "importAudioFromBaiduNetdisk": "从百度网盘导入",
+  "cloudDriveSourceShort": "网盘",
+  "baiduNetdisk": "百度网盘",
+  "baiduNetdiskAllFiles": "全部文件",
+  "baiduNetdiskWaitingAuthorization": "等待百度授权...",
+  "baiduNetdiskLoadingFiles": "正在加载百度网盘文件...",
+  "baiduNetdiskImportFailed": "百度网盘导入失败。",
+  "baiduNetdiskConnectTitle": "连接百度网盘",
+  "baiduNetdiskConnectDescription": "授权 Echo Loop 浏览你的百度网盘，并导入选中的音频文件。",
+  "baiduNetdiskConnectAction": "连接百度网盘",
+  "baiduNetdiskLogoutTooltip": "退出百度网盘登录",
+  "baiduNetdiskSelectAllAction": "全选",
+  "baiduNetdiskClearSelectionAction": "取消",
+  "baiduNetdiskLogoutTitle": "退出百度网盘登录？",
+  "baiduNetdiskLogoutMessage": "Echo Loop 会清除当前设备上保存的百度网盘授权。",
+  "baiduNetdiskLogoutConfirm": "退出登录",
+  "baiduNetdiskNoSupportedAudio": "此文件夹中没有支持的音频文件。",
+  "importAudioShort": "导入",
+  "importAudioSelectedCount": "导入 {count} 个",
+  "@importAudioSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "importAudioAndSubtitleCount": "导入（{audioCount, plural, =0{} other{{audioCount} 个音频}}{subtitleCount, plural, =0{} other{，{subtitleCount} 个字幕}}）",
+  "@importAudioAndSubtitleCount": {
+    "placeholders": {
+      "audioCount": {"type": "int"},
+      "subtitleCount": {"type": "int"}
+    }
+  },
+  "baiduNetdiskImporting": "正在导入...",
+  "baiduNetdiskImportingFile": "正在导入 {name}...",
+  "@baiduNetdiskImportingFile": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "baiduNetdiskImportedCount": "已从百度网盘导入 {count} 个",
+  "@baiduNetdiskImportedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "baiduNetdiskSkippedSummary": "跳过重复项：{duplicates} · 失败：{failures}",
+  "@baiduNetdiskSkippedSummary": {
+    "placeholders": {
+      "duplicates": {"type": "int"},
+      "failures": {"type": "int"}
+    }
+  },
   "audioUrlLabel": "音频链接",
   "audioUrlHint": "https://example.com/audio.mp3",
   "pasteAudioLink": "粘贴链接",

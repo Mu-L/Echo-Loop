@@ -1759,6 +1759,7 @@
       "count": {"type": "int"}
     }
   },
+  "importList": "Import List",
   "filesSelected": "{count} files selected",
   "@filesSelected": {
     "placeholders": {
@@ -1770,6 +1771,14 @@
     "placeholders": {
       "current": {"type": "int"},
       "total": {"type": "int"}
+    }
+  },
+  "importingFileProgress": "Importing {current}/{total}: {name}",
+  "@importingFileProgress": {
+    "placeholders": {
+      "current": {"type": "int"},
+      "total": {"type": "int"},
+      "name": {"type": "String"}
     }
   },
   "multipleAudioAdded": "{count} audio files added",
@@ -1797,6 +1806,12 @@
     }
   },
   "duplicatesSkippedDetail": "The following audio files have identical content to audio already in this collection and were skipped:",
+  "duplicateExistingFileName": "Duplicate file name: {name}",
+  "@duplicateExistingFileName": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "duplicateOfExisting": "Same content as \"{name}\"",
   "@duplicateOfExisting": {
     "placeholders": {
@@ -2162,6 +2177,58 @@
   "importAudioFromFileDescription": "Choose audio files from your phone or cloud drive",
   "importAudioFromUrl": "Import from Link",
   "importAudioFromUrlDescription": "Paste a direct audio link and download it",
+  "importAudioFromCloudDrive": "Import from Cloud Drive",
+  "importAudioFromBaiduNetdisk": "Import from Baidu Netdisk",
+  "cloudDriveSourceShort": "Cloud Drive",
+  "baiduNetdisk": "Baidu Netdisk",
+  "baiduNetdiskAllFiles": "All Files",
+  "baiduNetdiskWaitingAuthorization": "Waiting for Baidu authorization...",
+  "baiduNetdiskLoadingFiles": "Loading Baidu Netdisk files...",
+  "baiduNetdiskImportFailed": "Baidu Netdisk import failed.",
+  "baiduNetdiskConnectTitle": "Connect Baidu Netdisk",
+  "baiduNetdiskConnectDescription": "Authorize Echo Loop to browse your Baidu Netdisk and import selected audio files.",
+  "baiduNetdiskConnectAction": "Connect Baidu Netdisk",
+  "baiduNetdiskLogoutTooltip": "Sign out of Baidu Netdisk",
+  "baiduNetdiskSelectAllAction": "Select",
+  "baiduNetdiskClearSelectionAction": "Clear",
+  "baiduNetdiskLogoutTitle": "Sign out of Baidu Netdisk?",
+  "baiduNetdiskLogoutMessage": "Echo Loop will clear the saved Baidu Netdisk authorization on this device.",
+  "baiduNetdiskLogoutConfirm": "Sign Out",
+  "baiduNetdiskNoSupportedAudio": "No supported audio files found in this folder.",
+  "importAudioShort": "Import",
+  "importAudioSelectedCount": "Import {count}",
+  "@importAudioSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "importAudioAndSubtitleCount": "Import ({audioCount, plural, =0{} =1{1 audio} other{{audioCount} audio files}}{subtitleCount, plural, =0{} =1{, 1 subtitle} other{, {subtitleCount} subtitles}})",
+  "@importAudioAndSubtitleCount": {
+    "placeholders": {
+      "audioCount": {"type": "int"},
+      "subtitleCount": {"type": "int"}
+    }
+  },
+  "baiduNetdiskImporting": "Importing...",
+  "baiduNetdiskImportingFile": "Importing {name}...",
+  "@baiduNetdiskImportingFile": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "baiduNetdiskImportedCount": "Imported {count} from Baidu Netdisk",
+  "@baiduNetdiskImportedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "baiduNetdiskSkippedSummary": "Skipped duplicates: {duplicates} · Failed: {failures}",
+  "@baiduNetdiskSkippedSummary": {
+    "placeholders": {
+      "duplicates": {"type": "int"},
+      "failures": {"type": "int"}
+    }
+  },
   "audioUrlLabel": "Audio link",
   "audioUrlHint": "https://example.com/audio.mp3",
   "pasteAudioLink": "Paste Link",
