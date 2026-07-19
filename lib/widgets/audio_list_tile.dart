@@ -225,8 +225,22 @@ class AudioListTile extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // 多选态隐藏右侧菜单按钮，避免与选中交互冲突。
-                  if (!selectionMode) _buildTrailing(context, ref, l10n, theme),
+                  // 多选态：右侧放选中框（替代菜单按钮），垂直居中。
+                  if (selectionMode)
+                    Padding(
+                      padding: EdgeInsets.only(right: isDesktop ? 20 : 16),
+                      child: Center(
+                        child: Checkbox(
+                          value: selected,
+                          onChanged: (_) => onSelectToggle?.call(),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    )
+                  else
+                    _buildTrailing(context, ref, l10n, theme),
                 ],
               ),
             ),
