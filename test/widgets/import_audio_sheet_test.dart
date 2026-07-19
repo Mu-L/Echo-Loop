@@ -83,6 +83,11 @@ class _TokenCredentialRepository implements BaiduCredentialRepository {
   }) async {}
 }
 
+class _NoTokenCredentialRepository extends _TokenCredentialRepository {
+  @override
+  Future<String?> getValidAccessToken() async => null;
+}
+
 class _PendingBaiduNetdiskApi implements BaiduNetdiskApi {
   final Completer<CloudDriveListPage> _listCompleter =
       Completer<CloudDriveListPage>();
@@ -515,6 +520,18 @@ void main() {
     expect(find.text('Import from Cloud Drive'), findsOneWidget);
     expect(find.text('Choose a cloud drive provider'), findsNothing);
     expect(find.text('Baidu Netdisk'), findsNothing);
+
+    final localTop = tester
+        .getTopLeft(find.byKey(const ValueKey('import-option-local-file')))
+        .dy;
+    final cloudTop = tester
+        .getTopLeft(find.byKey(const ValueKey('import-option-cloud-drive')))
+        .dy;
+    final linkTop = tester
+        .getTopLeft(find.byKey(const ValueKey('import-option-direct-url')))
+        .dy;
+    expect(localTop, lessThan(cloudTop));
+    expect(cloudTop, lessThan(linkTop));
   });
 
   testWidgets('导入方式入口使用独立边框分隔', (tester) async {
@@ -551,11 +568,11 @@ void main() {
     );
 
     final localBottom = tester.getBottomLeft(localOption).dy;
-    final linkTop = tester.getTopLeft(linkOption).dy;
-    expect(linkTop - localBottom, 12);
-    final linkBottom = tester.getBottomLeft(linkOption).dy;
     final cloudDriveTop = tester.getTopLeft(cloudDriveOption).dy;
-    expect(cloudDriveTop - linkBottom, 12);
+    expect(cloudDriveTop - localBottom, 8);
+    final cloudDriveBottom = tester.getBottomLeft(cloudDriveOption).dy;
+    final linkTop = tester.getTopLeft(linkOption).dy;
+    expect(linkTop - cloudDriveBottom, 8);
   });
 
   testWidgets('本地文件入口允许一次选择多个音频和字幕文件', (tester) async {
@@ -605,6 +622,28 @@ void main() {
       findsNothing,
     );
     expect(find.text('Connect Baidu Netdisk'), findsNothing);
+  });
+
+  testWidgets('百度网盘未授权时不显示退出登录按钮', (tester) async {
+    await tester.pumpWidget(
+      _buildApp(
+        overrides: [
+          baiduCredentialRepositoryProvider.overrideWithValue(
+            _NoTokenCredentialRepository(),
+          ),
+        ],
+      ),
+    );
+    await tester.tap(find.text('Open Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import from Cloud Drive'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Baidu Netdisk'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connect Baidu Netdisk'), findsWidgets);
+    expect(find.byIcon(Icons.logout), findsNothing);
+    expect(find.byTooltip('Sign out of Baidu Netdisk'), findsNothing);
   });
 
   testWidgets('百度网盘文件加载态使用当前语言', (tester) async {

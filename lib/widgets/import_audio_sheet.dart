@@ -72,7 +72,6 @@ class _ImportAudioFlowSheetState extends ConsumerState<ImportAudioFlowSheet> {
     );
     final busy = _isBusy(state) || baiduState.isBusy;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final hasSelectedFile = baiduState.selectedFsIds.isNotEmpty;
 
     return PopScope(
       canPop: !busy,
@@ -96,23 +95,12 @@ class _ImportAudioFlowSheetState extends ConsumerState<ImportAudioFlowSheet> {
                   titleSmall:
                       _step == _ImportStep.baiduNetdisk && !_baiduConfirming,
                   onBack: _goBack,
-                  trailing:
-                      _step == _ImportStep.baiduNetdisk && !_baiduConfirming
-                      ? hasSelectedFile
-                            ? _HeaderTextButton(
-                                label: baiduState.isAllSelectableSelected
-                                    ? l10n.baiduNetdiskClearSelectionAction
-                                    : l10n.baiduNetdiskSelectAllAction,
-                                onPressed: busy
-                                    ? null
-                                    : baiduController.toggleSelectAll,
-                              )
-                            : _HeaderIconButton(
-                                icon: Icons.logout,
-                                tooltip: l10n.baiduNetdiskLogoutTooltip,
-                                onPressed: busy ? null : _confirmBaiduLogout,
-                              )
-                      : null,
+                  trailing: _baiduHeaderTrailing(
+                    l10n: l10n,
+                    state: baiduState,
+                    busy: busy,
+                    onToggleSelectAll: baiduController.toggleSelectAll,
+                  ),
                   onClose: busy
                       ? _cancelActiveImport
                       : () => Navigator.pop(context),
@@ -137,6 +125,39 @@ class _ImportAudioFlowSheetState extends ConsumerState<ImportAudioFlowSheet> {
     return state is AudioImportResolving ||
         state is AudioImportDownloading ||
         state is AudioImportSaving;
+  }
+
+  Widget? _baiduHeaderTrailing({
+    required AppLocalizations l10n,
+    required BaiduNetdiskImportState state,
+    required bool busy,
+    required VoidCallback onToggleSelectAll,
+  }) {
+    if (_step != _ImportStep.baiduNetdisk || _baiduConfirming) return null;
+    if (state.selectedFsIds.isNotEmpty) {
+      return _HeaderTextButton(
+        label: state.isAllSelectableSelected
+            ? l10n.baiduNetdiskClearSelectionAction
+            : l10n.baiduNetdiskSelectAllAction,
+        onPressed: busy ? null : onToggleSelectAll,
+      );
+    }
+    final canLogout = switch (state.phase) {
+      BaiduNetdiskImportPhase.ready ||
+      BaiduNetdiskImportPhase.importing ||
+      BaiduNetdiskImportPhase.completed ||
+      BaiduNetdiskImportPhase.failed => true,
+      BaiduNetdiskImportPhase.idle ||
+      BaiduNetdiskImportPhase.authorizationRequired ||
+      BaiduNetdiskImportPhase.authorizing ||
+      BaiduNetdiskImportPhase.loading => false,
+    };
+    if (!canLogout) return null;
+    return _HeaderIconButton(
+      icon: Icons.logout,
+      tooltip: l10n.baiduNetdiskLogoutTooltip,
+      onPressed: busy ? null : _confirmBaiduLogout,
+    );
   }
 
   String _titleFor(AppLocalizations l10n, BaiduNetdiskImportState baiduState) {
@@ -494,20 +515,20 @@ class _ChooseSourcePanel extends StatelessWidget {
           title: l10n.importAudioFromFile,
           onTap: onLocalFile,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        _ImportOptionTile(
+          key: const ValueKey('import-option-cloud-drive'),
+          icon: Icons.cloud_outlined,
+          title: l10n.importAudioFromCloudDrive,
+          onTap: onCloudDrive,
+        ),
+        const SizedBox(height: 8),
         _ImportOptionTile(
           key: const ValueKey('import-option-direct-url'),
           icon: Icons.link,
           title: l10n.importAudioFromUrl,
           description: l10n.importAudioFromUrlDescription,
           onTap: onDirectUrl,
-        ),
-        const SizedBox(height: 12),
-        _ImportOptionTile(
-          key: const ValueKey('import-option-cloud-drive'),
-          icon: Icons.cloud_outlined,
-          title: l10n.importAudioFromCloudDrive,
-          onTap: onCloudDrive,
         ),
       ],
     );
@@ -1170,15 +1191,15 @@ class _ImportOptionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               SizedBox(
-                width: 40,
-                height: 40,
+                width: 34,
+                height: 34,
                 child: Icon(icon, color: colorScheme.primary),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
