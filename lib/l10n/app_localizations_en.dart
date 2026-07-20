@@ -3877,6 +3877,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto-show cached translation, analysis and sense groups';
 
   @override
+  String get autoShowAiExplanationToggle => 'Auto-show AI explanations';
+
+  @override
+  String get autoShowAiExplanationSubtitle =>
+      'Automatically show selected AI help when you enter sentence explanations';
+
+  @override
+  String get autoShowAiAnalysisToggle => 'AI Analysis';
+
+  @override
+  String get autoShowAiTranslationToggle => 'AI Translation';
+
+  @override
+  String get autoShowAiSenseGroupsToggle => 'AI Sense Groups';
+
+  @override
   String get autoPlayRetellRecordingToggle => 'Auto-play retell recording';
 
   @override

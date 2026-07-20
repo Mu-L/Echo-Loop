@@ -23,6 +23,10 @@ void main() {
 
   Future<Widget> buildApp({
     bool autoSkipRetell = false,
+    bool autoShowAiExplanation = true,
+    bool autoShowAiAnalysis = true,
+    bool autoShowAiTranslation = true,
+    bool autoShowAiSenseGroups = false,
     bool autoPlayRetellRecording = false,
     bool listenAndRepeatRatingEnabled = true,
     bool retellRatingEnabled = true,
@@ -31,6 +35,13 @@ void main() {
   }) async {
     SharedPreferences.setMockInitialValues({
       if (autoSkipRetell) LearningSettingsKeys.autoSkipRetell: true,
+      if (!autoShowAiExplanation)
+        LearningSettingsKeys.autoShowAiExplanation: false,
+      if (!autoShowAiAnalysis) LearningSettingsKeys.autoShowAiAnalysis: false,
+      if (!autoShowAiTranslation)
+        LearningSettingsKeys.autoShowAiTranslation: false,
+      if (autoShowAiSenseGroups)
+        LearningSettingsKeys.autoShowAiSenseGroups: true,
       if (autoPlayRetellRecording)
         LearningSettingsKeys.autoPlayRetellRecordingAfterCompletion: true,
       if (!listenAndRepeatRatingEnabled)
@@ -61,9 +72,25 @@ void main() {
     );
   }
 
-  testWidgets('默认显示开关 OFF + 说明文字', (tester) async {
+  testWidgets('默认显示 AI 讲解总开关 ON，解析/翻译 ON，意群 OFF', (tester) async {
     await tester.pumpWidget(await buildApp());
     await tester.pumpAndSettle();
+
+    final autoShowFinder = find.byWidgetPredicate(
+      (w) =>
+          w is SwitchListTile &&
+          w.title is Text &&
+          (w.title as Text).data == 'Auto-show AI explanations',
+    );
+    final autoShowTile = tester.widget<SwitchListTile>(autoShowFinder);
+    expect(autoShowTile.value, isTrue);
+
+    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(find.text('AI Translation'), findsOneWidget);
+    expect(find.text('AI Sense Groups'), findsOneWidget);
+    expect(find.byIcon(Icons.psychology_alt_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.translate), findsOneWidget);
+    expect(find.byIcon(Icons.account_tree_outlined), findsOneWidget);
 
     // 找到 "Auto-skip" label 所在的 SwitchListTile
     final autoSkipFinder = find.byWidgetPredicate(
@@ -99,6 +126,41 @@ void main() {
     );
     final ratingTile = tester.widget<SwitchListTile>(retellRatingFinder);
     expect(ratingTile.value, isTrue);
+  });
+
+  testWidgets('关闭 AI 讲解总开关后隐藏三个子开关', (tester) async {
+    await tester.pumpWidget(await buildApp(autoShowAiExplanation: false));
+    await tester.pumpAndSettle();
+
+    final autoShowFinder = find.byWidgetPredicate(
+      (w) =>
+          w is SwitchListTile &&
+          w.title is Text &&
+          (w.title as Text).data == 'Auto-show AI explanations',
+    );
+    expect(tester.widget<SwitchListTile>(autoShowFinder).value, isFalse);
+    expect(find.text('AI Analysis'), findsNothing);
+    expect(find.text('AI Translation'), findsNothing);
+    expect(find.text('AI Sense Groups'), findsNothing);
+  });
+
+  testWidgets('点击 AI 讲解子开关 → 翻转 state + 写 SP', (tester) async {
+    await tester.pumpWidget(await buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AI Sense Groups'));
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(LearningSettingsKeys.autoShowAiSenseGroups), isTrue);
+
+    await tester.tap(find.text('AI Analysis'));
+    await tester.pumpAndSettle();
+    expect(prefs.getBool(LearningSettingsKeys.autoShowAiAnalysis), isFalse);
+
+    await tester.tap(find.text('AI Translation'));
+    await tester.pumpAndSettle();
+    expect(prefs.getBool(LearningSettingsKeys.autoShowAiTranslation), isFalse);
   });
 
   testWidgets('点击开关 → 翻转 state + 写 SP', (tester) async {

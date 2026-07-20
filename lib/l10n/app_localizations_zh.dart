@@ -3705,6 +3705,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoExpandCachedAnnotationSubtitle => '自动展示查看过的翻译、解析和意群';
 
   @override
+  String get autoShowAiExplanationToggle => '自动显示 AI 讲解';
+
+  @override
+  String get autoShowAiExplanationSubtitle => '进入句子讲解时自动显示选中的 AI 辅助内容';
+
+  @override
+  String get autoShowAiAnalysisToggle => 'AI 解析';
+
+  @override
+  String get autoShowAiTranslationToggle => 'AI 翻译';
+
+  @override
+  String get autoShowAiSenseGroupsToggle => 'AI 意群分割';
+
+  @override
   String get autoPlayRetellRecordingToggle => '自动播放复述录音';
 
   @override

@@ -6764,6 +6764,36 @@ abstract class AppLocalizations {
   /// **'Auto-show cached translation, analysis and sense groups'**
   String get autoExpandCachedAnnotationSubtitle;
 
+  /// No description provided for @autoShowAiExplanationToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-show AI explanations'**
+  String get autoShowAiExplanationToggle;
+
+  /// No description provided for @autoShowAiExplanationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically show selected AI help when you enter sentence explanations'**
+  String get autoShowAiExplanationSubtitle;
+
+  /// No description provided for @autoShowAiAnalysisToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Analysis'**
+  String get autoShowAiAnalysisToggle;
+
+  /// No description provided for @autoShowAiTranslationToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Translation'**
+  String get autoShowAiTranslationToggle;
+
+  /// No description provided for @autoShowAiSenseGroupsToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Sense Groups'**
+  String get autoShowAiSenseGroupsToggle;
+
   /// No description provided for @autoPlayRetellRecordingToggle.
   ///
   /// In en, this message translates to:
