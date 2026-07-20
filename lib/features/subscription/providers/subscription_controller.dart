@@ -34,6 +34,20 @@ final subscriptionPaymentChannelProvider = Provider<ClientPaymentChannel>(
   (ref) => clientPaymentChannel,
 );
 
+/// Paddle checkout 的渠道级门控：direct/Web 默认允许；商店包必须由 UI 在远程开关
+/// 命中后显式声明 fallback，避免默认原生购买链路误走 Paddle。
+bool canStartPaddleCheckoutForChannel({
+  required ClientPaymentChannel channel,
+  required bool allowStoreFallback,
+}) {
+  return switch (channel) {
+    ClientPaymentChannel.web => true,
+    ClientPaymentChannel.appleStore ||
+    ClientPaymentChannel.googlePlay => allowStoreFallback,
+    ClientPaymentChannel.unavailable => false,
+  };
+}
+
 @Riverpod(keepAlive: true)
 class SubscriptionController extends _$SubscriptionController {
   /// 防竞态代际计数。每次重对账 / 登录切换前自增，异步回调校验不匹配则丢弃。
@@ -248,13 +262,23 @@ class SubscriptionController extends _$SubscriptionController {
     }
   }
 
-  /// 创建 direct Paddle checkout。创建成功只返回 URL，不改变 premium 状态；
+  /// 创建 Paddle checkout。创建成功只返回 URL，不改变 premium 状态；
   /// 只有 webhook 更新后端权益并由 [refresh] 读回才算购买完成。
-  Future<Uri> startPaddleCheckout(String planId) async {
-    if (_paymentChannel != ClientPaymentChannel.web) {
+  ///
+  /// 默认只允许 direct/Web 渠道；商店包只能由 Paywall 在远程门控通过后显式传入
+  /// [allowStoreFallback]，避免原生购买路径误穿到 Paddle。
+  Future<Uri> startPaddleCheckout(
+    String planId, {
+    bool allowStoreFallback = false,
+  }) async {
+    if (!canStartPaddleCheckoutForChannel(
+      channel: _paymentChannel,
+      allowStoreFallback: allowStoreFallback,
+    )) {
       AppLogger.log(
         'Subscription',
-        'Paddle checkout 中止: channel=${_paymentChannel.name} planId=$planId',
+        'Paddle checkout 中止: channel=${_paymentChannel.name} '
+            'allowStoreFallback=$allowStoreFallback planId=$planId',
       );
       throw PurchaseException('当前渠道不支持 Paddle checkout');
     }

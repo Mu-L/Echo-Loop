@@ -38,6 +38,7 @@ class _SpyController extends SubscriptionController {
   int checkoutCalls = 0;
   int portalCalls = 0;
   String? checkoutPlanId;
+  bool? checkoutAllowStoreFallback;
   Object? restoreError;
   @override
   EntitlementState build() => _state;
@@ -53,9 +54,13 @@ class _SpyController extends SubscriptionController {
   @override
   Future<void> refresh() async => refreshCalls++;
   @override
-  Future<Uri> startPaddleCheckout(String planId) async {
+  Future<Uri> startPaddleCheckout(
+    String planId, {
+    bool allowStoreFallback = false,
+  }) async {
     checkoutCalls++;
     checkoutPlanId = planId;
+    checkoutAllowStoreFallback = allowStoreFallback;
     return Uri.parse('https://checkout.paddle.test/txn_1');
   }
 
@@ -68,6 +73,18 @@ class _SpyController extends SubscriptionController {
 
 class _FixedPlansController extends SubscriptionPlansController {
   _FixedPlansController(this._plans);
+
+  final List<SubscriptionPlan> _plans;
+
+  @override
+  AsyncValue<List<SubscriptionPlan>> build() => AsyncData(_plans);
+
+  @override
+  Future<void> refresh({bool force = false}) async {}
+}
+
+class _FixedPaddlePlansController extends PaddleSubscriptionPlansController {
+  _FixedPaddlePlansController(this._plans);
 
   final List<SubscriptionPlan> _plans;
 
@@ -158,12 +175,14 @@ const _paddlePlans = [
 Widget _harness({
   required EntitlementState state,
   List<SubscriptionPlan> plans = _plans,
+  List<SubscriptionPlan> paddlePlans = _paddlePlans,
   bool? authenticated,
   SubscriptionController Function()? controller,
   // 测试宿主（macOS/无 key）默认不支持订阅，这里默认置 true 以覆盖购买页 UI。
   bool available = true,
   // 网页支付渠道（侧载 APK / 桌面）：切换到浏览器结账购买态。
   bool webCheckout = false,
+  bool showStoreWebCheckoutFallback = false,
   SubscriptionIdentity? identity,
   ThemeMode themeMode = ThemeMode.light,
 }) {
@@ -171,11 +190,17 @@ Widget _harness({
     overrides: [
       subscriptionAvailabilityProvider.overrideWithValue(available),
       webCheckoutModeProvider.overrideWithValue(webCheckout),
+      showStoreWebCheckoutFallbackProvider.overrideWithValue(
+        showStoreWebCheckoutFallback,
+      ),
       subscriptionControllerProvider.overrideWith(
         controller ?? () => _FixedController(state),
       ),
       subscriptionPlansProvider.overrideWith(
         () => _FixedPlansController(plans),
+      ),
+      paddleSubscriptionPlansProvider.overrideWith(
+        () => _FixedPaddlePlansController(paddlePlans),
       ),
       if (authenticated != null)
         isAuthenticatedProvider.overrideWithValue(authenticated),
@@ -253,6 +278,105 @@ void main() {
     // direct/Web 渠道同样用用户语义「恢复购买」，底层走后端权益同步。
     expect(find.text('Restore Purchases'), findsOneWidget);
     expect(find.text('Refresh'), findsNothing);
+  });
+
+  testWidgets('商店包：切换到 Web 支付后展示 Paddle 套餐并创建 Paddle checkout', (tester) async {
+    final spy = _SpyController(const EntitlementState.free());
+    await tester.pumpWidget(
+      _harness(
+        state: const EntitlementState.free(),
+        showStoreWebCheckoutFallback: true,
+        authenticated: true,
+        identity: const SubscriptionIdentity(
+          userId: 'user-1',
+          accessToken: 'token',
+        ),
+        controller: () => spy,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(
+        TextButton,
+        'Can\'t pay through the store? Use web checkout',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(FilledButton, 'Start 7-day free trial'),
+      findsOneWidget,
+    );
+    expect(find.text(r'$39.99'), findsOneWidget);
+    expect(find.text(r'$24.99'), findsNothing);
+
+    await tester.tap(
+      find.widgetWithText(
+        TextButton,
+        'Can\'t pay through the store? Use web checkout',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue with store payment'), findsOneWidget);
+    expect(find.textContaining('secure browser'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
+    expect(find.text(r'$24.99'), findsOneWidget);
+    expect(find.text('/first yr'), findsOneWidget);
+    expect(find.text(r'$39.99'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Subscribe'));
+    await tester.pump();
+
+    expect(spy.checkoutCalls, 1);
+    expect(spy.checkoutPlanId, 'plus_yearly');
+    expect(spy.checkoutAllowStoreFallback, isTrue);
+    expect(urlLauncher.launched, ['https://checkout.paddle.test/txn_1']);
+
+    await tester.pump(const Duration(seconds: 121));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('商店包：切换到 Web 支付后可返回商店支付', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        state: const EntitlementState.free(),
+        showStoreWebCheckoutFallback: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(
+        TextButton,
+        'Can\'t pay through the store? Use web checkout',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with store payment'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(
+        TextButton,
+        'Can\'t pay through the store? Use web checkout',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Continue with store payment'), findsNothing);
+    expect(find.text(r'$39.99'), findsOneWidget);
+    expect(find.text(r'$24.99'), findsNothing);
+  });
+
+  testWidgets('商店包：远程开关关闭时不展示 Web 支付切换入口', (tester) async {
+    await tester.pumpWidget(_harness(state: const EntitlementState.free()));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Can\'t pay through the store? Use web checkout'),
+      findsNothing,
+    );
+    expect(find.text('Continue with store payment'), findsNothing);
   });
 
   testWidgets('direct 渠道：未登录点击订阅不创建 Paddle checkout', (tester) async {

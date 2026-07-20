@@ -31,6 +31,7 @@ void main() {
         },
         'features': {
           'cloudDriveImport': {'enabled': true, 'ignored': 'x'},
+          'showStoreWebCheckoutFallback': {'enabled': true},
         },
         'ignoredRoot': true,
       });
@@ -39,11 +40,19 @@ void main() {
       expect(config.ttlSeconds, 600);
       expect(config.context.countryCode, 'CN');
       expect(config.isEnabled(RemoteFeature.cloudDriveImport), isTrue);
+      expect(
+        config.isEnabled(RemoteFeature.showStoreWebCheckoutFallback),
+        isTrue,
+      );
     });
 
     test('缺字段和未知版本回退本地默认', () {
       final missing = RemoteConfig.fromJson({'version': 1});
       expect(missing.isEnabled(RemoteFeature.cloudDriveImport), isFalse);
+      expect(
+        missing.isEnabled(RemoteFeature.showStoreWebCheckoutFallback),
+        isFalse,
+      );
       expect(missing.ttlSeconds, RemoteConfig.defaultTtlSeconds);
 
       final unknownVersion = RemoteConfig.fromJson({

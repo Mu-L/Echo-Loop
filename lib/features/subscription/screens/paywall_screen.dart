@@ -50,6 +50,9 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   /// 网页支付：已打开浏览器结账、正在轮询后端等权益到账。
   bool _waitingForWeb = false;
 
+  /// 商店包内用户主动切换到 Web 支付兜底。
+  bool _useWebCheckoutFallback = false;
+
   final SubscriptionManagementLauncher _subscriptionManagementLauncher =
       SubscriptionManagementLauncher();
 
@@ -96,7 +99,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final isPremium = subState.isActive;
     // direct 渠道复用统一套餐 UI，购买动作改为 Paddle 浏览器结账 + 回流对账。
     final webMode = ref.watch(webCheckoutModeProvider);
-    final plansAsync = isPremium ? null : ref.watch(subscriptionPlansProvider);
+    final showStoreWebCheckoutFallback = ref.watch(
+      showStoreWebCheckoutFallbackProvider,
+    );
+    final usingWebCheckout =
+        webMode || (_useWebCheckoutFallback && showStoreWebCheckoutFallback);
+    final usingStoreWebCheckoutFallback =
+        _useWebCheckoutFallback && showStoreWebCheckoutFallback;
+    final plansAsync = isPremium
+        ? null
+        : ref.watch(
+            usingStoreWebCheckoutFallback
+                ? paddleSubscriptionPlansProvider
+                : subscriptionPlansProvider,
+          );
     final specialOfferLabel = _specialOfferLabel(
       l10n,
       plansAsync?.valueOrNull ?? const [],
@@ -104,6 +120,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     AppLogger.log(
       'Subscription',
       'paywall build: isPremium=$isPremium webMode=$webMode '
+          'storeWebFallback=$_useWebCheckoutFallback '
+          'showStoreWebFallback=$showStoreWebCheckoutFallback '
           'status=${subState.status} waitingForWeb=$_waitingForWeb busy=$_busy',
     );
     return Scaffold(
@@ -157,7 +175,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                             ),
                             _FixedPurchasePanel(
                               maxHeight: constraints.maxHeight * 0.52,
-                              child: _buildPurchaseArea(l10n, webMode: webMode),
+                              child: _buildPurchaseArea(
+                                l10n,
+                                webMode: usingWebCheckout,
+                                showStoreWebCheckoutFallback:
+                                    showStoreWebCheckoutFallback,
+                                usingStoreWebCheckoutFallback:
+                                    usingStoreWebCheckoutFallback,
+                              ),
                             ),
                           ],
                         );
@@ -237,8 +262,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final source = entitlement.source;
     final isPaddle = source == EntitlementSource.paddle;
     final isKnownStore =
-        source == EntitlementSource.apple ||
-        source == EntitlementSource.google;
+        source == EntitlementSource.apple || source == EntitlementSource.google;
     final usePortal =
         isPaddle || (source == EntitlementSource.unknown && webMode);
     final showManage =
@@ -273,8 +297,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     ];
   }
 
-  Widget _buildPurchaseArea(AppLocalizations l10n, {required bool webMode}) {
-    final plansAsync = ref.watch(subscriptionPlansProvider);
+  Widget _buildPurchaseArea(
+    AppLocalizations l10n, {
+    required bool webMode,
+    required bool showStoreWebCheckoutFallback,
+    required bool usingStoreWebCheckoutFallback,
+  }) {
+    final plansAsync = ref.watch(
+      usingStoreWebCheckoutFallback
+          ? paddleSubscriptionPlansProvider
+          : subscriptionPlansProvider,
+    );
     return plansAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 32),
@@ -335,12 +368,35 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 onPressed: _busy || _waitingForWeb
                     ? null
                     : () => webMode
-                          ? _startPaddleCheckout(selected)
+                          ? _startPaddleCheckout(
+                              selected,
+                              storeFallback: usingStoreWebCheckoutFallback,
+                            )
                           : _purchase(selected),
                 child: _ctaChild(l10n, selected),
               ),
             ),
-            const SizedBox(height: 2),
+            if (showStoreWebCheckoutFallback) ...[
+              const SizedBox(height: 6),
+              _StoreWebCheckoutSwitch(
+                usingWebCheckout: usingStoreWebCheckoutFallback,
+                onPressed: _busy || _waitingForWeb
+                    ? null
+                    : () {
+                        setState(
+                          () => _useWebCheckoutFallback =
+                              !usingStoreWebCheckoutFallback,
+                        );
+                        AppLogger.log(
+                          'Subscription',
+                          '商店包 Web 支付切换: enabled=${!usingStoreWebCheckoutFallback}',
+                        );
+                      },
+                l10n: l10n,
+              ),
+              const SizedBox(height: 2),
+            ] else
+              const SizedBox(height: 2),
             _LegalFooter(l10n: l10n),
           ],
         );
@@ -350,12 +406,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
   /// 发起 Paddle 结账：登录 → 服务端创建 transaction → 系统浏览器打开 →
   /// 等待 webhook 后刷新统一权益。打开 URL 本身永远不视为购买成功。
-  Future<void> _startPaddleCheckout(SubscriptionPlan plan) async {
-    AppLogger.log('Subscription', 'Paddle checkout 点击: planId=${plan.planId}');
+  Future<void> _startPaddleCheckout(
+    SubscriptionPlan plan, {
+    required bool storeFallback,
+  }) async {
+    final checkoutPlanId = _paddleCheckoutPlanId(plan, storeFallback);
+    AppLogger.log(
+      'Subscription',
+      'Paddle checkout 点击: planId=$checkoutPlanId '
+          'displayPlanId=${plan.planId} storeFallback=$storeFallback',
+    );
     if (!await _ensureSignedIn() || !mounted) {
       AppLogger.log(
         'Subscription',
-        'Paddle checkout 点击中止: planId=${plan.planId} reason=notSignedIn',
+        'Paddle checkout 点击中止: planId=$checkoutPlanId reason=notSignedIn',
       );
       return;
     }
@@ -365,10 +429,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     try {
       uri = await ref
           .read(subscriptionControllerProvider.notifier)
-          .startPaddleCheckout(plan.planId);
+          .startPaddleCheckout(
+            checkoutPlanId,
+            allowStoreFallback: storeFallback,
+          );
       AppLogger.log(
         'Subscription',
-        'Paddle checkout URL 已获取: planId=${plan.planId} '
+        'Paddle checkout URL 已获取: planId=$checkoutPlanId '
             'host=${uri.host} path=${uri.path}',
       );
       opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
@@ -392,6 +459,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       _waitingForWeb = true;
     });
     unawaited(_pollEntitlement());
+  }
+
+  /// 商店包展示的套餐来自 RevenueCat，Paddle 后端只接受 direct 套餐 id。
+  /// Web 兜底按周期映射到现有 Paddle plan，避免把商店商品 id 发给 Paddle。
+  String _paddleCheckoutPlanId(SubscriptionPlan plan, bool storeFallback) {
+    if (!storeFallback) return plan.planId;
+    return switch (plan.period) {
+      SubscriptionPeriod.monthly => 'plus_monthly',
+      SubscriptionPeriod.yearly => 'plus_yearly',
+      SubscriptionPeriod.lifetime => plan.planId,
+    };
   }
 
   /// 轮询后端权益对账，直到到账（自动关闭）或超时（~2 分钟）。
@@ -804,6 +882,56 @@ class _FixedPurchasePanel extends StatelessWidget {
           child: child,
         ),
       ),
+    );
+  }
+}
+
+class _StoreWebCheckoutSwitch extends StatelessWidget {
+  const _StoreWebCheckoutSwitch({
+    required this.usingWebCheckout,
+    required this.onPressed,
+    required this.l10n,
+  });
+
+  final bool usingWebCheckout;
+  final VoidCallback? onPressed;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (usingWebCheckout) {
+      return TextButton(
+        style: _subtleTextButtonStyle(),
+        onPressed: onPressed,
+        child: Text(
+          l10n.premiumUseStoreCheckout,
+          style: _subtleTextStyle(theme),
+        ),
+      );
+    }
+    return TextButton(
+      style: _subtleTextButtonStyle(),
+      onPressed: onPressed,
+      child: Text(
+        l10n.premiumUseWebCheckoutFallback,
+        style: _subtleTextStyle(theme),
+      ),
+    );
+  }
+
+  ButtonStyle _subtleTextButtonStyle() {
+    return TextButton.styleFrom(
+      minimumSize: const Size(0, 32),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  TextStyle? _subtleTextStyle(ThemeData theme) {
+    return theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.76),
+      fontWeight: FontWeight.w400,
     );
   }
 }

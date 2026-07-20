@@ -7,6 +7,9 @@ library;
 enum RemoteFeature {
   /// 从网盘导入总入口；当前 provider 只有百度网盘，但开关不绑定具体 provider。
   cloudDriveImport,
+
+  /// 商店包 Paywall 是否展示切换到 Web 支付的兜底入口。
+  showStoreWebCheckoutFallback,
 }
 
 class RemoteConfigContext {
@@ -50,13 +53,17 @@ class RemoteFeatureConfig {
 }
 
 class RemoteConfigFeatures {
-  const RemoteConfigFeatures({required this.cloudDriveImport});
+  const RemoteConfigFeatures({
+    this.cloudDriveImport = const RemoteFeatureConfig(enabled: false),
+    this.showStoreWebCheckoutFallback = const RemoteFeatureConfig(
+      enabled: false,
+    ),
+  });
 
   final RemoteFeatureConfig cloudDriveImport;
+  final RemoteFeatureConfig showStoreWebCheckoutFallback;
 
-  static const defaults = RemoteConfigFeatures(
-    cloudDriveImport: RemoteFeatureConfig(enabled: false),
-  );
+  static const defaults = RemoteConfigFeatures();
 
   factory RemoteConfigFeatures.fromJson(Object? json) {
     if (json is! Map) return defaults;
@@ -65,17 +72,24 @@ class RemoteConfigFeatures {
         json['cloudDriveImport'],
         enabled: defaults.cloudDriveImport.enabled,
       ),
+      showStoreWebCheckoutFallback: RemoteFeatureConfig.fromJson(
+        json['showStoreWebCheckoutFallback'],
+        enabled: defaults.showStoreWebCheckoutFallback.enabled,
+      ),
     );
   }
 
   bool isEnabled(RemoteFeature feature) {
     return switch (feature) {
       RemoteFeature.cloudDriveImport => cloudDriveImport.enabled,
+      RemoteFeature.showStoreWebCheckoutFallback =>
+        showStoreWebCheckoutFallback.enabled,
     };
   }
 
   Map<String, Object?> toJson() => {
     'cloudDriveImport': cloudDriveImport.toJson(),
+    'showStoreWebCheckoutFallback': showStoreWebCheckoutFallback.toJson(),
   };
 }
 

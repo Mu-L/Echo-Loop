@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/app_logger.dart';
 import '../models/subscription_plan.dart';
+import '../services/paddle_billing_repository.dart';
 import '../services/purchase_service.dart';
 import '../services/revenuecat_purchase_service.dart';
 
@@ -27,6 +28,90 @@ final subscriptionPlansProvider =
       SubscriptionPlansController,
       AsyncValue<List<SubscriptionPlan>>
     >(SubscriptionPlansController.new);
+
+/// Paddle Web 支付套餐。
+///
+/// 商店包 Web 支付兜底不能复用 App Store / Google Play 的本地价格，否则页面展示价
+/// 会和实际 Web checkout 价格不一致。这里独立读取 Paddle plans，供 Paywall 在用户
+/// 主动切换到 Web 支付时展示。
+final paddleSubscriptionPlansProvider =
+    NotifierProvider<
+      PaddleSubscriptionPlansController,
+      AsyncValue<List<SubscriptionPlan>>
+    >(PaddleSubscriptionPlansController.new);
+
+class PaddleSubscriptionPlansController
+    extends Notifier<AsyncValue<List<SubscriptionPlan>>> {
+  DateTime? _lastSuccessAt;
+  int _generation = 0;
+  Future<void> _settled = Future<void>.value();
+
+  /// 当前预热或刷新链路完成时兑现，主要供测试和启动编排观察。
+  Future<void> get settled => _settled;
+
+  @override
+  AsyncValue<List<SubscriptionPlan>> build() {
+    _settled = Future<void>.microtask(() => _refresh(force: true));
+    return const AsyncLoading();
+  }
+
+  Future<void> refresh({bool force = false}) {
+    final operation = _refresh(force: force);
+    _settled = operation;
+    return operation;
+  }
+
+  Future<void> _refresh({required bool force}) async {
+    final generation = ++_generation;
+    final lastSuccessAt = _lastSuccessAt;
+    final isFresh =
+        lastSuccessAt != null &&
+        ref.read(subscriptionPlansNowProvider)().difference(lastSuccessAt) <
+            subscriptionPlansRefreshInterval;
+    if (!force && isFresh) {
+      AppLogger.log('Subscription', 'Paddle plans 刷新跳过: reason=freshCache');
+      return;
+    }
+
+    final previousPlans = state.valueOrNull;
+    if (previousPlans == null) state = const AsyncLoading();
+    AppLogger.log(
+      'Subscription',
+      'Paddle plans 刷新开始: generation=$generation force=$force',
+    );
+    try {
+      final plans = await ref
+          .read(paddleBillingRepositoryProvider)
+          .fetchPlans();
+      if (generation != _generation) {
+        AppLogger.log(
+          'Subscription',
+          'Paddle plans 刷新丢弃: generation=$generation reason=outdated',
+        );
+        return;
+      }
+      state = AsyncData(plans);
+      _lastSuccessAt = ref.read(subscriptionPlansNowProvider)();
+      AppLogger.log(
+        'Subscription',
+        'Paddle plans 刷新成功: generation=$generation count=${plans.length} '
+            'ids=${plans.map((p) => p.planId).toList()}',
+      );
+    } catch (error, stackTrace) {
+      if (generation != _generation) return;
+      if (previousPlans != null) {
+        state = AsyncData(previousPlans);
+        AppLogger.log('Subscription', 'Paddle plans 刷新失败，保留会话缓存: $error');
+      } else {
+        state = AsyncError(error, stackTrace);
+        AppLogger.log(
+          'Subscription',
+          'Paddle plans 刷新失败，进入错误态: generation=$generation error=$error',
+        );
+      }
+    }
+  }
+}
 
 class SubscriptionPlansController
     extends Notifier<AsyncValue<List<SubscriptionPlan>>> {

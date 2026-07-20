@@ -338,6 +338,18 @@ abstract class AppLocalizations {
   /// **'Continue to secure checkout'**
   String get premiumWebCheckoutCta;
 
+  /// No description provided for @premiumUseWebCheckoutFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t pay through the store? Use web checkout'**
+  String get premiumUseWebCheckoutFallback;
+
+  /// No description provided for @premiumUseStoreCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with store payment'**
+  String get premiumUseStoreCheckout;
+
   /// No description provided for @premiumWebVerifying.
   ///
   /// In en, this message translates to:

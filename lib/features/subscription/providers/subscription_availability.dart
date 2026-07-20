@@ -8,12 +8,14 @@
 /// 再看该渠道对应实现是否配置就绪（原生 RC key / Paddle 后端 API）。
 library;
 
-import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Provider, Ref;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../config/client_distribution.dart';
 import '../../../config/paddle_config.dart';
 import '../../../config/revenuecat_config.dart';
+import '../../remote_config/remote_config.dart';
+import '../../remote_config/remote_config_providers.dart';
 
 part 'subscription_availability.g.dart';
 
@@ -60,3 +62,29 @@ bool webCheckoutModeFor({
   required ClientPaymentChannel channel,
   required bool webConfigured,
 }) => channel == ClientPaymentChannel.web && webConfigured;
+
+/// 商店包是否展示「切换到 Web 支付」兜底入口。
+///
+/// 这是 UI 展示门控，不改变默认购买渠道；只有商店包、Paddle 后端可用、远程开关
+/// 同时满足时才展示，便于按国家/审核策略灰度。
+final showStoreWebCheckoutFallbackProvider = Provider<bool>((ref) {
+  return showStoreWebCheckoutFallbackFor(
+    channel: clientPaymentChannel,
+    webConfigured: isPaddleBackendConfigured,
+    remoteEnabled: ref.watch(
+      remoteFeatureEnabledProvider(RemoteFeature.showStoreWebCheckoutFallback),
+    ),
+  );
+});
+
+/// 纯函数形式供测试覆盖渠道与开关矩阵。
+bool showStoreWebCheckoutFallbackFor({
+  required ClientPaymentChannel channel,
+  required bool webConfigured,
+  required bool remoteEnabled,
+}) {
+  final storeChannel =
+      channel == ClientPaymentChannel.appleStore ||
+      channel == ClientPaymentChannel.googlePlay;
+  return storeChannel && webConfigured && remoteEnabled;
+}

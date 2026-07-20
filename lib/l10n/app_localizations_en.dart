@@ -139,6 +139,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumWebCheckoutCta => 'Continue to secure checkout';
 
   @override
+  String get premiumUseWebCheckoutFallback =>
+      'Can\'t pay through the store? Use web checkout';
+
+  @override
+  String get premiumUseStoreCheckout => 'Continue with store payment';
+
+  @override
   String get premiumWebVerifying => 'Waiting for payment to be confirmed…';
 
   @override

@@ -55,6 +55,8 @@
   "premiumRestoreNone": "未找到可恢复的购买。",
   "premiumRestored": "已恢复购买。",
   "premiumWebCheckoutCta": "查看订阅方案",
+  "premiumUseWebCheckoutFallback": "无法通过商店付款？切换到网页支付",
+  "premiumUseStoreCheckout": "继续使用商店支付",
   "premiumWebVerifying": "正在等待支付结果确认…",
   "premiumWebOpenFailed": "无法打开结账页面，请重试。",
   "premiumRefresh": "刷新",

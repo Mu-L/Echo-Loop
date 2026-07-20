@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:echo_loop/features/subscription/models/entitlement.dart';
-import 'package:echo_loop/features/subscription/models/entitlement_source.dart';
 import 'package:echo_loop/features/subscription/models/subscription_plan.dart';
 import 'package:echo_loop/features/subscription/providers/subscription_controller.dart';
 import 'package:echo_loop/features/subscription/providers/subscription_identity.dart';
@@ -231,6 +230,44 @@ void main() {
           webConfigured: false,
         ),
         PurchaseServiceType.stub,
+      );
+    });
+  });
+
+  group('canStartPaddleCheckoutForChannel', () {
+    test('direct 默认允许，商店包必须显式允许 fallback', () {
+      expect(
+        canStartPaddleCheckoutForChannel(
+          channel: ClientPaymentChannel.web,
+          allowStoreFallback: false,
+        ),
+        isTrue,
+      );
+      for (final channel in [
+        ClientPaymentChannel.appleStore,
+        ClientPaymentChannel.googlePlay,
+      ]) {
+        expect(
+          canStartPaddleCheckoutForChannel(
+            channel: channel,
+            allowStoreFallback: false,
+          ),
+          isFalse,
+        );
+        expect(
+          canStartPaddleCheckoutForChannel(
+            channel: channel,
+            allowStoreFallback: true,
+          ),
+          isTrue,
+        );
+      }
+      expect(
+        canStartPaddleCheckoutForChannel(
+          channel: ClientPaymentChannel.unavailable,
+          allowStoreFallback: true,
+        ),
+        isFalse,
       );
     });
   });
