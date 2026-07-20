@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-20（AI 讲解开关组 UI 优化）
+> 最后更新：2026-07-20（商店包 Web 支付兜底入口文案调整）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -89,10 +89,11 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-20 14:20：商店包 Web 支付兜底入口文案调整。将商店包订阅页的 Web 支付兜底入口中文文案改为“商店支付遇到问题？使用网页支付”，英文同步调整为“Store payment not working? Use web checkout”，并更新订阅页回归测试断言。
 - [x] 2026-07-20 14:02：AI 讲解开关组 UI 优化。学习设置中的 AI 讲解子开关改为自定义对齐行，使用解析、翻译、意群分割对应图标，统一左侧图标/文案和右侧开关位置，强化总开关与子项层级；子项文案调整为“AI 解析 / AI 翻译 / AI 意群分割”，补充设置页回归测试。
 - [x] 2026-07-20 13:54：自动意群分割 loading 状态对齐。将意群自动加载触发收口到 `SentenceAnnotationCard` 内，与解析/翻译共用自动加载路径；意群按钮新增外部 loading 状态，自动显示时按钮会展示 spinner 并禁止重复点击；请求来源透传 automatic / userTap，自动请求继续遵守本地 quota reset，手动点击保持强制弹提醒；补充自动意群按钮 loading 回归测试。
 - [x] 2026-07-20 13:46：学习设置 AI 讲解自动显示开关。学习设置新增“自动显示 AI 讲解”总开关（默认开启），开启时显示解析、翻译、意群分割三个子开关；解析和翻译默认自动显示，意群默认不自动显示。句子详情页与逐句精听等现有自动讲解入口改为读取该全局设置，关闭总开关时三类 AI 内容都不自动请求或自动展开，手动点击工具栏仍可正常查看；补充 provider、设置页和讲解视图回归测试。
-- [x] 2026-07-20 10:19：商店包 Web 支付兜底入口。会员订阅页在商店包远程开关 `showStoreWebCheckoutFallback` 命中且 Paddle 后端可用时，在主订阅按钮下方展示弱化“切换到网页支付”文字入口；用户切换后重新拉取 Paddle plans 并展示 Web 支付价格，主 CTA 文案不额外改成 Web 支付，下面展示弱化“继续使用商店支付”用于切回；购买动作走 Paddle checkout，登录门、浏览器打开和权益轮询复用现有 direct 链路；补充远程配置解析、展示门控、Paddle plans 数据源切换和 Paywall checkout 回归测试。
+- [x] 2026-07-20 10:19：商店包 Web 支付兜底入口。会员订阅页在商店包远程开关 `showStoreWebCheckoutFallback` 命中且 Paddle 后端可用时，在主订阅按钮下方展示弱化“商店支付遇到问题？使用网页支付”文字入口；用户切换后重新拉取 Paddle plans 并展示 Web 支付价格，主 CTA 文案不额外改成 Web 支付，下面展示弱化“继续使用商店支付”用于切回；购买动作走 Paddle checkout，登录门、浏览器打开和权益轮询复用现有 direct 链路；补充远程配置解析、展示门控、Paddle plans 数据源切换和 Paywall checkout 回归测试。
 - [x] 2026-07-19 15:26：远程 Config 定期刷新。Remote Config provider 从启动期静态值改为可变 StateNotifier，保留 `main.dart` 冷启动安全加载，同时运行期通过 `RefreshCoordinator` 复用 TTL 节流与 inflight 合并；新增直接触网的 `fetchRemote()`，回前台和前台长驻时按 `ttlSeconds` one-shot 定时静默刷新，失败只记录日志并保留旧内存配置；导入弹窗继续通过 `remoteFeatureEnabledProvider(RemoteFeature.cloudDriveImport)` 自动响应开关变化；补充 service/controller/provider 单测并回归导入弹窗远程开关测试。
 - [x] 2026-07-19 14:16：远程 Config V1：从网盘导入开关。后端 `/api/v1/client/config` 改为版本化 schema，统一 `countryCode` 为 ISO 3166-1 alpha-2 uppercase，并用集中 registry 按国家解析 `features.cloudDriveImport.enabled`（默认关闭，CN 开启）；Flutter 新增 remote config 模型、TTL 缓存、启动期加载与 provider，导入弹窗通过 `RemoteFeature.cloudDriveImport` 控制“从网盘导入”入口显示，当前 provider 仍只有百度网盘；补充后端路由、Flutter 解析/缓存/service 和导入弹窗显示/隐藏回归测试。
 - [x] 2026-07-18：合集详情页音频多选删除（仅用户自建合集）。长按任一音频进入多选模式，AppBar 切换为多选工具栏（关闭 / 已选 N / 全选·取消全选 / 删除），支持全选后一键删除；删除弹二选一确认「从合集移除 N 项」/「彻底删除 N 项」，分别复用 `CollectionList.removeAudiosFromCollection`（新增批量方法 + `CollectionDao.removeAudios` 单条 SQL 删 junction、内存 `audioIdsMap` 一次更新）与已有 `AudioLibrary.removeAudioItems`。选中态由 `CollectionDetailScreen` 局部持有透传到 `AudioListView`/`AudioListTile`（新增可选参数，默认关闭，库/播客场景零影响），多选态卡片高亮 + 左侧 Checkbox + `IgnorePointer` 屏蔽右侧播放/菜单，`PopScope` 拦截返回优先退出多选；官方/播客合集不启用。测试：DAO 批量移除边界单测 + 屏幕多选进入/全选/二选一删除/官方合集不启用的 widget 测试。

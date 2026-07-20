@@ -55,7 +55,7 @@
   "premiumRestoreNone": "No purchases found to restore.",
   "premiumRestored": "Purchases restored.",
   "premiumWebCheckoutCta": "Continue to secure checkout",
-  "premiumUseWebCheckoutFallback": "Can't pay through the store? Use web checkout",
+  "premiumUseWebCheckoutFallback": "Store payment not working? Use web checkout",
   "premiumUseStoreCheckout": "Continue with store payment",
   "premiumWebVerifying": "Waiting for payment to be confirmed…",
   "premiumWebOpenFailed": "Couldn't open the checkout page. Please try again.",

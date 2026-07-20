@@ -136,7 +136,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumWebCheckoutCta => '查看订阅方案';
 
   @override
-  String get premiumUseWebCheckoutFallback => '无法通过商店付款？切换到网页支付';
+  String get premiumUseWebCheckoutFallback => '商店支付遇到问题？使用网页支付';
 
   @override
   String get premiumUseStoreCheckout => '继续使用商店支付';

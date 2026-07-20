@@ -341,7 +341,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumUseWebCheckoutFallback.
   ///
   /// In en, this message translates to:
-  /// **'Can\'t pay through the store? Use web checkout'**
+  /// **'Store payment not working? Use web checkout'**
   String get premiumUseWebCheckoutFallback;
 
   /// No description provided for @premiumUseStoreCheckout.

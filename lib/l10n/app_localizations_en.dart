@@ -140,7 +140,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumUseWebCheckoutFallback =>
-      'Can\'t pay through the store? Use web checkout';
+      'Store payment not working? Use web checkout';
 
   @override
   String get premiumUseStoreCheckout => 'Continue with store payment';

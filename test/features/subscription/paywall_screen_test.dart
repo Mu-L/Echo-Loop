@@ -299,7 +299,7 @@ void main() {
     expect(
       find.widgetWithText(
         TextButton,
-        'Can\'t pay through the store? Use web checkout',
+        'Store payment not working? Use web checkout',
       ),
       findsOneWidget,
     );
@@ -313,7 +313,7 @@ void main() {
     await tester.tap(
       find.widgetWithText(
         TextButton,
-        'Can\'t pay through the store? Use web checkout',
+        'Store payment not working? Use web checkout',
       ),
     );
     await tester.pumpAndSettle();
@@ -349,7 +349,7 @@ void main() {
     await tester.tap(
       find.widgetWithText(
         TextButton,
-        'Can\'t pay through the store? Use web checkout',
+        'Store payment not working? Use web checkout',
       ),
     );
     await tester.pumpAndSettle();
@@ -359,7 +359,7 @@ void main() {
     expect(
       find.widgetWithText(
         TextButton,
-        'Can\'t pay through the store? Use web checkout',
+        'Store payment not working? Use web checkout',
       ),
       findsOneWidget,
     );
@@ -373,7 +373,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Can\'t pay through the store? Use web checkout'),
+      find.text('Store payment not working? Use web checkout'),
       findsNothing,
     );
     expect(find.text('Continue with store payment'), findsNothing);
