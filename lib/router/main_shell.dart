@@ -59,6 +59,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   ProviderSubscription<ReminderSettings>? _reminderSettingsSubscription;
   ProviderSubscription<int>? _notificationPromptSubscription;
   ProviderSubscription<GuideControllerState>? _guideWaitSubscription;
+  late final RemoteConfigController _remoteConfigController;
   late final AppLifecycleListener _lifecycleListener;
 
   /// 资源库 tab 图标的引导 target key；在整个 shell 生命周期内保持稳定。
@@ -75,6 +76,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void initState() {
     super.initState();
+    // 缓存 controller，避免 dispose 阶段从已卸载的 ConsumerState ref 读取 provider。
+    _remoteConfigController = ref.read(remoteConfigProvider.notifier);
     _lifecycleListener = AppLifecycleListener(
       onResume: _onAppResume,
       onHide: _onAppBackground,
@@ -267,7 +270,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
-    ref.read(remoteConfigProvider.notifier).stopPeriodicRefresh();
+    _remoteConfigController.stopPeriodicRefresh();
     _lifecycleListener.dispose();
     _pendingTaskCountSubscription?.close();
     _progressMapSubscription?.close();

@@ -67,6 +67,30 @@ class _TestLearningSettingsNotifier extends Notifier<LearningSettings>
   }
 
   @override
+  Future<void> setAutoShowAiExplanation(bool enabled) async {
+    if (state.autoShowAiExplanation == enabled) return;
+    state = state.copyWith(autoShowAiExplanation: enabled);
+  }
+
+  @override
+  Future<void> setAutoShowAiAnalysis(bool enabled) async {
+    if (state.autoShowAiAnalysis == enabled) return;
+    state = state.copyWith(autoShowAiAnalysis: enabled);
+  }
+
+  @override
+  Future<void> setAutoShowAiTranslation(bool enabled) async {
+    if (state.autoShowAiTranslation == enabled) return;
+    state = state.copyWith(autoShowAiTranslation: enabled);
+  }
+
+  @override
+  Future<void> setAutoShowAiSenseGroups(bool enabled) async {
+    if (state.autoShowAiSenseGroups == enabled) return;
+    state = state.copyWith(autoShowAiSenseGroups: enabled);
+  }
+
+  @override
   Future<void> setAutoPlayRetellRecordingAfterCompletion(bool enabled) async {
     if (state.autoPlayRetellRecordingAfterCompletion == enabled) return;
     state = state.copyWith(autoPlayRetellRecordingAfterCompletion: enabled);
