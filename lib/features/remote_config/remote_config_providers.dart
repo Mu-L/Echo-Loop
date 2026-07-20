@@ -44,6 +44,12 @@ final remoteFeatureEnabledProvider = Provider.family<bool, RemoteFeature>((
   return ref.watch(remoteConfigProvider).isEnabled(feature);
 });
 
+final remoteTranscriptionLimitsProvider = Provider<RemoteTranscriptionLimits>((
+  ref,
+) {
+  return ref.watch(remoteConfigProvider).transcriptionLimits;
+});
+
 /// 远程配置运行期刷新控制器。
 class RemoteConfigController extends StateNotifier<RemoteConfig> {
   /// 创建远程配置控制器。

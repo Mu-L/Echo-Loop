@@ -93,12 +93,54 @@ class RemoteConfigFeatures {
   };
 }
 
+/// AI 转录入口的远程限制。
+class RemoteTranscriptionLimits {
+  const RemoteTranscriptionLimits({
+    this.maxDurationSeconds = defaultMaxDurationSeconds,
+    this.maxUploadBytes = defaultMaxUploadBytes,
+  });
+
+  /// 默认允许 30 分钟音频发起云端转录。
+  static const defaultMaxDurationSeconds = 30 * 60;
+
+  /// 默认允许最大 50MB 音频发起云端转录。
+  static const defaultMaxUploadBytes = 50 * 1024 * 1024;
+
+  static const defaults = RemoteTranscriptionLimits();
+
+  final int maxDurationSeconds;
+  final int maxUploadBytes;
+
+  factory RemoteTranscriptionLimits.fromJson(Object? json) {
+    if (json is! Map) return defaults;
+    return RemoteTranscriptionLimits(
+      maxDurationSeconds:
+          _readPositiveInt(json, 'maxDurationSeconds') ??
+          defaultMaxDurationSeconds,
+      maxUploadBytes:
+          _readPositiveInt(json, 'maxUploadBytes') ?? defaultMaxUploadBytes,
+    );
+  }
+
+  int get maxDurationMinutesForDisplay =>
+      (maxDurationSeconds / Duration.secondsPerMinute).ceil();
+
+  int get maxUploadMegabytesForDisplay =>
+      (maxUploadBytes / (1024 * 1024)).ceil();
+
+  Map<String, Object?> toJson() => {
+    'maxDurationSeconds': maxDurationSeconds,
+    'maxUploadBytes': maxUploadBytes,
+  };
+}
+
 class RemoteConfig {
   const RemoteConfig({
     required this.version,
     required this.ttlSeconds,
     required this.context,
     required this.features,
+    this.transcriptionLimits = RemoteTranscriptionLimits.defaults,
   });
 
   static const currentVersion = 1;
@@ -109,12 +151,14 @@ class RemoteConfig {
     ttlSeconds: defaultTtlSeconds,
     context: RemoteConfigContext(),
     features: RemoteConfigFeatures.defaults,
+    transcriptionLimits: RemoteTranscriptionLimits.defaults,
   );
 
   final int version;
   final int ttlSeconds;
   final RemoteConfigContext context;
   final RemoteConfigFeatures features;
+  final RemoteTranscriptionLimits transcriptionLimits;
 
   factory RemoteConfig.fromJson(Object? json) {
     if (json is! Map) return defaults;
@@ -126,6 +170,9 @@ class RemoteConfig {
       ttlSeconds: ttlSeconds > 0 ? ttlSeconds : defaultTtlSeconds,
       context: RemoteConfigContext.fromJson(json['context']),
       features: RemoteConfigFeatures.fromJson(json['features']),
+      transcriptionLimits: RemoteTranscriptionLimits.fromJson(
+        _readMap(json, 'limits')?['transcription'],
+      ),
     );
   }
 
@@ -136,6 +183,7 @@ class RemoteConfig {
     'ttlSeconds': ttlSeconds,
     'context': context.toJson(),
     'features': features.toJson(),
+    'limits': {'transcription': transcriptionLimits.toJson()},
   };
 }
 
@@ -152,4 +200,14 @@ bool? _readBool(Map<Object?, Object?> json, String key) {
 int? _readInt(Map<Object?, Object?> json, String key) {
   final value = json[key];
   return value is int ? value : null;
+}
+
+int? _readPositiveInt(Map<Object?, Object?> json, String key) {
+  final value = _readInt(json, key);
+  return value != null && value > 0 ? value : null;
+}
+
+Map<Object?, Object?>? _readMap(Map<Object?, Object?> json, String key) {
+  final value = json[key];
+  return value is Map<Object?, Object?> ? value : null;
 }

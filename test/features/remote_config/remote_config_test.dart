@@ -33,6 +33,12 @@ void main() {
           'cloudDriveImport': {'enabled': true, 'ignored': 'x'},
           'showStoreWebCheckoutFallback': {'enabled': true},
         },
+        'limits': {
+          'transcription': {
+            'maxDurationSeconds': 3600,
+            'maxUploadBytes': 104857600,
+          },
+        },
         'ignoredRoot': true,
       });
 
@@ -44,6 +50,8 @@ void main() {
         config.isEnabled(RemoteFeature.showStoreWebCheckoutFallback),
         isTrue,
       );
+      expect(config.transcriptionLimits.maxDurationSeconds, 3600);
+      expect(config.transcriptionLimits.maxUploadBytes, 104857600);
     });
 
     test('缺字段和未知版本回退本地默认', () {
@@ -54,6 +62,14 @@ void main() {
         isFalse,
       );
       expect(missing.ttlSeconds, RemoteConfig.defaultTtlSeconds);
+      expect(
+        missing.transcriptionLimits.maxDurationSeconds,
+        RemoteTranscriptionLimits.defaultMaxDurationSeconds,
+      );
+      expect(
+        missing.transcriptionLimits.maxUploadBytes,
+        RemoteTranscriptionLimits.defaultMaxUploadBytes,
+      );
 
       final unknownVersion = RemoteConfig.fromJson({
         'version': 99,
@@ -62,6 +78,21 @@ void main() {
         },
       });
       expect(unknownVersion.isEnabled(RemoteFeature.cloudDriveImport), isFalse);
+    });
+
+    test('转录限制字段非法时逐项回退本地默认', () {
+      final config = RemoteConfig.fromJson({
+        'version': 1,
+        'limits': {
+          'transcription': {'maxDurationSeconds': 0, 'maxUploadBytes': 1024},
+        },
+      });
+
+      expect(
+        config.transcriptionLimits.maxDurationSeconds,
+        RemoteTranscriptionLimits.defaultMaxDurationSeconds,
+      );
+      expect(config.transcriptionLimits.maxUploadBytes, 1024);
     });
   });
 
@@ -331,6 +362,31 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('transcription limits provider 暴露远程限制值', () {
+      final container = ProviderContainer(
+        overrides: [
+          initialRemoteConfigProvider.overrideWithValue(
+            const RemoteConfig(
+              version: 1,
+              ttlSeconds: 60,
+              context: RemoteConfigContext(countryCode: 'US'),
+              features: RemoteConfigFeatures.defaults,
+              transcriptionLimits: RemoteTranscriptionLimits(
+                maxDurationSeconds: 300,
+                maxUploadBytes: 1048576,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final limits = container.read(remoteTranscriptionLimitsProvider);
+
+      expect(limits.maxDurationSeconds, 300);
+      expect(limits.maxUploadBytes, 1048576);
     });
 
     test('并发刷新只发起一次后端请求', () async {

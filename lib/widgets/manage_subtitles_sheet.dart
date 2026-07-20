@@ -16,6 +16,7 @@ import '../features/subscription/providers/ai_trial_usage_provider.dart';
 import '../features/subscription/providers/feature_access_provider.dart';
 import '../features/subscription/providers/subscription_controller.dart';
 import '../features/subscription/widgets/feature_gate.dart';
+import '../features/remote_config/remote_config_providers.dart';
 import '../features/usage/usage_event.dart';
 import '../features/usage/usage_providers.dart';
 import '../models/audio_item.dart';
@@ -1771,12 +1772,6 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     }
   }
 
-  /// AI 转录文件大小上限（50MB）
-  static const _maxFileSize = 50 * 1024 * 1024;
-
-  /// AI 转录时长上限（30 分钟）
-  static const _maxDurationSeconds = 30 * 60;
-
   /// 处理 AI 转录
   Future<void> _handleAiTranscription(
     BuildContext context,
@@ -1797,12 +1792,14 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
       return;
     }
 
+    final limits = ref.read(remoteTranscriptionLimitsProvider);
+
     // 检查时长限制
-    if (audioItem.totalDuration > _maxDurationSeconds) {
+    if (audioItem.totalDuration > limits.maxDurationSeconds) {
       _showInlineError(
         _InlineError(
           _UploadErrorKind.generic,
-          l10n.transcriptionErrorTooLong(30),
+          l10n.transcriptionErrorTooLong(limits.maxDurationMinutesForDisplay),
         ),
       );
       return;
@@ -1819,11 +1816,13 @@ class _ManageSubtitlesSheetState extends ConsumerState<ManageSubtitlesSheet> {
     }
     final fileSize = await File(fullPath).length();
     if (!mounted) return;
-    if (fileSize > _maxFileSize) {
+    if (fileSize > limits.maxUploadBytes) {
       _showInlineError(
         _InlineError(
           _UploadErrorKind.generic,
-          l10n.transcriptionErrorFileTooLarge(50),
+          l10n.transcriptionErrorFileTooLarge(
+            limits.maxUploadMegabytesForDisplay,
+          ),
         ),
       );
       return;

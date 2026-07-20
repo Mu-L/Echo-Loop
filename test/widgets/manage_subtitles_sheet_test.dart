@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:echo_loop/database/providers.dart';
+import 'package:echo_loop/features/remote_config/remote_config.dart';
+import 'package:echo_loop/features/remote_config/remote_config_providers.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/providers/audio_library_provider.dart';
 import 'package:echo_loop/providers/collection_provider.dart';
@@ -308,11 +310,21 @@ void main() {
         expect(find.text('Sign in to use AI transcription'), findsNothing);
       });
 
-      testWidgets('AI 转录音频过长时在弹窗内显示 12 秒错误提示', (tester) async {
+      testWidgets('AI 转录读取远程时长限制并在弹窗内显示错误提示', (tester) async {
         final item = createTestAudioItem(
-          totalDuration: 31 * 60,
+          totalDuration: 2 * 60,
         ).copyWith(transcriptSource: TranscriptSource.local);
-        await tester.pumpWidget(buildSheet(item, session: signedInSession()));
+        await tester.pumpWidget(
+          buildSheet(
+            item,
+            session: signedInSession(),
+            extraOverrides: [
+              remoteTranscriptionLimitsProvider.overrideWithValue(
+                const RemoteTranscriptionLimits(maxDurationSeconds: 60),
+              ),
+            ],
+          ),
+        );
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('Open'));
@@ -327,7 +339,10 @@ void main() {
         );
         await tester.pump();
 
-        expect(find.textContaining('Audio too long'), findsOneWidget);
+        expect(
+          find.textContaining('Audio too long (max 1 minutes)'),
+          findsOneWidget,
+        );
         expect(find.byType(SnackBar), findsNothing);
 
         await tester.pump(const Duration(seconds: 12));
