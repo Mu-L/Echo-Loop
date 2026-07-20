@@ -1165,15 +1165,33 @@ class AudioListTile extends ConsumerWidget {
     }
     // 仅在确实失败时提示；并发占用（另一单集正在下载）静默忽略，
     // 不误报"下载失败"。
-    final isFailed =
-        ref.read(podcastDownloadControllerProvider) is AudioImportFailed;
-    if (!isFailed) return;
+    final state = ref.read(podcastDownloadControllerProvider);
+    if (state is! AudioImportFailed) return;
+    final detail = _downloadFailureDetail(l10n, state.error);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(l10n.downloadFailed(audioItem.name)),
+        content: Text('${l10n.downloadFailed(audioItem.name)}\n$detail'),
         duration: const Duration(seconds: 4),
       ),
     );
+  }
+
+  String _downloadFailureDetail(
+    AppLocalizations l10n,
+    AudioImportException error,
+  ) {
+    return switch (error.code) {
+      AudioImportFailureCode.invalidUrl => l10n.audioUrlUnsupported,
+      AudioImportFailureCode.unsupportedScheme => l10n.audioUrlUnsupported,
+      AudioImportFailureCode.unsupportedFormat => l10n.audioUrlUnsupported,
+      AudioImportFailureCode.notAudio => l10n.audioUrlUnsupported,
+      AudioImportFailureCode.network => l10n.downloadErrorNetwork,
+      AudioImportFailureCode.storage => l10n.downloadErrorStorage,
+      AudioImportFailureCode.duplicate => error.message,
+      AudioImportFailureCode.canceled => l10n.cancel,
+      AudioImportFailureCode.unknown =>
+        error.message.isEmpty ? l10n.audioDownloadFailed : error.message,
+    };
   }
 
   Future<void> _showRenameDialog(BuildContext context, WidgetRef ref) async {

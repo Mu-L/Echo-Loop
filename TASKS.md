@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-20（CI 测试结果判定改按 testDone 明细）
+> 最后更新：2026-07-20（播客音频下载优先使用 HTTPS enclosure）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -118,6 +118,7 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-20 23:28：修复 BBC 等播客音频下载失败提示不透明的问题。RSS 解析优先使用 `ppg:enclosureSecure` HTTPS 音频地址；已落库的 BBC HTTP enclosure 下载前自动升级为 HTTPS；播客单集下载失败 SnackBar 追加具体原因，并记录下载失败 URL、Dio 类型和 HTTP 状态；补充 parser、下载服务和列表项 widget 回归测试。
 - [x] 2026-07-20 23:18：修复 CI JSON 测试判定对 Flutter runner 收尾噪声过严的问题。GitHub Actions 测试解析现在只把带 `error` payload 的 `testDone failure/error` 判为真实失败；对无错误载荷的 orphan `testDone error` 只输出 warning，避免 `done.success=false` 被污染时误挡已全量通过的测试。
 - [x] 2026-07-20 23:04：修复 CI 中 TTS controller 预览竞态单测偶发失败。`previewVoice 同一 speakingKey 连续发音` 用例不再依赖固定 `pumpEventQueue()` 次数，而是等待 fake engine 收到指定数量的合成 gate，避免 CI 机器调度较慢时在首个合成请求入队前误判失败；补跑相关 analyze 与单测。
 - [x] 2026-07-20 21:39：补充 AI 转录远程时长限制业务入口回归测试，验证默认允许的 2 分钟音频在远程 1 分钟限制下会被字幕管理弹窗正确拦截并展示远程限制值。

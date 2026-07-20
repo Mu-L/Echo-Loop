@@ -13,4 +13,4 @@ const bool kChatbotEnabled = true;
 ///
 /// 默认 **false**（走真实后端）。仅本地联调 / 手动验收（后端未就绪时跑通流式/停止/
 /// markdown/多轮）时临时置 true；不进 release 逻辑分支。
-const bool kChatbotUseFakeApi = true;
+const bool kChatbotUseFakeApi = false;

@@ -56,8 +56,17 @@ class PodcastFeedParser {
       if (guid == null || guid.isEmpty) continue; // 无 guid 跳过
 
       final enclosure = item.findElements('enclosure').firstOrNull;
-      final enclosureUrl = enclosure?.getAttribute('url') ?? '';
-      final enclosureType = enclosure?.getAttribute('type') ?? 'audio/mpeg';
+      final secureEnclosure = item
+          .findElements('ppg:enclosureSecure')
+          .firstOrNull;
+      final enclosureUrl =
+          secureEnclosure?.getAttribute('url') ??
+          enclosure?.getAttribute('url') ??
+          '';
+      final enclosureType =
+          secureEnclosure?.getAttribute('type') ??
+          enclosure?.getAttribute('type') ??
+          'audio/mpeg';
       if (enclosureUrl.isEmpty) continue; // 无音频 URL 跳过
 
       final title = _text(item, 'title') ?? guid;

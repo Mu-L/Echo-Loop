@@ -266,6 +266,31 @@ void main() {
       expect(ep1.link, 'https://example.com/episodes/1');
     });
 
+    test('BBC RSS 同时提供 secure enclosure 时优先使用 HTTPS 音频 URL', () {
+      const xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+    xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+    xmlns:ppg="http://bbc.co.uk/2009/01/ppgRss">
+  <channel>
+    <title>BBC Learning English</title>
+    <item>
+      <guid>urn:bbc:podcast:p0n4bkpz</guid>
+      <title>The English We Speak: Short-change</title>
+      <enclosure url="http://open.live.bbc.co.uk/mediaselector/6/redir/version/2.0/mediaset/audio-nondrm-download-rss-low/proto/http/vpid/p0n4bjcm.mp3" type="audio/mpeg"/>
+      <ppg:enclosureSecure url="https://open.live.bbc.co.uk/mediaselector/6/redir/version/2.0/mediaset/audio-nondrm-download-rss-low/proto/https/vpid/p0n4bjcm.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>''';
+
+      final result = parser.parse(xml, feedUrl: feedUrl);
+
+      expect(
+        result.episodes.single.enclosureUrl,
+        'https://open.live.bbc.co.uk/mediaselector/6/redir/version/2.0/mediaset/audio-nondrm-download-rss-low/proto/https/vpid/p0n4bjcm.mp3',
+      );
+      expect(result.episodes.single.enclosureType, 'audio/mpeg');
+    });
+
     test('解析 VOA 单集的 summary 和网页 link', () {
       const xml = '''<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">

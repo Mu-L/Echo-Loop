@@ -90,6 +90,19 @@ class _PendingAudioImportController extends PodcastDownloadController {
   }
 }
 
+class _FailingAudioImportController extends PodcastDownloadController {
+  @override
+  AudioImportState build() => const AudioImportIdle();
+
+  @override
+  Future<bool> downloadPodcastEpisode(AudioItem item) async {
+    state = const AudioImportFailed(
+      AudioImportException(AudioImportFailureCode.network, 'network blocked'),
+    );
+    return false;
+  }
+}
+
 Session _signedInSession() {
   final user = User(
     id: 'user-1',
@@ -535,6 +548,49 @@ void main() {
 
       controller.complete();
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('单集下载失败时 SnackBar 显示具体错误原因', (tester) async {
+      final item =
+          createTestAudioItem(
+            name: 'Podcast Episode',
+            transcriptPath: null,
+            transcriptSource: null,
+          ).copyWith(
+            audioPath: null,
+            podcastEpisodeGuid: 'episode-guid-1',
+            podcastEnclosureUrl: 'https://example.com/episode.mp3',
+            podcastEnclosureType: 'audio/mpeg',
+          );
+
+      await tester.pumpWidget(
+        createTestApp(
+          Center(
+            child: SizedBox(width: 420, child: AudioListTile(audioItem: item)),
+          ),
+          overrides: [
+            audioLibraryProvider.overrideWith(
+              () => TestAudioLibrary(AudioLibraryState(audioItems: [item])),
+            ),
+            podcastDownloadControllerProvider.overrideWith(
+              _FailingAudioImportController.new,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Podcast Episode'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Podcast Episode download failed, please retry'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Network error. Check your connection and retry.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('未下载单集左侧显示下载图标而非进度环', (tester) async {

@@ -716,6 +716,36 @@ void main() {
       expect(await existingFile.readAsBytes(), [9, 9, 9]);
       expect(await _tmpAudioImportFiles(tmpDir), isEmpty);
     });
+
+    test('BBC 旧 HTTP enclosure 下载前自动升级为 HTTPS secure URL', () async {
+      final service = AudioImportService(
+        dio: dio,
+        resolveDataDir: () async => tmpDir,
+        computeSha256: (_) async => 'sha-episode',
+        readDurationSeconds: (_) async => 61,
+      );
+
+      await service.downloadEpisodeToSandbox(
+        url:
+            'http://open.live.bbc.co.uk/mediaselector/6/redir/version/2.0/mediaset/audio-nondrm-download-rss-low/proto/http/vpid/p0n4bjcm.mp3',
+        enclosureType: 'audio/mpeg',
+      );
+
+      final captured =
+          verify(
+                () => dio.download(
+                  captureAny(),
+                  any(),
+                  cancelToken: any(named: 'cancelToken'),
+                  options: any(named: 'options'),
+                  onReceiveProgress: any(named: 'onReceiveProgress'),
+                ),
+              ).captured.single
+              as String;
+      expect(captured, startsWith('https://open.live.bbc.co.uk/'));
+      expect(captured, contains('/proto/https/'));
+      expect(captured, endsWith('/vpid/p0n4bjcm.mp3'));
+    });
   });
 }
 
