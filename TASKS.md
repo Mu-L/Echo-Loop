@@ -118,6 +118,7 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-20 23:18：修复 CI JSON 测试判定对 Flutter runner 收尾噪声过严的问题。GitHub Actions 测试解析现在只把带 `error` payload 的 `testDone failure/error` 判为真实失败；对无错误载荷的 orphan `testDone error` 只输出 warning，避免 `done.success=false` 被污染时误挡已全量通过的测试。
 - [x] 2026-07-20 23:04：修复 CI 中 TTS controller 预览竞态单测偶发失败。`previewVoice 同一 speakingKey 连续发音` 用例不再依赖固定 `pumpEventQueue()` 次数，而是等待 fake engine 收到指定数量的合成 gate，避免 CI 机器调度较慢时在首个合成请求入队前误判失败；补跑相关 analyze 与单测。
 - [x] 2026-07-20 21:39：补充 AI 转录远程时长限制业务入口回归测试，验证默认允许的 2 分钟音频在远程 1 分钟限制下会被字幕管理弹窗正确拦截并展示远程限制值。
 - [x] 2026-07-20 21:12：AI 转录音频限制接入 remote app config。后端 `/api/v1/client/config` 新增 `limits.transcription.maxDurationSeconds/maxUploadBytes` resolved 配置，默认 30 分钟 / 50MB；Flutter remote config 新增 `RemoteTranscriptionLimits` 与 `remoteTranscriptionLimitsProvider`，AI 转录入口的时长和文件大小预校验改为读取远程配置，缺失或非法值回退本地默认；补充 remote config 解析、provider 和后端 route 回归测试。
