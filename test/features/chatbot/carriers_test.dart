@@ -163,10 +163,10 @@ void main() {
     expect(find.byType(ChatView), findsNothing);
   });
 
-  test('本地联调开关已开启（入口可见 + fake 流式数据）', () {
-    // 本地手动验收 chatbot 时入口保持可见，并用 fake 流式实现避免依赖后端状态。
+  test('发布默认开关（入口可见 + 真实流式 API）', () {
+    // 发布默认值保持入口可见，但不使用 fake 流式实现，避免 CI 依赖本地联调临时开关。
     expect(kChatbotEnabled, isTrue);
-    expect(kChatbotUseFakeApi, isTrue);
+    expect(kChatbotUseFakeApi, isFalse);
   });
 
   testWidgets('ChatScreen 全屏页壳渲染标题与 ChatView', (tester) async {
