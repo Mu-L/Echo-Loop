@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-20（播客音频下载优先使用 HTTPS enclosure）
+> 最后更新：2026-07-21（合集列表显示相对更新时间）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -118,6 +118,7 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-21 11:02：合集列表 item 改为显示“更新于”相对时间。`Collection` 模型补齐 `updatedAt` 并从 Drift 映射；资源库合集副标题复用现有 `formatTimeAgo` 显示刚刚/分钟前/小时前/天前等；添加/移除音频、重命名、播客成功刷新和官方合集内容同步会刷新合集更新时间，置顶和刷新失败不刷新；补充模型、provider、合集列表、播客和官方同步回归测试。
 - [x] 2026-07-21 07:25：修复 GitHub Actions run 29760958767 的 chatbot carriers 测试断言。`kChatbotUseFakeApi` 已恢复发布默认 false，测试同步改为验证入口开启但走真实流式 API，避免本地联调临时开关污染 CI。
 - [x] 2026-07-21 07:16：AI 聊天助手入口接入 remote config 全球开关。Flutter remote config 新增 `features.aiChatAssistant.enabled`，缺失时默认开启；句子详情页 AI 聊天入口改为编译期开关 `kChatbotEnabled` 与远程开关同时命中才显示，保留本地硬停能力；补充 remote config 解析/provider 和入口门控单测。
 - [x] 2026-07-20 23:28：修复 BBC 等播客音频下载失败提示不透明的问题。RSS 解析优先使用 `ppg:enclosureSecure` HTTPS 音频地址；已落库的 BBC HTTP enclosure 下载前自动升级为 HTTPS；播客单集下载失败 SnackBar 追加具体原因，并记录下载失败 URL、Dio 类型和 HTTP 状态；补充 parser、下载服务和列表项 widget 回归测试。

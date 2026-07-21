@@ -325,6 +325,14 @@
       }
     }
   },
+  "updatedOn": "Updated {date}",
+  "@updatedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "collections": "Collections",
   "collection": "Collection",
   "createCollection": "Create Collection",

@@ -626,6 +626,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String updatedOn(String date) {
+    return '更新于 $date';
+  }
+
+  @override
   String get collections => '合集';
 
   @override

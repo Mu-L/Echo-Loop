@@ -277,6 +277,7 @@
   "back": "返回",
   "ok": "确定",
   "addedOn": "添加于：{date}",
+  "updatedOn": "更新于 {date}",
   "collections": "合集",
   "collection": "合集",
   "createCollection": "创建合集",

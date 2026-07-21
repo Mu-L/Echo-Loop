@@ -637,6 +637,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String updatedOn(String date) {
+    return 'Updated $date';
+  }
+
+  @override
   String get collections => 'Collections';
 
   @override

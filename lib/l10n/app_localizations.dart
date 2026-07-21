@@ -1232,6 +1232,12 @@ abstract class AppLocalizations {
   /// **'Added: {date}'**
   String addedOn(String date);
 
+  /// No description provided for @updatedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {date}'**
+  String updatedOn(String date);
+
   /// No description provided for @collections.
   ///
   /// In en, this message translates to:
