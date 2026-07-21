@@ -20,7 +20,10 @@ class _PodcastTestCollectionList extends TestCollectionList {
   _PodcastTestCollectionList(super.initialState);
 
   @override
-  Future<void> updatePodcastCollection(Collection updated) async {
+  Future<void> updatePodcastCollection(
+    Collection updated, {
+    bool touchUpdatedAt = true,
+  }) async {
     final collections = [...state.rawCollections];
     final index = collections.indexWhere((c) => c.id == updated.id);
     if (index == -1) return;

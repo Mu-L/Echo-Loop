@@ -52,15 +52,18 @@ void main() {
       });
 
       testWidgets('列表视图模式下合集列表正确显示', (tester) async {
+        final updatedAt = DateTime.now().subtract(const Duration(minutes: 5));
         final c1 = createTestCollection(
           id: '1',
           name: 'English Lessons',
           isPinned: true,
+          updatedAt: updatedAt,
         );
         final c2 = createTestCollection(
           id: '2',
           name: 'Podcasts',
           isPinned: false,
+          updatedAt: updatedAt,
         );
 
         await tester.pumpWidget(
@@ -95,6 +98,8 @@ void main() {
         // 音频数量（列表模式下 audioCount 与日期组合显示）
         expect(find.textContaining('2 audios'), findsOneWidget);
         expect(find.textContaining('1 audios'), findsOneWidget);
+        expect(find.textContaining('Updated 5 minutes ago'), findsNWidgets(2));
+        expect(find.textContaining('Added'), findsNothing);
       });
 
       testWidgets('置顶合集使用淡背景色标记', (tester) async {
