@@ -20,8 +20,9 @@ import '../features/auth/screens/password_sign_in_screen.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../features/official_collections/screens/discover_collections_screen.dart';
 import '../features/official_collections/screens/official_collection_detail_screen.dart';
-import '../features/official_collections/screens/official_podcast_list_screen.dart';
-import '../features/official_collections/screens/official_podcast_preview_screen.dart';
+import '../features/podcast/podcast_models.dart';
+import '../features/podcast/screens/podcast_discovery_screen.dart';
+import '../features/podcast/screens/podcast_preview_screen.dart';
 import '../features/onboarding_survey/providers/onboarding_survey_provider.dart';
 import '../features/onboarding_survey/screens/onboarding_survey_screen.dart';
 import '../features/subtitle_editor/subtitle_simple_editor_screen.dart';
@@ -64,9 +65,11 @@ abstract class AppRoutes {
   static const passwordSignIn = '/login/password';
   static const account = '/account';
 
-  static const discoverPodcasts = '/discover/podcasts';
-  static String discoverPodcastPreview(String podcastId) =>
-      '/discover/podcasts/$podcastId';
+  /// Podcast 搜索与订阅统一页（全屏，两个入口共用）。
+  static const podcastSubscribe = '/podcast-subscribe';
+
+  /// Podcast 单集预览页路径段（挂在 [podcastSubscribe] 之下的相对子路由）。
+  static const podcastPreviewSegment = 'preview';
 
   /// 合集详情页路径
   static String collectionDetail(String collectionId) =>
@@ -480,26 +483,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DiscoverCollectionsScreen(),
         routes: [
           GoRoute(
-            path: 'podcasts',
-            parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) => const OfficialPodcastListScreen(),
-            routes: [
-              GoRoute(
-                path: ':podcastId',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) {
-                  final podcastId = state.pathParameters['podcastId']!;
-                  return OfficialPodcastPreviewScreen(podcastId: podcastId);
-                },
-              ),
-            ],
-          ),
-          GoRoute(
             path: ':remoteId',
             parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) {
               final remoteId = state.pathParameters['remoteId']!;
               return OfficialCollectionDetailScreen(remoteId: remoteId);
+            },
+          ),
+        ],
+      ),
+      // Podcast 搜索与订阅统一页（全屏），两个入口共用；单集预览下沉为
+      // 本页嵌套子路由，使 URL 自表达完整栈（§7.17）。
+      GoRoute(
+        path: AppRoutes.podcastSubscribe,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const PodcastDiscoveryScreen(),
+        routes: [
+          GoRoute(
+            path: AppRoutes.podcastPreviewSegment,
+            parentNavigatorKey: rootNavigatorKey,
+            // extra（PodcastPreviewArg）在 Android Activity 重建等重解析场景
+            // 不可序列化 → 可能为 null；此时交由 _RestoredRoutePopper 首帧
+            // 退回已重建的订阅页。
+            builder: (context, state) {
+              final arg = state.extra;
+              if (arg is! PodcastPreviewArg) {
+                return const _RestoredRoutePopper();
+              }
+              return PodcastPreviewScreen(arg: arg);
             },
           ),
         ],

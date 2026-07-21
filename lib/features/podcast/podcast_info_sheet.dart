@@ -7,7 +7,9 @@ library;
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -142,6 +144,42 @@ void showPodcastEpisodeInfoSheet(BuildContext context, AudioItem item) {
   );
 }
 
+/// 展示预览态 podcast 单集（[PodcastEpisode]）的详情（只读）。
+///
+/// 与已入库的 [showPodcastEpisodeInfoSheet] 布局一致，但数据来自 RSS 预览而非
+/// 本地 [AudioItem]，用于订阅前在预览页查看单集标题/摘要/发布时间/下载链接。
+/// [podcastImageUrl] 作为单集无自带封面时的兜底头图。
+void showPodcastPreviewEpisodeSheet(
+  BuildContext context,
+  PodcastEpisode episode, {
+  String? podcastImageUrl,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  final metaParts = <String>[
+    if (episode.pubDate != null)
+      l10n.publishedOn(_formatDate(episode.pubDate!)),
+    if (episode.durationSeconds != null && episode.durationSeconds! > 0)
+      l10n.audioDuration(_formatDuration(episode.durationSeconds!)),
+  ];
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => _InfoSheet(
+      title: l10n.podcastEpisodeMeta,
+      heroTitle: episode.title,
+      heroDescription: episode.description,
+      dateText: metaParts.isEmpty ? null : metaParts.join(' · '),
+      imageUrl: _hasText(episode.imageUrl) ? episode.imageUrl : podcastImageUrl,
+      links: [
+        if (_hasText(episode.link))
+          PodcastInfoLink(l10n.podcastOriginalLink, episode.link!),
+        if (_hasText(episode.enclosureUrl))
+          PodcastInfoLink(l10n.podcastEnclosureUrl, episode.enclosureUrl),
+      ],
+    ),
+  );
+}
+
 PodcastFeedMeta? _decodeMeta(String? raw) {
   if (raw == null || raw.isEmpty) return null;
   try {
@@ -200,6 +238,95 @@ class PodcastInfoLink {
   final String url;
 
   const PodcastInfoLink(this.label, this.url);
+}
+
+/// 匹配正文中的 http/https 链接（到空白为止）。
+final _urlPattern = RegExp(r'https?://[^\s]+');
+
+/// 用外部浏览器打开链接，失败时提示。
+Future<void> _openExternalUrl(BuildContext context, String value) async {
+  final l10n = AppLocalizations.of(context)!;
+  final uri = Uri.tryParse(value);
+  if (uri == null) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.podcastOpenLinkFailed)));
+    return;
+  }
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.podcastOpenLinkFailed)));
+  }
+}
+
+/// 可选中的正文文本，其中的 http/https 链接渲染为可点击（点击外部打开）。
+///
+/// 末尾常见标点（`.,;:!?)]}` 与全角句读）不并入链接，避免把句号带进 URL。
+class _LinkifiedText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+
+  const _LinkifiedText({required this.text, this.style});
+
+  @override
+  State<_LinkifiedText> createState() => _LinkifiedTextState();
+}
+
+class _LinkifiedTextState extends State<_LinkifiedText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+
+    final baseStyle = widget.style;
+    final linkStyle = baseStyle?.copyWith(
+      color: theme.colorScheme.primary,
+      decoration: TextDecoration.underline,
+      decorationColor: theme.colorScheme.primary,
+    );
+
+    final spans = <InlineSpan>[];
+    var index = 0;
+    for (final match in _urlPattern.allMatches(widget.text)) {
+      if (match.start > index) {
+        spans.add(TextSpan(text: widget.text.substring(index, match.start)));
+      }
+      var url = match.group(0)!;
+      var trailing = '';
+      // 把结尾标点从链接里剥出来，避免污染目标 URL。
+      while (url.isNotEmpty && '.,;:!?)]}）】。，、'.contains(url[url.length - 1])) {
+        trailing = url[url.length - 1] + trailing;
+        url = url.substring(0, url.length - 1);
+      }
+      final target = url;
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => _openExternalUrl(context, target);
+      _recognizers.add(recognizer);
+      spans.add(TextSpan(text: url, style: linkStyle, recognizer: recognizer));
+      if (trailing.isNotEmpty) spans.add(TextSpan(text: trailing));
+      index = match.end;
+    }
+    if (index < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(index)));
+    }
+
+    return SelectableText.rich(TextSpan(style: baseStyle, children: spans));
+  }
 }
 
 class _InfoSheet extends StatelessWidget {
@@ -342,8 +469,8 @@ class _InfoHero extends StatelessWidget {
         ),
         if (_hasText(description)) ...[
           const SizedBox(height: AppSpacing.m),
-          SelectableText(
-            description!,
+          _LinkifiedText(
+            text: description!,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               height: 1.35,
@@ -428,77 +555,100 @@ class _LinkRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 主点击打开链接；桌面右键（onSecondaryTapDown）/ 移动端长按
+    // （onLongPressStart）在指针处弹出「复制」菜单，不常驻复制图标。
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => _openLink(context, link.url),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s,
-            vertical: AppSpacing.s,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.link_rounded,
-                size: 20,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      link.label,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      link.url,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.primary,
-                        decoration: TextDecoration.underline,
-                        decorationColor: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
+      child: GestureDetector(
+        onSecondaryTapDown: (d) => _showCopyMenu(context, d.globalPosition),
+        onLongPressStart: (d) => _showCopyMenu(context, d.globalPosition),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _openExternalUrl(context, link.url),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s,
+              vertical: AppSpacing.s,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.link_rounded,
+                  size: 20,
+                  color: theme.colorScheme.primary,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Icon(
-                Icons.open_in_new_rounded,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        link.label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        link.url,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                          decorationColor: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Icon(
+                  Icons.open_in_new_rounded,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _openLink(BuildContext context, String value) async {
+  /// 在 [position]（全局坐标）弹出仅含「复制」的上下文菜单。
+  Future<void> _showCopyMenu(BuildContext context, Offset position) async {
     final l10n = AppLocalizations.of(context)!;
-    final uri = Uri.tryParse(value);
-    if (uri == null) {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'copy',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.copy_rounded, size: 18),
+              const SizedBox(width: AppSpacing.s),
+              Text(l10n.copy),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (selected == 'copy' && context.mounted) {
+      await Clipboard.setData(ClipboardData(text: link.url));
+      if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.podcastOpenLinkFailed)));
-      return;
-    }
-
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.podcastOpenLinkFailed)));
+      ).showSnackBar(SnackBar(content: Text(l10n.linkCopied)));
     }
   }
 }

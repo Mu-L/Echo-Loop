@@ -41,7 +41,7 @@ final podcastPreviewServiceProvider = Provider<PodcastPreviewService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PodcastPreviewServiceRef = ProviderRef<PodcastPreviewService>;
-String _$podcastPreviewHash() => r'102dfad34486133b51ae29ef392db6a039e21013';
+String _$podcastPreviewHash() => r'da4544329963232118faedcadcfadc7904702d0d';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -64,33 +64,45 @@ class _SystemHash {
   }
 }
 
-/// 拉取单个精选 Podcast 的 RSS 预览。
+/// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+///
+/// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+/// 天然按来源缓存并防竞态。
 ///
 /// Copied from [podcastPreview].
 @ProviderFor(podcastPreview)
 const podcastPreviewProvider = PodcastPreviewFamily();
 
-/// 拉取单个精选 Podcast 的 RSS 预览。
+/// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+///
+/// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+/// 天然按来源缓存并防竞态。
 ///
 /// Copied from [podcastPreview].
 class PodcastPreviewFamily extends Family<AsyncValue<PodcastPreviewData>> {
-  /// 拉取单个精选 Podcast 的 RSS 预览。
+  /// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+  ///
+  /// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+  /// 天然按来源缓存并防竞态。
   ///
   /// Copied from [podcastPreview].
   const PodcastPreviewFamily();
 
-  /// 拉取单个精选 Podcast 的 RSS 预览。
+  /// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+  ///
+  /// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+  /// 天然按来源缓存并防竞态。
   ///
   /// Copied from [podcastPreview].
-  PodcastPreviewProvider call(String podcastId) {
-    return PodcastPreviewProvider(podcastId);
+  PodcastPreviewProvider call(String inputUrl) {
+    return PodcastPreviewProvider(inputUrl);
   }
 
   @override
   PodcastPreviewProvider getProviderOverride(
     covariant PodcastPreviewProvider provider,
   ) {
-    return call(provider.podcastId);
+    return call(provider.inputUrl);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -108,17 +120,23 @@ class PodcastPreviewFamily extends Family<AsyncValue<PodcastPreviewData>> {
   String? get name => r'podcastPreviewProvider';
 }
 
-/// 拉取单个精选 Podcast 的 RSS 预览。
+/// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+///
+/// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+/// 天然按来源缓存并防竞态。
 ///
 /// Copied from [podcastPreview].
 class PodcastPreviewProvider
     extends AutoDisposeFutureProvider<PodcastPreviewData> {
-  /// 拉取单个精选 Podcast 的 RSS 预览。
+  /// 由订阅输入 URL 拉取单个 Podcast 的 RSS 预览。
+  ///
+  /// [inputUrl] 为 RSS 或 Apple Podcasts 链接，同时用作 family key，
+  /// 天然按来源缓存并防竞态。
   ///
   /// Copied from [podcastPreview].
-  PodcastPreviewProvider(String podcastId)
+  PodcastPreviewProvider(String inputUrl)
     : this._internal(
-        (ref) => podcastPreview(ref as PodcastPreviewRef, podcastId),
+        (ref) => podcastPreview(ref as PodcastPreviewRef, inputUrl),
         from: podcastPreviewProvider,
         name: r'podcastPreviewProvider',
         debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -127,7 +145,7 @@ class PodcastPreviewProvider
         dependencies: PodcastPreviewFamily._dependencies,
         allTransitiveDependencies:
             PodcastPreviewFamily._allTransitiveDependencies,
-        podcastId: podcastId,
+        inputUrl: inputUrl,
       );
 
   PodcastPreviewProvider._internal(
@@ -137,10 +155,10 @@ class PodcastPreviewProvider
     required super.allTransitiveDependencies,
     required super.debugGetCreateSourceHash,
     required super.from,
-    required this.podcastId,
+    required this.inputUrl,
   }) : super.internal();
 
-  final String podcastId;
+  final String inputUrl;
 
   @override
   Override overrideWith(
@@ -155,7 +173,7 @@ class PodcastPreviewProvider
         dependencies: null,
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
-        podcastId: podcastId,
+        inputUrl: inputUrl,
       ),
     );
   }
@@ -167,13 +185,13 @@ class PodcastPreviewProvider
 
   @override
   bool operator ==(Object other) {
-    return other is PodcastPreviewProvider && other.podcastId == podcastId;
+    return other is PodcastPreviewProvider && other.inputUrl == inputUrl;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
-    hash = _SystemHash.combine(hash, podcastId.hashCode);
+    hash = _SystemHash.combine(hash, inputUrl.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -182,8 +200,8 @@ class PodcastPreviewProvider
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 mixin PodcastPreviewRef on AutoDisposeFutureProviderRef<PodcastPreviewData> {
-  /// The parameter `podcastId` of this provider.
-  String get podcastId;
+  /// The parameter `inputUrl` of this provider.
+  String get inputUrl;
 }
 
 class _PodcastPreviewProviderElement
@@ -192,7 +210,7 @@ class _PodcastPreviewProviderElement
   _PodcastPreviewProviderElement(super.provider);
 
   @override
-  String get podcastId => (origin as PodcastPreviewProvider).podcastId;
+  String get inputUrl => (origin as PodcastPreviewProvider).inputUrl;
 }
 
 // ignore_for_file: type=lint

@@ -77,6 +77,43 @@ class PodcastSearchResult {
   });
 }
 
+/// 播客预览页入参（承载展示信息 + 订阅所需 URL）。
+///
+/// 让「精选播客（CatalogPodcast）/ Apple 搜索结果（PodcastSearchResult）/
+/// 用户粘贴链接」三种来源共用同一预览页与订阅主干：
+/// - 展示字段（[title]/[imageUrl]/[description]/[author]）供 header 首帧渲染，
+///   feed 拉取成功后再用 [PodcastFeedMeta] 覆盖。
+/// - [subscriptionInputUrl] 作为订阅输入 URL（交给 `createAndFetch`）与预览
+///   provider 的 family key：RSS 优先，否则 Apple 链接。
+class PodcastPreviewArg {
+  final String title;
+  final String? imageUrl;
+  final String? description;
+  final String? author;
+
+  /// 已知 RSS feed 地址（catalog.rssUrl / search.feedUrl / 解析后的用户链接）。
+  final String? feedUrl;
+
+  /// Apple Podcasts 网页地址（catalog / search），无 RSS 时用于解析。
+  final String? applePodcastUrl;
+
+  const PodcastPreviewArg({
+    required this.title,
+    this.imageUrl,
+    this.description,
+    this.author,
+    this.feedUrl,
+    this.applePodcastUrl,
+  });
+
+  /// 订阅输入 URL / 预览 provider family key：RSS 优先，否则 Apple。
+  String get subscriptionInputUrl {
+    final feed = feedUrl?.trim() ?? '';
+    if (feed.isNotEmpty) return feed;
+    return applePodcastUrl?.trim() ?? '';
+  }
+}
+
 /// 单个 podcast episode
 class PodcastEpisode {
   final String guid;

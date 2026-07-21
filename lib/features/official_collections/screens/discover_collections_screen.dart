@@ -137,7 +137,7 @@ class _DiscoverCollectionsScreenState
         if (hasPodcastEntry && index == 0) {
           return _PodcastDiscoverEntry(
             count: podcasts.length,
-            onTap: () => context.push(AppRoutes.discoverPodcasts),
+            onTap: () => context.push(AppRoutes.podcastSubscribe),
           );
         }
         final item = items[index - (hasPodcastEntry ? 1 : 0)];
