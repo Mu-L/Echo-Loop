@@ -20,7 +20,8 @@ import '../providers/official_enrollment_provider.dart';
 import '../widgets/official_collection_card.dart';
 
 const _logTag = 'DiscoverScreen';
-const _podcastEntryImageUrl = 'https://i.postimg.cc/tRPzG4zX/podcast.jpg';
+const _podcastEntryImageUrl =
+    'https://i.postimg.cc/t4fTVSWw/Apple-Podcasts.png';
 
 /// 发现官方合集页。
 ///

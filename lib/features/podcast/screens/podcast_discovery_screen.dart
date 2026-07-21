@@ -171,7 +171,11 @@ class _PodcastDiscoveryScreenState
                   feedUrl: meta.feedUrl,
                 ),
               ),
-              onSubscribe: () => _subscribe(url, meta.feedUrl),
+              onSubscribe: () => _subscribe(
+                inputUrl: url,
+                id: meta.feedUrl,
+                knownFeedUrl: meta.feedUrl,
+              ),
               onGoLearn: () {
                 if (local != null) _goLearn(local.id);
               },
@@ -219,8 +223,13 @@ class _PodcastDiscoveryScreenState
               applePodcastUrl: podcast.applePodcastUrl,
             ),
           ),
-          onSubscribe: () =>
-              _subscribe(podcast.subscriptionInputUrl, podcast.id),
+          onSubscribe: () => _subscribe(
+            inputUrl: podcast.applePodcastUrl.trim().isNotEmpty
+                ? podcast.applePodcastUrl
+                : podcast.subscriptionInputUrl,
+            id: podcast.id,
+            knownFeedUrl: podcast.rssUrl,
+          ),
           onGoLearn: () {
             if (local != null) _goLearn(local.id);
           },
@@ -261,7 +270,14 @@ class _PodcastDiscoveryScreenState
                   applePodcastUrl: r.applePodcastUrl,
                 ),
               ),
-              onSubscribe: () => _subscribe(r.feedUrl, r.id),
+              onSubscribe: () {
+                final appleUrl = r.applePodcastUrl?.trim() ?? '';
+                _subscribe(
+                  inputUrl: appleUrl.isNotEmpty ? appleUrl : r.feedUrl,
+                  id: r.id,
+                  knownFeedUrl: r.feedUrl,
+                );
+              },
               onGoLearn: () {
                 if (local != null) _goLearn(local.id);
               },
@@ -285,7 +301,11 @@ class _PodcastDiscoveryScreenState
   ///
   /// collectionListProvider 更新会使 tile 自动翻成「去学习」，故不导航。
   /// 用 [id] 驱动对应 tile 的 loading，防竞态。
-  Future<void> _subscribe(String url, String id) async {
+  Future<void> _subscribe({
+    required String inputUrl,
+    required String id,
+    String? knownFeedUrl,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     if (_subscribingIds.contains(id)) return;
 
@@ -299,7 +319,9 @@ class _PodcastDiscoveryScreenState
 
     setState(() => _subscribingIds.add(id));
     try {
-      await ref.read(podcastRepositoryProvider).createAndFetch(url);
+      await ref
+          .read(podcastRepositoryProvider)
+          .createAndFetch(inputUrl, knownFeedUrl: knownFeedUrl);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

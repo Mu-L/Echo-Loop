@@ -164,6 +164,7 @@ class PodcastCover extends StatelessWidget {
       ),
       child: Icon(
         Icons.podcasts_rounded,
+        size: size * 0.48,
         color: theme.colorScheme.onSecondaryContainer,
       ),
     );
@@ -175,6 +176,7 @@ class PodcastCover extends StatelessWidget {
         child: imageUrl == null || imageUrl!.isEmpty
             ? placeholder
             : CachedNetworkImage(
+                key: ValueKey<String>('podcast-cover-$imageUrl'),
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => placeholder,

@@ -8,6 +8,11 @@ class PodcastFeedMeta {
   final String? description;
   final String? imageUrl;
   final String feedUrl;
+  final List<String> categories;
+  final String? language;
+  final String? copyright;
+  final String? websiteUrl;
+  final String? explicit;
 
   const PodcastFeedMeta({
     required this.title,
@@ -15,6 +20,11 @@ class PodcastFeedMeta {
     this.author,
     this.description,
     this.imageUrl,
+    this.categories = const [],
+    this.language,
+    this.copyright,
+    this.websiteUrl,
+    this.explicit,
   });
 
   Map<String, dynamic> toJson() => {
@@ -23,6 +33,11 @@ class PodcastFeedMeta {
     'description': description,
     'imageUrl': imageUrl,
     'feedUrl': feedUrl,
+    'categories': categories,
+    'language': language,
+    'copyright': copyright,
+    'websiteUrl': websiteUrl,
+    'explicit': explicit,
   };
 
   factory PodcastFeedMeta.fromJson(Map<String, dynamic> json) =>
@@ -32,6 +47,14 @@ class PodcastFeedMeta {
         author: json['author'] as String?,
         description: json['description'] as String?,
         imageUrl: json['imageUrl'] as String?,
+        categories: switch (json['categories']) {
+          final List<dynamic> raw => raw.whereType<String>().toList(),
+          _ => const <String>[],
+        },
+        language: json['language'] as String?,
+        copyright: json['copyright'] as String?,
+        websiteUrl: json['websiteUrl'] as String?,
+        explicit: json['explicit'] as String?,
       );
 }
 

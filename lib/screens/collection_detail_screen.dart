@@ -4,7 +4,6 @@
 // 支持上传音频到合集。
 import 'dart:convert';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/audio_item.dart';
@@ -21,6 +20,7 @@ import '../widgets/import_audio_sheet.dart';
 import '../features/podcast/podcast_repository.dart';
 import '../features/podcast/podcast_models.dart';
 import '../features/podcast/podcast_info_sheet.dart';
+import '../features/podcast/widgets/podcast_feed_summary_header.dart';
 
 /// 合集详情页面 - 展示合集中的音频，支持上传音频
 class CollectionDetailScreen extends ConsumerStatefulWidget {
@@ -420,63 +420,22 @@ class _PodcastFeedHeader extends StatefulWidget {
 class _PodcastFeedHeaderState extends State<_PodcastFeedHeader> {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final meta = _decodeMeta(widget.collection.podcastMetaJson);
     final imageUrl = meta?.imageUrl ?? widget.collection.coverUrl;
     final description = meta?.description ?? widget.collection.description;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => showPodcastFeedInfoSheet(
-          context,
+    return PodcastFeedSummaryHeader(
+      imageUrl: imageUrl,
+      description: description,
+      moreLabel: l10n.podcastShowMore,
+      onTap: () => showPodcastFeedInfoSheet(
+        context,
+        widget.collection,
+        refreshStatusText: _podcastRefreshStatusText(
+          l10n,
           widget.collection,
-          refreshStatusText: _podcastRefreshStatusText(
-            l10n,
-            widget.collection,
-            widget.refreshState,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.m,
-            AppSpacing.s,
-            AppSpacing.m,
-            AppSpacing.s,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PodcastCover(imageUrl: imageUrl),
-              const SizedBox(width: AppSpacing.m),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (description != null && description.isNotEmpty) ...[
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                    ],
-                    Text(
-                      l10n.podcastShowMore,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          widget.refreshState,
         ),
       ),
     );
@@ -489,43 +448,6 @@ class _PodcastFeedHeaderState extends State<_PodcastFeedHeader> {
     } catch (_) {
       return null;
     }
-  }
-}
-
-class _PodcastCover extends StatelessWidget {
-  final String? imageUrl;
-
-  const _PodcastCover({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final placeholder = DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(
-        Icons.podcasts_rounded,
-        color: theme.colorScheme.onPrimaryContainer,
-      ),
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: imageUrl == null || imageUrl!.isEmpty
-            ? placeholder
-            : CachedNetworkImage(
-                imageUrl: imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => placeholder,
-                errorWidget: (_, __, ___) => placeholder,
-              ),
-      ),
-    );
   }
 }
 

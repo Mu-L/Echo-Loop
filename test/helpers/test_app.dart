@@ -380,6 +380,11 @@ GoRouter createTestRouter(Widget screen) {
         builder: (context, state) => const Scaffold(body: Text('Paywall')),
       ),
       GoRoute(
+        path: '/podcast-subscribe',
+        builder: (context, state) =>
+            const Scaffold(body: Text('Podcast Subscribe')),
+      ),
+      GoRoute(
         path: '/sentence-detail',
         builder: (context, state) =>
             const Scaffold(body: Text('Sentence Detail')),

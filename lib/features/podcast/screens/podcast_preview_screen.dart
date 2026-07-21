@@ -22,6 +22,7 @@ import '../podcast_info_sheet.dart';
 import '../podcast_models.dart';
 import '../podcast_preview_provider.dart';
 import '../podcast_repository.dart';
+import '../widgets/podcast_feed_summary_header.dart';
 import '../widgets/podcast_subscribe_tile.dart';
 
 class PodcastPreviewScreen extends ConsumerStatefulWidget {
@@ -98,7 +99,8 @@ class _PodcastPreviewScreenState extends ConsumerState<PodcastPreviewScreen> {
         ],
       ),
       data: (data) {
-        // 单集封面兜底：单集无自带头图时用播客封面。
+        // 单集封面兜底：单集无自带头图时用播客封面，优先入参原始封面
+        // （与 header 一致，避免 feed 图不可用时退回默认占位图）。
         final cover = (data.meta.imageUrl?.isNotEmpty ?? false)
             ? data.meta.imageUrl
             : _arg.imageUrl;
@@ -215,7 +217,13 @@ class _PodcastPreviewScreenState extends ConsumerState<PodcastPreviewScreen> {
 
     setState(() => _subscribing = true);
     try {
-      await ref.read(podcastRepositoryProvider).createAndFetch(_inputUrl);
+      final appleUrl = _arg.applePodcastUrl?.trim() ?? '';
+      await ref
+          .read(podcastRepositoryProvider)
+          .createAndFetch(
+            appleUrl.isNotEmpty ? appleUrl : _inputUrl,
+            knownFeedUrl: _arg.feedUrl,
+          );
       if (!mounted) return;
       // 订阅成功后停留在本页：collectionListProvider 更新会使 CTA/单集自动
       // 翻成「去学习」，仅提示成功、不导航。
@@ -270,81 +278,63 @@ class _PodcastPreviewHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final meta = ref
         .watch(podcastPreviewProvider(arg.subscriptionInputUrl))
         .valueOrNull
         ?.meta;
-    final title = meta?.title.isNotEmpty == true ? meta!.title : arg.title;
     final description = meta?.description ?? arg.description;
-    final imageUrl = meta?.imageUrl ?? arg.imageUrl;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showPodcastInfo(context, meta),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.m,
-            AppSpacing.m,
-            AppSpacing.m,
-            AppSpacing.s,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PodcastCover(imageUrl: imageUrl, size: 72),
-              const SizedBox(width: AppSpacing.m),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleLarge,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if ((description ?? '').isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        description!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.25,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      l10n.podcastShowMore,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    // RSS 加载完成后优先使用 feed 图，避免详情页和已订阅合集继续停在
+    // 搜索/catalog 占位图；RSS 缺图时再回退到入参图。
+    final imageUrl = (meta?.imageUrl?.isNotEmpty ?? false)
+        ? meta?.imageUrl
+        : arg.imageUrl;
+    return PodcastFeedSummaryHeader(
+      imageUrl: imageUrl,
+      description: description,
+      moreLabel: l10n.podcastShowMore,
+      onTap: () => _showPodcastInfo(context, meta),
     );
   }
 
   void _showPodcastInfo(BuildContext context, PodcastFeedMeta? meta) {
     final l10n = AppLocalizations.of(context)!;
+    if (meta != null) {
+      showPodcastFeedMetaInfoSheet(
+        context,
+        meta: meta,
+        applePodcastUrl: arg.applePodcastUrl,
+        fallbackImageUrl: arg.imageUrl,
+      );
+      return;
+    }
     final applePodcastUrl = arg.applePodcastUrl?.trim() ?? '';
-    final feedUrl = meta?.feedUrl ?? arg.feedUrl?.trim() ?? '';
+    final feedUrl = arg.feedUrl?.trim() ?? '';
+    final fallbackMeta = feedUrl.isEmpty
+        ? null
+        : PodcastFeedMeta(
+            title: arg.title,
+            feedUrl: feedUrl,
+            author: arg.author,
+            description: arg.description,
+            imageUrl: arg.imageUrl,
+          );
+    if (fallbackMeta != null) {
+      showPodcastFeedMetaInfoSheet(
+        context,
+        meta: fallbackMeta,
+        applePodcastUrl: arg.applePodcastUrl,
+        fallbackImageUrl: arg.imageUrl,
+      );
+      return;
+    }
     showPodcastInfoSheet(
       context,
       title: l10n.podcastDetails,
-      heroTitle: meta?.title.isNotEmpty == true ? meta!.title : arg.title,
-      heroAuthor: meta?.author ?? arg.author,
-      heroDescription: meta?.description ?? arg.description,
-      imageUrl: meta?.imageUrl ?? arg.imageUrl,
+      heroTitle: arg.title,
+      heroAuthor: arg.author,
+      heroDescription: arg.description,
+      imageUrl: arg.imageUrl,
       links: [
         if (applePodcastUrl.isNotEmpty)
           PodcastInfoLink(l10n.podcastAppleLink, applePodcastUrl),

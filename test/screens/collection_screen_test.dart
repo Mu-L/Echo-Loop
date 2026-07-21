@@ -3,7 +3,6 @@
 // 测试资源库页面的合集视图渲染和交互。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:echo_loop/features/official_collections/providers/discover_podcasts_provider.dart';
 import 'package:echo_loop/models/collection.dart';
 import 'package:echo_loop/screens/library_screen.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
@@ -189,16 +188,8 @@ void main() {
         expect(find.text('Collection Name'), findsOneWidget);
       });
 
-      testWidgets('创建合集和订阅 Podcast 表单弱化输入提示样式', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(
-            const LibraryScreen(),
-            // 精选 catalog 置空，避免订阅面板落到 null → 无限 spinner
-            overrides: [
-              discoverPodcastsProvider.overrideWith((ref) => const []),
-            ],
-          ),
-        );
+      testWidgets('创建本地合集表单弱化输入提示样式', (tester) async {
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         await tester.tap(find.byIcon(Icons.add).first);
@@ -234,34 +225,6 @@ void main() {
           localField.decoration?.contentPadding,
           const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         );
-
-        await tester.tap(find.byIcon(Icons.arrow_back));
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey('collection-option-podcast')),
-        );
-        await tester.pumpAndSettle();
-
-        final podcastField = tester.widget<TextField>(find.byType(TextField));
-        final podcastContext = tester.element(find.byType(TextField));
-        final podcastTheme = Theme.of(podcastContext);
-
-        expect(
-          podcastField.style?.fontSize,
-          podcastTheme.textTheme.bodyMedium?.fontSize,
-        );
-        expect(
-          podcastField.decoration?.hintStyle?.fontSize,
-          podcastTheme.textTheme.bodyMedium?.fontSize,
-        );
-        expect(
-          podcastField.decoration?.hintStyle?.color,
-          podcastTheme.colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
-        );
-        expect(
-          podcastField.decoration?.floatingLabelStyle?.color,
-          podcastTheme.colorScheme.primary.withValues(alpha: 0.78),
-        );
       });
 
       testWidgets('创建合集时空名称时 Add 按钮禁用', (tester) async {
@@ -290,15 +253,8 @@ void main() {
         expect(enabledButton.onPressed, isNotNull);
       });
 
-      testWidgets('订阅 Podcast 使用同一个底部 sheet 表单', (tester) async {
-        await tester.pumpWidget(
-          createTestScreen(
-            const LibraryScreen(),
-            overrides: [
-              discoverPodcastsProvider.overrideWith((ref) => const []),
-            ],
-          ),
-        );
+      testWidgets('点击「订阅 Podcast」关闭 sheet 并进入统一订阅页', (tester) async {
+        await tester.pumpWidget(createTestScreen(const LibraryScreen()));
         await tester.pumpAndSettle();
 
         await tester.tap(find.byIcon(Icons.add).first);
@@ -308,11 +264,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-        // 面板改为搜索框：label 为搜索提示，标题仍是「Subscribe Podcast」
-        expect(find.text('Search podcasts or paste a link'), findsOneWidget);
-        expect(find.text('Subscribe Podcast'), findsOneWidget);
-        expect(find.byType(AlertDialog), findsNothing);
+        // sheet 关闭并跳转到统一的 Podcast 搜索与订阅页（stub）。
+        expect(find.text('Podcast Subscribe'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('collection-option-podcast')),
+          findsNothing,
+        );
       });
 
       testWidgets('点击排序按钮显示排序选项', (tester) async {

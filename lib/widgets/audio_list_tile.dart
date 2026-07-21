@@ -3,6 +3,7 @@
 // 统一的音频列表项，同时用于资源库全局列表和合集详情页。
 // 通过 collectionId 参数区分两种上下文，自动调整菜单、路由和显示逻辑。
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +33,7 @@ import 'dialogs/text_input_dialog.dart';
 import '../features/audio_import/audio_import_models.dart';
 import '../features/audio_import/audio_import_provider.dart';
 import '../features/podcast/podcast_info_sheet.dart';
+import '../features/podcast/podcast_models.dart';
 
 /// 音频列表项 — 资源库全局列表和合集详情页共用
 ///
@@ -884,11 +886,44 @@ class AudioListTile extends ConsumerWidget {
                 .read(audioLibraryProvider.notifier)
                 .deleteDownloadedAudio(audioItem.id);
           } else if (value == 'podcastEpisodeInfo') {
-            showPodcastEpisodeInfoSheet(context, _latestAudioItem(ref));
+            showPodcastEpisodeInfoSheet(
+              context,
+              _latestAudioItem(ref),
+              podcastImageUrl: _podcastFeedImageUrl(ref),
+            );
           }
         },
       ),
     );
+  }
+
+  String? _podcastFeedImageUrl(WidgetRef ref) {
+    final state = ref.read(collectionListProvider);
+    final candidateIds = <String>[
+      if (collectionId case final id?) id,
+      ...?state.audioToCollectionsMap[audioItem.id],
+    ];
+    for (final id in candidateIds) {
+      final collection = state.rawCollections
+          .where((c) => c.id == id && c.isPodcast)
+          .firstOrNull;
+      if (collection == null) continue;
+      final meta = _decodePodcastMeta(collection.podcastMetaJson);
+      final imageUrl = meta?.imageUrl ?? collection.coverUrl;
+      if (imageUrl != null && imageUrl.trim().isNotEmpty) return imageUrl;
+    }
+    return null;
+  }
+
+  PodcastFeedMeta? _decodePodcastMeta(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      return PodcastFeedMeta.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 从 provider 读取当前最新 AudioItem，避免下载完成后 widget 仍持有旧对象。

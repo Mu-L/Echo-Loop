@@ -113,12 +113,9 @@ void main() {
       expect(AppRoutes.pdfPreviewSegment, 'pdf-preview');
     });
 
-    test('发现播客路径正确', () {
-      expect(AppRoutes.discoverPodcasts, '/discover/podcasts');
-      expect(
-        AppRoutes.discoverPodcastPreview('podcast-1'),
-        '/discover/podcasts/podcast-1',
-      );
+    test('Podcast 搜索订阅页与预览子路由段正确', () {
+      expect(AppRoutes.podcastSubscribe, '/podcast-subscribe');
+      expect(AppRoutes.podcastPreviewSegment, 'preview');
     });
   });
 
