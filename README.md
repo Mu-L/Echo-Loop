@@ -200,11 +200,8 @@ flowchart LR
 <table>
   <tr>
     <td valign="middle" align="center" width="140">
-      <img src="assets/qr/wechat-group.jpg" alt="微信群二维码" width="110" /><br/>
-      <sub>扫码加入微信群</sub>
-    </td>
-    <td valign="middle">
-      <p><sub>二维码过期或群已满 200 人后请先加微信 <code>echo-loop-app</code>，由群主拉你进群。</sub></p>
+      <img src="assets/qr/xiaohongshu.jpg" alt="小红书二维码" width="110" /><br/>
+      <sub>扫码关注小红书</sub>
     </td>
   </tr>
 </table>
