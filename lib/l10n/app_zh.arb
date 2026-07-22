@@ -310,7 +310,7 @@
       "date": {"type": "String"}
     }
   },
-  "discoverEntryTitleA": "发现精选资源",
+  "discoverEntryTitleA": "发现资源",
   "discoverEntrySubtitleA": "播客 · 托福 · 雅思 · 专四专八，教材...",
   "officialCollectionEmpty": "该合集暂无音频",
   "sortCollections": "排序",
@@ -1432,7 +1432,7 @@
   "discoverEmpty": "暂无精选合集",
   "discoverLoadFailed": "加载失败，点击重试",
   "discoverRetry": "重试",
-  "discoverPodcastEntryTitle": "精选播客",
+  "discoverPodcastEntryTitle": "播客",
   "discoverPodcastEntrySubtitle": "共 {count} 个播客，订阅后可自动获取最新单集",
   "@discoverPodcastEntrySubtitle": {
     "placeholders": {

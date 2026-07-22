@@ -1403,7 +1403,7 @@ abstract class AppLocalizations {
   /// No description provided for @discoverEntryTitleA.
   ///
   /// In en, this message translates to:
-  /// **'Discover Curated Resources'**
+  /// **'Discover Resources'**
   String get discoverEntryTitleA;
 
   /// No description provided for @discoverEntrySubtitleA.
@@ -6125,7 +6125,7 @@ abstract class AppLocalizations {
   /// No description provided for @discoverPodcastEntryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Curated Podcasts'**
+  /// **'Podcasts'**
   String get discoverPodcastEntryTitle;
 
   /// No description provided for @discoverPodcastEntrySubtitle.

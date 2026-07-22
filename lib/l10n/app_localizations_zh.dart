@@ -720,7 +720,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get discoverEntryTitleA => '发现精选资源';
+  String get discoverEntryTitleA => '发现资源';
 
   @override
   String get discoverEntrySubtitleA => '播客 · 托福 · 雅思 · 专四专八，教材...';
@@ -3369,7 +3369,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverRetry => '重试';
 
   @override
-  String get discoverPodcastEntryTitle => '精选播客';
+  String get discoverPodcastEntryTitle => '播客';
 
   @override
   String discoverPodcastEntrySubtitle(int count) {

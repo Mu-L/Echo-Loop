@@ -732,7 +732,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get discoverEntryTitleA => 'Discover Curated Resources';
+  String get discoverEntryTitleA => 'Discover Resources';
 
   @override
   String get discoverEntrySubtitleA =>
@@ -3519,7 +3519,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverRetry => 'Retry';
 
   @override
-  String get discoverPodcastEntryTitle => 'Curated Podcasts';
+  String get discoverPodcastEntryTitle => 'Podcasts';
 
   @override
   String discoverPodcastEntrySubtitle(int count) {

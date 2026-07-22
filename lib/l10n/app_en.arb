@@ -386,7 +386,7 @@
       "date": {"type": "String"}
     }
   },
-  "discoverEntryTitleA": "Discover Curated Resources",
+  "discoverEntryTitleA": "Discover Resources",
   "discoverEntrySubtitleA": "Podcasts · TOEFL · IELTS · TEM, textbooks...",
   "officialCollectionEmpty": "This collection has no audios yet",
   "sortCollections": "Sort",
@@ -1906,7 +1906,7 @@
   "discoverEmpty": "No curated collections yet",
   "discoverLoadFailed": "Failed to load, tap to retry",
   "discoverRetry": "Retry",
-  "discoverPodcastEntryTitle": "Curated Podcasts",
+  "discoverPodcastEntryTitle": "Podcasts",
   "discoverPodcastEntrySubtitle": "{count} podcasts. Subscribe to keep new episodes in your library.",
   "@discoverPodcastEntrySubtitle": {
     "placeholders": {
