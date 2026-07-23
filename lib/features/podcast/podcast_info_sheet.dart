@@ -58,6 +58,7 @@ void showPodcastFeedInfoSheet(
           heroAuthor: meta?.author,
           heroDescription: description,
           imageUrl: imageUrl,
+          refreshStatusText: refreshStatusText,
           metadata: _feedMetadata(l10n, meta),
           links: [
             if (_isApplePodcastUrl(current.podcastInputUrl))
