@@ -243,6 +243,62 @@ void main() {
     expect(e, isNull);
   });
 
+  test('force=true：请求携带 ?force=1', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => resp({
+        'isPremium': false,
+        'entitlementIds': <String>[],
+        'productId': null,
+        'expiresAtMs': null,
+      }),
+    );
+
+    await repo.fetchRemote(userId: 'u1', accessToken: 't', force: true);
+
+    final captured = verify(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        queryParameters: captureAny(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).captured.single;
+    expect(captured, {'force': '1'});
+  });
+
+  test('默认（force=false）：请求不带 force 参数', () async {
+    when(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).thenAnswer(
+      (_) async => resp({
+        'isPremium': false,
+        'entitlementIds': <String>[],
+        'productId': null,
+        'expiresAtMs': null,
+      }),
+    );
+
+    await repo.fetchRemote(userId: 'u1', accessToken: 't');
+
+    final captured = verify(
+      () => dio.get<Map<String, dynamic>>(
+        '/api/entitlements',
+        queryParameters: captureAny(named: 'queryParameters'),
+        options: any(named: 'options'),
+      ),
+    ).captured.single;
+    expect(captured, isNull);
+  });
+
   test('fetchRemote：GET /api/entitlements 携带 Bearer token', () async {
     when(
       () => dio.get<Map<String, dynamic>>(

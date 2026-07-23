@@ -166,6 +166,11 @@ class RevenueCatPurchaseService implements PurchaseService {
       if (code == PurchasesErrorCode.purchaseCancelledError) {
         throw PurchaseException('用户取消恢复', cancelled: true);
       }
+      if (code == PurchasesErrorCode.receiptAlreadyInUseError) {
+        // 收据属其他 RC 订阅者：交由上层回源后端确认真实会员态，不当「购买失败」。
+        AppLogger.log('Subscription', 'restore 收据被占用 msg=${e.message}');
+        throw PurchaseException(e.message ?? '收据已被占用', receiptInUse: true);
+      }
       AppLogger.log('Subscription', 'restore 失败 code=$code msg=${e.message}');
       throw PurchaseException(e.message ?? '恢复失败');
     }

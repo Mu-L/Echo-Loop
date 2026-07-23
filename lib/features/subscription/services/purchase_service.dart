@@ -15,6 +15,7 @@ class PurchaseException implements Exception {
     this.message, {
     this.cancelled = false,
     this.ownershipConflict = false,
+    this.receiptInUse = false,
   });
 
   /// 错误描述。
@@ -26,10 +27,15 @@ class PurchaseException implements Exception {
   /// 是否为恢复购买时发现订阅归属于另一个 App User ID。
   final bool ownershipConflict;
 
+  /// 收据已被其他 RevenueCat 订阅者占用（receiptAlreadyInUseError）。
+  /// 本账号可能已被后端判为会员（如 Paddle 订阅），调用方应转回源确认，
+  /// 而不是当作「购买失败」。
+  final bool receiptInUse;
+
   @override
   String toString() =>
       'PurchaseException($message, cancelled: $cancelled, '
-      'ownershipConflict: $ownershipConflict)';
+      'ownershipConflict: $ownershipConflict, receiptInUse: $receiptInUse)';
 }
 
 /// 恢复购买结果。

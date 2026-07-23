@@ -14,6 +14,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:echo_loop/database/app_database.dart' as db;
 import 'package:echo_loop/database/providers.dart';
 import 'package:echo_loop/features/audio_import/audio_finalization_service.dart';
+import 'package:echo_loop/features/subscription/providers/subscription_controller.dart'
+    show entitlementQuotaDivergenceHandlerProvider;
 import 'package:echo_loop/features/audio_import/audio_import_models.dart';
 import 'package:echo_loop/models/audio_item.dart';
 import 'package:echo_loop/models/word_timestamp.dart';
@@ -103,6 +105,7 @@ ProviderContainer _createContainer({
   MockSubtitleAutoAlignService? mockAutoAlignService,
   AudioFinalizationService? finalizationService,
   List<AudioItem>? audioItems,
+  void Function(String context)? quotaDivergenceHandler,
 }) {
   final overrides = <Override>[
     transcriptionApiClientProvider.overrideWithValue(mockApi),
@@ -111,6 +114,10 @@ ProviderContainer _createContainer({
     audioLibraryProvider.overrideWith(TestAudioLibrary.new),
     // 避免测试触达 SharedPreferences（需要 Flutter binding）。
     appSettingsProvider.overrideWith(() => _FakeAppSettings()),
+    // 避免 402 路径实例化真实订阅栈（E7 收敛信号在测试中默认 no-op）。
+    entitlementQuotaDivergenceHandlerProvider.overrideWithValue(
+      quotaDivergenceHandler ?? (_) {},
+    ),
     analyticsOverride(),
   ];
   if (finalizationService != null) {
@@ -525,11 +532,13 @@ void main() {
         ),
       );
 
+      final quotaSignals = <String>[];
       final container = _createContainer(
         mockApi: mockApi,
         mockFileOps: mockFileOps,
         database: database,
         audioItems: [audioItem],
+        quotaDivergenceHandler: quotaSignals.add,
       );
       await _seedAudioRows(database, [audioItem]);
       final notifier = container.read(
@@ -542,6 +551,8 @@ void main() {
         notifier.getTaskState('test-audio-1'),
         isA<TranscriptionQuotaExceeded>(),
       );
+      // E7：402 触发权益分歧收敛信号。
+      expect(quotaSignals, ['transcription']);
       container.dispose();
     });
 

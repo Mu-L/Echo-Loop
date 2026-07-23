@@ -15,6 +15,8 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../database/providers.dart';
 import '../features/audio_import/audio_finalization_service.dart';
+import '../features/subscription/providers/subscription_controller.dart'
+    show entitlementQuotaDivergenceHandlerProvider;
 import '../models/audio_item.dart';
 import '../models/word_timestamp.dart';
 import '../providers/audio_library_provider.dart';
@@ -268,6 +270,8 @@ class TranscriptionTaskManager extends _$TranscriptionTaskManager {
       );
       // 后端本月免费额度用尽 → 交由 UI 引导订阅（区别于普通失败的重试提示）。
       if (e.response?.statusCode == 402) {
+        // E7：后端 402 与本地 premium 分歧时回源对账（handler 内部判 isActive）。
+        ref.read(entitlementQuotaDivergenceHandlerProvider)('transcription');
         _updateState(audioId, const TranscriptionQuotaExceeded());
         return;
       }

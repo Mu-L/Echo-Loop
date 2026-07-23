@@ -1,6 +1,9 @@
 import 'package:echo_loop/config/revenuecat_config.dart';
 import 'package:echo_loop/config/paddle_config.dart';
 import 'package:echo_loop/features/auth/providers/auth_providers.dart';
+import 'package:echo_loop/features/remote_config/remote_config.dart';
+import 'package:echo_loop/features/remote_config/remote_config_providers.dart';
+import 'package:echo_loop/features/remote_config/remote_config_service.dart';
 import 'package:echo_loop/features/subscription/models/entitlement.dart';
 import 'package:echo_loop/features/subscription/models/entitlement_source.dart';
 import 'package:echo_loop/features/subscription/models/subscription_plan.dart';
@@ -53,7 +56,7 @@ class _SpyController extends SubscriptionController {
   }
 
   @override
-  Future<void> refresh() async => refreshCalls++;
+  Future<void> refresh({bool force = false}) async => refreshCalls++;
   @override
   Future<Uri> startPaddleCheckout(
     String planId, {
@@ -94,6 +97,28 @@ class _FixedPaddlePlansController extends PaddleSubscriptionPlansController {
 
   @override
   Future<void> refresh({bool force = false}) async {}
+}
+
+/// Paywall 只需要触发 remote config 后台刷新；测试中用假 service 避免依赖 SP。
+class _SpyRemoteConfigService implements RemoteConfigService {
+  int fetchCalls = 0;
+
+  @override
+  DateTime? get lastFetchedAt => DateTime(2026, 7, 23, 14);
+
+  @override
+  Future<RemoteConfig> fetchRemote() async {
+    fetchCalls++;
+    return const RemoteConfig(
+      version: RemoteConfig.currentVersion,
+      ttlSeconds: RemoteConfig.defaultTtlSeconds,
+      context: RemoteConfigContext(countryCode: 'CN'),
+      features: RemoteConfigFeatures.defaults,
+    );
+  }
+
+  @override
+  Future<RemoteConfig> load() async => fetchRemote();
 }
 
 /// 记录 Web checkout 打开参数的假 url_launcher 平台实现。
@@ -184,11 +209,14 @@ Widget _harness({
   // 网页支付渠道（侧载 APK / 桌面）：切换到浏览器结账购买态。
   bool webCheckout = false,
   bool showStoreWebCheckoutFallback = false,
+  _SpyRemoteConfigService? remoteConfigService,
   SubscriptionIdentity? identity,
   ThemeMode themeMode = ThemeMode.light,
 }) {
+  final remoteService = remoteConfigService ?? _SpyRemoteConfigService();
   return ProviderScope(
     overrides: [
+      remoteConfigServiceProvider.overrideWithValue(remoteService),
       subscriptionAvailabilityProvider.overrideWithValue(available),
       webCheckoutModeProvider.overrideWithValue(webCheckout),
       showStoreWebCheckoutFallbackProvider.overrideWithValue(
@@ -254,6 +282,21 @@ void main() {
     expect(find.text('Monthly'), findsNothing);
     expect(find.byType(FilledButton), findsNothing);
     expect(find.text('Restore Purchases'), findsNothing);
+  });
+
+  testWidgets('打开 Paywall 时后台强制刷新 remote config', (tester) async {
+    final remoteConfigService = _SpyRemoteConfigService();
+    await tester.pumpWidget(
+      _harness(
+        state: const EntitlementState.free(),
+        remoteConfigService: remoteConfigService,
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(remoteConfigService.fetchCalls, 1);
   });
 
   testWidgets('direct 渠道：展示 Paddle 月付/年付套餐卡', (tester) async {
@@ -929,6 +972,11 @@ void main() {
 
     // 走通用 ensureSignedInForAction 登录引导弹窗，且未真正发起购买
     expect(find.text('Sign in to Echo Loop'), findsOneWidget);
+    expect(find.text('Please sign in before subscribing.'), findsOneWidget);
+    expect(
+      find.text('Please sign in before restoring purchases.'),
+      findsNothing,
+    );
     expect(spy.purchaseCalls, 0);
   });
 
@@ -947,6 +995,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in to Echo Loop'), findsOneWidget);
+    expect(
+      find.text('Please sign in before restoring purchases.'),
+      findsOneWidget,
+    );
+    expect(find.text('Please sign in before subscribing.'), findsNothing);
     expect(spy.restoreCalls, 0);
   });
 
@@ -973,6 +1026,61 @@ void main() {
       find.text(
         'This subscription is linked to another Echo Loop account. '
         'Sign in to the original account and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Purchase failed. Please try again.'), findsNothing);
+  });
+
+  testWidgets('Paddle 会员：按钮文案为刷新会员状态，点击走统一 restore', (tester) async {
+    final spy = _SpyController(
+      const EntitlementState(
+        status: EntitlementStatus.premium,
+        entitlement: Entitlement(
+          isPremium: true,
+          productId: 'plus_yearly',
+          source: EntitlementSource.paddle,
+        ),
+      ),
+    );
+    await tester.pumpWidget(
+      _harness(state: spy._state, authenticated: true, controller: () => spy),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Refresh membership'), findsOneWidget);
+    expect(find.text('Restore Purchases'), findsNothing);
+
+    await tester.tap(find.text('Refresh membership'));
+    await tester.pumpAndSettle();
+
+    // 统一走 controller.restore()（无 webMode 分流）。
+    expect(spy.restoreCalls, 1);
+    expect(spy.refreshCalls, 0);
+  });
+
+  testWidgets('购买成功但权益未收敛：提示同步中，不提示购买失败', (tester) async {
+    // spy.purchase 成功返回但 state 仍为 free（模拟成交后收敛未确认）。
+    final spy = _SpyController(const EntitlementState.free());
+    await tester.pumpWidget(
+      _harness(
+        state: const EntitlementState.free(),
+        authenticated: true,
+        controller: () => spy,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Start 7-day free trial'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(spy.purchaseCalls, 1);
+    expect(
+      find.text(
+        'Purchase successful. Your membership is syncing '
+        'and will activate shortly.',
       ),
       findsOneWidget,
     );

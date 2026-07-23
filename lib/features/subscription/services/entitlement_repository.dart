@@ -1,10 +1,8 @@
 /// 后端权益仓库接口 + 实现。
 ///
-/// 查询后端权威权益。
-///
-/// 该仓库只供 Web/direct 支付渠道使用：这些端没有可用的原生商店 SDK，
-/// 权益必须经后端 `/api/entitlements` 读回。App Store / Google Play
-/// 渠道的客户端权益以 RevenueCat SDK CustomerInfo 为准。
+/// 全渠道（appleStore / googlePlay / web-direct）唯一权威源：
+/// 后端 `/api/entitlements` 已在服务端合并 RevenueCat + Paddle 权益，
+/// 客户端不再做本地权益裁决。
 library;
 
 import 'package:dio/dio.dart';
@@ -25,9 +23,12 @@ abstract class EntitlementRepository {
   /// - 返回非空：后端确认的权益（active 或 [Entitlement.free]）。
   /// - 返回 **null**：未能获取（离线 / 错误 / 后端未就绪），调用方据此走缓存兜底，
   ///   **不可**把「获取失败」误判为「无权益」。
+  /// - [force] 为 true 时请求后端绕过 24h 节流回源 RevenueCat
+  ///   （成交收敛 / 用户主动刷新用，后端有每用户 60s 防刷兜底）。
   Future<Entitlement?> fetchRemote({
     required String userId,
     required String accessToken,
+    bool force = false,
   });
 }
 
@@ -41,6 +42,7 @@ class StubEntitlementRepository implements EntitlementRepository {
   Future<Entitlement?> fetchRemote({
     required String userId,
     required String accessToken,
+    bool force = false,
   }) async {
     return null;
   }
@@ -75,28 +77,31 @@ class BackendEntitlementRepository implements EntitlementRepository {
   Future<Entitlement?> fetchRemote({
     required String userId,
     required String accessToken,
+    bool force = false,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/entitlements',
+        queryParameters: force ? const {'force': '1'} : null,
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       final data = response.data;
       if (data == null) {
-        AppLogger.log('Subscription', '后端权益：响应体为空，走兜底');
+        AppLogger.log('Subscription', '后端权益：响应体为空，走兜底 force=$force');
         return null;
       }
-      _logEntitlementResponse(data, response.statusCode);
+      _logEntitlementResponse(data, response.statusCode, force: force);
       return _entitlementFrom(data);
     } on DioException catch (e) {
       // 网络 / 超时 / 非 2xx：不可误判为无权益，返回 null 由上层走缓存兜底。
       AppLogger.log(
         'Subscription',
-        '后端权益查询失败（走兜底）: ${e.type} ${e.response?.statusCode ?? ""}',
+        '后端权益查询失败（走兜底）: ${e.type} ${e.response?.statusCode ?? ""} '
+            'force=$force',
       );
       return null;
     } catch (e) {
-      AppLogger.log('Subscription', '后端权益解析异常（走兜底）: $e');
+      AppLogger.log('Subscription', '后端权益解析异常（走兜底）: $e force=$force');
       return null;
     }
   }
@@ -132,14 +137,18 @@ class BackendEntitlementRepository implements EntitlementRepository {
   /// 打印 App 实际收到的权益响应，避免排查时只看后端预期。
   ///
   /// 只记录业务摘要与字段存在性，不打印 access token / Authorization header。
-  void _logEntitlementResponse(Map<String, dynamic> json, int? statusCode) {
+  void _logEntitlementResponse(
+    Map<String, dynamic> json,
+    int? statusCode, {
+    required bool force,
+  }) {
     final rawIds = json['entitlementIds'];
     final entitlementIds = rawIds is List
         ? rawIds.whereType<String>().toList()
         : const <String>[];
     AppLogger.log(
       'Subscription',
-      '后端权益响应: http=${statusCode ?? "unknown"} '
+      '后端权益响应: http=${statusCode ?? "unknown"} force=$force '
           'isPremium=${json['isPremium'] == true} '
           'entitlementIds=$entitlementIds '
           'productId=${json['productId'] is String ? json['productId'] : "null"} '

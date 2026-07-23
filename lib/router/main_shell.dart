@@ -112,7 +112,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref
           .read(notificationPermissionServiceProvider)
           .syncSystemAuthorizationStatus();
-      ref.read(remoteConfigProvider.notifier).startPeriodicRefresh();
+      _remoteConfigController.startPeriodicRefresh(forceFirst: true);
 
       AppLogger.log('StartupLoad', 'study bootstrap start');
       try {

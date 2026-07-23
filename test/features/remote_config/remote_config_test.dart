@@ -65,6 +65,7 @@ void main() {
       );
       expect(missing.isEnabled(RemoteFeature.aiChatAssistant), isTrue);
       expect(missing.ttlSeconds, RemoteConfig.defaultTtlSeconds);
+      expect(RemoteConfig.defaultTtlSeconds, 86400);
       expect(
         missing.transcriptionLimits.maxDurationSeconds,
         RemoteTranscriptionLimits.defaultMaxDurationSeconds,
@@ -316,6 +317,70 @@ void main() {
           queryParameters: any(named: 'queryParameters'),
         ),
       );
+      controller.dispose();
+    });
+
+    test('startPeriodicRefresh forceFirst 会忽略未过期 TTL 刷新一次', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = RemoteConfigStore(prefs);
+      await store.write(
+        const RemoteConfig(
+          version: 1,
+          ttlSeconds: 60,
+          context: RemoteConfigContext(countryCode: 'US'),
+          features: RemoteConfigFeatures(
+            cloudDriveImport: RemoteFeatureConfig(enabled: false),
+          ),
+        ),
+        now: DateTime(2026, 7, 19, 14),
+      );
+
+      final dio = _MockDio();
+      when(
+        () => dio.get<Object?>(
+          '/api/v1/client/config',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => response({
+          'version': 1,
+          'ttlSeconds': 120,
+          'context': {'countryCode': 'CN'},
+          'features': {
+            'cloudDriveImport': {'enabled': true},
+          },
+        }),
+      );
+      final service = RemoteConfigService(
+        dio: dio,
+        store: store,
+        now: () => DateTime(2026, 7, 19, 14, 0, 30),
+      );
+      final controller = RemoteConfigController(
+        readService: () => service,
+        initialConfig: const RemoteConfig(
+          version: 1,
+          ttlSeconds: 60,
+          context: RemoteConfigContext(countryCode: 'US'),
+          features: RemoteConfigFeatures(
+            cloudDriveImport: RemoteFeatureConfig(enabled: false),
+          ),
+        ),
+        now: () => DateTime(2026, 7, 19, 14, 0, 30),
+      );
+
+      controller.startPeriodicRefresh(forceFirst: true);
+      await pumpEventQueue();
+
+      expect(controller.state.context.countryCode, 'CN');
+      expect(controller.state.isEnabled(RemoteFeature.cloudDriveImport), true);
+      verify(
+        () => dio.get<Object?>(
+          '/api/v1/client/config',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).called(1);
       controller.dispose();
     });
 

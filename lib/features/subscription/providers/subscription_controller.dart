@@ -17,6 +17,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../config/client_distribution.dart';
 import '../../../services/app_logger.dart';
+import '../../../services/entitlement_signal_interceptor.dart';
 import '../models/entitlement.dart';
 import '../models/entitlement_source.dart';
 import '../services/entitlement_cache.dart';
@@ -34,6 +35,17 @@ part 'subscription_controller.g.dart';
 final subscriptionPaymentChannelProvider = Provider<ClientPaymentChannel>(
   (ref) => clientPaymentChannel,
 );
+
+/// E7 收敛回调：供 AI / 转录等后端 402 触发点调用，测试可 override 为 spy。
+///
+/// 惰性读取 controller（仅真实 402 发生时才触达订阅栈），让数据层不静态依赖
+/// 订阅实现（副作用经接口注入，见 CLAUDE.md §2.5-22）。
+final entitlementQuotaDivergenceHandlerProvider =
+    Provider<void Function(String context)>((ref) {
+      return (context) => ref
+          .read(subscriptionControllerProvider.notifier)
+          .reconcileOnServerQuotaRejection(context);
+    });
 
 /// Paddle checkout 的渠道级门控：direct/Web 默认允许；商店包必须由 UI 在远程开关
 /// 命中后显式声明 fallback，避免默认原生购买链路误走 Paddle。
@@ -65,6 +77,13 @@ class SubscriptionController extends _$SubscriptionController {
   /// 当前权益到期刷新计时器。只在 premium 且存在未来 expiresAt 时启用。
   Timer? _expiryRefreshTimer;
 
+  /// 最近一次在线权威确认时刻（remote 非 null 落定时更新）。
+  /// [refreshIfStale]（E8）据此判断 resume 时是否需要真正回源。
+  DateTime? _lastOnlineSyncAt;
+
+  /// E6 信号触发的对账是否在途（去重：一批并发响应只触发一次 refresh）。
+  bool _signalRefreshInFlight = false;
+
   @override
   EntitlementState build() {
     // 监听身份变化：登出清权益、切换用户重对账。
@@ -94,6 +113,18 @@ class SubscriptionController extends _$SubscriptionController {
     final sub = _purchases.entitlementStream.listen((_) => refresh());
     ref.onDispose(sub.cancel);
     ref.onDispose(_cancelExpiryRefreshTimer);
+    // E6：注册后端权益信号处理（backend Dio 拦截器读响应头转发到这里）。
+    // 静态槽位：谁注册谁解除；dispose 时仅当仍是本实例的回调才清除。
+    void signalHandler({required bool serverActive, required String path}) {
+      _onServerEntitlementSignal(serverActive: serverActive, path: path);
+    }
+
+    EntitlementSignalInterceptor.onSignal = signalHandler;
+    ref.onDispose(() {
+      if (identical(EntitlementSignalInterceptor.onSignal, signalHandler)) {
+        EntitlementSignalInterceptor.onSignal = null;
+      }
+    });
     // 冷启动首帧返回「未知」中间态（C5）。后续对账由上面的身份监听串行触发：
     // 已登录时先 RevenueCat identify，再读取权益；匿名启动则直接匿名对账。
     return const EntitlementState.unknown();
@@ -108,10 +139,11 @@ class SubscriptionController extends _$SubscriptionController {
 
   SubscriptionIdentity get _identity => ref.read(subscriptionIdentityProvider);
 
-  /// 与在线权威源对账并刷新权益。集中状态变更入口之一。
-  Future<void> refresh() async {
+  /// 与后端权威源对账并刷新权益。集中状态变更入口之一。
+  /// [force] 让后端绕过节流回源 RC（成交收敛 / 用户主动刷新用）。
+  Future<void> refresh({bool force = false}) async {
     await _waitForIdentitySync();
-    await _refreshOnline();
+    await _refreshOnline(force: force);
   }
 
   /// 等待当前最新身份同步完成。等待过程中若身份再次切换，会继续等待新的任务，
@@ -125,8 +157,9 @@ class SubscriptionController extends _$SubscriptionController {
     }
   }
 
-  /// 执行实际在线对账。调用方必须保证需要绑定购买身份时已完成 identify。
-  Future<void> _refreshOnline() async {
+  /// 执行实际在线对账（全渠道单一来源）。调用方必须保证需要绑定购买身份时
+  /// 已完成 identify。
+  Future<void> _refreshOnline({bool force = false}) async {
     // 调试覆盖生效时跳过在线对账，保持人为设定的状态。
     final override = _debugOverride;
     if (override != null) {
@@ -139,84 +172,39 @@ class SubscriptionController extends _$SubscriptionController {
     final accessToken = identity.accessToken;
     AppLogger.log(
       'Subscription',
-      '权益刷新开始: generation=$generation channel=${_paymentChannel.name} '
-          'userId=${userId ?? "匿名"} hasToken=${accessToken != null}',
+      '权益刷新开始: generation=$generation force=$force '
+          'channel=${_paymentChannel.name} userId=${userId ?? "匿名"} '
+          'hasToken=${accessToken != null}',
     );
 
     final cached = await _readValidCache(userId);
     Entitlement? remote;
-    String? error;
-    try {
-      // Web/direct 无原生商店 SDK，权益经后端 /api/entitlements 读回；
-      // App Store / Google Play 则以 RevenueCat SDK CustomerInfo 为准。
-      if (_paymentChannel == ClientPaymentChannel.web &&
-          userId != null &&
-          accessToken != null) {
-        AppLogger.log('Subscription', 'Web/direct 权益刷新读取后端: userId=$userId');
-        remote = await _repository.fetchRemote(
-          userId: userId,
-          accessToken: accessToken,
-        );
-      }
-      if (_paymentChannel == ClientPaymentChannel.web &&
-          remote == null &&
-          (userId == null || accessToken == null)) {
-        // Direct/Paddle 权益只能通过已登录账号从后端读取。匿名或 token 未就绪时
-        // 与 native 匿名无购买保持同一上层语义：明确 free，而不是把无 token 当错误态。
-        remote = Entitlement.free;
-      }
-      // Native 渠道或后端不可达时，用平台购买服务的当前权益快照兜底。
-      if (remote == null) {
-        AppLogger.log(
-          'Subscription',
-          '权益刷新读取购买服务快照: channel=${_paymentChannel.name}',
-        );
-        remote = await _purchases.currentEntitlement();
-        // 需求1：native 商店渠道在 RC 判定为「非会员」时，回退查后端补充识别。
-        // RevenueCat CustomerInfo 不含 Paddle 订阅——用户若在 Web/direct 用 Paddle
-        // 订阅后换到商店版 App 登录同一账号，仅凭 RC 会被漏判为免费。此处补一次
-        // /api/entitlements（后端已合并 RC + Paddle），命中会员则以后端结果为准。
-        if (_paymentChannel != ClientPaymentChannel.web &&
-            !remote.isPremium &&
-            userId != null &&
-            accessToken != null) {
-          AppLogger.log(
-            'Subscription',
-            'native RC 非会员，回退查后端补充: userId=$userId',
-          );
-          final backend = await _repository.fetchRemote(
-            userId: userId,
-            accessToken: accessToken,
-          );
-          if (backend != null && backend.isPremium) {
-            AppLogger.log(
-              'Subscription',
-              'native 后端补查命中会员: source=${backend.source.name} '
-                  'productId=${backend.productId}',
-            );
-            remote = backend;
-          }
-        }
-      }
-    } catch (e) {
-      // 失败不静默吞：记录错误、保留兜底，不误判为无权益。
-      error = e.toString();
-      AppLogger.log(
-        'Subscription',
-        '权益刷新在线源失败: generation=$generation error=$error',
+    if (userId != null && accessToken != null) {
+      // 唯一权威源：后端 /api/entitlements（服务端已合并 RC + Paddle）。
+      // fetchRemote 约定：成功有权益→premium；成功无权益→Entitlement.free（权威降级）；
+      // 网络/超时/非2xx/解析异常→null（内部已捕获，不抛），交由 reconciler 走缓存兜底。
+      remote = await _repository.fetchRemote(
+        userId: userId,
+        accessToken: accessToken,
+        force: force,
       );
+    } else if (userId == null) {
+      // 匿名：无账号可绑定的权益，明确 free（购买/恢复均强制登录，不存在匿名会员）。
+      remote = Entitlement.free;
     }
+    // userId != null 但 token 未就绪：remote 保持 null → 缓存兜底，不误判 free。
 
-    if (generation != _generation) return; // 已被更新的对账 / 登录切换作废。
+    if (generation != _generation) return; // 竞态：被更新的对账/登录切换作废。
 
     final next = reconcileEntitlement(
       remote: remote,
       cached: cached,
       now: clock.now(),
     );
-    _setEntitlementState(
-      error == null ? next : next.copyWith(error: error, isStale: true),
-    );
+    _setEntitlementState(next);
+    if (remote != null) {
+      _lastOnlineSyncAt = clock.now(); // E8：记录在线权威确认时刻。
+    }
 
     // 对账关键日志：在线源 / 缓存各自结果 + 合并后最终态，便于排查
     // 「删了订阅仍显示已订阅」「在线不可达走缓存」等问题。
@@ -224,10 +212,9 @@ class SubscriptionController extends _$SubscriptionController {
       'Subscription',
       '对账完成: remote=${remote != null ? "isPremium=${remote.isPremium}" : "无"} '
           'cached=${cached != null ? "isPremium=${cached.entitlement.isPremium}" : "无"} '
-          '→ status=${state.status.name} isStale=${state.isStale}'
-          ' source=${state.entitlement?.source.name ?? "none"} '
-          'channel=${_paymentChannel.name}'
-          '${error != null ? " error=$error" : ""}',
+          '→ status=${state.status.name} isStale=${state.isStale} '
+          'source=${state.entitlement?.source.name ?? "none"} '
+          'channel=${_paymentChannel.name}',
     );
 
     if (remote != null) {
@@ -235,20 +222,20 @@ class SubscriptionController extends _$SubscriptionController {
     }
   }
 
-  /// 发起购买。成功后立即以平台返回的权益快照解锁。
+  /// 发起购买。成交后不做本地裁决，统一回源后端收敛（单一来源）。
   Future<void> purchase(String planId) async {
     AppLogger.log(
       'Subscription',
       '发起购买: planId=$planId userId=${_identity.userId ?? "匿名"}',
     );
     await _ensurePurchaseIdentity(); // fail-closed：未绑定 Supabase user_id 直接中止。
+    final generation = _generation; // 成交期间身份若变化，跳过收敛（新身份自有对账）。
     try {
       final entitlement = await _purchases.purchase(planId);
-      await _applyEntitlement(entitlement, _identity.userId);
       AppLogger.log(
         'Subscription',
-        '购买成功: isPremium=${entitlement.isPremium} productId=${entitlement.productId} '
-            'expiresAt=${entitlement.expiresAt?.toIso8601String() ?? "无"}',
+        '购买成交: productId=${entitlement.productId} '
+            'isPremium=${entitlement.isPremium}（结果仅记录，不作裁决）',
       );
     } on PurchaseException catch (e) {
       // 取消与失败分别记录：取消属正常路径，不当错误处理。
@@ -263,6 +250,11 @@ class SubscriptionController extends _$SubscriptionController {
       AppLogger.log('Subscription', '购买异常: planId=$planId error=$e');
       rethrow;
     }
+    if (generation != _generation) {
+      AppLogger.log('Subscription', '购买期间身份已变化，跳过收敛刷新');
+      return;
+    }
+    await _convergeAfterTransaction('purchase');
   }
 
   /// 创建 Paddle checkout。创建成功只返回 URL，不改变 premium 状态；
@@ -360,16 +352,29 @@ class SubscriptionController extends _$SubscriptionController {
     }
   }
 
-  /// 恢复购买。
+  /// 找回/刷新会员（全渠道统一语义）。
+  /// 1) 先回源后端（唯一权威，含 Paddle 与已同步的商店订阅），命中即结束；
+  /// 2) 仍非会员且是商店渠道 → RC restore 认领游离商店收据，认领后回源收敛。
   Future<void> restore() async {
-    AppLogger.log('Subscription', '发起恢复购买: userId=${_identity.userId ?? "匿名"}');
-    if (_paymentChannel == ClientPaymentChannel.web) {
-      // Web/direct 无平台恢复入口，恢复语义等价于回源刷新后端权益。
-      AppLogger.log('Subscription', 'Web 渠道恢复购买转为刷新后端权益');
-      await refresh();
-      return;
-    }
-    await _ensurePurchaseIdentity(); // fail-closed：未绑定 Supabase user_id 直接中止。
+    AppLogger.log(
+      'Subscription',
+      '恢复/刷新会员发起: channel=${_paymentChannel.name} '
+          'source=${state.entitlement?.source.name ?? "none"} '
+          'userId=${_identity.userId ?? "匿名"}',
+    );
+
+    // 用户主动动作 → force 取最新权威（后端 60s 防刷兜底）。
+    // 注意：_ensurePurchaseIdentity 在此步之后——RC identify 故障不得阻断纯后端刷新。
+    await refresh(force: true);
+    if (state.isActive) return; // 命中（含 Paddle 会员在商店包：不调 RC restore）。
+
+    final isStoreChannel =
+        _paymentChannel == ClientPaymentChannel.appleStore ||
+        _paymentChannel == ClientPaymentChannel.googlePlay;
+    if (!isStoreChannel) return; // web/direct/unavailable：恢复=后端刷新，已完成。
+
+    await _ensurePurchaseIdentity(); // fail-closed：仅 RC restore 需要。
+    final generation = _generation;
     try {
       final result = await _purchases.restore();
       final entitlement = result.entitlement;
@@ -389,15 +394,98 @@ class SubscriptionController extends _$SubscriptionController {
           ownershipConflict: true,
         );
       }
-      await _applyEntitlement(entitlement, _identity.userId);
+      if (!entitlement.isActive(clock.now())) {
+        AppLogger.log('Subscription', 'RC 无可恢复收据，保持后端对账结果'); // 不降级。
+        return;
+      }
       AppLogger.log(
         'Subscription',
-        '恢复完成: isPremium=${entitlement.isPremium} productId=${entitlement.productId}',
+        '商店收据认领成功: productId=${entitlement.productId}',
       );
-    } catch (e) {
+    } on PurchaseException catch (e) {
+      if (e.receiptInUse) {
+        // 收据属其他 RC 订阅者，但本账号可能已被后端判为会员：回源确认，
+        // 不当「购买失败」。
+        AppLogger.log('Subscription', 'RC 收据被占用，回源确认真实会员态');
+        await refresh(force: true);
+        return;
+      }
       AppLogger.log('Subscription', '恢复购买失败: error=$e');
       rethrow;
     }
+    if (generation != _generation) return; // 认领期间身份已变化，跳过收敛。
+    await _convergeAfterTransaction('restore'); // 认领→RC 已知→force 回源即收敛。
+  }
+
+  /// E8：resume 等低信号触发点用的条件刷新——仅在以下任一情况才真正回源：
+  /// - 从未获得在线确认（unknown / 无确认时刻），或当前 state 本就 isStale；
+  /// - 距上次在线确认超过 [maxAge]（长新鲜窗，兜住长期只用本地功能、无后端
+  ///   流量的用户；退款等分歧主要靠 E6/E7 被动收敛，这里只是天级兜底）；
+  /// - 后台期间越过了 expiresAt（到期 one-shot timer 在挂起时不可靠）。
+  /// 其余情况跳过，避免频繁切前台盲查后端。
+  Future<void> refreshIfStale({
+    Duration maxAge = const Duration(hours: 24),
+  }) async {
+    final lastSync = _lastOnlineSyncAt;
+    final now = clock.now();
+    final expiresAt = state.entitlement?.expiresAt;
+    final crossedExpiry =
+        state.status == EntitlementStatus.premium &&
+        expiresAt != null &&
+        !expiresAt.isAfter(now);
+    final needsRefresh =
+        state.status == EntitlementStatus.unknown ||
+        state.isStale ||
+        lastSync == null ||
+        now.difference(lastSync) > maxAge ||
+        crossedExpiry;
+    if (!needsRefresh) {
+      AppLogger.log(
+        'Subscription',
+        'resume 权益刷新跳过：距上次在线确认 '
+            '${now.difference(lastSync).inSeconds}s（<${maxAge.inSeconds}s）',
+      );
+      return;
+    }
+    await refresh();
+  }
+
+  /// E6：后端权益信号与本地 state 分歧时回源对账。
+  ///
+  /// 信号来自 backend Dio 拦截器读到的 `x-entitlement-active` 响应头。
+  /// 跳过 /api/entitlements 自身（其响应体即权威，正常对账流程会落定）；
+  /// unknown 中间态不比对；in-flight 标记去重并发信号。
+  void _onServerEntitlementSignal({
+    required bool serverActive,
+    required String path,
+  }) {
+    if (path.contains('/api/entitlements')) return;
+    if (state.status == EntitlementStatus.unknown) return;
+    if (serverActive == state.isActive) return;
+    if (_signalRefreshInFlight) return;
+    AppLogger.log(
+      'Subscription',
+      '后端权益信号与本地分歧: server=$serverActive local=${state.isActive} '
+          'path=$path，触发对账',
+    );
+    _signalRefreshInFlight = true;
+    unawaited(
+      refresh().whenComplete(() => _signalRefreshInFlight = false),
+    );
+  }
+
+  /// E7：后端按权威权益拒绝请求（402 配额超限）而本地仍 premium 时的收敛入口。
+  ///
+  /// 分歧说明本地权益已过时（退款/到期未同步到客户端），立即回源对账拉平；
+  /// 本地非 premium 时属免费额度用尽的正常路径，不动作。
+  /// 后端配额裁决读实时库，普通 refresh 即可取到权威结果，无需 force。
+  void reconcileOnServerQuotaRejection(String context) {
+    if (!state.isActive) return;
+    AppLogger.log(
+      'Subscription',
+      '后端配额拒绝与本地 premium 分歧，触发权益对账: context=$context',
+    );
+    unawaited(refresh());
   }
 
   /// 清本地权益缓存 + 失效平台 SDK 缓存后强制重对账（调试用）。
@@ -443,23 +531,25 @@ class SubscriptionController extends _$SubscriptionController {
     };
   }
 
-  /// 立即把一份权益应用为当前 state 并落盘（购买 / 恢复成功路径）。
-  Future<void> _applyEntitlement(
-    Entitlement entitlement,
-    String? userId,
-  ) async {
-    final generation = ++_generation;
-    if (generation != _generation) return;
-    _setEntitlementState(
-      EntitlementState(
-        status: entitlement.isActive(clock.now())
-            ? EntitlementStatus.premium
-            : EntitlementStatus.free,
-        entitlement: entitlement,
-        isStale: false,
-      ),
+  /// 成交后回源收敛：force 绕过后端节流读取 RC 最新权益。
+  /// 短重试兜住瞬时网络失败（每次都完整走 refresh 的 generation 防竞态）；
+  /// 重试后仍未 active 只记日志——钱已成交，权益由后续触发点（RC 流 / 到期
+  /// timer / resume）自然收敛，UI 据 state 提示「同步中」，绝不报「购买失败」。
+  Future<void> _convergeAfterTransaction(String reason) async {
+    const maxAttempts = 3;
+    const interval = Duration(seconds: 2);
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      await refresh(force: true);
+      if (state.isActive) {
+        AppLogger.log('Subscription', '成交收敛完成: reason=$reason attempt=$attempt');
+        return;
+      }
+      if (attempt < maxAttempts) await Future<void>.delayed(interval);
+    }
+    AppLogger.log(
+      'Subscription',
+      '成交收敛未确认（等待后续触发点）: reason=$reason status=${state.status.name}',
     );
-    await _writeCache(entitlement, userId);
   }
 
   /// 购买 / 恢复前的 fail-closed 身份门禁。

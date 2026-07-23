@@ -72,10 +72,13 @@ class RemoteConfigController extends StateNotifier<RemoteConfig> {
   Timer? _refreshTimer;
   bool _active = false;
 
-  /// App 进入前台时启动 TTL 驱动的 one-shot 刷新循环。
-  void startPeriodicRefresh() {
+  /// App 进入前台时启动 one-shot 刷新循环。
+  ///
+  /// [forceFirst] 仅用于冷启动后首轮后台刷新，确保网络环境切换（例如 VPN
+  /// 地区变化）不会被旧缓存 TTL 长时间挡住；普通回前台仍走 TTL 节流。
+  void startPeriodicRefresh({bool forceFirst = false}) {
     _active = true;
-    unawaited(refreshIfStale());
+    unawaited(refreshIfStale(force: forceFirst));
   }
 
   /// App 进入后台或 controller 销毁时停止前台刷新循环。

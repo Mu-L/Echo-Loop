@@ -155,7 +155,7 @@ class RemoteConfig {
   });
 
   static const currentVersion = 1;
-  static const defaultTtlSeconds = 3600;
+  static const defaultTtlSeconds = 86400;
 
   static const defaults = RemoteConfig(
     version: currentVersion,

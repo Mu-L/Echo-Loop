@@ -20,6 +20,7 @@ import '../../../config/revenuecat_config.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/app_logger.dart';
 import '../../auth/sign_in_required_dialog.dart';
+import '../../remote_config/remote_config_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../models/entitlement.dart';
 import '../models/entitlement_source.dart';
@@ -66,6 +67,9 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       AppLogger.log(
         'Subscription',
         'paywall init refresh plans: webMode=$webMode',
+      );
+      unawaited(
+        ref.read(remoteConfigProvider.notifier).refreshIfStale(force: true),
       );
       unawaited(
         ref.read(subscriptionPlansProvider.notifier).refresh(force: true),
@@ -126,18 +130,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           'source=${subState.entitlement?.source.name ?? "none"} '
           'waitingForWeb=$_waitingForWeb busy=$_busy',
     );
+    // Paddle 会员在任何包内看到的语义都是「刷新会员状态」而非「恢复购买」；
+    // 底层统一走 controller.restore()（先回源后端，命中即结束）。
+    final isPaddleMember =
+        subState.entitlement?.source == EntitlementSource.paddle && isPremium;
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.premiumTitle),
         // 恢复购买为低频操作（登录后通常自动对账获取权益），弱化为右上角文字 action。
-        // 网页渠道没有平台恢复接口，但用户语义仍是「找回已购买权益」；
-        // 底层转为后端权益同步。
         actions: [
           TextButton(
-            onPressed: _busy
-                ? null
-                : (webMode ? _refreshEntitlement : _restore),
-            child: Text(l10n.premiumRestore),
+            onPressed: _busy ? null : _restore,
+            child: Text(
+              isPaddleMember ? l10n.premiumRefreshStatus : l10n.premiumRestore,
+            ),
           ),
         ],
       ),
@@ -521,31 +527,6 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     if (mounted) setState(() => _waitingForWeb = false);
   }
 
-  /// Web 渠道恢复购买：直接触发后端对账并提示当前账号的权益状态。
-  Future<void> _refreshEntitlement() async {
-    AppLogger.log('Subscription', 'Web/direct 恢复购买点击：刷新后端权益');
-    setState(() => _busy = true);
-    try {
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      final state = ref.read(subscriptionControllerProvider);
-      final active = state.isActive;
-      AppLogger.log(
-        'Subscription',
-        'Web/direct 恢复购买结果: status=${state.status.name} '
-            'isActive=$active isStale=${state.isStale} '
-            'error=${state.error ?? "none"}',
-      );
-      _showMessage(active ? l10n.premiumRestored : l10n.premiumRestoreNone);
-    } catch (error) {
-      AppLogger.log('Subscription', 'Web/direct 恢复购买异常: $error');
-      rethrow;
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   /// 解析当前生效选择：用户选中 > 推荐年付 > 第一个。
   String _effectiveSelection(List<SubscriptionPlan> plans) {
     final chosen = _selectedPlanId;
@@ -597,13 +578,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   /// 购买 / 恢复前的统一登录门：权益需绑定 Supabase user_id（跨设备 / 可恢复），
   /// 复用全 App 通用的 [ensureSignedInForAction]（弹登录引导 → 跳登录页），
   /// 未登录返回 false，调用方据此中止本次动作。
-  Future<bool> _ensureSignedIn() async {
+  Future<bool> _ensureSignedIn({String? message}) async {
     final l10n = AppLocalizations.of(context)!;
     final signedIn = await ensureSignedInForAction(
       context: context,
       ref: ref,
       title: l10n.authSignInTitle,
-      message: l10n.premiumLoginRequired,
+      message: message ?? l10n.premiumLoginRequired,
     );
     AppLogger.log('Subscription', '订阅动作登录门结果: signedIn=$signedIn');
     return signedIn;
@@ -611,14 +592,22 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
   Future<void> _purchase(SubscriptionPlan plan) async {
     // 购买前强制登录：权益需绑定 Supabase user_id（跨设备 / 可恢复）。
-    if (!await _ensureSignedIn() || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    if (!await _ensureSignedIn(message: l10n.premiumLoginRequired) ||
+        !mounted) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await ref
           .read(subscriptionControllerProvider.notifier)
           .purchase(plan.planId);
-      if (mounted && ref.read(subscriptionControllerProvider).isActive) {
+      if (!mounted) return;
+      if (ref.read(subscriptionControllerProvider).isActive) {
         context.pop();
+      } else {
+        // 成交但后端收敛未确认：权益同步中，绝不显示「购买失败」。
+        _showMessage(AppLocalizations.of(context)!.premiumPurchasePendingSync);
       }
     } on PurchaseException catch (e) {
       if (!e.cancelled && mounted) {
@@ -635,7 +624,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
   Future<void> _restore() async {
     // 恢复购买同样先登录：否则会对 RevenueCat 匿名身份恢复，权益绑不到 user_id。
-    if (!await _ensureSignedIn() || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    if (!await _ensureSignedIn(message: l10n.premiumRestoreLoginRequired) ||
+        !mounted) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await ref.read(subscriptionControllerProvider.notifier).restore();

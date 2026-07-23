@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'Please sign in before subscribing.'**
   String get premiumLoginRequired;
 
+  /// No description provided for @premiumRestoreLoginRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please sign in before restoring purchases.'**
+  String get premiumRestoreLoginRequired;
+
   /// No description provided for @premiumPurchaseFailed.
   ///
   /// In en, this message translates to:
@@ -367,6 +373,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh'**
   String get premiumRefresh;
+
+  /// No description provided for @premiumRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh membership'**
+  String get premiumRefreshStatus;
+
+  /// No description provided for @premiumPurchasePendingSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase successful. Your membership is syncing and will activate shortly.'**
+  String get premiumPurchasePendingSync;
 
   /// No description provided for @premiumPeriodMonthly.
   ///

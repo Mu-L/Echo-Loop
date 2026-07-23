@@ -498,9 +498,13 @@ class _EchoLoopAppState extends ConsumerState<EchoLoopApp>
     switch (state) {
       case AppLifecycleState.resumed:
         _triggerCatalogSync();
-        // 回前台时重对账订阅权益：用户可能刚在系统订阅页退订 / 换 plan / 续费，
-        // 或退款生效。RevenueCat 有约 5 分钟缓存，频繁切前台基本命中缓存、近零成本。
-        unawaited(ref.read(subscriptionControllerProvider.notifier).refresh());
+        // 回前台时条件重对账订阅权益（E8）。单一来源下每次刷新都是真实后端请求
+        // （不再有 RC SDK 客户端缓存兜着），且退款/退订分歧主要靠 E6/E7 在后端
+        // 交互时被动收敛，故仅在状态陈旧 / 越过到期点 / 超过 24h 新鲜窗（兜住
+        // 长期无后端流量的用户）时才回源，频繁切前台不盲查。
+        unawaited(
+          ref.read(subscriptionControllerProvider.notifier).refreshIfStale(),
+        );
         // 同时检查商店 storefront。跨区时立即撤下旧币种价格并重新读取商品；
         // 同区则遵循五分钟 TTL，避免每次短暂切后台都重复查询。
         unawaited(

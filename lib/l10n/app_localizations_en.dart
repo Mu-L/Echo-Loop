@@ -123,6 +123,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumLoginRequired => 'Please sign in before subscribing.';
 
   @override
+  String get premiumRestoreLoginRequired =>
+      'Please sign in before restoring purchases.';
+
+  @override
   String get premiumPurchaseFailed => 'Purchase failed. Please try again.';
 
   @override
@@ -154,6 +158,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumRefresh => 'Refresh';
+
+  @override
+  String get premiumRefreshStatus => 'Refresh membership';
+
+  @override
+  String get premiumPurchasePendingSync =>
+      'Purchase successful. Your membership is syncing and will activate shortly.';
 
   @override
   String get premiumPeriodMonthly => 'Monthly';

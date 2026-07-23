@@ -1,8 +1,58 @@
+import 'package:echo_loop/features/subscription/services/purchase_service.dart';
 import 'package:echo_loop/features/subscription/services/revenuecat_purchase_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('restore 错误码映射', () {
+    const channel = MethodChannel('purchases_flutter');
+
+    /// 让 restorePurchases 抛出指定 RC 错误码的 [PlatformException]。
+    void mockRestoreError(PurchasesErrorCode code) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'restorePurchases') {
+              throw PlatformException(
+                code: code.index.toString(),
+                message: 'mock ${code.name}',
+              );
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+    }
+
+    test('receiptAlreadyInUseError → PurchaseException.receiptInUse', () async {
+      mockRestoreError(PurchasesErrorCode.receiptAlreadyInUseError);
+      await expectLater(
+        RevenueCatPurchaseService().restore(),
+        throwsA(
+          isA<PurchaseException>()
+              .having((e) => e.receiptInUse, 'receiptInUse', isTrue)
+              .having((e) => e.cancelled, 'cancelled', isFalse),
+        ),
+      );
+    });
+
+    test('purchaseCancelledError → PurchaseException.cancelled', () async {
+      mockRestoreError(PurchasesErrorCode.purchaseCancelledError);
+      await expectLater(
+        RevenueCatPurchaseService().restore(),
+        throwsA(
+          isA<PurchaseException>()
+              .having((e) => e.cancelled, 'cancelled', isTrue)
+              .having((e) => e.receiptInUse, 'receiptInUse', isFalse),
+        ),
+      );
+    });
+  });
+
   group('RevenueCat CustomerInfo 诊断日志', () {
     test('摘要包含权益裁决关键字段', () {
       final entitlement = EntitlementInfo(

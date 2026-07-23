@@ -120,6 +120,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumLoginRequired => '订阅前请先登录。';
 
   @override
+  String get premiumRestoreLoginRequired => '恢复购买前请先登录。';
+
+  @override
   String get premiumPurchaseFailed => '购买失败，请重试。';
 
   @override
@@ -149,6 +152,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get premiumRefresh => '刷新';
+
+  @override
+  String get premiumRefreshStatus => '刷新会员状态';
+
+  @override
+  String get premiumPurchasePendingSync => '购买成功，会员权益同步中，稍后自动生效。';
 
   @override
   String get premiumPeriodMonthly => '月付';
