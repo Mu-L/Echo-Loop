@@ -1,8 +1,10 @@
 // 学习计划表页面测试
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:echo_loop/features/onboarding_survey/providers/onboarding_survey_provider.dart';
@@ -296,6 +298,97 @@ void main() {
       expect(find.text('Not started'), findsOneWidget);
     });
 
+    testWidgets('复习轮次左侧图标使用固定 SVG，避免 emoji 跨平台差异', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.text('🔁'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/refresh.svg',
+        ),
+        findsWidgets,
+      );
+
+      final svg = await rootBundle.loadString('assets/icon/refresh.svg');
+      expect(svg, contains('M3.582 10A6.42'));
+    });
+
+    testWidgets('首次学习左侧图标使用固定 book SVG', (tester) async {
+      await tester.pumpWidget(createTestWidget(locale: const Locale('zh')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('🌱'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/book.svg',
+        ),
+        findsOneWidget,
+      );
+
+      final svg = await rootBundle.loadString('assets/icon/book.svg');
+      expect(svg, contains('viewBox="0 0 24 24"'));
+    });
+
+    testWidgets('当前到期轮次使用固定 calendar SVG，避免 emoji 跨平台差异', (tester) async {
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review4,
+            currentSubStage: SubStageType.blindListen,
+            updatedAt: DateTime(2026, 1, 1),
+          ),
+        },
+      );
+
+      await tester.pumpWidget(createTestWidget(progressState: progressState));
+      await tester.pumpAndSettle();
+
+      expect(find.text('📖'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/calendar-2.svg',
+        ),
+        findsWidgets,
+      );
+
+      final svg = await rootBundle.loadString('assets/icon/calendar-2.svg');
+      expect(svg, contains('viewBox="0 0 24 24"'));
+    });
+
+    testWidgets('锁定轮次使用固定 lock SVG，避免 emoji 跨平台差异', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.text('🔒'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/lock.svg',
+        ),
+        findsWidgets,
+      );
+
+      final svg = await rootBundle.loadString('assets/icon/lock.svg');
+      expect(svg, contains('viewBox="0 0 24 24"'));
+    });
+
     testWidgets('音频损坏时进度卡片显示内容警告徽章', (tester) async {
       final damagedItem = testAudioItem.copyWith(
         contentStatus: AudioContentStatus.damaged,
@@ -339,7 +432,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Initial Learning'), findsOneWidget);
-      expect(find.text('0/4 completed'), findsOneWidget);
+      expect(find.text('0/4'), findsOneWidget);
+      expect(find.text('0/4 completed'), findsNothing);
 
       expect(find.text('Blind Listening'), findsWidgets);
       expect(find.text('Intensive Listening'), findsOneWidget);
@@ -690,7 +784,8 @@ void main() {
       await tester.pumpWidget(createTestWidget(progressState: progressState));
       await tester.pumpAndSettle();
 
-      expect(find.text('2/4 completed'), findsOneWidget);
+      expect(find.text('2/4'), findsOneWidget);
+      expect(find.text('2/4 completed'), findsNothing);
     });
 
     testWidgets('点击"开始学习"显示简报弹窗', (tester) async {
@@ -851,13 +946,80 @@ void main() {
 
       expect(find.text('未开始'), findsOneWidget);
       expect(find.text('首次学习'), findsOneWidget);
-      expect(find.text('0/4 完成'), findsOneWidget);
+      expect(find.text('0/4'), findsOneWidget);
+      expect(find.text('0/4 完成'), findsNothing);
       expect(find.text('全文盲听'), findsWidgets);
       expect(find.text('开始学习'), findsOneWidget);
 
       // 滚动到复习轮次区域
       await tester.scrollUntilVisible(find.text('首轮复习'), 200);
       expect(find.text('首轮复习'), findsOneWidget);
+    });
+
+    testWidgets('阶段标题行各列上下对齐且进度列不带完成后缀', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final now = DateTime(2026, 1, 10, 12, 0);
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review7,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            firstLearnCompletedAt: now.subtract(const Duration(days: 8)),
+            lastStageCompletedAt: now.subtract(const Duration(days: 4)),
+            updatedAt: now,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          locale: const Locale('zh'),
+          progressState: progressState,
+          fixedNow: now,
+          completedStageTimes: {
+            LearningStage.firstLearn.key: now.subtract(const Duration(days: 8)),
+            LearningStage.review0.key: now.subtract(const Duration(days: 7)),
+            LearningStage.review1.key: now.subtract(const Duration(days: 6)),
+            LearningStage.review2.key: now.subtract(const Duration(days: 5)),
+            LearningStage.review4.key: now.subtract(const Duration(days: 4)),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('4/4 完成'), findsNothing);
+      expect(find.text('3/3 完成'), findsNothing);
+      expect(find.text('0/3 完成'), findsNothing);
+      expect(find.text('4/4'), findsOneWidget);
+      expect(find.text('0/3'), findsWidgets);
+
+      double columnDx(String stageKey, String column) => tester
+          .getTopLeft(
+            find.byKey(Key('learning_plan_stage_${stageKey}_$column')),
+          )
+          .dx;
+
+      void expectAligned(String column) {
+        final firstLearnDx = columnDx('first_learn', column);
+        for (final stageKey in ['review0', 'review7', 'review14']) {
+          expect(
+            columnDx(stageKey, column),
+            moreOrLessEquals(firstLearnDx, epsilon: 0.1),
+            reason: '$column should align for $stageKey',
+          );
+        }
+      }
+
+      expectAligned('title_column');
+      expectAligned('status_icon_column');
+      expectAligned('status_text_column');
+      expectAligned('progress_column');
+      expectAligned('expand_column');
     });
 
     testWidgets('audioItem 找不到时显示错误页面', (tester) async {
@@ -1174,6 +1336,123 @@ void main() {
       expect(find.text('After 1 day'), findsNothing);
     });
 
+    testWidgets('当前复习轮锁定时显示「立即解锁」，点击后解锁并隐藏按钮', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // review0 间隔 6h：1 小时前完成首学 → 还剩 5h，锁定中
+      final firstLearnCompletedAt = DateTime(2026, 1, 1, 11, 0);
+      final now = DateTime(2026, 1, 1, 12, 0);
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            firstLearnCompletedAt: firstLearnCompletedAt,
+            lastStageCompletedAt: firstLearnCompletedAt,
+            updatedAt: now,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(progressState: progressState, fixedNow: now),
+      );
+      await tester.pumpAndSettle();
+
+      // 锁定态：显示倒计时与「立即解锁」按钮
+      expect(find.textContaining('Unlocks in'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Unlock now'), 200);
+      await tester.pumpAndSettle();
+      expect(find.text('Unlock now'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/unlock.svg',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Unlock now'));
+      await tester.pumpAndSettle();
+
+      // 解锁后：manualUnlockAt 写入，按钮与倒计时消失
+      final context = tester.element(find.byType(LearningPlanScreen));
+      final container = ProviderScope.containerOf(context);
+      final after = container
+          .read(learningProgressNotifierProvider)
+          .progressMap['test-1']!;
+      expect(after.manualUnlockAt, isNotNull);
+      expect(after.isReviewLockedAt(now), isFalse);
+      expect(find.text('Unlock now'), findsNothing);
+      expect(find.textContaining('Unlocks in'), findsNothing);
+    });
+
+    testWidgets('当前复习轮已到期时不显示「立即解锁」', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // review0 间隔 6h：7 小时前完成 → 已到期
+      final now = DateTime(2026, 1, 1, 12, 0);
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            firstLearnCompletedAt: now.subtract(const Duration(hours: 7)),
+            lastStageCompletedAt: now.subtract(const Duration(hours: 7)),
+            updatedAt: now,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(progressState: progressState, fixedNow: now),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unlock now'), findsNothing);
+    });
+
+    testWidgets('已暂停时锁定轮次不显示「立即解锁」', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final firstLearnCompletedAt = DateTime(2026, 1, 1, 11, 0);
+      final now = DateTime(2026, 1, 1, 12, 0);
+      final progressState = LearningProgressState(
+        progressMap: {
+          'test-1': LearningProgress(
+            audioItemId: 'test-1',
+            currentStage: LearningStage.review0,
+            currentSubStage: SubStageType.reviewDifficultPractice,
+            firstLearnCompletedAt: firstLearnCompletedAt,
+            lastStageCompletedAt: firstLearnCompletedAt,
+            updatedAt: now,
+            isPaused: true,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(progressState: progressState, fixedNow: now),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unlock now'), findsNothing);
+    });
+
     testWidgets('已完成复习轮次显示相对完成时间', (tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -1311,7 +1590,19 @@ void main() {
 
       expect(find.text('100%'), findsOneWidget);
       expect(find.text('Completed'), findsOneWidget);
-      expect(find.text('4/4 completed'), findsOneWidget);
+      expect(find.text('4/4'), findsOneWidget);
+      expect(find.text('4/4 completed'), findsNothing);
+      expect(find.text('✅'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SvgPicture &&
+              widget.bytesLoader is SvgAssetLoader &&
+              (widget.bytesLoader as SvgAssetLoader).assetName ==
+                  'assets/icon/check-circle-3.svg',
+        ),
+        findsWidgets,
+      );
     });
 
     // ====== Phase 2 Pilot：从 integration_test 下沉的 case ======

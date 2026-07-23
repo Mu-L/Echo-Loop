@@ -89,7 +89,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 当前 schema 版本（静态访问，用于导入前版本检查）
-  static const currentSchemaVersion = 46;
+  static const currentSchemaVersion = 47;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -203,6 +203,15 @@ class AppDatabase extends _$AppDatabase {
               WHERE type LIKE 'translation:%'
             ''');
           }
+        }
+        // v46→v47：learning_progresses 新增 manual_unlock_at
+        // （「立即解锁」当前复习轮的时刻，null = 未手动解锁）。
+        if (from < 47) {
+          await _addColumnIfNotExists(
+            'learning_progresses',
+            'manual_unlock_at',
+            'INTEGER',
+          );
         }
         // v14→v15：新增 saved_words 表（收藏单词）
         if (from < 15) {

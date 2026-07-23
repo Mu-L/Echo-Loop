@@ -485,7 +485,7 @@
   "learningPlanNotStarted": "Not started",
   "firstStudy": "Initial Learning",
   "review": "Review",
-  "stepProgress": "{completed}/{total} completed",
+  "stepProgress": "{completed}/{total}",
   "@stepProgress": {
     "placeholders": {
       "completed": { "type": "int" },
@@ -532,6 +532,10 @@
     }
   },
   "reviewUnlocked": "Unlocked",
+  "unlockReviewNow": "Unlock now",
+  "@unlockReviewNow": {
+    "description": "Button on the learning plan page to immediately unlock the locked current review round"
+  },
   "startLearning": "Start Learning",
   "continueLearning": "Continue Learning",
   "learningInProgress": "In Progress",

@@ -866,7 +866,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String stepProgress(int completed, int total) {
-    return '$completed/$total 完成';
+    return '$completed/$total';
   }
 
   @override
@@ -935,6 +935,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reviewUnlocked => '已解锁';
+
+  @override
+  String get unlockReviewNow => '立即解锁';
 
   @override
   String get startLearning => '开始学习';

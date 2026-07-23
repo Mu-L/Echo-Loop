@@ -886,7 +886,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String stepProgress(int completed, int total) {
-    return '$completed/$total completed';
+    return '$completed/$total';
   }
 
   @override
@@ -959,6 +959,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reviewUnlocked => 'Unlocked';
+
+  @override
+  String get unlockReviewNow => 'Unlock now';
 
   @override
   String get startLearning => 'Start Learning';

@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-23（学习任务页接入 AI 助手入口）
+> 最后更新：2026-07-23（学习计划页首次学习图标替换）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -39,6 +39,7 @@
   - 已完成（步骤 4 · 气泡按钮等宽）：`SelectionToolbar` 按最长本地化文案统一按钮宽度，修复中文「复制 / 问 AI」分割线不居中的问题，并补中文等宽 widget 回归。**完成时间**: 2026-07-20
 - [x] T13 学习任务页接入 AI 助手入口：抽出共享按钮 `SentenceChatButton`（`lib/features/chatbot/widgets/sentence_chat_button.dart`，显隐开关 + ChatbotConfig 组装单一来源），句子详情页改用共享组件；逐句精听 / 难句跟读 / 难句复习 / 收藏复习 4 个句子级页面 AppBar 挂入口，打开前复用各页设置按钮的「暂停自动推进」逻辑；同句跨页面复用同一会话。全文盲听 / 段落复述维持现状（讲解走句子详情页）。**完成时间**: 2026-07-23
 - [x] T14 流式中后端 401（token 过期/服务端判未登录）→ 气泡 inline 登录引导：新增 `ChatMessageStatus.authRequired`，`_mapRunError` 识别 `ChatAuthRequiredException`，气泡 inline「需要登录」入口（onSignIn → ensureSignedInForAction，对齐 quotaBlocked 模式）；发送前未登录仍走既有 gate banner。同时修正 `chatbot_flags.dart` 过期注释（后端端点 2026-07-21 已上线，`kChatbotEnabled=true` 为有意发布态）。**完成时间**: 2026-07-23
+- [x] T15 学习计划页复习轮次标题左侧图标改为固定 SVG：新增通用 `assets/icon/refresh.svg`（来自 `readable-svg-icons/icons/refresh.svg`），替换 `LearningPlanScreen` 中的 `🔁` emoji，避免不同平台 emoji 字体渲染成蓝色圆角方块；图标颜色跟随轮次状态（完成绿、当前正文色、未来弱化）；完成态 `✅` emoji 改为 `assets/icon/check-circle-3.svg`，当前到期态 `📖` emoji 改为 `assets/icon/calendar-2.svg`，锁定态 `🔒` emoji 改为 `assets/icon/lock.svg`；「立即解锁」按钮新增 `assets/icon/unlock.svg`；补充 widget 回归断言。**完成时间**: 2026-07-23
 
 ### P1
 
@@ -120,6 +121,9 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-23：学习计划页首次学习图标替换。首次学习阶段标题左侧图标从 `🌱` emoji 改为固定资源 `assets/icon/book.svg`，并将该 SVG 纳入运行时 assets，避免平台 emoji 渲染差异；补充 widget 回归断言确认页面使用 book SVG 且不再渲染叶子 emoji。**完成时间**: 2026-07-23 20:36
+- [x] 2026-07-23：学习计划页阶段标题行对齐优化。首次学习与复习轮次标题行改用共享列布局，固定标题、状态图标、状态文案、进度计数和展开箭头列，解决有无完成时间/待复习文案时各列上下不齐的问题；`stepProgress` 中英文文案去掉“完成 / completed”后缀，仅显示 `x/y`；补充中文布局列对齐和文案回归测试。**完成时间**: 2026-07-23
+- [x] 2026-07-23：学习计划页复习轮次「立即解锁」。锁定中的当前复习轮标题下显示「立即解锁」按钮（免费、一键直接解锁），让用户按自己的节奏提前复习。实现：`learning_progresses` 新增 `manual_unlock_at` 列（v46→v47 迁移），不篡改 `lastStageCompletedAt`——后续轮次仍按本轮实际完成时间顺延；`LearningProgress.nextReviewAt` 解锁后返回解锁时刻（倒计时文案、学习任务页分类、per-audio 通知调度全部自动跟随，原定提醒被 `_cancelStalePerAudioNotifications` 自动取消），`isReviewReadyAt` 对非空 `manualUnlockAt` 无条件短路（规避时光机时间偏差）；跨 stage 推进（完成/跳过）时清除该字段恢复时间锁；`unlockCurrentReview` 带幂等守卫 + 埋点 `review_unlock_early`；暂停中的音频不显示按钮。测试：迁移 fixture、模型解锁/窗口/copyWith、provider 解锁/guard 放行/跨阶段清除/幂等、计划页按钮显隐与点击解锁 widget 回归。UI 调整（同日）：按钮由 `TextButton.icon` 改为浅主色圆角药丸（仅含「立即解锁」主色字，整体可点），倒计时保留在标题行做纯展示 label，与解锁动作分离避免歧义。**完成时间**: 2026-07-23
 - [x] 2026-07-23：订阅权益 P1-E6/E8——后端权益信号头 + resume 去盲查（plan §6，P1 收官）。**E6**：`authorizeAiUsage` 仅在配额链路本来就查询权益（开关开启且 client 受限）时把 `entitlementActive` 带回，guard 据此下发 `x-entitlement-active: 1|0` 信号头——**零额外查询、不扩大 DB 故障面**，旁路路径不带头（客户端对无头响应零动作）；放行时各计费 AI 路由把头附到流式/JSON 响应，402 直接带头，401/403 不带；客户端 `EntitlementSignalInterceptor`（`createBackendDio` 统一安装）读头转发，controller 比对分歧后 in-flight 去重 refresh，跳过 `/api/entitlements` 自身。信号头用布尔而非原方案 epoch（客户端本就是与当前 state 比对，见 plan §6 偏差说明）。**E8**：`main.dart` resume 改 `refreshIfStale()`（unknown/isStale/超 5 分钟新鲜窗/越过 expiresAt 才回源）。**状态码反应**：sentence AI 客户端把后端 401 映射为 `AiFeatureAuthRequiredException`（登录引导、不重试），402 维持配额异常 + E7。新增拦截器单测、controller E6 分歧/去重与 E8 新鲜窗/越期用例、后端 guard 信号头与 401 用例、translate 路由成功响应头断言；7 个路由测试补 entitlements mock。
 - [x] 2026-07-23：订阅权益 P1-E7——后端配额拒绝触发权益收敛（plan §6 E7，纯客户端）。`SubscriptionController` 新增 `reconcileOnServerQuotaRejection`（本地仍 premium 时才回源对账，free 属正常额度用尽不动作）；经可 override 的 `entitlementQuotaDivergenceHandlerProvider` 注入两个 402 触发点：`SentenceAiNotifier` 新增 `onBackendQuotaRejected` 回调（`_quotaExceptionFor` 确认 402 quota_exceeded 时触发）、转录任务 402 分支直调 handler。新增 controller 收敛/不动作用例、sentence AI 402 触发与非 402 不触发用例、转录 402 信号断言（handler 在转录测试容器默认 no-op，避免实例化真实订阅栈）。
 - [x] 2026-07-23：调整 Remote Config 刷新策略。客户端默认 TTL 改为 24 小时；冷启动首帧后后台 force 刷新一次 remote config，避免 VPN/地区变化被旧缓存挡住；回前台继续按 TTL 节流刷新；进入 Paywall 时后台 force 刷新一次，保证支付相关远程开关尽快更新。补充 remote config controller 与 Paywall widget 回归测试。后端 `/api/v1/client/config` 下发 `ttlSeconds=86400` 需在后端仓库同步调整。

@@ -207,6 +207,10 @@ abstract class Events {
   /// params: stage, subStage, source ∈ {'manual', 'auto'}
   static const retellSkipped = 'retell_skipped';
 
+  /// 手动提前解锁当前复习轮（学习计划页「立即解锁」按钮）
+  /// params: audioId, stage
+  static const reviewUnlockEarly = 'review_unlock_early';
+
   // ── Onboarding 问卷（首启 2 题，只采集不消费） ──
   /// 进入问卷页
   static const onboardingSurveyShown = 'onboarding_survey_shown';

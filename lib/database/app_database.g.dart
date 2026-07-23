@@ -4469,6 +4469,18 @@ class $LearningProgressesTable extends LearningProgresses
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _manualUnlockAtMeta = const VerificationMeta(
+    'manualUnlockAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> manualUnlockAt =
+      GeneratedColumn<DateTime>(
+        'manual_unlock_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _planVersionsJsonMeta = const VerificationMeta(
     'planVersionsJson',
   );
@@ -4511,6 +4523,7 @@ class $LearningProgressesTable extends LearningProgresses
     updatedAt,
     skippedSubStages,
     isPaused,
+    manualUnlockAt,
     planVersionsJson,
   ];
   @override
@@ -4772,6 +4785,15 @@ class $LearningProgressesTable extends LearningProgresses
         isPaused.isAcceptableOrUnknown(data['is_paused']!, _isPausedMeta),
       );
     }
+    if (data.containsKey('manual_unlock_at')) {
+      context.handle(
+        _manualUnlockAtMeta,
+        manualUnlockAt.isAcceptableOrUnknown(
+          data['manual_unlock_at']!,
+          _manualUnlockAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('plan_versions_json')) {
       context.handle(
         _planVersionsJsonMeta,
@@ -4902,6 +4924,10 @@ class $LearningProgressesTable extends LearningProgresses
         DriftSqlType.bool,
         data['${effectivePrefix}is_paused'],
       )!,
+      manualUnlockAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}manual_unlock_at'],
+      ),
       planVersionsJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}plan_versions_json'],
@@ -5014,6 +5040,13 @@ class LearningProgressesData extends DataClass
   /// 是否暂停学习（true 表示该音频不参与复习调度，可由用户随时恢复）
   final bool isPaused;
 
+  /// 手动解锁当前复习轮的时刻（null = 未手动解锁）
+  ///
+  /// 用户点击「立即解锁」时写入，使当前复习轮跳过时间锁提前可学。
+  /// 不篡改 [lastStageCompletedAt]，后续轮次仍按实际完成时间顺延。
+  /// 跨 stage 推进时必须清除。
+  final DateTime? manualUnlockAt;
+
   /// 每个 [LearningStage] 的 plan 版本快照（dense map，JSON 存储）。
   ///
   /// 格式：JSON object，key = `LearningStage.key`，value = 整数版本号。例：
@@ -5063,6 +5096,7 @@ class LearningProgressesData extends DataClass
     required this.updatedAt,
     required this.skippedSubStages,
     required this.isPaused,
+    this.manualUnlockAt,
     required this.planVersionsJson,
   });
   @override
@@ -5162,6 +5196,9 @@ class LearningProgressesData extends DataClass
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['skipped_sub_stages'] = Variable<String>(skippedSubStages);
     map['is_paused'] = Variable<bool>(isPaused);
+    if (!nullToAbsent || manualUnlockAt != null) {
+      map['manual_unlock_at'] = Variable<DateTime>(manualUnlockAt);
+    }
     map['plan_versions_json'] = Variable<String>(planVersionsJson);
     return map;
   }
@@ -5244,6 +5281,9 @@ class LearningProgressesData extends DataClass
       updatedAt: Value(updatedAt),
       skippedSubStages: Value(skippedSubStages),
       isPaused: Value(isPaused),
+      manualUnlockAt: manualUnlockAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(manualUnlockAt),
       planVersionsJson: Value(planVersionsJson),
     );
   }
@@ -5320,6 +5360,7 @@ class LearningProgressesData extends DataClass
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       skippedSubStages: serializer.fromJson<String>(json['skippedSubStages']),
       isPaused: serializer.fromJson<bool>(json['isPaused']),
+      manualUnlockAt: serializer.fromJson<DateTime?>(json['manualUnlockAt']),
       planVersionsJson: serializer.fromJson<String>(json['planVersionsJson']),
     );
   }
@@ -5385,6 +5426,7 @@ class LearningProgressesData extends DataClass
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'skippedSubStages': serializer.toJson<String>(skippedSubStages),
       'isPaused': serializer.toJson<bool>(isPaused),
+      'manualUnlockAt': serializer.toJson<DateTime?>(manualUnlockAt),
       'planVersionsJson': serializer.toJson<String>(planVersionsJson),
     };
   }
@@ -5418,6 +5460,7 @@ class LearningProgressesData extends DataClass
     DateTime? updatedAt,
     String? skippedSubStages,
     bool? isPaused,
+    Value<DateTime?> manualUnlockAt = const Value.absent(),
     String? planVersionsJson,
   }) => LearningProgressesData(
     audioItemId: audioItemId ?? this.audioItemId,
@@ -5488,6 +5531,9 @@ class LearningProgressesData extends DataClass
     updatedAt: updatedAt ?? this.updatedAt,
     skippedSubStages: skippedSubStages ?? this.skippedSubStages,
     isPaused: isPaused ?? this.isPaused,
+    manualUnlockAt: manualUnlockAt.present
+        ? manualUnlockAt.value
+        : this.manualUnlockAt,
     planVersionsJson: planVersionsJson ?? this.planVersionsJson,
   );
   LearningProgressesData copyWithCompanion(LearningProgressesCompanion data) {
@@ -5577,6 +5623,9 @@ class LearningProgressesData extends DataClass
           ? data.skippedSubStages.value
           : this.skippedSubStages,
       isPaused: data.isPaused.present ? data.isPaused.value : this.isPaused,
+      manualUnlockAt: data.manualUnlockAt.present
+          ? data.manualUnlockAt.value
+          : this.manualUnlockAt,
       planVersionsJson: data.planVersionsJson.present
           ? data.planVersionsJson.value
           : this.planVersionsJson,
@@ -5630,6 +5679,7 @@ class LearningProgressesData extends DataClass
           ..write('updatedAt: $updatedAt, ')
           ..write('skippedSubStages: $skippedSubStages, ')
           ..write('isPaused: $isPaused, ')
+          ..write('manualUnlockAt: $manualUnlockAt, ')
           ..write('planVersionsJson: $planVersionsJson')
           ..write(')'))
         .toString();
@@ -5665,6 +5715,7 @@ class LearningProgressesData extends DataClass
     updatedAt,
     skippedSubStages,
     isPaused,
+    manualUnlockAt,
     planVersionsJson,
   ]);
   @override
@@ -5708,6 +5759,7 @@ class LearningProgressesData extends DataClass
           other.updatedAt == this.updatedAt &&
           other.skippedSubStages == this.skippedSubStages &&
           other.isPaused == this.isPaused &&
+          other.manualUnlockAt == this.manualUnlockAt &&
           other.planVersionsJson == this.planVersionsJson);
 }
 
@@ -5741,6 +5793,7 @@ class LearningProgressesCompanion
   final Value<DateTime> updatedAt;
   final Value<String> skippedSubStages;
   final Value<bool> isPaused;
+  final Value<DateTime?> manualUnlockAt;
   final Value<String> planVersionsJson;
   final Value<int> rowid;
   const LearningProgressesCompanion({
@@ -5772,6 +5825,7 @@ class LearningProgressesCompanion
     this.updatedAt = const Value.absent(),
     this.skippedSubStages = const Value.absent(),
     this.isPaused = const Value.absent(),
+    this.manualUnlockAt = const Value.absent(),
     this.planVersionsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -5804,6 +5858,7 @@ class LearningProgressesCompanion
     required DateTime updatedAt,
     this.skippedSubStages = const Value.absent(),
     this.isPaused = const Value.absent(),
+    this.manualUnlockAt = const Value.absent(),
     this.planVersionsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : audioItemId = Value(audioItemId),
@@ -5837,6 +5892,7 @@ class LearningProgressesCompanion
     Expression<DateTime>? updatedAt,
     Expression<String>? skippedSubStages,
     Expression<bool>? isPaused,
+    Expression<DateTime>? manualUnlockAt,
     Expression<String>? planVersionsJson,
     Expression<int>? rowid,
   }) {
@@ -5892,6 +5948,7 @@ class LearningProgressesCompanion
       if (updatedAt != null) 'updated_at': updatedAt,
       if (skippedSubStages != null) 'skipped_sub_stages': skippedSubStages,
       if (isPaused != null) 'is_paused': isPaused,
+      if (manualUnlockAt != null) 'manual_unlock_at': manualUnlockAt,
       if (planVersionsJson != null) 'plan_versions_json': planVersionsJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -5926,6 +5983,7 @@ class LearningProgressesCompanion
     Value<DateTime>? updatedAt,
     Value<String>? skippedSubStages,
     Value<bool>? isPaused,
+    Value<DateTime?>? manualUnlockAt,
     Value<String>? planVersionsJson,
     Value<int>? rowid,
   }) {
@@ -5976,6 +6034,7 @@ class LearningProgressesCompanion
       updatedAt: updatedAt ?? this.updatedAt,
       skippedSubStages: skippedSubStages ?? this.skippedSubStages,
       isPaused: isPaused ?? this.isPaused,
+      manualUnlockAt: manualUnlockAt ?? this.manualUnlockAt,
       planVersionsJson: planVersionsJson ?? this.planVersionsJson,
       rowid: rowid ?? this.rowid,
     );
@@ -6104,6 +6163,9 @@ class LearningProgressesCompanion
     if (isPaused.present) {
       map['is_paused'] = Variable<bool>(isPaused.value);
     }
+    if (manualUnlockAt.present) {
+      map['manual_unlock_at'] = Variable<DateTime>(manualUnlockAt.value);
+    }
     if (planVersionsJson.present) {
       map['plan_versions_json'] = Variable<String>(planVersionsJson.value);
     }
@@ -6160,6 +6222,7 @@ class LearningProgressesCompanion
           ..write('updatedAt: $updatedAt, ')
           ..write('skippedSubStages: $skippedSubStages, ')
           ..write('isPaused: $isPaused, ')
+          ..write('manualUnlockAt: $manualUnlockAt, ')
           ..write('planVersionsJson: $planVersionsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -15241,6 +15304,7 @@ typedef $$LearningProgressesTableCreateCompanionBuilder =
       required DateTime updatedAt,
       Value<String> skippedSubStages,
       Value<bool> isPaused,
+      Value<DateTime?> manualUnlockAt,
       Value<String> planVersionsJson,
       Value<int> rowid,
     });
@@ -15274,6 +15338,7 @@ typedef $$LearningProgressesTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<String> skippedSubStages,
       Value<bool> isPaused,
+      Value<DateTime?> manualUnlockAt,
       Value<String> planVersionsJson,
       Value<int> rowid,
     });
@@ -15461,6 +15526,11 @@ class $$LearningProgressesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<DateTime> get manualUnlockAt => $composableBuilder(
+    column: $table.manualUnlockAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get planVersionsJson => $composableBuilder(
     column: $table.planVersionsJson,
     builder: (column) => ColumnFilters(column),
@@ -15638,6 +15708,11 @@ class $$LearningProgressesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get manualUnlockAt => $composableBuilder(
+    column: $table.manualUnlockAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get planVersionsJson => $composableBuilder(
     column: $table.planVersionsJson,
     builder: (column) => ColumnOrderings(column),
@@ -15811,6 +15886,11 @@ class $$LearningProgressesTableAnnotationComposer
   GeneratedColumn<bool> get isPaused =>
       $composableBuilder(column: $table.isPaused, builder: (column) => column);
 
+  GeneratedColumn<DateTime> get manualUnlockAt => $composableBuilder(
+    column: $table.manualUnlockAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get planVersionsJson => $composableBuilder(
     column: $table.planVersionsJson,
     builder: (column) => column,
@@ -15909,6 +15989,7 @@ class $$LearningProgressesTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<String> skippedSubStages = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
+                Value<DateTime?> manualUnlockAt = const Value.absent(),
                 Value<String> planVersionsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion(
@@ -15943,6 +16024,7 @@ class $$LearningProgressesTableTableManager
                 updatedAt: updatedAt,
                 skippedSubStages: skippedSubStages,
                 isPaused: isPaused,
+                manualUnlockAt: manualUnlockAt,
                 planVersionsJson: planVersionsJson,
                 rowid: rowid,
               ),
@@ -15984,6 +16066,7 @@ class $$LearningProgressesTableTableManager
                 required DateTime updatedAt,
                 Value<String> skippedSubStages = const Value.absent(),
                 Value<bool> isPaused = const Value.absent(),
+                Value<DateTime?> manualUnlockAt = const Value.absent(),
                 Value<String> planVersionsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LearningProgressesCompanion.insert(
@@ -16018,6 +16101,7 @@ class $$LearningProgressesTableTableManager
                 updatedAt: updatedAt,
                 skippedSubStages: skippedSubStages,
                 isPaused: isPaused,
+                manualUnlockAt: manualUnlockAt,
                 planVersionsJson: planVersionsJson,
                 rowid: rowid,
               ),

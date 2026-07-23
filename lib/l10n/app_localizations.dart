@@ -1661,7 +1661,7 @@ abstract class AppLocalizations {
   /// No description provided for @stepProgress.
   ///
   /// In en, this message translates to:
-  /// **'{completed}/{total} completed'**
+  /// **'{completed}/{total}'**
   String stepProgress(int completed, int total);
 
   /// No description provided for @stepBlindListening.
@@ -1789,6 +1789,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlocked'**
   String get reviewUnlocked;
+
+  /// Button on the learning plan page to immediately unlock the locked current review round
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock now'**
+  String get unlockReviewNow;
 
   /// No description provided for @startLearning.
   ///

@@ -75,6 +75,7 @@ import 'package:echo_loop/providers/offline_asr_settings_provider.dart';
 import 'package:echo_loop/providers/repeat_flow/repeat_flow_engine.dart';
 import 'package:echo_loop/providers/settings_provider.dart';
 import 'package:echo_loop/providers/tag_provider.dart';
+import 'package:echo_loop/providers/time_provider.dart';
 import 'package:echo_loop/services/asr/offline_asr_engine.dart';
 import 'package:echo_loop/services/study_time_service.dart';
 
@@ -669,6 +670,21 @@ class FakeLearningProgressNotifier extends LearningProgressNotifier {
       progressMap: newMap,
       completionsByAudio: newCompletions,
     );
+  }
+
+  @override
+  Future<void> unlockCurrentReview(String audioItemId) async {
+    // 与真实实现同守卫，仅省去持久化：写 manualUnlockAt 解除当前轮时间锁。
+    final progress = state.progressMap[audioItemId];
+    if (progress == null || !progress.isInReviewStage) return;
+    if (!progress.isReviewLockedAt(ref.read(nowProvider)())) return;
+    final now = DateTime.now();
+    final newMap = Map<String, LearningProgress>.from(state.progressMap);
+    newMap[audioItemId] = progress.copyWith(
+      manualUnlockAt: now,
+      updatedAt: now,
+    );
+    state = state.copyWith(progressMap: newMap);
   }
 
   @override
