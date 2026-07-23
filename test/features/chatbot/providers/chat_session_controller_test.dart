@@ -236,6 +236,17 @@ void main() {
     expect(trialUsage.consumeCount, 0);
   });
 
+  test('后端 401（token 过期）→ 该条 authRequired（gate 不变）', () async {
+    final api = _ScriptApi(
+      (_) => Stream<ChatTextFrame>.error(const ChatAuthRequiredException()),
+    );
+    final c = await make(api);
+    await ctrl(c).send('hi');
+    expect(st(c).messages.last.status, ChatMessageStatus.authRequired);
+    expect(st(c).gate, ChatGate.none);
+    expect(trialUsage.consumeCount, 0);
+  });
+
   test('流内错误 → 该条 error', () async {
     final api = _ScriptApi(
       (_) => Stream<ChatTextFrame>.error(const ChatStreamException()),

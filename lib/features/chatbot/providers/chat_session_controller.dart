@@ -22,6 +22,7 @@ import '../../subscription/providers/subscription_controller.dart';
 import '../models/chat_message.dart';
 import '../models/chat_role.dart';
 import '../models/chatbot_config.dart';
+import '../services/chat_api_client.dart' show ChatAuthRequiredException;
 import '../state/chat_session_state.dart';
 import 'chat_api_client_provider.dart';
 
@@ -238,13 +239,18 @@ class ChatSessionController extends _$ChatSessionController {
   /// 异常 → 该条 assistant 消息的终态（气泡 inline 表达，不设会话级错误）。
   /// - DioException(cancel)（用户停止）→ done，保留已生成部分；
   /// - DioException(402)（额度权威判定）→ quotaBlocked（气泡 inline 升级入口）；
-  /// - ChatAuthRequiredException(401) / ChatStreamException / 其余 → error。
+  /// - ChatAuthRequiredException(401，token 过期/服务端判未登录)→ authRequired
+  ///   （气泡 inline 登录引导）；
+  /// - ChatStreamException / 其余 → error。
   ChatMessageStatus _mapRunError(Object e) {
     if (e is DioException && e.type == DioExceptionType.cancel) {
       return ChatMessageStatus.done;
     }
     if (e is DioException && e.response?.statusCode == 402) {
       return ChatMessageStatus.quotaBlocked;
+    }
+    if (e is ChatAuthRequiredException) {
+      return ChatMessageStatus.authRequired;
     }
     return ChatMessageStatus.error;
   }

@@ -12,7 +12,8 @@ import 'chat_role.dart';
 /// - [done]：已完成（user 消息发出即 done；assistant 收到 done 帧或被用户主动停止后）。
 /// - [error]：生成失败（网络 / 服务端 / 流内错误 / 异常断流），气泡 inline 重试。
 /// - [quotaBlocked]：额度超限（后端 402），气泡 inline 升级入口。
-enum ChatMessageStatus { streaming, done, error, quotaBlocked }
+/// - [authRequired]：登录态缺失/失效（后端 401，如 token 过期），气泡 inline 登录引导。
+enum ChatMessageStatus { streaming, done, error, quotaBlocked, authRequired }
 
 /// 不可变消息模型。Model 不依赖 State。
 @immutable

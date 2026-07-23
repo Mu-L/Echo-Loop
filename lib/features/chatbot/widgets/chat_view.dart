@@ -81,6 +81,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
               config: config,
               onRetry: (_) => notifier.retry(),
               onUpgrade: () => openPaywall(context, ref),
+              onSignIn: () => _signIn(context, ref, l10n, notifier),
               onCopy: (content) => _copy(context, l10n, content),
               onEdit: (messageId) => _handleEdit(notifier, messageId),
               onRegenerate: (messageId) => notifier.regenerate(messageId),

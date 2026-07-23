@@ -1,12 +1,13 @@
 /// 通用 Chatbot 组件的编译期开关。
 ///
-/// 后端流式聊天端点尚未上线，若无开关，一旦合入线上用户就会看到一个每次必失败的
-/// AI 入口。组件与测试照常合入，后端就绪后翻开关即可。
+/// 编译期开关保留硬停能力；运行期全球显隐由 remote config
+/// （RemoteFeature.aiChatAssistant）控制。
 library;
 
-/// 是否对用户暴露 chatbot 入口（句子讲解页 AppBar AI 按钮等）。
+/// 是否对用户暴露 chatbot 入口（句子讲解页 / 学习任务页 AppBar AI 按钮等）。
 ///
-/// 默认 **false**：后端端点未就绪前不上线。后端就绪后改 true 发布。
+/// 当前 **true**：后端流式端点已上线（2026-07-21 起走真实后端）。
+/// 如需全平台紧急下线改回 false；仅运行期隐藏用 remote config。
 const bool kChatbotEnabled = true;
 
 /// 是否使用 debug 假流实现（[FakeChatApiClient]）替代真实网络客户端。

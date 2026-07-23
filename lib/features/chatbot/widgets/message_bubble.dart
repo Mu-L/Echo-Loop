@@ -25,6 +25,7 @@ const String _iconQuote = 'assets/icon/chat/arrow-right-turn.svg';
 /// - streaming 且 content 为空 → 显示「思考中」动画指示（三点跳动）；
 /// - error → 气泡内 inline 重试入口（onRetry）；
 /// - quotaBlocked → 气泡内 inline 升级入口（onUpgrade → openPaywall）；
+/// - authRequired → 气泡内 inline 登录入口（onSignIn → 登录引导弹窗）；
 /// - assistant done 态气泡下方常驻操作栏：复制 + 重新生成（左下）；
 /// - user 消息无常驻操作栏，长按（桌面右键）弹菜单：复制 + 编辑（编辑打开独立编辑页）；
 ///   带追问引用时气泡上方显示「↳ + 灰字」引用行；
@@ -38,6 +39,7 @@ class ChatMessageBubble extends StatelessWidget {
     required this.message,
     this.onRetry,
     this.onUpgrade,
+    this.onSignIn,
     this.onCopy,
     this.onEdit,
     this.onRegenerate,
@@ -47,6 +49,7 @@ class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback? onRetry; // 仅 error 态用
   final VoidCallback? onUpgrade; // 仅 quotaBlocked 态用
+  final VoidCallback? onSignIn; // 仅 authRequired 态用
   final void Function(String content)? onCopy;
   final VoidCallback? onEdit; // 仅 user done 态用
   final VoidCallback? onRegenerate; // 仅 assistant done 态用
@@ -243,11 +246,18 @@ class ChatMessageBubble extends StatelessWidget {
             label: AppLocalizations.of(context)!.chatUpgrade,
             onTap: onUpgrade,
           ),
+        if (message.status == ChatMessageStatus.authRequired)
+          _inlineAction(
+            context,
+            icon: Icons.lock_outline,
+            label: AppLocalizations.of(context)!.chatSignInTitle,
+            onTap: onSignIn,
+          ),
       ],
     );
   }
 
-  /// 气泡内 inline 操作按钮（重试 / 升级）。
+  /// 气泡内 inline 操作按钮（重试 / 升级 / 登录）。
   Widget _inlineAction(
     BuildContext context, {
     required IconData icon,

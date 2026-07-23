@@ -37,6 +37,7 @@ class ChatMessageList extends ConsumerStatefulWidget {
     required this.config,
     this.onRetry,
     this.onUpgrade,
+    this.onSignIn,
     this.onCopy,
     this.onEdit,
     this.onRegenerate,
@@ -46,6 +47,7 @@ class ChatMessageList extends ConsumerStatefulWidget {
   final ChatbotConfig config;
   final void Function(String messageId)? onRetry;
   final VoidCallback? onUpgrade;
+  final VoidCallback? onSignIn;
   final void Function(String content)? onCopy;
   final void Function(String messageId)? onEdit;
   final void Function(String messageId)? onRegenerate;
@@ -289,6 +291,7 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
       messageId: id,
       onRetry: widget.onRetry,
       onUpgrade: widget.onUpgrade,
+      onSignIn: widget.onSignIn,
       onCopy: widget.onCopy,
       onEdit: widget.onEdit,
       onRegenerate: widget.onRegenerate,
@@ -312,6 +315,7 @@ class _MessageRow extends ConsumerWidget {
     required this.messageId,
     this.onRetry,
     this.onUpgrade,
+    this.onSignIn,
     this.onCopy,
     this.onEdit,
     this.onRegenerate,
@@ -322,6 +326,7 @@ class _MessageRow extends ConsumerWidget {
   final String messageId;
   final void Function(String messageId)? onRetry;
   final VoidCallback? onUpgrade;
+  final VoidCallback? onSignIn;
   final void Function(String content)? onCopy;
   final void Function(String messageId)? onEdit;
   final void Function(String messageId)? onRegenerate;
@@ -342,6 +347,7 @@ class _MessageRow extends ConsumerWidget {
       message: message,
       onRetry: onRetry == null ? null : () => onRetry!(messageId),
       onUpgrade: onUpgrade,
+      onSignIn: onSignIn,
       onCopy: onCopy,
       onEdit: onEdit == null ? null : () => onEdit!(messageId),
       onRegenerate: onRegenerate == null

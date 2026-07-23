@@ -9,7 +9,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../analytics/analytics_providers.dart';
 import '../analytics/audio_event_params.dart';
@@ -17,11 +16,7 @@ import '../analytics/models/event_names.dart';
 import '../features/usage/usage_event.dart';
 import '../features/usage/usage_providers.dart';
 import '../database/providers.dart';
-import '../features/chatbot/chatbot_flags.dart';
-import '../features/chatbot/chatbot_sheet.dart';
-import '../features/chatbot/models/chatbot_config.dart';
-import '../features/remote_config/remote_config.dart';
-import '../features/remote_config/remote_config_providers.dart';
+import '../features/chatbot/widgets/sentence_chat_button.dart';
 import '../l10n/app_localizations.dart';
 import '../models/audio_item.dart' as model;
 import '../models/sentence.dart';
@@ -64,15 +59,6 @@ class SentenceDetailArgs {
     required this.startTimeMs,
     required this.endTimeMs,
   });
-}
-
-/// AI 聊天入口显示规则：编译期开关负责硬停，远程开关负责运行期全球隐藏。
-@visibleForTesting
-bool shouldShowAiChatAssistantEntry({
-  required bool chatbotEnabled,
-  required bool remoteEnabled,
-}) {
-  return chatbotEnabled && remoteEnabled;
 }
 
 /// 句子详情页面
@@ -273,12 +259,6 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final args = widget.args;
-    final showAiChatAssistant = shouldShowAiChatAssistantEntry(
-      chatbotEnabled: kChatbotEnabled,
-      remoteEnabled: ref.watch(
-        remoteFeatureEnabledProvider(RemoteFeature.aiChatAssistant),
-      ),
-    );
 
     final durationMs = args.endTimeMs - args.startTimeMs;
     final durationSec = durationMs / 1000;
@@ -290,39 +270,7 @@ class _SentenceDetailScreenState extends ConsumerState<SentenceDetailScreen> {
       appBar: AppBar(
         title: Text(args.audioName),
         centerTitle: true,
-        // 发布开关：编译期开关保留硬停能力，remote config 支持全球动态隐藏入口。
-        actions: [
-          if (showAiChatAssistant)
-            // 右侧留白：让 action 按钮不贴屏幕右缘，与左侧返回箭头边距对称。
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                // 渐变多色图标，保留原始配色不做 colorFilter 染色。
-                // SVG 图案铺满 viewBox（无自带留白），渲染到 20px 使可见footprint
-                // 与返回箭头等大，左右视觉边距对称。
-                icon: SvgPicture.asset(
-                  'assets/icon/chat/use-ai-chat.svg',
-                  width: 24,
-                  height: 24,
-                ),
-                tooltip: l10n.chatOpenTooltip,
-                onPressed: () => showChatbotSheet(
-                  context: context,
-                  config: ChatbotConfig(
-                    // 会话按句子内容归属：相同句子无论出现在哪都复用同一会话
-                    // （context 只传 sentenceText，位置无关）。用完整 text 而非
-                    // hashCode，避免 hash 碰撞导致不同句子串会话；sessionId 仅内存 key，长度无妨。
-                    sessionId: 'sentence:${args.sentenceText}',
-                    endpoint: '/api/v1/stream/chat/sentence',
-                    context: {'sentence': args.sentenceText},
-                    title: l10n.chatSentenceTitle,
-                    inputPlaceholder: l10n.chatInputPlaceholder,
-                    contextSummary: args.sentenceText,
-                  ),
-                ),
-              ),
-            ),
-        ],
+        actions: [SentenceChatButton(sentenceText: args.sentenceText)],
       ),
       // 词典面板宿主：面板内嵌 body、非 modal（显示期间正文可继续点词）。
       // 页面自身无 PopScope，由宿主代管返回键（面板开着时先关面板）。

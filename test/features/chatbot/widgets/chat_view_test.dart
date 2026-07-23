@@ -220,7 +220,8 @@ void main() {
         .text('继续解释')
         .evaluate()
         .map(
-          (e) => (e.renderObject! as RenderBox).localToGlobal(Offset.zero).dy -
+          (e) =>
+              (e.renderObject! as RenderBox).localToGlobal(Offset.zero).dy -
               listTop,
         )
         .any((d) => d >= -1 && d <= 80);

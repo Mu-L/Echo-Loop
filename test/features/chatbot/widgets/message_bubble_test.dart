@@ -91,6 +91,21 @@ void main() {
     expect(upgraded, isTrue);
   });
 
+  testWidgets('authRequired 态显示 inline 登录并回调', (tester) async {
+    var signedIn = false;
+    await pumpChatWidget(
+      tester,
+      ChatMessageBubble(
+        message: msg(content: '登录', status: ChatMessageStatus.authRequired),
+        onSignIn: () => signedIn = true,
+      ),
+    );
+    final signIn = find.text('Sign in required');
+    expect(signIn, findsOneWidget);
+    await tester.tap(signIn);
+    expect(signedIn, isTrue);
+  });
+
   testWidgets(
     'assistant 内容渲染为可选中 markdown（SelectionArea → SelectableRegion）',
     (tester) async {

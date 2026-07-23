@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-21（合集列表显示相对更新时间）
+> 最后更新：2026-07-23（学习任务页接入 AI 助手入口）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -37,6 +37,8 @@
   - 已完成（步骤 2 · 操作条）：`SelectableAssistantMarkdown` 用 `contextMenuBuilder` 在选区上方弹出「复制 / 问 AI」气泡；抽出可复用组件 `SelectionToolbar`（横向 `CupertinoTextSelectionToolbar` 胶囊，三端一致，非 macOS 纵向下拉）；`SelectionToolbar.anchorsForSelection` 始终按选区几何算锚点（修右键弹在鼠标处），并收紧气泡与文字间隔（`_kAnchorInset`）；问 AI 接回 `onFollowUp` 链路。**完成时间**: 2026-07-20
   - 已确认（平台默认行为）：移动端按 Flutter 原生长按/拖拽结束弹出；桌面端回到 Flutter 默认交互，仅右键/上下文菜单触发同一套 `SelectionToolbar`，不做选区完成自动弹出；同时打开 `kChatbotUseFakeApi` 方便本地假流数据验收。**确认时间**: 2026-07-20
   - 已完成（步骤 4 · 气泡按钮等宽）：`SelectionToolbar` 按最长本地化文案统一按钮宽度，修复中文「复制 / 问 AI」分割线不居中的问题，并补中文等宽 widget 回归。**完成时间**: 2026-07-20
+- [x] T13 学习任务页接入 AI 助手入口：抽出共享按钮 `SentenceChatButton`（`lib/features/chatbot/widgets/sentence_chat_button.dart`，显隐开关 + ChatbotConfig 组装单一来源），句子详情页改用共享组件；逐句精听 / 难句跟读 / 难句复习 / 收藏复习 4 个句子级页面 AppBar 挂入口，打开前复用各页设置按钮的「暂停自动推进」逻辑；同句跨页面复用同一会话。全文盲听 / 段落复述维持现状（讲解走句子详情页）。**完成时间**: 2026-07-23
+- [x] T14 流式中后端 401（token 过期/服务端判未登录）→ 气泡 inline 登录引导：新增 `ChatMessageStatus.authRequired`，`_mapRunError` 识别 `ChatAuthRequiredException`，气泡 inline「需要登录」入口（onSignIn → ensureSignedInForAction，对齐 quotaBlocked 模式）；发送前未登录仍走既有 gate banner。同时修正 `chatbot_flags.dart` 过期注释（后端端点 2026-07-21 已上线，`kChatbotEnabled=true` 为有意发布态）。**完成时间**: 2026-07-23
 
 ### P1
 
