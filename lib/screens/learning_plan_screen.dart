@@ -84,7 +84,7 @@ const String _lockIconAsset = 'assets/icon/lock.svg';
 const String _unlockIconAsset = 'assets/icon/unlock.svg';
 
 /// 学习计划首次学习标题左侧图标。
-const String _bookIconAsset = 'assets/icon/book.svg';
+const String _readingIconAsset = 'assets/icon/reading.svg';
 
 /// 学习计划阶段标题行标题列宽。
 ///
@@ -2245,7 +2245,11 @@ class _FirstStudySection extends ConsumerWidget {
         // 标题行（可点击展开/折叠）
         _StageHeaderRow(
           keyPrefix: 'learning_plan_stage_first_learn',
-          leadingIcon: SvgPicture.asset(_bookIconAsset, width: 20, height: 20),
+          leadingIcon: SvgPicture.asset(
+            _readingIconAsset,
+            width: 20,
+            height: 20,
+          ),
           title: l10n.firstStudy,
           titleColor: isFirstLearnCompleted ? Colors.green : null,
           statusIcon: isFirstLearnCompleted

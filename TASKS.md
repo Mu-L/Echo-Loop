@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-23（学习计划页首次学习图标替换）
+> 最后更新：2026-07-23（设置页图标视觉尺寸收口）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -40,6 +40,7 @@
 - [x] T13 学习任务页接入 AI 助手入口：抽出共享按钮 `SentenceChatButton`（`lib/features/chatbot/widgets/sentence_chat_button.dart`，显隐开关 + ChatbotConfig 组装单一来源），句子详情页改用共享组件；逐句精听 / 难句跟读 / 难句复习 / 收藏复习 4 个句子级页面 AppBar 挂入口，打开前复用各页设置按钮的「暂停自动推进」逻辑；同句跨页面复用同一会话。全文盲听 / 段落复述维持现状（讲解走句子详情页）。**完成时间**: 2026-07-23
 - [x] T14 流式中后端 401（token 过期/服务端判未登录）→ 气泡 inline 登录引导：新增 `ChatMessageStatus.authRequired`，`_mapRunError` 识别 `ChatAuthRequiredException`，气泡 inline「需要登录」入口（onSignIn → ensureSignedInForAction，对齐 quotaBlocked 模式）；发送前未登录仍走既有 gate banner。同时修正 `chatbot_flags.dart` 过期注释（后端端点 2026-07-21 已上线，`kChatbotEnabled=true` 为有意发布态）。**完成时间**: 2026-07-23
 - [x] T15 学习计划页复习轮次标题左侧图标改为固定 SVG：新增通用 `assets/icon/refresh.svg`（来自 `readable-svg-icons/icons/refresh.svg`），替换 `LearningPlanScreen` 中的 `🔁` emoji，避免不同平台 emoji 字体渲染成蓝色圆角方块；图标颜色跟随轮次状态（完成绿、当前正文色、未来弱化）；完成态 `✅` emoji 改为 `assets/icon/check-circle-3.svg`，当前到期态 `📖` emoji 改为 `assets/icon/calendar-2.svg`，锁定态 `🔒` emoji 改为 `assets/icon/lock.svg`；「立即解锁」按钮新增 `assets/icon/unlock.svg`；补充 widget 回归断言。**完成时间**: 2026-07-23
+- [x] 2026-07-23 22:19：设置页 SVG viewBox 规范化。将设置页实际使用的 18 个 SVG 根 `viewBox` 统一为 `0 0 24 24`，并通过 `transform` 映射旧坐标系，避免 Flutter 外层 26x26 绘制时因资源坐标系差异导致视觉尺寸不一致；补充设置页测试断言所有设置页 SVG 图标均声明 `width="24"`、`height="24"`、`viewBox="0 0 24 24"`、根属性不重复且不再包含内联样式块；补跑 `xmllint` 确认 SVG XML 可解析。
 
 ### P1
 
@@ -121,6 +122,11 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-23：设置页图标视觉尺寸收口。将设置页偏满框的 `refresh.svg`、`lock.svg`、`group.svg`、`trash-bin.svg`、`diskette.svg`、`play-pause.svg` 在 SVG 资源内部增加居中视觉缩放，并补齐 `trash-bin.svg` / `diskette.svg` 的 24x24 根尺寸规范；设置页 leading 保持 32px 占位和 26px SVG 绘制，GitHub 品牌图标单独收紧到 20px；补充设置页回归测试断言资源级缩放与渲染尺寸。**完成时间**: 2026-07-23 22:55
+- [x] 2026-07-23：学习任务 Tab 分组图标替换。将学习任务列表中“待复习”分组标题的 `🔁` emoji 改为固定资源 `assets/icon/refresh.svg`，“首次学习”分组标题的 `🌱` emoji 改为用户指定的 `assets/icon/reading.svg`，复用运行时 assets；补充 StudyScreen widget 回归断言确认旧 emoji 不再渲染且两个 SVG 均出现。**完成时间**: 2026-07-23 22:39
+- [x] 2026-07-23：学习计划页首次学习图标改用 reading.svg。将首次学习阶段标题左侧图标从 `assets/icon/book.svg` 改为用户指定的 `assets/icon/reading.svg`，并将该 SVG 纳入运行时 assets；更新 widget 回归断言确认页面使用 reading SVG 且不再渲染叶子 emoji。**完成时间**: 2026-07-23 22:35
+- [x] 2026-07-23：设置页列表图标 SVG 替换。将设置页普通用户可见分组中的 emoji leading 图标替换为固定 SVG 资源：账户（`assets/icon/account-1.svg`）、会员与订阅、主题、界面语言、母语、复习提醒、学习设置、语音识别、语音合成、播放设置、词典设置（按要求使用 `assets/icon/locale-1.svg`）、备份与恢复、清空缓存、检查更新、服务条款、隐私政策、写反馈、加入社区；评价入口暂用 Material star 图标。新增 `_settingsSvgIcon` / `_settingsMaterialIcon` 统一尺寸约束，并将运行时所需 SVG 加入 `pubspec.yaml`；`book-shelf.svg` 改为 inline style 以避免 flutter_svg 忽略 `<style>`；补充设置页 widget 回归断言。**完成时间**: 2026-07-23 21:39
+- [x] 2026-07-23：主题设置图标替换。主题设置弹窗中的跟随系统、浅色模式、深色模式图标从 emoji 改为 Material 图标 `Icons.brightness_auto_rounded`、`Icons.light_mode_rounded`、`Icons.dark_mode_rounded`，保留原有选择状态和埋点逻辑；补充设置页 widget 回归断言确认新图标存在且旧 emoji 不再渲染。**完成时间**: 2026-07-23 20:47
 - [x] 2026-07-23：学习计划页首次学习图标替换。首次学习阶段标题左侧图标从 `🌱` emoji 改为固定资源 `assets/icon/book.svg`，并将该 SVG 纳入运行时 assets，避免平台 emoji 渲染差异；补充 widget 回归断言确认页面使用 book SVG 且不再渲染叶子 emoji。**完成时间**: 2026-07-23 20:36
 - [x] 2026-07-23：学习计划页阶段标题行对齐优化。首次学习与复习轮次标题行改用共享列布局，固定标题、状态图标、状态文案、进度计数和展开箭头列，解决有无完成时间/待复习文案时各列上下不齐的问题；`stepProgress` 中英文文案去掉“完成 / completed”后缀，仅显示 `x/y`；补充中文布局列对齐和文案回归测试。**完成时间**: 2026-07-23
 - [x] 2026-07-23：学习计划页复习轮次「立即解锁」。锁定中的当前复习轮标题下显示「立即解锁」按钮（免费、一键直接解锁），让用户按自己的节奏提前复习。实现：`learning_progresses` 新增 `manual_unlock_at` 列（v46→v47 迁移），不篡改 `lastStageCompletedAt`——后续轮次仍按本轮实际完成时间顺延；`LearningProgress.nextReviewAt` 解锁后返回解锁时刻（倒计时文案、学习任务页分类、per-audio 通知调度全部自动跟随，原定提醒被 `_cancelStalePerAudioNotifications` 自动取消），`isReviewReadyAt` 对非空 `manualUnlockAt` 无条件短路（规避时光机时间偏差）；跨 stage 推进（完成/跳过）时清除该字段恢复时间锁；`unlockCurrentReview` 带幂等守卫 + 埋点 `review_unlock_early`；暂停中的音频不显示按钮。测试：迁移 fixture、模型解锁/窗口/copyWith、provider 解锁/guard 放行/跨阶段清除/幂等、计划页按钮显隐与点击解锁 widget 回归。UI 调整（同日）：按钮由 `TextButton.icon` 改为浅主色圆角药丸（仅含「立即解锁」主色字，整体可点），倒计时保留在标题行做纯展示 label，与解锁动作分离避免歧义。**完成时间**: 2026-07-23

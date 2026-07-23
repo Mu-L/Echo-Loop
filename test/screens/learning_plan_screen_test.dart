@@ -318,7 +318,7 @@ void main() {
       expect(svg, contains('M3.582 10A6.42'));
     });
 
-    testWidgets('首次学习左侧图标使用固定 book SVG', (tester) async {
+    testWidgets('首次学习左侧图标使用固定 reading SVG', (tester) async {
       await tester.pumpWidget(createTestWidget(locale: const Locale('zh')));
       await tester.pumpAndSettle();
 
@@ -329,13 +329,13 @@ void main() {
               widget is SvgPicture &&
               widget.bytesLoader is SvgAssetLoader &&
               (widget.bytesLoader as SvgAssetLoader).assetName ==
-                  'assets/icon/book.svg',
+                  'assets/icon/reading.svg',
         ),
         findsOneWidget,
       );
 
-      final svg = await rootBundle.loadString('assets/icon/book.svg');
-      expect(svg, contains('viewBox="0 0 24 24"'));
+      final svg = await rootBundle.loadString('assets/icon/reading.svg');
+      expect(svg, contains('viewBox="0 0 1024 1024"'));
     });
 
     testWidgets('当前到期轮次使用固定 calendar SVG，避免 emoji 跨平台差异', (tester) async {

@@ -162,12 +162,29 @@ flutter:
     # ic_stat_logo 仅作 Android 通知图标源文件）不进包；订阅页透明底品牌图单独显式打包。
     - assets/icon/app-icon-1024.png
     - assets/icon/app-icon-1024-alpha.png
+    - assets/icon/artist-palette.svg
     - assets/icon/baidu-netdisk.svg
+    - assets/icon/bell.svg
     - assets/icon/book.svg
+    - assets/icon/book-shelf.svg
+    - assets/icon/reading.svg
     - assets/icon/refresh.svg
     - assets/icon/check-circle-3.svg
     - assets/icon/calendar-2.svg
+    - assets/icon/diamond.svg
+    - assets/icon/diskette.svg
+    - assets/icon/documents.svg
+    - assets/icon/feedback.svg
+    - assets/icon/group.svg
+    - assets/icon/locale-1.svg
+    - assets/icon/locale.svg
     - assets/icon/lock.svg
+    - assets/icon/microphone.svg
+    - assets/icon/account-1.svg
+    - assets/icon/play-pause.svg
+    - assets/icon/speak.svg
+    - assets/icon/speaker.svg
+    - assets/icon/trash-bin.svg
     - assets/icon/unlock.svg
     # PDF 导出品牌角标（96px 小图，1024 原图 190KB 直接嵌会撑大每份 PDF）
     - assets/icon/app-icon-96.png
