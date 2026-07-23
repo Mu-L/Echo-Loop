@@ -1,6 +1,6 @@
 # Echo Loop 任务清单
 
-> 最后更新：2026-07-23（设置页图标视觉尺寸收口）
+> 最后更新：2026-07-23（版本号升级到 1.0.27）
 > 当前焦点：Android 结束录音闪退（离线 ASR / Silero VAD）——仍未解决
 
 ## 当前优先级
@@ -122,6 +122,7 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-23：版本号升级到 `1.0.27`。**完成时间**: 2026-07-23 23:13
 - [x] 2026-07-23：设置页图标视觉尺寸收口。将设置页偏满框的 `refresh.svg`、`lock.svg`、`group.svg`、`trash-bin.svg`、`diskette.svg`、`play-pause.svg` 在 SVG 资源内部增加居中视觉缩放，并补齐 `trash-bin.svg` / `diskette.svg` 的 24x24 根尺寸规范；设置页 leading 保持 32px 占位和 26px SVG 绘制，GitHub 品牌图标单独收紧到 20px；补充设置页回归测试断言资源级缩放与渲染尺寸。**完成时间**: 2026-07-23 22:55
 - [x] 2026-07-23：学习任务 Tab 分组图标替换。将学习任务列表中“待复习”分组标题的 `🔁` emoji 改为固定资源 `assets/icon/refresh.svg`，“首次学习”分组标题的 `🌱` emoji 改为用户指定的 `assets/icon/reading.svg`，复用运行时 assets；补充 StudyScreen widget 回归断言确认旧 emoji 不再渲染且两个 SVG 均出现。**完成时间**: 2026-07-23 22:39
 - [x] 2026-07-23：学习计划页首次学习图标改用 reading.svg。将首次学习阶段标题左侧图标从 `assets/icon/book.svg` 改为用户指定的 `assets/icon/reading.svg`，并将该 SVG 纳入运行时 assets；更新 widget 回归断言确认页面使用 reading SVG 且不再渲染叶子 emoji。**完成时间**: 2026-07-23 22:35
