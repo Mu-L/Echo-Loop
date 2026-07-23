@@ -122,6 +122,8 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-23：修复 GitHub Actions run 30021852357 的 Podcast 详情失败态测试断言。`podcast 合集强刷失败后详情弹窗展示刷新失败状态和时间` 现在断言详情弹窗不显示成功刷新文案，并正向验证失败状态 `Failed · 2026-06-15 11:22`。**完成时间**: 2026-07-23 23:59
+- [x] 2026-07-23：收口两个预期异常测试的控制台噪声。`ManageSubtitlesSheet` 本地字幕上传失败测试与 `LocalTranscriptionTaskManager` 转录异常测试保留内存日志断言，但用 zone 截获预期失败路径的 `print` 输出，避免全量测试日志误显错误栈。**完成时间**: 2026-07-23 23:58
 - [x] 2026-07-23：修复 GitHub Actions run 30019650741 的 Podcast 合集详情测试失败。`showPodcastFeedInfoSheet` 现在把列表菜单传入的 `refreshStatusText` 继续透传给 `_InfoSheet`，让刷新失败状态在 Podcast 详情弹窗中显示，恢复 `Podcast 合集刷新失败时列表显示标记且菜单详情展示失败状态` widget 回归。**完成时间**: 2026-07-23 23:33
 - [x] 2026-07-23：版本号升级到 `1.0.27`。**完成时间**: 2026-07-23 23:13
 - [x] 2026-07-23：设置页图标视觉尺寸收口。将设置页偏满框的 `refresh.svg`、`lock.svg`、`group.svg`、`trash-bin.svg`、`diskette.svg`、`play-pause.svg` 在 SVG 资源内部增加居中视觉缩放，并补齐 `trash-bin.svg` / `diskette.svg` 的 24x24 根尺寸规范；设置页 leading 保持 32px 占位和 26px SVG 绘制，GitHub 品牌图标单独收紧到 20px；补充设置页回归测试断言资源级缩放与渲染尺寸。**完成时间**: 2026-07-23 22:55

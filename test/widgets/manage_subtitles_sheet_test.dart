@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -374,10 +375,12 @@ void main() {
         await tester.tap(find.text('Local Upload'));
         await tester.pumpAndSettle();
 
-        await tester.tap(
-          find.widgetWithText(FilledButton, 'Upload Transcript'),
-        );
-        await tester.pump();
+        await runZoned<Future<void>>(() async {
+          await tester.tap(
+            find.widgetWithText(FilledButton, 'Upload Transcript'),
+          );
+          await tester.pump();
+        }, zoneSpecification: ZoneSpecification(print: (_, _, _, _) {}));
 
         expect(find.textContaining(failurePath), findsOneWidget);
         expect(find.textContaining('Operation not permitted'), findsOneWidget);

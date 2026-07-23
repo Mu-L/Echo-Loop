@@ -343,6 +343,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Last refreshed: 2026-06-15 11:22'), findsNothing);
-    expect(find.text('Failed · 2026-06-15 11:22'), findsNothing);
+    expect(find.text('Failed · 2026-06-15 11:22'), findsOneWidget);
   });
 }
