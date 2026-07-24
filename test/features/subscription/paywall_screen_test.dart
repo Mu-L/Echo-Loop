@@ -212,6 +212,7 @@ Widget _harness({
   _SpyRemoteConfigService? remoteConfigService,
   SubscriptionIdentity? identity,
   ThemeMode themeMode = ThemeMode.light,
+  Locale locale = const Locale('en'),
 }) {
   final remoteService = remoteConfigService ?? _SpyRemoteConfigService();
   return ProviderScope(
@@ -247,6 +248,7 @@ Widget _harness({
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: [Locale('en'), Locale('zh')],
+      locale: locale,
       home: const PaywallScreen(),
     ),
   );
@@ -617,6 +619,7 @@ void main() {
     expect(find.text('More AI translation'), findsOneWidget);
     expect(find.text('More AI word explanation'), findsOneWidget);
     expect(find.text('More AI sentence breakdown'), findsOneWidget);
+    expect(find.text('More AI assistant conversations'), findsOneWidget);
     expect(find.text('More AI sentence chunking'), findsOneWidget);
     expect(find.text('Special offer:'), findsNothing);
     expect(find.byKey(const ValueKey('paywall_header_logo')), findsOneWidget);
@@ -637,6 +640,11 @@ void main() {
     );
     expect(
       tester.getTopLeft(find.text('More AI sentence breakdown')).dy <
+          tester.getTopLeft(find.text('More AI assistant conversations')).dy,
+      isTrue,
+    );
+    expect(
+      tester.getTopLeft(find.text('More AI assistant conversations')).dy <
           tester.getTopLeft(find.text('More AI sentence chunking')).dy,
       isTrue,
     );
@@ -677,6 +685,18 @@ void main() {
       find.ancestor(of: find.text('Yearly'), matching: find.byType(ListView)),
       findsNothing,
     );
+  });
+
+  testWidgets('中文 Paywall 权益列表展示更多 AI 助手对话次数', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        state: const EntitlementState.free(),
+        locale: const Locale('zh'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('更多 AI 助手对话次数'), findsOneWidget);
   });
 
   testWidgets('选中月付套餐后 CTA 变为订阅', (tester) async {

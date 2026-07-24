@@ -200,6 +200,12 @@ abstract class AppLocalizations {
   /// **'More AI subtitle transcription'**
   String get premiumBenefitTranscription;
 
+  /// No description provided for @premiumBenefitAiAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'More AI assistant conversations'**
+  String get premiumBenefitAiAssistant;
+
   /// No description provided for @premiumBenefitSenseGroups.
   ///
   /// In en, this message translates to:

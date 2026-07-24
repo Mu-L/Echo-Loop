@@ -60,6 +60,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get premiumBenefitTranscription => '更多 AI 字幕转录';
 
   @override
+  String get premiumBenefitAiAssistant => '更多 AI 助手对话次数';
+
+  @override
   String get premiumBenefitSenseGroups => '更多 AI 句子意群拆分';
 
   @override

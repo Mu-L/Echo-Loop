@@ -62,6 +62,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumBenefitTranscription => 'More AI subtitle transcription';
 
   @override
+  String get premiumBenefitAiAssistant => 'More AI assistant conversations';
+
+  @override
   String get premiumBenefitSenseGroups => 'More AI sentence chunking';
 
   @override

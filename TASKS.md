@@ -122,6 +122,7 @@
 
 ## 最近完成（保留近两周）
 
+- [x] 2026-07-24 10:56：Paywall 权益列表新增 AI 助手对话次数。订阅页权益卡新增 “More AI assistant conversations / 更多 AI 助手对话次数” 文案，未订阅购买态与会员态共用展示；补充英文权益顺序和中文展示 widget 回归测试。**完成时间**: 2026-07-24 10:56
 - [x] 2026-07-23：修复 GitHub Actions run 30021852357 的 Podcast 详情失败态测试断言。`podcast 合集强刷失败后详情弹窗展示刷新失败状态和时间` 现在断言详情弹窗不显示成功刷新文案，并正向验证失败状态 `Failed · 2026-06-15 11:22`。**完成时间**: 2026-07-23 23:59
 - [x] 2026-07-23：收口两个预期异常测试的控制台噪声。`ManageSubtitlesSheet` 本地字幕上传失败测试与 `LocalTranscriptionTaskManager` 转录异常测试保留内存日志断言，但用 zone 截获预期失败路径的 `print` 输出，避免全量测试日志误显错误栈。**完成时间**: 2026-07-23 23:58
 - [x] 2026-07-23：修复 GitHub Actions run 30019650741 的 Podcast 合集详情测试失败。`showPodcastFeedInfoSheet` 现在把列表菜单传入的 `refreshStatusText` 继续透传给 `_InfoSheet`，让刷新失败状态在 Podcast 详情弹窗中显示，恢复 `Podcast 合集刷新失败时列表显示标记且菜单详情展示失败状态` widget 回归。**完成时间**: 2026-07-23 23:33
